@@ -34,6 +34,11 @@ import { PPPoEManagement } from './pages/billing/PPPoEManagement';
 import { HotspotManagement } from './pages/billing/HotspotManagement';
 import { HotspotVouchers } from './pages/billing/HotspotVouchers';
 import { NetworkServices } from './pages/billing/NetworkServices';
+import { RadiusManagement } from './pages/billing/RadiusManagement';
+import { TicketSystem } from './pages/billing/TicketSystem';
+import { CaptivePortalBuilder } from './pages/billing/CaptivePortalBuilder';
+import { BandwidthGraphs } from './pages/billing/BandwidthGraphs';
+import { ResellerPortal } from './pages/billing/ResellerPortal';
 
 function App() {
   return (
@@ -73,6 +78,11 @@ function App() {
           <Route path="/hotspot" element={<HotspotManagement />} />
           <Route path="/hotspot-vouchers" element={<HotspotVouchers />} />
           <Route path="/network-services" element={<NetworkServices />} />
+          <Route path="/radius" element={<RadiusManagement />} />
+          <Route path="/tickets" element={<TicketSystem />} />
+          <Route path="/captive-portal" element={<CaptivePortalBuilder />} />
+          <Route path="/bandwidth" element={<BandwidthGraphs />} />
+          <Route path="/resellers" element={<ResellerPortal />} />
           <Route path="/portal/:customerId" element={<CustomerPortal />} />
         </Routes>
       </main>

@@ -27,6 +27,8 @@ import {
   TrendingUp,
   Wifi,
   Ticket,
+  LifeBuoy,
+  Palette,
 } from 'lucide-react';
 
 const navItems = [
@@ -58,6 +60,11 @@ const billingItems = [
   { to: '/hotspot', icon: Wifi, label: 'Hotspot' },
   { to: '/hotspot-vouchers', icon: Ticket, label: 'Vouchers' },
   { to: '/network-services', icon: Server, label: 'Network' },
+  { to: '/radius', icon: Shield, label: 'RADIUS' },
+  { to: '/tickets', icon: LifeBuoy, label: 'Support' },
+  { to: '/captive-portal', icon: Palette, label: 'Portal Builder' },
+  { to: '/bandwidth', icon: Activity, label: 'Bandwidth' },
+  { to: '/resellers', icon: UserCheck, label: 'Resellers' },
   { to: '/billing-backup', icon: Database, label: 'Backups' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
 ];

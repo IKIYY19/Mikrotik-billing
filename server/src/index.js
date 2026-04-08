@@ -64,6 +64,9 @@ app.use('/api/advanced', require('./routes/advanced'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/network', require('./routes/network'));
+app.use('/api/radius', require('./routes/radius'));
+app.use('/api/tickets', require('./routes/tickets'));
+app.use('/api/resellers', require('./routes/resellers'));
 app.use('/mikrotik', require('./routes/provision'));
 
 // Health check

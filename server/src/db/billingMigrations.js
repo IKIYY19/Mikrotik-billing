@@ -181,6 +181,197 @@ const billingMigrations = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_vouchers_connection ON hotspot_vouchers(connection_id)`,
+
+  // RADIUS NAS clients
+  `CREATE TABLE IF NOT EXISTS nas (
+    id SERIAL PRIMARY KEY,
+    nasname VARCHAR(128) NOT NULL,
+    shortname VARCHAR(32),
+    type VARCHAR(30) DEFAULT 'other',
+    ports INTEGER,
+    secret VARCHAR(60) NOT NULL,
+    server VARCHAR(64),
+    community VARCHAR(50),
+    description VARCHAR(200) DEFAULT 'RADIUS Client',
+    connection_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // RADIUS radcheck
+  `CREATE TABLE IF NOT EXISTS radcheck (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    attribute VARCHAR(64) NOT NULL,
+    op CHAR(2) NOT NULL DEFAULT '==',
+    value VARCHAR(253) NOT NULL,
+    customer_id UUID,
+    subscription_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // RADIUS radreply
+  `CREATE TABLE IF NOT EXISTS radreply (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    attribute VARCHAR(64) NOT NULL,
+    op CHAR(2) NOT NULL DEFAULT '=',
+    value VARCHAR(253) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // RADIUS radgroupcheck
+  `CREATE TABLE IF NOT EXISTS radgroupcheck (
+    id SERIAL PRIMARY KEY,
+    groupname VARCHAR(64) NOT NULL,
+    attribute VARCHAR(64) NOT NULL,
+    op CHAR(2) NOT NULL DEFAULT '==',
+    value VARCHAR(253) NOT NULL
+  )`,
+
+  // RADIUS radgroupreply
+  `CREATE TABLE IF NOT EXISTS radgroupreply (
+    id SERIAL PRIMARY KEY,
+    groupname VARCHAR(64) NOT NULL,
+    attribute VARCHAR(64) NOT NULL,
+    op CHAR(2) NOT NULL DEFAULT '=',
+    value VARCHAR(253) NOT NULL
+  )`,
+
+  // RADIUS radusergroup
+  `CREATE TABLE IF NOT EXISTS radusergroup (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    groupname VARCHAR(64) NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // RADIUS radacct
+  `CREATE TABLE IF NOT EXISTS radacct (
+    radacctid BIGSERIAL PRIMARY KEY,
+    acctsessionid VARCHAR(64) NOT NULL,
+    acctuniqueid VARCHAR(32),
+    username VARCHAR(64) NOT NULL,
+    realm VARCHAR(64),
+    nasipaddress VARCHAR(50),
+    nasportid VARCHAR(15),
+    nasporttype VARCHAR(32),
+    acctstarttime TIMESTAMP,
+    acctupdatetime TIMESTAMP,
+    acctstoptime TIMESTAMP,
+    acctinterval INTEGER,
+    acctsessiontime INTEGER,
+    acctauthentic VARCHAR(32),
+    connectinfo_start VARCHAR(50),
+    connectinfo_stop VARCHAR(50),
+    acctinputoctets BIGINT,
+    acctoutputoctets BIGINT,
+    calledstationid VARCHAR(50),
+    callingstationid VARCHAR(50),
+    acctterminatecause VARCHAR(32),
+    servicetype VARCHAR(32),
+    framedprotocol VARCHAR(32),
+    framedipaddress VARCHAR(50),
+    customer_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // RADIUS radpostauth
+  `CREATE TABLE IF NOT EXISTS radpostauth (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    pass VARCHAR(64),
+    reply VARCHAR(32) NOT NULL,
+    authdate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    nasipaddress VARCHAR(50),
+    calledstationid VARCHAR(50),
+    callingstationid VARCHAR(50)
+  )`,
+
+  // RADIUS indexes
+  `CREATE INDEX IF NOT EXISTS idx_radcheck_username ON radcheck(username)`,
+  `CREATE INDEX IF NOT EXISTS idx_radreply_username ON radreply(username)`,
+  `CREATE INDEX IF NOT EXISTS idx_radacct_username ON radacct(username)`,
+  `CREATE INDEX IF NOT EXISTS idx_radacct_sessionid ON radacct(acctsessionid)`,
+  `CREATE INDEX IF NOT EXISTS idx_radacct_starttime ON radacct(acctstarttime)`,
+
+  // Resellers
+  `CREATE TABLE IF NOT EXISTS resellers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    company VARCHAR(255),
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    commission_rate DECIMAL(5,2) DEFAULT 10.00,
+    credit_limit DECIMAL(10,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS reseller_id UUID REFERENCES resellers(id) ON DELETE SET NULL`,
+
+  // Captive Portals
+  `CREATE TABLE IF NOT EXISTS captive_portals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    elements JSONB DEFAULT '[]',
+    styles JSONB,
+    hotspot_profile VARCHAR(100),
+    connection_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // Support Tickets
+  `CREATE TABLE IF NOT EXISTS ticket_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    sla_hours INTEGER DEFAULT 24,
+    color VARCHAR(7) DEFAULT '#3b82f6',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS tickets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_number VARCHAR(50) UNIQUE NOT NULL,
+    customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+    category_id UUID REFERENCES ticket_categories(id) ON DELETE SET NULL,
+    subject VARCHAR(255) NOT NULL,
+    description TEXT,
+    priority VARCHAR(20) DEFAULT 'medium',
+    status VARCHAR(20) DEFAULT 'open',
+    assignee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    sla_deadline TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS ticket_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    message TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS ticket_attachments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+    filename VARCHAR(255),
+    file_type VARCHAR(50),
+    file_size INTEGER,
+    file_path TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // Indexes for tickets
+  `CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,
 ];
 
 // Seed data

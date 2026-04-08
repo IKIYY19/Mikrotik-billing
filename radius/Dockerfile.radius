@@ -1,0 +1,38 @@
+FROM freeradius/freeradius-server:3.2.6
+
+# Switch to root to install packages and configure
+USER root
+
+# Install PostgreSQL client and other utilities
+RUN apt-get update && \
+    apt-get install -y \
+    postgresql-client \
+    netcat-openbsd \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy configuration files
+COPY clients.conf /etc/freeradius/3.0/clients.conf
+COPY mods-available/sql /etc/freeradius/3.0/mods-available/sql
+COPY mods-enabled/ /etc/freeradius/3.0/mods-enabled/
+
+# Copy custom dictionary if needed
+# COPY dictionary /etc/freeradius/3.0/dictionary
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Switch back to freeradius user
+USER freerad
+
+# Expose RADIUS ports
+# 1812/udp - Authentication
+# 1813/udp - Accounting
+EXPOSE 1812/udp 1813/udp
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Run FreeRADIUS in foreground
+CMD ["radiusd", "-X"]
