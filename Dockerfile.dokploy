@@ -1,0 +1,33 @@
+# Use official Node.js image from Docker Hub instead
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies for both client and server
+COPY server/package*.json ./server/
+COPY client/package*.json ./client/
+
+RUN cd server && npm ci --only=production
+RUN cd client && npm ci
+
+# Copy source code
+COPY server/ ./server/
+COPY client/ ./client/
+
+# Build frontend
+RUN cd client && npm run build
+
+# Expose ports
+EXPOSE 5000 80
+
+# Install nginx for serving frontend
+RUN apk add --no-cache nginx supervisor
+
+# Configure nginx
+COPY nginx-dokploy.conf /etc/nginx/http.d/default.conf
+
+# Create supervisor config
+RUN mkdir -p /etc/supervisor.d
+COPY supervisord.conf /etc/supervisor.d/supervisord.ini
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.d/supervisord.ini"]
