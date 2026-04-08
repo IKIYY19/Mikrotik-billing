@@ -1,63 +1,65 @@
+version: '3.8'
+
+# Simplified Docker Compose for Dokploy
+# PostgreSQL should be added as a separate database service in Dokploy
+
 services:
-  app:
-    image: node:18-alpine
-    command: sh -c "cd /app/server && npm install && npm run db:migrate && npm run db:seed && npm start"
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=mikrotik_config_builder
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-postgres_secret}
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - CORS_ORIGIN=${FRONTEND_URL:-http://localhost:5173}
+      # Database - these will be set by Dokploy's database connection
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-mikrotik_config_builder}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-change-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-encryption-key-change-in-production}
+      # CORS
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      # Optional integrations (leave blank if not using)
+      - AT_API_KEY=${AT_API_KEY:-}
+      - AT_USERNAME=${AT_USERNAME:-sandbox}
+      - AT_SENDER_ID=${AT_SENDER_ID:-MyISP}
+      - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY:-}
+      - MPESA_CONSUMER_SECRET=${MPESA_CONSUMER_SECRET:-}
+      - MPESA_SHORTCODE=${MPESA_SHORTCODE:-174379}
+      - MPESA_PASSKEY=${MPESA_PASSKEY:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
       - "5000:5000"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # Wait for database and run migrations
+    command: >
+      sh -c "
+        echo 'Starting server...' &&
+        npm run db:migrate &&
+        npm run db:seed &&
+        npm start
+      "
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 512M
 
-  frontend:
-    image: node:18-alpine
-    command: sh -c "cd /app/client && npm install && npm run build && npx serve -s dist -l 3000"
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
     environment:
-      - VITE_API_URL=/api
+      - VITE_API_URL=${VITE_API_URL:-/api}
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
-      - app
+      - server
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 256M
-
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=mikrotik_config_builder
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_secret}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-volumes:
-  pgdata:
