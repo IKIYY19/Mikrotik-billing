@@ -34,7 +34,7 @@ services:
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
-      - "3000:80"
+      - "3001:80"
     # Run migrations before starting
     command: >
       sh -c "
