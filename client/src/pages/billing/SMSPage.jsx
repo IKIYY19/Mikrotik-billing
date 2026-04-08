@@ -1,0 +1,297 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Send, Settings, FileText, MessageSquare, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+
+const API = import.meta.env.VITE_API_URL || '/api';
+
+export function SMSPage() {
+  const [activeTab, setActiveTab] = useState('send');
+  const [templates, setTemplates] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [balance, setBalance] = useState(null);
+
+  // Send form
+  const [sendTo, setSendTo] = useState('');
+  const [sendTemplate, setSendTemplate] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  // Template editing
+  const [editingTemplate, setEditingTemplate] = useState(null);
+
+  useEffect(() => {
+    fetchTemplates();
+    fetchLogs();
+    fetchSettings();
+    fetchBalance();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try { const { data } = await axios.get(`${API}/sms/templates`); setTemplates(data); } catch (e) {}
+  };
+
+  const fetchLogs = async () => {
+    try { const { data } = await axios.get(`${API}/sms/logs`); setLogs(data.data || []); } catch (e) {}
+  };
+
+  const fetchSettings = async () => {
+    try { const { data } = await axios.get(`${API}/sms/settings`); setSettings(data); } catch (e) {}
+  };
+
+  const fetchBalance = async () => {
+    try { const { data } = await axios.get(`${API}/sms/balance`); setBalance(data); } catch (e) {}
+  };
+
+  const handleSend = async () => {
+    if (!sendTo) return;
+    setSending(true);
+    setSendResult(null);
+
+    try {
+      let result;
+      if (sendTemplate) {
+        // Extract phone from variables or use sendTo
+        const customer = templates.find(t => t.id === sendTemplate);
+        result = await axios.post(`${API}/sms/send-template`, {
+          template_id: sendTemplate,
+          to: sendTo,
+          variables: { customer_name: 'Test', invoice_number: 'INV-TEST', amount: '100', due_date: '2026-05-01' },
+        });
+      } else {
+        result = await axios.post(`${API}/sms/send`, { to: sendTo, message: customMessage });
+      }
+      setSendResult(result.data);
+      fetchLogs();
+      if (result.data.balance) fetchBalance();
+    } catch (e) {
+      setSendResult({ success: false, message: e.response?.data?.error || e.message });
+    }
+    setSending(false);
+  };
+
+  const handleSaveTemplate = async (template) => {
+    try {
+      await axios.put(`${API}/sms/templates/${template.id}`, template);
+      setEditingTemplate(null);
+      fetchTemplates();
+    } catch (e) {}
+  };
+
+  return (
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white">SMS Notifications</h2>
+          <p className="text-sm text-slate-400">Africa's Talking Integration</p>
+        </div>
+        <div className="flex items-center gap-4">
+          {balance && (
+            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+              <span className="text-sm text-slate-400">Balance: </span>
+              <span className="text-white font-semibold">{balance.balance} {balance.unit}</span>
+              {balance.isSandbox && <span className="text-xs text-amber-400 ml-2">(Sandbox)</span>}
+            </div>
+          )}
+          {!settings.is_configured && (
+            <div className="bg-amber-600/20 border border-amber-600/50 rounded px-3 py-1.5 text-amber-400 text-sm">
+              Sandbox Mode — SMS logged but not sent
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6">
+        {[
+          { id: 'send', label: 'Send SMS', icon: Send },
+          { id: 'templates', label: 'Templates', icon: FileText },
+          { id: 'logs', label: 'SMS Logs', icon: MessageSquare },
+          { id: 'settings', label: 'Settings', icon: Settings },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
+              activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" /> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Send SMS Tab */}
+      {activeTab === 'send' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Phone Number</label>
+            <input
+              value={sendTo}
+              onChange={e => setSendTo(e.target.value)}
+              placeholder="+254712345678"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Or Use Template</label>
+            <select
+              value={sendTemplate}
+              onChange={e => setSendTemplate(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+            >
+              <option value="">Custom message</option>
+              {templates.filter(t => t.is_active).map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          {!sendTemplate && (
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Message</label>
+              <textarea
+                value={customMessage}
+                onChange={e => setCustomMessage(e.target.value)}
+                rows="3"
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                placeholder="Type your message..."
+              />
+              <div className="text-xs text-slate-500 mt-1">{customMessage.length}/160 characters</div>
+            </div>
+          )}
+          <button
+            onClick={handleSend}
+            disabled={sending || (!sendTo) || (!sendTemplate && !customMessage)}
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" /> {sending ? 'Sending...' : 'Send SMS'}
+          </button>
+
+          {sendResult && (
+            <div className={`mt-4 p-4 rounded ${sendResult.success ? 'bg-green-600/20 border border-green-600/50' : 'bg-red-600/20 border border-red-600/50'}`}>
+              <div className="flex items-center gap-2">
+                {sendResult.success ? <CheckCircle className="w-5 h-5 text-green-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+                <span className={sendResult.success ? 'text-green-400' : 'text-red-400'}>{sendResult.message}</span>
+              </div>
+              {sendResult.isSandbox && (
+                <p className="text-xs text-amber-300 mt-1">Sandbox mode — SMS was logged but not actually sent</p>
+              )}
+              {sendResult.results?.[0] && (
+                <div className="mt-2 text-xs text-slate-300">
+                  <div>To: {sendResult.results[0].phoneNumber}</div>
+                  <div>Status: {sendResult.results[0].status}</div>
+                  {sendResult.results[0].messageId && <div>Message ID: {sendResult.results[0].messageId}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Templates Tab */}
+      {activeTab === 'templates' && (
+        <div className="space-y-4">
+          {templates.map(tmpl => (
+            <div key={tmpl.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              {editingTemplate === tmpl.id ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={tmpl.body}
+                    onChange={e => setEditingTemplate({ ...tmpl, body: e.target.value })}
+                    rows="3"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => handleSaveTemplate(editingTemplate)} className="bg-green-600 text-white px-3 py-1 rounded text-sm">Save</button>
+                    <button onClick={() => setEditingTemplate(null)} className="bg-slate-600 text-white px-3 py-1 rounded text-sm">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-white font-semibold">{tmpl.name}</h4>
+                      <span className={`px-2 py-0.5 rounded text-xs ${tmpl.is_active ? 'bg-green-600/20 text-green-400' : 'bg-slate-600/20 text-slate-400'}`}>
+                        {tmpl.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <button onClick={() => setEditingTemplate(tmpl)} className="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
+                  </div>
+                  <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap bg-slate-900 p-3 rounded">{tmpl.body}</pre>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Logs Tab */}
+      {activeTab === 'logs' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+          {logs.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">No SMS sent yet</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-900 text-slate-400">
+                <tr>
+                  <th className="text-left p-3">Time</th>
+                  <th className="text-left p-3">To</th>
+                  <th className="text-left p-3">Message</th>
+                  <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(log => (
+                  <tr key={log.id} className="border-t border-slate-700 hover:bg-slate-700/50">
+                    <td className="p-3 text-slate-400 text-xs">{new Date(log.created_at).toLocaleString()}</td>
+                    <td className="p-3 text-white text-xs">{log.to?.[0]}</td>
+                    <td className="p-3 text-slate-300 text-xs max-w-xs truncate">{log.message}</td>
+                    <td className="p-3">
+                      <span className={`flex items-center gap-1 text-xs ${log.status === 'sent' ? 'text-green-400' : log.status === 'failed' ? 'text-red-400' : 'text-amber-400'}`}>
+                        {log.status === 'sent' ? <CheckCircle className="w-3 h-3" /> : log.status === 'failed' ? <XCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-400 text-xs">{log.cost || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
+          <h3 className="text-white font-semibold">Africa's Talking Configuration</h3>
+          <div className="bg-slate-900 rounded p-4 space-y-2 text-sm">
+            <p className="text-slate-300">To enable real SMS (not sandbox), set these environment variables:</p>
+            <div className="font-mono text-xs space-y-1">
+              <div><span className="text-green-400">AT_API_KEY</span>=your_api_key_from_at_dashboard</div>
+              <div><span className="text-green-400">AT_USERNAME</span>=your_at_username</div>
+              <div><span className="text-green-400">AT_SENDER_ID</span>=YourSenderID</div>
+              <div><span className="text-green-400">COMPANY_NAME</span>=Your ISP Company</div>
+              <div><span className="text-green-400">MPESA_PAYBILL</span>=123456</div>
+              <div><span className="text-green-400">SUPPORT_PHONE</span>=+254700000000</div>
+            </div>
+            <p className="text-slate-500 text-xs mt-3">
+              Get your API key from <a href="https://account.africastalking.com" target="_blank" rel="noreferrer" className="text-blue-400 underline">account.africastalking.com</a>
+            </p>
+          </div>
+          <div className="bg-slate-900 rounded p-4">
+            <h4 className="text-white font-medium mb-2">Current Settings</h4>
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between"><span className="text-slate-400">Username</span><span className="text-white">{settings.username || 'sandbox'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">Sender ID</span><span className="text-white">{settings.sender_id || 'MyISP'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">Configured</span><span className={settings.is_configured ? 'text-green-400' : 'text-amber-400'}>{settings.is_configured ? 'Yes (Production)' : 'No (Sandbox)'}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">Company</span><span className="text-white">{settings.company?.company_name || 'Your ISP'}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

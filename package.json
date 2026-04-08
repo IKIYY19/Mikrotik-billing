@@ -1,0 +1,20 @@
+{
+  "name": "mikrotik-config-builder",
+  "version": "1.0.0",
+  "description": "Full-stack web application for generating MikroTik RouterOS scripts",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "nodemon server/src/index.js",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "node server/src/index.js",
+    "db:migrate": "node server/src/db/migrate.js",
+    "db:seed": "node server/src/db/seed.js"
+  },
+  "keywords": ["mikrotik", "routeros", "network", "config", "generator"],
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.2"
+  }
+}

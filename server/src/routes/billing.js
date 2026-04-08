@@ -1,0 +1,403 @@
+const express = require('express');
+const router = express.Router();
+const billing = require('../db/billingStore');
+const PPPoEProvisioner = require('../utils/pppoeProvisioner');
+const { triggerSMS } = require('./sms');
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+router.get('/dashboard', async (req, res) => {
+  try {
+    const stats = await billing.getDashboardStats();
+    res.json(stats);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// CUSTOMERS
+// ═══════════════════════════════════════
+router.get('/customers', async (req, res) => {
+  try {
+    const customers = billing.store.customers;
+    const enriched = customers.map(c => {
+      const subs = billing.store.subscriptions.filter(s => s.customer_id === c.id);
+      const invoices = billing.store.invoices.filter(i => i.customer_id === c.id && i.status !== 'paid');
+      const outstanding = invoices.reduce((sum, i) => sum + i.total, 0);
+      return { ...c, subscription_count: subs.length, outstanding_balance: outstanding };
+    });
+    res.json(enriched);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/customers/:id', async (req, res) => {
+  try {
+    const customer = billing.store.customers.find(c => c.id === req.params.id);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    const subs = billing.store.subscriptions.filter(s => s.customer_id === customer.id).map(s => {
+      const plan = billing.store.service_plans.find(p => p.id === s.plan_id);
+      return { ...s, plan };
+    });
+    const invoices = billing.store.invoices.filter(i => i.customer_id === customer.id);
+    const payments = billing.store.payments.filter(p => p.customer_id === customer.id);
+    res.json({ ...customer, subscriptions: subs, invoices, payments });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/customers', async (req, res) => {
+  try {
+    const customer = await billing.createCustomer(req.body);
+    res.status(201).json(customer);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/customers/:id', async (req, res) => {
+  try {
+    const customer = await billing.updateCustomer(req.params.id, req.body);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    res.json(customer);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/customers/:id', async (req, res) => {
+  try {
+    const customer = await billing.deleteCustomer(req.params.id);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    res.json({ message: 'Customer deleted' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// SERVICE PLANS
+// ═══════════════════════════════════════
+router.get('/plans', async (req, res) => {
+  try {
+    const plans = billing.store.service_plans.map(p => {
+      const subCount = billing.store.subscriptions.filter(s => s.plan_id === p.id && s.status === 'active').length;
+      return { ...p, active_subscribers: subCount };
+    });
+    res.json(plans);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/plans', async (req, res) => {
+  try {
+    const plan = await billing.createPlan(req.body);
+    res.status(201).json(plan);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/plans/:id', async (req, res) => {
+  try {
+    const plan = await billing.updatePlan(req.params.id, req.body);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    res.json(plan);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/plans/:id', async (req, res) => {
+  try {
+    const plan = await billing.deletePlan(req.params.id);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    res.json({ message: 'Plan deleted' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// SUBSCRIPTIONS
+// ═══════════════════════════════════════
+router.get('/subscriptions', async (req, res) => {
+  try {
+    const subs = billing.store.subscriptions.map(s => {
+      const customer = billing.store.customers.find(c => c.id === s.customer_id);
+      const plan = billing.store.service_plans.find(p => p.id === s.plan_id);
+      const router = billing.store.routers ? billing.store.routers.find(r => r.id === s.router_id) : null;
+      return { ...s, customer, plan, router };
+    });
+    res.json(subs);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/subscriptions', async (req, res) => {
+  try {
+    const sub = await billing.createSubscription(req.body);
+    
+    // Auto-generate first invoice
+    const plan = billing.store.service_plans.find(p => p.id === sub.plan_id);
+    if (plan) {
+      await billing.createInvoice({
+        customer_id: sub.customer_id,
+        subscription_id: sub.id,
+        amount: plan.price,
+        tax: plan.price * 0.16,
+        notes: `First invoice for ${plan.name}`,
+      });
+    }
+
+    // Generate MikroTik provision script if PPPoE credentials provided
+    let provisionScript = null;
+    if (sub.auto_provision && sub.pppoe_username) {
+      const customer = billing.store.customers.find(c => c.id === sub.customer_id);
+      provisionScript = PPPoEProvisioner.generateProvisioningScript('activate', { ...sub, customer, plan });
+    }
+
+    res.status(201).json({ ...sub, provision_script: provisionScript });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/subscriptions/:id', async (req, res) => {
+  try {
+    const sub = await billing.updateSubscription(req.params.id, req.body);
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+    res.json(sub);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/subscriptions/:id/toggle', async (req, res) => {
+  try {
+    const sub = await billing.toggleSubscriptionStatus(req.params.id);
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+    // Generate MikroTik provisioning script
+    const customer = billing.store.customers.find(c => c.id === sub.customer_id);
+    const plan = billing.store.service_plans.find(p => p.id === sub.plan_id);
+    const action = sub.status === 'active' ? 'activate_existing' : 'suspend';
+    const provisionScript = sub.pppoe_username
+      ? PPPoEProvisioner.generateProvisioningScript(action, { ...sub, customer, plan })
+      : null;
+
+    // Send SMS notification
+    if (customer?.phone) {
+      triggerSMS(sub.status === 'active' ? 'service_restored' : 'service_suspended', {
+        customer, sub, plan, invoice: null, payment: null,
+      }).catch(e => console.error('SMS error:', e.message));
+    }
+
+    res.json({ ...sub, provision_script: provisionScript });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// INVOICES
+// ═══════════════════════════════════════
+router.get('/invoices', async (req, res) => {
+  try {
+    const invoices = billing.store.invoices.map(i => {
+      const customer = billing.store.customers.find(c => c.id === i.customer_id);
+      const payments = billing.store.payments.filter(p => p.invoice_id === i.id);
+      const paid = payments.reduce((sum, p) => sum + p.amount, 0);
+      return { ...i, customer, paid_amount: paid, balance: i.total - paid };
+    });
+    res.json(invoices.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/invoices', async (req, res) => {
+  try {
+    const invoice = await billing.createInvoice(req.body);
+    
+    // Send SMS notification
+    const customer = billing.store.customers.find(c => c.id === invoice.customer_id);
+    if (customer?.phone) {
+      triggerSMS('invoice_due_soon', { customer, invoice }).catch(e => console.error('SMS error:', e.message));
+    }
+    
+    res.status(201).json(invoice);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/invoices/:id', async (req, res) => {
+  try {
+    const invoice = await billing.updateInvoice(req.params.id, req.body);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+    res.json(invoice);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/invoices/generate-monthly', async (req, res) => {
+  try {
+    const created = await billing.generateMonthlyInvoices();
+    res.json({ message: `Generated ${created.length} invoices`, invoices: created });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// PAYMENTS
+// ═══════════════════════════════════════
+router.get('/payments', async (req, res) => {
+  try {
+    const payments = billing.store.payments.map(p => {
+      const customer = billing.store.customers.find(c => c.id === p.customer_id);
+      const invoice = billing.store.invoices.find(i => i.id === p.invoice_id);
+      return { ...p, customer, invoice };
+    });
+    res.json(payments.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/payments', async (req, res) => {
+  try {
+    const payment = await billing.createPayment(req.body);
+    
+    // Send SMS confirmation
+    const customer = billing.store.customers.find(c => c.id === payment.customer_id);
+    const invoice = billing.store.invoices.find(i => i.id === payment.invoice_id);
+    if (customer?.phone) {
+      triggerSMS('payment_received', { customer, invoice, payment }).catch(e => console.error('SMS error:', e.message));
+    }
+    
+    res.status(201).json(payment);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// REAL-TIME ONLINE STATUS
+// ═══════════════════════════════════════
+router.get('/customers/online-status', async (req, res) => {
+  try {
+    const { connection_id } = req.query;
+    if (!connection_id) return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
+
+    // Get MikroTik connection
+    const db = global.db || require('../db/memory');
+    const crypto = require('crypto');
+    const algorithm = 'aes-256-gcm';
+    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
+
+    const connResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [connection_id]);
+    if (connResult.rows.length === 0) return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
+
+    const device = connResult.rows[0];
+    const [ivHex, authTagHex, encrypted] = device.password_encrypted.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+    decipher.setAuthTag(authTag);
+    let password = decipher.update(encrypted, 'hex', 'utf8');
+    password += decipher.final('utf8');
+
+    // Fetch active PPPoE and Hotspot sessions
+    const MikroNode = require('mikronode');
+    const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
+    const connection = await mikrotik.connect(device.username, password);
+    const close = connection.closeOnDone(true);
+
+    // Get PPPoE active sessions
+    const pppoeChan = connection.openChannel();
+    pppoeChan.write('/ppp/active/print');
+    const pppoeActive = await pppoeChan.done;
+
+    // Get Hotspot active sessions
+    const hotspotChan = connection.openChannel();
+    hotspotChan.write('/ip/hotspot/active/print');
+    const hotspotActive = await hotspotChan.done;
+
+    // Get PPPoE secrets to map username → customer
+    const secretsChan = connection.openChannel();
+    secretsChan.write('/ppp/secret/print', { '.proplist': 'name,comment' });
+    const pppoeSecrets = await secretsChan.done;
+
+    close();
+
+    // Build online map: customer_id → session info
+    const onlineMap = {};
+    const pppoeOnline = [];
+    const hotspotOnline = [];
+
+    // Match PPPoE sessions to billing customers
+    const allCustomers = billing.store.customers;
+    const allSubscriptions = billing.store.subscriptions;
+
+    for (const session of (Array.isArray(pppoeActive) ? pppoeActive : [])) {
+      const username = session.name || session.user;
+      if (!username) continue;
+
+      // Find subscription with this PPPoE username
+      const sub = allSubscriptions.find(s => s.pppoe_username === username);
+      if (sub) {
+        onlineMap[sub.customer_id] = {
+          type: 'pppoe',
+          username,
+          address: session.address,
+          uptime: session.uptime,
+          encoding: session.encoding,
+          connected_at: new Date().toISOString(),
+        };
+        pppoeOnline.push({
+          customer_id: sub.customer_id,
+          customer_name: allCustomers.find(c => c.id === sub.customer_id)?.name || 'Unknown',
+          username,
+          address: session.address,
+          uptime: session.uptime,
+          encoding: session.encoding,
+        });
+      }
+    }
+
+    // Match Hotspot sessions to billing customers
+    for (const session of (Array.isArray(hotspotActive) ? hotspotActive : [])) {
+      const username = session.user;
+      if (!username) continue;
+
+      // Try to find customer by hotspot username match in subscriptions or custom field
+      const sub = allSubscriptions.find(s => s.hotspot_username === username);
+      if (sub) {
+        const customerId = sub.customer_id;
+        if (!onlineMap[customerId]) { // Don't override PPPoE if already online
+          onlineMap[customerId] = {
+            type: 'hotspot',
+            username,
+            address: session.address,
+            uptime: session.uptime,
+            mac: session['mac-address'],
+            bytes_in: session['bytes-in'],
+            bytes_out: session['bytes-out'],
+            connected_at: new Date().toISOString(),
+          };
+          hotspotOnline.push({
+            customer_id: customerId,
+            customer_name: allCustomers.find(c => c.id === customerId)?.name || 'Unknown',
+            username,
+            address: session.address,
+            uptime: session.uptime,
+            mac: session['mac-address'],
+            bytes_in: session['bytes-in'],
+            bytes_out: session['bytes-out'],
+          });
+        }
+      }
+    }
+
+    res.json({
+      online: onlineMap,
+      pppoe: pppoeOnline,
+      hotspot: hotspotOnline,
+      total: pppoeOnline.length + hotspotOnline.length,
+    });
+  } catch (e) {
+    console.error('Online status error:', e);
+    res.json({ online: {}, pppoe: [], hotspot: [], total: 0, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// USAGE
+// ═══════════════════════════════════════
+router.get('/usage/:customerId', async (req, res) => {
+  try {
+    const records = billing.store.usage_records
+      .filter(r => r.customer_id === req.params.customerId)
+      .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at))
+      .slice(0, 100);
+    res.json(records);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/usage', async (req, res) => {
+  try {
+    const record = await billing.recordUsage(req.body);
+    res.status(201).json(record);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+module.exports = router;
