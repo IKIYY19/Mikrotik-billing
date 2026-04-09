@@ -15,6 +15,12 @@ const authMigrations = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'staff'`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`,
+
+  // Customer portal auth columns
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_pin_hash VARCHAR(255)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS pin_reset_code VARCHAR(10)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS pin_reset_expires TIMESTAMP`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_portal_login TIMESTAMP`,
 ];
 
 async function runAuthMigrations() {

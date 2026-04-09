@@ -66,6 +66,8 @@ app.get('/api/health', (req, res) => {
 });
 app.use('/api/auth', require('./routes/auth'));
 app.use('/mikrotik', require('./routes/provision')); // Public provisioning
+app.use('/api/portal/auth', require('./routes/customerAuth')); // Customer auth (public endpoints)
+app.use('/mikrotik', require('./routes/provision')); // Public provisioning
 
 // Protected routes (require authentication)
 const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
@@ -134,6 +136,10 @@ let cronStarted = false;
 // Start server
 const startServer = async () => {
   try {
+    // Validate security before starting
+    const { validateSecrets } = require('./utils/security');
+    validateSecrets();
+
     await initDB();
 
     global.db = db;
