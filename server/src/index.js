@@ -140,6 +140,53 @@ const startServer = async () => {
     global.dbAvailable = dbAvailable;
     global.billingRepo = billingRepo;
 
+    // Run database migrations automatically
+    try {
+      const { runMigrations } = require('./db/migrate');
+      await runMigrations();
+      console.log('✅ Core migrations done');
+    } catch (e) {
+      console.warn('⚠️  Core migrations skipped:', e.message);
+    }
+
+    try {
+      const { runAuthMigrations } = require('./db/authMigrations');
+      await runAuthMigrations();
+    } catch (e) {
+      console.warn('⚠️  Auth migrations skipped:', e.message);
+    }
+
+    // Run billing migrations
+    try {
+      const { billingMigrations } = require('./db/billingMigrations');
+      for (const migration of billingMigrations) {
+        await db.query(migration);
+      }
+      console.log('✅ Billing migrations done');
+    } catch (e) {
+      console.warn('⚠️  Billing migrations skipped:', e.message);
+    }
+
+    // Create default admin user if no users exist
+    try {
+      const bcrypt = require('bcryptjs');
+      const { v4: uuidv4 } = require('uuid');
+      const userCount = await db.query('SELECT COUNT(*) FROM users');
+      if (parseInt(userCount.rows[0].count) === 0) {
+        const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const adminHash = await bcrypt.hash(adminPassword, 10);
+        await db.query(
+          `INSERT INTO users (id, email, password_hash, name, role, is_active, created_at)
+           VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
+          [uuidv4(), 'admin@example.com', adminHash, 'Administrator', 'admin']
+        );
+        console.log('✅ Default admin created: admin@example.com');
+        console.log(`🔑 Password: ${process.env.ADMIN_PASSWORD ? '(check env var)' : 'admin123'}`);
+      }
+    } catch (e) {
+      console.warn('⚠️  Admin user creation skipped:', e.message);
+    }
+
     // Start auto-suspend cron
     if (!cronStarted) {
       try {
