@@ -1,0 +1,35 @@
+# Railway Build
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Install client dependencies (including devDependencies for Vite)
+COPY client/package*.json ./client/
+RUN cd client && npm ci
+
+# Install server dependencies
+COPY server/package*.json ./server/
+RUN cd server && npm ci --omit=dev
+
+# Copy all source code
+COPY . .
+
+# Build frontend
+RUN cd client && npm run build
+
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy server
+COPY --from=build /app/server ./server
+COPY --from=build /app/client/dist ./client/dist
+
+# Install server dependencies
+COPY server/package*.json ./server/
+RUN cd server && npm ci --omit=dev
+
+EXPOSE 5000
+
+CMD ["node", "server/src/index.js"]
