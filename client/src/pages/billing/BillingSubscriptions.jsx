@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, Power, PowerOff, Copy, Terminal, Check } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function BillingSubscriptions() {
+  const toast = useToast();
   const [subs, setSubs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -22,7 +24,7 @@ export function BillingSubscriptions() {
   }, []);
 
   const fetchSubs = async () => {
-    try { const { data } = await axios.get(`${API}/billing/subscriptions`); setSubs(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/billing/subscriptions`); setSubs(data); } catch (error) { console.error('Failed to fetch subscriptions:', error); toast.error('Failed to load subscriptions', error.response?.data?.error || error.message); }
   };
 
   const handleSubmit = async (e) => {

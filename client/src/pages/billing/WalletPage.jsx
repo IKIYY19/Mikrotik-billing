@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Wallet, Plus, Minus, DollarSign, Clock, AlertTriangle, CheckCircle, Smartphone } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function WalletPage() {
+  const toast = useToast();
   const [wallets, setWallets] = useState([]);
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -20,7 +22,7 @@ export function WalletPage() {
     try {
       const { data } = await axios.get(`${API}/advanced/wallet/all`);
       setWallets(data);
-    } catch (e) {}
+    } catch (error) { console.error('Failed to fetch wallets:', error); toast.error('Failed to load wallets', error.response?.data?.error || error.message); }
   };
 
   const selectWallet = async (w) => {
@@ -28,7 +30,7 @@ export function WalletPage() {
     try {
       const { data } = await axios.get(`${API}/advanced/wallet/${w.customer_id}`);
       setTransactions(data.transactions || []);
-    } catch (e) {}
+    } catch (error) { console.error('Failed to fetch wallet transactions:', error); toast.error('Failed to load transactions', error.response?.data?.error || error.message); }
   };
 
   const handleTopup = async (e) => {
@@ -53,7 +55,7 @@ export function WalletPage() {
       const { data } = await axios.post(`${API}/advanced/wallet/daily-run`);
       alert(`Deducted: ${data.deducted.length}, Suspended: ${data.suspended.length}`);
       fetchWallets();
-    } catch (e) {}
+    } catch (error) { console.error('Failed to run daily deductions:', error); toast.error('Daily deductions failed', error.response?.data?.error || error.message); }
   };
 
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);

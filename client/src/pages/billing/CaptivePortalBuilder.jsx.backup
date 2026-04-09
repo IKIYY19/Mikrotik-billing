@@ -1,0 +1,592 @@
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import axios from 'axios';
+import {
+  Palette, Eye, Save, Upload, Plus, Trash2, Type, Image, Square,
+  MoveUp, MoveDown, Download, Settings, Monitor, Smartphone, RefreshCw,
+  Palette as PaletteIcon, Layout, FileText, Send, Undo, Redo, GripVertical,
+  Facebook, Twitter, Instagram, Wifi, Bell, Shield, Globe, Clock, ExternalLink,
+  AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Layers,
+  ArrowUp, ArrowDown, Maximize2, Minimize2, Copy, Clipboard, Check
+} from 'lucide-react';
+
+const API = import.meta.env.VITE_API_URL || '/api';
+
+/* ─── Default Portal Templates ─── */
+const templates = {
+  blank: { 
+    elements: [], 
+    styles: { bgType: 'solid', bgColor: '#0f1117', accentColor: '#3b82f6' },
+    settings: { language: 'en', showTerms: false, showTimeout: false, redirectUrl: '' }
+  },
+  modern: {
+    elements: [
+      { id: '1', type: 'logo', content: 'MyISP WiFi', x: 50, y: 10, width: 40, height: 8, size: 'large', style: { color: '#ffffff', fontSize: '32px', fontWeight: 'bold', textAlign: 'center' } },
+      { id: '2', type: 'text', content: 'Welcome to our HotSpot', x: 50, y: 22, width: 60, height: 5, size: 'medium', style: { color: '#a1a1aa', fontSize: '16px', textAlign: 'center' } },
+      { id: '3', type: 'login-form', x: 50, y: 40, width: 60, height: 30, style: { borderRadius: '16px', bgColor: 'rgba(24,24,27,0.8)' } },
+      { id: '4', type: 'text', content: 'Need help? Call +254 700 000 000', x: 50, y: 85, width: 60, height: 4, size: 'small', style: { color: '#71717a', fontSize: '12px', textAlign: 'center' } },
+    ],
+    styles: { bgType: 'gradient', bgColor1: '#0f1117', bgColor2: '#1a1a2e', accentColor: '#3b82f6', bgImage: '' },
+    settings: { language: 'en', showTerms: true, showTimeout: true, redirectUrl: 'https://google.com' }
+  },
+  colorful: {
+    elements: [
+      { id: '1', type: 'logo', content: '🌐 HotSpot', x: 50, y: 8, width: 50, height: 10, size: 'large', style: { color: '#fbbf24', fontSize: '36px', fontWeight: 'bold', textAlign: 'center' } },
+      { id: '2', type: 'text', content: 'Free WiFi • Fast Internet', x: 50, y: 18, width: 60, height: 5, size: 'medium', style: { color: '#e4e4e7', fontSize: '18px', textAlign: 'center' } },
+      { id: '3', type: 'promo-banner', x: 50, y: 28, width: 80, height: 12, style: { bgColor: 'rgba(251,191,36,0.1)', textColor: '#fbbf24', borderRadius: '12px' }, content: '🔥 Special Offer: 50% OFF Daily Pass!' },
+      { id: '4', type: 'login-form', x: 50, y: 45, width: 50, height: 28, style: { borderRadius: '20px', bgColor: 'rgba(0,0,0,0.7)' } },
+      { id: '5', type: 'social-login', x: 50, y: 75, width: 50, height: 8, style: {} },
+      { id: '6', type: 'text', content: 'By connecting, you agree to our Terms of Service', x: 50, y: 88, width: 60, height: 4, size: 'small', style: { color: '#52525b', fontSize: '11px', textAlign: 'center' } },
+    ],
+    styles: { bgType: 'gradient', bgColor1: '#1e1b4b', bgColor2: '#312e81', accentColor: '#fbbf24', bgImage: '' },
+    settings: { language: 'en', showTerms: true, showTimeout: false, redirectUrl: '' }
+  },
+  withWidgets: {
+    elements: [
+      { id: '1', type: 'logo', content: '☕ Café WiFi', x: 50, y: 5, width: 40, height: 8, size: 'large', style: { color: '#ffffff', fontSize: '28px', fontWeight: 'bold', textAlign: 'center' } },
+      { id: '2', type: 'announcement', x: 50, y: 15, width: 70, height: 10, style: { bgColor: 'rgba(16,185,129,0.1)', textColor: '#10b981', borderRadius: '12px' }, content: '✅ Free 30min trial available | Premium: $2/hr' },
+      { id: '3', type: 'login-form', x: 50, y: 32, width: 55, height: 28, style: { borderRadius: '16px', bgColor: 'rgba(24,24,27,0.85)' } },
+      { id: '4', type: 'speed-test', x: 50, y: 65, width: 45, height: 12, style: { bgColor: 'rgba(59,130,246,0.1)', accentColor: '#3b82f6' } },
+      { id: '5', type: 'social-links', x: 50, y: 80, width: 40, height: 6, style: { iconColor: '#a1a1aa', spacing: '16px' }, social: { facebook: 'https://facebook.com/myisp', twitter: '', instagram: 'https://instagram.com/myisp' } },
+      { id: '6', type: 'text', content: 'Enjoy your stay! 🎉', x: 50, y: 90, width: 50, height: 4, size: 'small', style: { color: '#71717a', fontSize: '12px', textAlign: 'center' } },
+    ],
+    styles: { bgType: 'gradient', bgColor1: '#0f172a', bgColor2: '#1e293b', accentColor: '#10b981', bgImage: '' },
+    settings: { language: 'en', showTerms: true, showTimeout: true, redirectUrl: 'https://myisp.com/welcome' }
+  }
+};
+
+/* ─── Language Translations ─── */
+const translations = {
+  en: {
+    welcome: 'Welcome',
+    username: 'Username',
+    password: 'Password',
+    connect: 'Connect',
+    disconnect: 'Disconnect',
+    login: 'Login',
+    logout: 'Logout',
+    termsAccept: 'I agree to the Terms of Service and Privacy Policy',
+    termsRequired: 'You must accept the terms to continue',
+    sessionTimeout: 'Your session will expire in',
+    sessionExpired: 'Your session has expired',
+    sessionWarning: 'You have {minutes} minutes remaining',
+    continue: 'Continue',
+    extend: 'Extend Session',
+    speedTest: 'Test Your Speed',
+    announcement: 'Announcement',
+    followUs: 'Follow Us',
+    needHelp: 'Need help? Contact support',
+    freeTrial: 'Free Trial',
+    buyPackage: 'Buy Package'
+  },
+  sw: {
+    welcome: 'Karibu',
+    username: 'Jina la mtumiaji',
+    password: 'Nenosiri',
+    connect: 'Unganisha',
+    disconnect: 'Tenganisha',
+    login: 'Ingia',
+    logout: 'Ondoka',
+    termsAccept: 'Ninakubali Masharti na Sera ya Faragha',
+    termsRequired: 'Lazima ukubali masharti ili kuendelea',
+    sessionTimeout: 'Muda wako utaisha ndani ya',
+    sessionExpired: 'Muda wako umeisha',
+    sessionWarning: 'Umebakiza dakika {minutes}',
+    continue: 'Endelea',
+    extend: 'Ongeza Muda',
+    speedTest: 'Jaribu Kasi',
+    announcement: 'Tangazo',
+    followUs: 'Tufuate',
+    needHelp: 'Unahitaji msaada? Wasiliana nasi',
+    freeTrial: 'Jaribio la Bure',
+    buyPackage: 'Nunua Kifurushi'
+  },
+  fr: {
+    welcome: 'Bienvenue',
+    username: 'Nom d\'utilisateur',
+    password: 'Mot de passe',
+    connect: 'Connecter',
+    disconnect: 'Déconnecter',
+    login: 'Connexion',
+    logout: 'Déconnexion',
+    termsAccept: 'J\'accepte les conditions d\'utilisation et la politique de confidentialité',
+    termsRequired: 'Vous devez accepter les conditions pour continuer',
+    sessionTimeout: 'Votre session expirera dans',
+    sessionExpired: 'Votre session a expiré',
+    sessionWarning: 'Il vous reste {minutes} minutes',
+    continue: 'Continuer',
+    extend: 'Prolonger',
+    speedTest: 'Tester la vitesse',
+    announcement: 'Annonce',
+    followUs: 'Suivez-nous',
+    needHelp: 'Besoin d\'aide? Contactez-nous',
+    freeTrial: 'Essai gratuit',
+    buyPackage: 'Acheter un forfait'
+  }
+};
+
+export function CaptivePortalBuilder() {
+  const [portals, setPortals] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [preview, setPreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState('mobile');
+  const [elements, setElements] = useState([]);
+  const [styles, setStyles] = useState({ bgType: 'solid', bgColor: '#0f1117', bgColor1: '#0f1117', bgColor2: '#1a1a2e', accentColor: '#3b82f6', bgImage: '', bgOverlay: 0.5 });
+  const [selectedElement, setSelectedElement] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [connections, setConnections] = useState([]);
+  const [selectedConnection, setSelectedConnection] = useState('');
+  const [settings, setSettings] = useState({ language: 'en', showTerms: false, showTimeout: true, redirectUrl: '', timeoutMinutes: 60, warningMinutes: 10 });
+  
+  // Drag and resize state
+  const [dragging, setDragging] = useState(null);
+  const [resizing, setResizing] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [showGrid, setShowGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [gridSize] = useState(5);
+  
+  // Undo/Redo state
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  
+  // BG Image upload
+  const [bgImageFile, setBgImageFile] = useState(null);
+  const fileInputRef = useRef(null);
+  
+  // Canvas ref for measurements
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    fetchPortals();
+    axios.get(`${API}/mikrotik`).then(r => setConnections(r.data)).catch(() => {});
+  }, []);
+
+  // Save to history for undo
+  const saveToHistory = useCallback((newElements) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(newElements)));
+    setHistory(newHistory.slice(-20)); // Keep last 20 states
+    setHistoryIndex(newHistory.length - 1);
+  }, [history, historyIndex]);
+
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setElements(JSON.parse(JSON.stringify(history[newIndex])));
+    }
+  }, [history, historyIndex]);
+
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setElements(JSON.parse(JSON.stringify(history[newIndex])));
+    }
+  }, [history, historyIndex]);
+
+  const fetchPortals = async () => {
+    try {
+      const { data } = await axios.get(`${API}/captive-portals`).catch(() => ({ data: [] }));
+      setPortals(data);
+    } catch (e) {}
+  };
+
+  const loadTemplate = (name) => {
+    const t = templates[name];
+    setElements(JSON.parse(JSON.stringify(t.elements)));
+    setStyles({ ...t.styles });
+  };
+
+  const addElement = (type) => {
+    const newEl = {
+      id: Date.now().toString(),
+      type,
+      content: type === 'text' ? 'Your text here' : type === 'logo' ? 'MyISP' : type === 'button' ? 'Click Here' : '',
+      x: 50, y: 50, width: type === 'login-form' ? 60 : undefined,
+      style: { color: '#ffffff', fontSize: '14px', borderRadius: '8px' },
+    };
+    setElements([...elements, newEl]);
+    setSelectedElement(newEl.id);
+  };
+
+  const updateElement = (id, updates) => {
+    setElements(elements.map(el => el.id === id ? { ...el, ...updates } : el));
+  };
+
+  const updateElementStyle = (id, styleUpdates) => {
+    setElements(elements.map(el => el.id === id ? { ...el, style: { ...el.style, ...styleUpdates } } : el));
+  };
+
+  const deleteElement = (id) => {
+    setElements(elements.filter(el => el.id !== id));
+    if (selectedElement === id) setSelectedElement(null);
+  };
+
+  const moveElement = (id, dir) => {
+    const idx = elements.findIndex(el => el.id === id);
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= elements.length) return;
+    const newEls = [...elements];
+    [newEls[idx], newEls[newIdx]] = [newEls[newIdx], newEls[idx]];
+    setElements(newEls);
+  };
+
+  const savePortal = async () => {
+    if (!editing?.name && !editing) {
+      const name = prompt('Portal name:', 'My HotSpot Portal');
+      if (!name) return;
+      setEditing({ name });
+    }
+    setLoading(true);
+    try {
+      await axios.post(`${API}/captive-portals`, {
+        name: editing?.name || 'Untitled',
+        elements,
+        styles,
+        hotspot_profile: editing?.hotspot_profile || '',
+        connection_id: selectedConnection,
+      });
+      fetchPortals();
+      alert('Portal saved!');
+    } catch (e) { alert('Failed to save'); }
+    setLoading(false);
+  };
+
+  const pushToMikroTik = async () => {
+    if (!selectedConnection) { alert('Select a router first'); return; }
+    setLoading(true);
+    try {
+      const html = generateHTML();
+      await axios.post(`${API}/captive-portals/push`, {
+        connection_id: selectedConnection,
+        html,
+        profile: editing?.hotspot_profile || '',
+      });
+      alert('Portal pushed to MikroTik!');
+    } catch (e) { alert('Push failed: ' + (e.response?.data?.error || e.message)); }
+    setLoading(false);
+  };
+
+  const generateHTML = () => {
+    const bgStyle = styles.bgType === 'gradient'
+      ? `background: linear-gradient(135deg, ${styles.bgColor1}, ${styles.bgColor2});`
+      : `background: ${styles.bgColor};`;
+
+    let elementsHTML = elements.map(el => {
+      const pos = `position:absolute;left:${el.x}%;top:${el.y}%;transform:translateX(-50%);${el.width ? `width:${el.width}%;` : ''}`;
+      const st = Object.entries(el.style || {}).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v}`).join(';');
+
+      switch (el.type) {
+        case 'logo':
+          return `<div style="${pos}${st}text-align:center;">${el.content}</div>`;
+        case 'text':
+          return `<div style="${pos}${st}text-align:center;">${el.content}</div>`;
+        case 'image':
+          return `<img src="${el.content}" style="${pos}${st}max-width:100%;object-fit:cover;" />`;
+        case 'login-form':
+          const formBg = el.style.bgColor || 'rgba(24,24,27,0.8)';
+          const radius = el.style.borderRadius || '16px';
+          return `<div style="${pos}width:${el.width || 60}%;max-width:320px;">
+            <div style="background:${formBg};backdrop-filter:blur(16px);border-radius:${radius};padding:24px;border:1px solid rgba(63,63,70,0.4);">
+              <form action="$(link-login-only)" method="post">
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+                <div style="margin-bottom:12px;">
+                  <input name="username" placeholder="Username" style="width:100%;padding:12px 16px;background:rgba(39,39,42,0.6);border:1px solid rgba(63,63,70,0.6);border-radius:10px;color:#fff;font-size:14px;outline:none;" />
+                </div>
+                <div style="margin-bottom:16px;">
+                  <input name="password" type="password" placeholder="Password" style="width:100%;padding:12px 16px;background:rgba(39,39,42,0.6);border:1px solid rgba(63,63,70,0.6);border-radius:10px;color:#fff;font-size:14px;outline:none;" />
+                </div>
+                <button type="submit" style="width:100%;padding:12px;background:${styles.accentColor};color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Connect</button>
+              </form>
+              $(if error)<div style="margin-top:12px;padding:8px 12px;background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.2);border-radius:8px;color:#f43f5e;font-size:12px;">$(error)</div>$(endif)
+            </div>
+          </div>`;
+        case 'button':
+          return `<a href="${el.content}" style="${pos}${st}display:inline-block;padding:10px 24px;background:${styles.accentColor};color:#fff;border-radius:8px;text-decoration:none;font-weight:500;">${el.content}</a>`;
+        default: return '';
+      }
+    }).join('\n');
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HotSpot Login</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;}
+  body{${bgStyle}font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;position:relative;}
+  .container{position:relative;width:100%;height:100%;max-width:480px;margin:0 auto;}
+  @media(max-width:480px){.container{width:100%;}}
+</style></head><body>
+<div class="container">${elementsHTML}</div>
+</body></html>`;
+  };
+
+  const selectedEl = elements.find(el => el.id === selectedElement);
+
+  return (
+    <div className="relative min-h-full p-8 animate-fade-in">
+      <div className="absolute inset-0 bg-mesh" />
+      <div className="absolute inset-0 bg-noise" />
+
+      {/* Header */}
+      <div className="relative flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+              <Palette className="w-4 h-4 text-white" />
+            </div>
+            Captive Portal Builder
+          </h1>
+          <p className="text-zinc-400 mt-1">Design and deploy branded WiFi login pages to MikroTik hotspots</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select value={selectedConnection} onChange={e => setSelectedConnection(e.target.value)} className="modern-input text-sm py-2">
+            <option value="">Select router...</option>
+            {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button onClick={savePortal} disabled={loading} className="btn-secondary">
+            <Save className="w-4 h-4" /> Save
+          </button>
+          <button onClick={pushToMikroTik} disabled={loading} className="btn-primary">
+            <Upload className="w-4 h-4" /> Push to Router
+          </button>
+        </div>
+      </div>
+
+      <div className="relative grid grid-cols-12 gap-6">
+        {/* Left Panel - Elements */}
+        <div className="col-span-2 glass rounded-2xl p-4">
+          <h3 className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+            <Layout className="w-4 h-4" /> Elements
+          </h3>
+          <div className="space-y-2">
+            {[
+              { type: 'logo', icon: PaletteIcon, label: 'Logo' },
+              { type: 'text', icon: Type, label: 'Text' },
+              { type: 'login-form', icon: FileText, label: 'Login Form' },
+              { type: 'image', icon: Image, label: 'Image' },
+              { type: 'button', icon: Square, label: 'Button' },
+            ].map(item => (
+              <button key={item.type} onClick={() => addElement(item.type)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-all">
+                <item.icon className="w-4 h-4" /> {item.label}
+              </button>
+            ))}
+          </div>
+
+          <h3 className="text-sm font-medium text-zinc-300 mt-6 mb-3">Templates</h3>
+          <div className="space-y-2">
+            {Object.keys(templates).map(name => (
+              <button key={name} onClick={() => loadTemplate(name)}
+                className="w-full px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 capitalize transition-all">
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Canvas */}
+        <div className="col-span-7">
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-zinc-300">Canvas</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setPreview(true)} className="btn-ghost text-xs py-1 px-2">
+                  <Eye className="w-3.5 h-3.5" /> Preview
+                </button>
+              </div>
+            </div>
+
+            {/* Phone Preview */}
+            <div className="relative mx-auto" style={{ width: 375, height: 667 }}>
+              {/* Phone Frame */}
+              <div className="absolute inset-0 rounded-[32px] border-[3px] border-zinc-700 overflow-hidden shadow-2xl">
+                {/* Background */}
+                <div className="absolute inset-0" style={{
+                  background: styles.bgType === 'gradient'
+                    ? `linear-gradient(135deg, ${styles.bgColor1}, ${styles.bgColor2})`
+                    : styles.bgColor,
+                }} />
+
+                {/* Elements */}
+                {elements.map((el, i) => (
+                  <div
+                    key={el.id}
+                    onClick={() => setSelectedElement(el.id)}
+                    className={`absolute cursor-pointer transition-shadow ${selectedElement === el.id ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-transparent' : 'hover:ring-1 hover:ring-zinc-500'}`}
+                    style={{
+                      left: `${el.x}%`,
+                      top: `${el.y}%`,
+                      transform: 'translateX(-50%)',
+                      width: el.width ? `${el.width}%` : 'auto',
+                    }}
+                  >
+                    {el.type === 'logo' && (
+                      <div style={{ textAlign: 'center', ...el.style, color: el.style.color }}>{el.content}</div>
+                    )}
+                    {el.type === 'text' && (
+                      <div style={{ textAlign: 'center', ...el.style }}>{el.content}</div>
+                    )}
+                    {el.type === 'image' && (
+                      <img src={el.content} alt="" style={{ maxWidth: '100%', borderRadius: el.style.borderRadius, opacity: el.style.opacity }} />
+                    )}
+                    {el.type === 'login-form' && (
+                      <div style={{
+                        background: el.style.bgColor || 'rgba(24,24,27,0.8)',
+                        backdropFilter: 'blur(16px)',
+                        borderRadius: el.style.borderRadius || '16px',
+                        padding: '16px',
+                        border: '1px solid rgba(63,63,70,0.4)',
+                      }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ width: '100%', padding: '8px 12px', background: 'rgba(39,39,42,0.6)', border: '1px solid rgba(63,63,70,0.6)', borderRadius: '8px', color: '#71717a', fontSize: '12px' }}>Username</div>
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ width: '100%', padding: '8px 12px', background: 'rgba(39,39,42,0.6)', border: '1px solid rgba(63,63,70,0.6)', borderRadius: '8px', color: '#71717a', fontSize: '12px' }}>Password</div>
+                        </div>
+                        <div style={{ width: '100%', padding: '8px', background: styles.accentColor, borderRadius: '8px', color: '#fff', fontSize: '12px', textAlign: 'center', fontWeight: 600 }}>Connect</div>
+                      </div>
+                    )}
+                    {el.type === 'button' && (
+                      <div style={{
+                        display: 'inline-block', padding: '8px 16px',
+                        background: styles.accentColor, color: '#fff',
+                        borderRadius: '8px', fontSize: '12px',
+                      }}>{el.content}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Panel - Properties */}
+        <div className="col-span-3 glass rounded-2xl p-4">
+          <h3 className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+            <Settings className="w-4 h-4" /> Properties
+          </h3>
+
+          {selectedEl ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Type</label>
+                <div className="text-sm text-white capitalize">{selectedEl.type}</div>
+              </div>
+              {(selectedEl.type === 'text' || selectedEl.type === 'logo' || selectedEl.type === 'button') && (
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Content</label>
+                  <input value={selectedEl.content} onChange={e => updateElement(selectedEl.id, { content: e.target.value })} className="modern-input text-xs py-1.5" />
+                </div>
+              )}
+              {selectedEl.type === 'image' && (
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Image URL</label>
+                  <input value={selectedEl.content} onChange={e => updateElement(selectedEl.id, { content: e.target.value })} className="modern-input text-xs py-1.5" placeholder="https://..." />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">X Position</label>
+                  <input type="number" value={selectedEl.x} onChange={e => updateElement(selectedEl.id, { x: parseInt(e.target.value) })} className="modern-input text-xs py-1.5" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Y Position</label>
+                  <input type="number" value={selectedEl.y} onChange={e => updateElement(selectedEl.id, { y: parseInt(e.target.value) })} className="modern-input text-xs py-1.5" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Color</label>
+                <input type="color" value={selectedEl.style.color || '#ffffff'} onChange={e => updateElementStyle(selectedEl.id, { color: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Font Size</label>
+                <input value={selectedEl.style.fontSize || '14px'} onChange={e => updateElementStyle(selectedEl.id, { fontSize: e.target.value })} className="modern-input text-xs py-1.5" placeholder="14px" />
+              </div>
+              {selectedEl.type === 'login-form' && (
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Background</label>
+                  <input type="color" value={selectedEl.style.bgColor || 'rgba(24,24,27,0.8)'} onChange={e => updateElementStyle(selectedEl.id, { bgColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+                </div>
+              )}
+              <div className="flex gap-2 pt-2 border-t border-zinc-800/50">
+                <button onClick={() => moveElement(selectedEl.id, -1)} className="btn-ghost p-1.5 flex-1"><MoveUp className="w-3.5 h-3.5" /></button>
+                <button onClick={() => moveElement(selectedEl.id, 1)} className="btn-ghost p-1.5 flex-1"><MoveDown className="w-3.5 h-3.5" /></button>
+                <button onClick={() => deleteElement(selectedEl.id)} className="btn-ghost p-1.5 flex-1 text-rose-400"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-xs text-zinc-500">Select an element to edit its properties</div>
+              <div className="border-t border-zinc-800/50 pt-4">
+                <h4 className="text-xs text-zinc-400 mb-2">Background</h4>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button onClick={() => setStyles({ ...styles, bgType: 'solid' })}
+                      className={`flex-1 px-2 py-1 rounded text-xs ${styles.bgType === 'solid' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>Solid</button>
+                    <button onClick={() => setStyles({ ...styles, bgType: 'gradient' })}
+                      className={`flex-1 px-2 py-1 rounded text-xs ${styles.bgType === 'gradient' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>Gradient</button>
+                  </div>
+                  {styles.bgType === 'solid' ? (
+                    <input type="color" value={styles.bgColor} onChange={e => setStyles({ ...styles, bgColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+                  ) : (
+                    <>
+                      <input type="color" value={styles.bgColor1} onChange={e => setStyles({ ...styles, bgColor1: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+                      <input type="color" value={styles.bgColor2} onChange={e => setStyles({ ...styles, bgColor2: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+                    </>
+                  )}
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Accent Color</label>
+                    <input type="color" value={styles.accentColor} onChange={e => setStyles({ ...styles, accentColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer bg-transparent" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Preview Modal */}
+      {preview && (
+        <div className="modal-backdrop" onClick={() => setPreview(false)}>
+          <div className="glass-strong rounded-2xl w-full max-w-sm animate-fade-in-scale" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-white">Portal Preview</h3>
+              <button onClick={() => setPreview(false)} className="btn-ghost p-2">✕</button>
+            </div>
+            <div className="p-4">
+              <div className="relative mx-auto" style={{ width: 375, height: 667 }}>
+                <div className="absolute inset-0 rounded-[32px] border-[3px] border-zinc-700 overflow-hidden"
+                  style={{ background: styles.bgType === 'gradient' ? `linear-gradient(135deg, ${styles.bgColor1}, ${styles.bgColor2})` : styles.bgColor }}>
+                  {elements.map(el => (
+                    <div key={el.id} style={{ position: 'absolute', left: `${el.x}%`, top: `${el.y}%`, transform: 'translateX(-50%)', width: el.width ? `${el.width}%` : 'auto' }}>
+                      {el.type === 'logo' && <div style={{ textAlign: 'center', ...el.style }}>{el.content}</div>}
+                      {el.type === 'text' && <div style={{ textAlign: 'center', ...el.style }}>{el.content}</div>}
+                      {el.type === 'login-form' && (
+                        <div style={{ background: el.style.bgColor || 'rgba(24,24,27,0.8)', backdropFilter: 'blur(16px)', borderRadius: el.style.borderRadius || '16px', padding: '24px', border: '1px solid rgba(63,63,70,0.4)' }}>
+                          <div style={{ marginBottom: '12px' }}><div style={{ width: '100%', padding: '12px 16px', background: 'rgba(39,39,42,0.6)', border: '1px solid rgba(63,63,70,0.6)', borderRadius: '10px', color: '#71717a', fontSize: '14px' }}>Username</div></div>
+                          <div style={{ marginBottom: '16px' }}><div style={{ width: '100%', padding: '12px 16px', background: 'rgba(39,39,42,0.6)', border: '1px solid rgba(63,63,70,0.6)', borderRadius: '10px', color: '#71717a', fontSize: '14px' }}>Password</div></div>
+                          <div style={{ width: '100%', padding: '12px', background: styles.accentColor, borderRadius: '10px', color: '#fff', fontSize: '14px', textAlign: 'center', fontWeight: 600 }}>Connect</div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-zinc-800/50 flex gap-2">
+              <button onClick={() => { const html = generateHTML(); const blob = new Blob([html], { type: 'text/html' }); const url = URL.createObjectURL(blob); window.open(url); }} className="btn-secondary flex-1 text-xs">
+                <Download className="w-3.5 h-3.5" /> Download HTML
+              </button>
+              <button onClick={() => { navigator.clipboard.writeText(generateHTML()); alert('HTML copied!'); }} className="btn-secondary flex-1 text-xs">
+                <FileText className="w-3.5 h-3.5" /> Copy HTML
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -5,6 +5,7 @@ import {
   MessageSquare, User, ArrowUpRight, ArrowDownRight, ChevronDown, RefreshCw,
   Send, Paperclip, Eye, UserCheck, Tag, Hash
 } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -33,6 +34,7 @@ function StatCard({ title, value, icon: Icon, bg, ring, textColor }) {
 }
 
 export function TicketSystem() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState([]);
@@ -68,7 +70,7 @@ export function TicketSystem() {
       const { data } = await axios.get(`${API}/tickets/${id}`);
       setTicketDetail(data);
       setSelectedTicket(id);
-    } catch (e) {}
+    } catch (error) { console.error('Failed to fetch ticket detail:', error); toast.error('Failed to load ticket', error.response?.data?.error || error.message); }
   };
 
   const filteredTickets = tickets.filter(t => {

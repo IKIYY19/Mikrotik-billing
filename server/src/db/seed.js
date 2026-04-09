@@ -1,4 +1,6 @@
 const db = require('./index');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
 const exampleTemplates = [
   {
@@ -126,8 +128,24 @@ const exampleTemplates = [
 ];
 
 async function seed() {
-  console.log('Seeding database with example templates...');
+  console.log('Seeding database...');
   try {
+    // Create default admin user
+    console.log('Creating default admin user...');
+    const adminEmail = 'admin@example.com';
+    const adminPassword = 'admin123';
+    const adminHash = await bcrypt.hash(adminPassword, 10);
+    
+    await db.query(
+      `INSERT INTO users (id, email, password_hash, name, role, created_at)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+       ON CONFLICT (email) DO NOTHING`,
+      [uuidv4(), adminEmail, adminHash, 'Administrator', 'admin']
+    );
+    console.log('✅ Default admin created: admin@example.com / admin123');
+
+    // Seed example templates
+    console.log('Seeding example templates...');
     for (const template of exampleTemplates) {
       await db.query(
         `INSERT INTO templates (name, description, category, content, is_public)
@@ -136,7 +154,8 @@ async function seed() {
         [template.name, template.description, template.category, template.content, template.is_public]
       );
     }
-    console.log('Seed completed successfully');
+    console.log(`✅ Seeded ${exampleTemplates.length} templates`);
+    console.log('✅ Seed completed successfully');
   } catch (error) {
     console.error('Seed failed:', error);
     throw error;

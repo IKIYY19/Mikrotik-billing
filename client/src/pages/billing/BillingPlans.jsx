@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, Zap } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function BillingPlans() {
+  const toast = useToast();
   const [plans, setPlans] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -12,7 +14,7 @@ export function BillingPlans() {
 
   useEffect(() => { fetchPlans(); }, []);
   const fetchPlans = async () => {
-    try { const { data } = await axios.get(`${API}/billing/plans`); setPlans(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/billing/plans`); setPlans(data); } catch (error) { console.error('Failed to fetch plans:', error); toast.error('Failed to load plans', error.response?.data?.error || error.message); }
   };
 
   const handleSubmit = async (e) => {

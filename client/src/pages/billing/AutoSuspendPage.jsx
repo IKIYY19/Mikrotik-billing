@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Clock, Shield, AlertTriangle, Settings, Play, CheckCircle, Save } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function AutoSuspendPage() {
+  const toast = useToast();
   const [config, setConfig] = useState({ warn_days: 7, throttle_days: 14, suspend_days: 30, throttle_speed_up: '1M', throttle_speed_down: '1M' });
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
@@ -12,11 +14,11 @@ export function AutoSuspendPage() {
   useEffect(() => { fetchConfig(); }, []);
 
   const fetchConfig = async () => {
-    try { const { data } = await axios.get(`${API}/features/auto-suspend/config`); setConfig(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/features/auto-suspend/config`); setConfig(data); } catch (error) { console.error('Failed to fetch auto-suspend config:', error); toast.error('Failed to load config', error.response?.data?.error || error.message); }
   };
 
   const handleSave = async () => {
-    try { await axios.put(`${API}/features/auto-suspend/config`, config); } catch (e) {}
+    try { await axios.put(`${API}/features/auto-suspend/config`, config); toast.success('Config saved', 'Auto-suspend configuration updated'); } catch (error) { console.error('Failed to save auto-suspend config:', error); toast.error('Failed to save config', error.response?.data?.error || error.message); }
   };
 
   const handleRun = async () => {

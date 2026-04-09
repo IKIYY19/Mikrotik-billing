@@ -4,10 +4,10 @@ import {
   Palette, Eye, Save, Upload, Plus, Trash2, Type, Image, Square,
   MoveUp, MoveDown, Download, Settings, Monitor, Smartphone, RefreshCw,
   Palette as PaletteIcon, Layout, FileText, Send, Undo, Redo, GripVertical,
-  Facebook, Twitter, Instagram, Wifi, Bell, Shield, Globe, Clock, ExternalLink,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Layers,
   ArrowUp, ArrowDown, Maximize2, Minimize2, Copy, Clipboard, Check
 } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -125,6 +125,7 @@ const translations = {
 };
 
 export function CaptivePortalBuilder() {
+  const toast = useToast();
   const [portals, setPortals] = useState([]);
   const [editing, setEditing] = useState(null);
   const [preview, setPreview] = useState(false);
@@ -205,7 +206,7 @@ export function CaptivePortalBuilder() {
     try {
       const { data } = await axios.get(`${API}/captive-portals`).catch(() => ({ data: [] }));
       setPortals(data);
-    } catch (e) {}
+    } catch (error) { console.error('Failed to fetch portals:', error); toast.error('Failed to load portals', error.response?.data?.error || error.message); }
   };
 
   /* ─── Template & Element Helpers ─── */

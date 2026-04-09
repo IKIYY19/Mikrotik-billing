@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Smartphone, Wifi, Download, Upload, FileText, CreditCard, Clock, AlertTriangle, CheckCircle, DollarSign, MessageSquare } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function CustomerPortal() {
   const { customerId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPay, setShowPay] = useState(false);
@@ -55,7 +57,8 @@ export function CustomerPortal() {
       await axios.post(`${API}/portal/${customerId}/tickets`, ticketForm);
       setShowTicket(false);
       setTicketForm({ subject: '', description: '', category: 'general' });
-    } catch (e) {}
+      toast.success('Ticket created', 'Your support ticket has been submitted');
+    } catch (error) { console.error('Failed to create ticket:', error); toast.error('Failed to create ticket', error.response?.data?.error || error.message); }
   };
 
   if (loading) return <div className="p-8 text-white">Loading...</div>;

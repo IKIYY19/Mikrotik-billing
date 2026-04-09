@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Plus, Search, ExternalLink, UserPlus, Trash2, Pencil, ChevronRight, Wifi, Zap, ArrowUpRight, ArrowDownRight, Clock, RefreshCw } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -43,6 +44,7 @@ function OnlineStatus({ customer, connections, selectedConnection, onConnectionC
 
 export function BillingCustomers() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [customers, setCustomers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -59,12 +61,12 @@ export function BillingCustomers() {
 
   const fetchCustomers = async () => {
     setLoading(true);
-    try { const { data } = await axios.get(`${API}/billing/customers`); setCustomers(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/billing/customers`); setCustomers(data); } catch (error) { console.error('Failed to fetch customers:', error); toast.error('Failed to load customers', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
   const fetchConnections = async () => {
-    try { const { data } = await axios.get(`${API}/mikrotik`); setConnections(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/mikrotik`); setConnections(data); } catch (error) { console.error('Failed to fetch connections:', error); toast.error('Failed to load connections', error.response?.data?.error || error.message); }
   };
 
   const fetchOnlineStatus = async () => {

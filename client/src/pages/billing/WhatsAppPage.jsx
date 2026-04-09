@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { MessageCircle, Send, Settings, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function WhatsAppPage() {
+  const toast = useToast();
   const [logs, setLogs] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [settings, setSettings] = useState({});
@@ -24,7 +26,7 @@ export function WhatsAppPage() {
     try {
       const { data } = await axios.get(`${API}/sms/logs`);
       setLogs((data.data || []).filter(l => l.channel === 'whatsapp' || l.channel === 'whatsapp_inbound'));
-    } catch (e) {}
+    } catch (error) { console.error('Failed to fetch WhatsApp logs:', error); toast.error('Failed to load logs', error.response?.data?.error || error.message); }
   };
 
   const handleSend = async () => {

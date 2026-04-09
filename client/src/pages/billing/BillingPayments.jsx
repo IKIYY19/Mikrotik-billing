@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, DollarSign } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function BillingPayments() {
+  const toast = useToast();
   const [payments, setPayments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -18,7 +20,7 @@ export function BillingPayments() {
   }, []);
 
   const fetchPayments = async () => {
-    try { const { data } = await axios.get(`${API}/billing/payments`); setPayments(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/billing/payments`); setPayments(data); } catch (error) { console.error('Failed to fetch payments:', error); toast.error('Failed to load payments', error.response?.data?.error || error.message); }
   };
 
   const handleSubmit = async (e) => {

@@ -430,7 +430,7 @@ function DeviceForm({ form, setForm, onClose, onSave, categories, brands, locati
                 <label className="block text-sm font-medium text-zinc-300 mb-1.5">Specifications (JSON)</label>
                 <textarea
                   value={JSON.stringify(form.specs || {}, null, 2)}
-                  onChange={e => { try { setForm({...form, specs: JSON.parse(e.target.value)}); } catch(ex) {} }}
+                  onChange={e => { try { setForm({...form, specs: JSON.parse(e.target.value)}); } catch(ex) { /* Ignore parse errors while typing */ } }}
                   rows="8"
                   className="modern-input resize-none font-mono text-xs"
                   placeholder='{"cpu": "AL32400", "ram": "1GB", "ports": "12xSFP+"}'

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Send, Settings, FileText, MessageSquare, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function SMSPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('send');
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -29,19 +31,19 @@ export function SMSPage() {
   }, []);
 
   const fetchTemplates = async () => {
-    try { const { data } = await axios.get(`${API}/sms/templates`); setTemplates(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/sms/templates`); setTemplates(data); } catch (error) { console.error('Failed to fetch SMS templates:', error); toast.error('Failed to load templates', error.response?.data?.error || error.message); }
   };
 
   const fetchLogs = async () => {
-    try { const { data } = await axios.get(`${API}/sms/logs`); setLogs(data.data || []); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/sms/logs`); setLogs(data.data || []); } catch (error) { console.error('Failed to fetch SMS logs:', error); toast.error('Failed to load logs', error.response?.data?.error || error.message); }
   };
 
   const fetchSettings = async () => {
-    try { const { data } = await axios.get(`${API}/sms/settings`); setSettings(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/sms/settings`); setSettings(data); } catch (error) { console.error('Failed to fetch SMS settings:', error); toast.error('Failed to load settings', error.response?.data?.error || error.message); }
   };
 
   const fetchBalance = async () => {
-    try { const { data } = await axios.get(`${API}/sms/balance`); setBalance(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/sms/balance`); setBalance(data); } catch (error) { console.error('Failed to fetch SMS balance:', error); toast.error('Failed to load balance', error.response?.data?.error || error.message); }
   };
 
   const handleSend = async () => {
@@ -76,7 +78,8 @@ export function SMSPage() {
       await axios.put(`${API}/sms/templates/${template.id}`, template);
       setEditingTemplate(null);
       fetchTemplates();
-    } catch (e) {}
+      toast.success('Template saved', 'SMS template updated successfully');
+    } catch (error) { console.error('Failed to save template:', error); toast.error('Failed to save template', error.response?.data?.error || error.message); }
   };
 
   return (

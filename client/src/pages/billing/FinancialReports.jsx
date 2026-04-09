@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FileText, DollarSign, TrendingUp, AlertTriangle, Download, Users, Calendar, Filter } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function FinancialReports() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('daily');
   const [daily, setDaily] = useState(null);
   const [monthly, setMonthly] = useState(null);
@@ -26,19 +28,19 @@ export function FinancialReports() {
 
   const fetchDaily = async () => {
     setLoading(true);
-    try { const { data } = await axios.get(`${API}/portal/reports/daily?date=${date}`); setDaily(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/portal/reports/daily?date=${date}`); setDaily(data); } catch (error) { console.error('Failed to fetch daily report:', error); toast.error('Failed to load daily report', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
   const fetchMonthly = async () => {
     setLoading(true);
-    try { const { data } = await axios.get(`${API}/portal/reports/monthly?month=${month}&year=${year}`); setMonthly(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/portal/reports/monthly?month=${month}&year=${year}`); setMonthly(data); } catch (error) { console.error('Failed to fetch monthly report:', error); toast.error('Failed to load monthly report', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
   const fetchDebtors = async () => {
     setLoading(true);
-    try { const { data } = await axios.get(`${API}/portal/reports/debtors`); setDebtors(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/portal/reports/debtors`); setDebtors(data); } catch (error) { console.error('Failed to fetch debtors report:', error); toast.error('Failed to load debtors report', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
@@ -46,13 +48,13 @@ export function FinancialReports() {
     setLoading(true);
     const startDate = new Date(year, month, 1).toISOString().split('T')[0];
     const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
-    try { const { data } = await axios.get(`${API}/portal/reports/tax?start_date=${startDate}&end_date=${endDate}`); setTax(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/portal/reports/tax?start_date=${startDate}&end_date=${endDate}`); setTax(data); } catch (error) { console.error('Failed to fetch tax report:', error); toast.error('Failed to load tax report', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
   const fetchCommissions = async () => {
     setLoading(true);
-    try { const { data } = await axios.get(`${API}/portal/reports/commissions`); setCommissions(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/portal/reports/commissions`); setCommissions(data); } catch (error) { console.error('Failed to fetch commissions report:', error); toast.error('Failed to load commissions report', error.response?.data?.error || error.message); }
     setLoading(false);
   };
 
@@ -64,7 +66,7 @@ export function FinancialReports() {
       a.href = url;
       a.download = `${type}-report-${date}.csv`;
       a.click();
-    } catch (e) {}
+    } catch (error) { console.error('Failed to export CSV:', error); toast.error('Export failed', error.response?.data?.error || error.message); }
   };
 
   const tabs = [

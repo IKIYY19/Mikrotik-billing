@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { HardDrive, Plus, Play, Download, Eye, Trash2, Clock, CheckCircle, XCircle, Settings } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function BackupPage() {
+  const toast = useToast();
   const [schedules, setSchedules] = useState([]);
   const [backups, setBackups] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -18,11 +20,11 @@ export function BackupPage() {
   }, []);
 
   const fetchSchedules = async () => {
-    try { const { data } = await axios.get(`${API}/advanced/backup/schedules`); setSchedules(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/advanced/backup/schedules`); setSchedules(data); } catch (error) { console.error('Failed to fetch schedules:', error); toast.error('Failed to load schedules', error.response?.data?.error || error.message); }
   };
 
   const fetchBackups = async () => {
-    try { const { data } = await axios.get(`${API}/advanced/backup/backups`); setBackups(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/advanced/backup/backups`); setBackups(data); } catch (error) { console.error('Failed to fetch backups:', error); toast.error('Failed to load backups', error.response?.data?.error || error.message); }
   };
 
   const handleSubmit = async (e) => {
@@ -39,7 +41,7 @@ export function BackupPage() {
       await axios.post(`${API}/advanced/backup/schedules/${id}/run`);
       fetchBackups();
       fetchSchedules();
-    } catch (e) {}
+    } catch (error) { console.error('Failed to run backup:', error); toast.error('Backup failed', error.response?.data?.error || error.message); }
     setRunning(false);
   };
 
@@ -50,7 +52,7 @@ export function BackupPage() {
       alert(`Success: ${data.success}, Failed: ${data.failed}`);
       fetchBackups();
       fetchSchedules();
-    } catch (e) {}
+    } catch (error) { console.error('Failed to run all backups:', error); toast.error('Run all backups failed', error.response?.data?.error || error.message); }
     setRunning(false);
   };
 
@@ -64,7 +66,7 @@ export function BackupPage() {
     try {
       const { data } = await axios.get(`${API}/advanced/backup/backups/${id}`);
       setViewBackup(data);
-    } catch (e) {}
+    } catch (error) { console.error('Failed to view backup content:', error); toast.error('Failed to load backup', error.response?.data?.error || error.message); }
   };
 
   const downloadBackup = (backup) => {

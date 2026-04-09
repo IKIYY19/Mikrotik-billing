@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Users, Tag, Plus, DollarSign, Package, RefreshCw, Copy, Check, UserPlus } from 'lucide-react';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function AgentResellerPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('agents');
   const [agents, setAgents] = useState([]);
   const [vouchers, setVouchers] = useState([]);
@@ -29,11 +31,11 @@ export function AgentResellerPage() {
   }, []);
 
   const fetchAgents = async () => {
-    try { const { data } = await axios.get(`${API}/features/agents`); setAgents(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/features/agents`); setAgents(data); } catch (error) { console.error('Failed to fetch agents:', error); toast.error('Failed to fetch agents', error.response?.data?.error || error.message); }
   };
 
   const fetchVouchers = async () => {
-    try { const { data } = await axios.get(`${API}/features/vouchers`); setVouchers(data); } catch (e) {}
+    try { const { data } = await axios.get(`${API}/features/vouchers`); setVouchers(data); } catch (error) { console.error('Failed to fetch vouchers:', error); toast.error('Failed to fetch vouchers', error.response?.data?.error || error.message); }
   };
 
   const handleCreateAgent = async (e) => {
