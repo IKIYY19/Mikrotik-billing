@@ -5,11 +5,12 @@ RUN apk add --no-cache nginx supervisor
 
 WORKDIR /app
 
-# Install dependencies for both client and server
+# Copy package files first
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-RUN cd server && npm ci --only=production
+# Install dependencies
+RUN cd server && npm ci --omit=dev
 RUN cd client && npm ci && npm cache clean --force
 
 # Copy source code
