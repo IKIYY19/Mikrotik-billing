@@ -7,6 +7,9 @@ const { v4: uuidv4 } = require('uuid');
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
 
+// Valid RBAC roles
+const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
+
 // Lazy db getter - avoids requiring pg at module load time
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
 
@@ -16,6 +19,9 @@ router.post('/register', async (req, res) => {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name required' });
 
+    // Validate role if provided, default to 'staff'
+    const userRole = role && VALID_ROLES.includes(role) ? role : 'staff';
+
     const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) return res.status(409).json({ error: 'Email already exists' });
 
@@ -23,7 +29,7 @@ router.post('/register', async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5)
        RETURNING id, email, name, role, created_at`,
-      [uuidv4(), email, hash, name, role || 'user']
+      [uuidv4(), email, hash, name, userRole]
     );
 
     const token = jwt.sign({ id: result.rows[0].id, email: result.rows[0].email, role: result.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });

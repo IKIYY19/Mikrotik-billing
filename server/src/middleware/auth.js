@@ -1,10 +1,29 @@
 /**
  * Authentication Middleware
  * Protects API routes with JWT authentication
+ * Includes Role-Based Access Control (RBAC)
  */
 
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'mikrotik-billing-secret-' + require('crypto').randomBytes(32).toString('hex');
+
+// Role hierarchy
+const ROLES = {
+  ADMIN: 'admin',
+  STAFF: 'staff',
+  TECHNICIAN: 'technician',
+  RESELLER: 'reseller',
+  CUSTOMER: 'customer',
+};
+
+// Permission matrix
+const PERMISSIONS = {
+  admin: ['*'], // all permissions
+  staff: ['billing:read', 'billing:write', 'customers:read', 'customers:write', 'reports:read'],
+  technician: ['network:read', 'network:write', 'monitoring:read', 'devices:read', 'devices:write'],
+  reseller: ['customers:read', 'customers:write', 'billing:read', 'invoices:write'],
+  customer: ['own:read', 'billing:read', 'tickets:write'],
+};
 
 // Authentication middleware
 const authenticate = async (req, res, next) => {
@@ -16,7 +35,7 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
-    
+
     // Attach user info to request
     req.user = decoded;
     next();
@@ -58,9 +77,28 @@ const requireRole = (...roles) => {
   };
 };
 
+// Middleware to check permissions
+const requirePermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userPerms = PERMISSIONS[req.user.role] || [];
+    if (userPerms.includes('*') || userPerms.includes(permission)) {
+      return next();
+    }
+
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  };
+};
+
 module.exports = {
   authenticate,
   optionalAuth,
   requireRole,
+  requirePermission,
+  ROLES,
+  PERMISSIONS,
   JWT_SECRET,
 };

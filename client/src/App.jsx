@@ -41,6 +41,7 @@ import { TicketSystem } from './pages/billing/TicketSystem';
 import { CaptivePortalBuilder } from './pages/billing/CaptivePortalBuilder';
 import { BandwidthGraphs } from './pages/billing/BandwidthGraphs';
 import { ResellerPortal } from './pages/billing/ResellerPortal';
+import { UserManagement } from './pages/UserManagement';
 
 function App() {
   return (
@@ -98,6 +99,7 @@ function App() {
                   <Route path="/captive-portal" element={<CaptivePortalBuilder />} />
                   <Route path="/bandwidth" element={<BandwidthGraphs />} />
                   <Route path="/resellers" element={<ResellerPortal />} />
+                  <Route path="/users" element={<UserManagement />} />
                   
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />

@@ -161,6 +161,28 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-zinc-800/50 space-y-3">
+        {/* Settings section - admin only */}
+        {user?.role === 'admin' && (
+          <>
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="h-px flex-1 bg-zinc-800/60" />
+              <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Settings</div>
+              <div className="h-px flex-1 bg-zinc-800/60" />
+            </div>
+            <NavLink
+              to="/users"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  isActive ? 'bg-blue-500/10 text-blue-400' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                }`
+              }
+            >
+              <Users className="w-[18px] h-[18px] flex-shrink-0" />
+              <span className="truncate">User Management</span>
+            </NavLink>
+          </>
+        )}
+
         {user && (
           <div className="flex items-center gap-3 p-2 bg-zinc-800/30 rounded-lg">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -168,7 +190,7 @@ export function Sidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-zinc-300 truncate">{user.name}</p>
-              <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+              <p className="text-xs text-zinc-500 truncate">{user.email}{user.role ? ` (${user.role})` : ''}</p>
             </div>
           </div>
         )}

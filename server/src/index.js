@@ -68,17 +68,25 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/mikrotik', require('./routes/provision')); // Public provisioning
 
 // Protected routes (require authentication)
-const { authenticate } = require('./middleware/auth');
+const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
 
 app.use(authenticate); // All routes below require auth
 
+// Admin-only routes
+app.use('/api/users', requireRole(ROLES.ADMIN), require('./routes/users'));
+
+// Role-protected routes
+app.use('/api/billing', requirePermission('billing:read'), require('./routes/billing'));
+app.use('/api/network', requirePermission('network:read'), require('./routes/network'));
+app.use('/api/customers', requirePermission('customers:read'), require('./routes/billing'));
+
+// Standard authenticated routes
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/modules', require('./routes/modules'));
 app.use('/api/generator', require('./routes/generator'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/devices', require('./routes/devices'));
-app.use('/api/billing', require('./routes/billing'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/sms', require('./routes/sms'));
 app.use('/api/features', require('./routes/features'));
@@ -86,7 +94,6 @@ app.use('/api/portal', require('./routes/customerPortal'));
 app.use('/api/advanced', require('./routes/advanced'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/network', require('./routes/network'));
 app.use('/api/radius', require('./routes/radius'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/resellers', require('./routes/resellers'));
