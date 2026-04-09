@@ -75,21 +75,28 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
 });
 
-// Serve static frontend in production
-if (process.env.NODE_ENV === 'production') {
-  const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
-  const fallbackPath = path.join(__dirname, '..', 'client', 'dist');
+// Serve static frontend (frontend is always bundled in Docker)
+const fs = require('fs');
+
+// Try multiple possible paths for the built frontend
+const possiblePaths = [
+  path.join(__dirname, '..', '..', 'client', 'dist'),  // Docker: /app/server/src/../.. -> /app/client/dist
+  path.join(__dirname, '..', 'client', 'dist'),        // Docker alt: /app/server/src/.. -> /app/server/client/dist
+  path.join(process.cwd(), 'client', 'dist'),          // Absolute: /app/client/dist
+];
+
+let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+if (frontendPath) {
+  console.log(`📦 Serving frontend from: ${frontendPath}`);
+  app.use(express.static(frontendPath));
   
-  // Try both possible paths for the built frontend
-  const staticPath = require('fs').existsSync(clientDistPath) ? clientDistPath : fallbackPath;
-  
-  console.log(`📦 Serving frontend from: ${staticPath}`);
-  app.use(express.static(staticPath));
-  
-  // Catch-all: serve index.html for all non-API routes
+  // Catch-all: serve index.html for all non-API routes (SPA routing)
   app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
+} else {
+  console.warn('⚠️  Frontend dist not found, skipping static file serving');
 }
 
 // Global error handler
