@@ -45,12 +45,20 @@ pool.on('connect', () => {
   console.log('Database connected successfully');
 });
 
+// Handle pool errors gracefully (don't crash the server)
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error('⚠️  Database pool error:', err.message);
+  // Don't exit - let the server continue with fallback behavior
 });
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
+  query: async (text, params) => {
+    try {
+      return await pool.query(text, params);
+    } catch (err) {
+      console.error('⚠️  Database query error:', err.message);
+      throw err;
+    }
+  },
   pool,
 };

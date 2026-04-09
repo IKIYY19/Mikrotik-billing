@@ -5,6 +5,18 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+// Prevent crashes from unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️  Unhandled Promise Rejection:', reason?.message || reason);
+  // Don't exit - log and continue
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('⚠️  Uncaught Exception:', error.message);
+  console.error(error.stack);
+  // Don't exit - log and continue
+});
+
 // Try to use PostgreSQL, fall back to in-memory storage
 let db;
 let dbAvailable = false;

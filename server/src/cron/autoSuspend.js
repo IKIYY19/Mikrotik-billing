@@ -45,10 +45,12 @@ async function runAutoSuspend() {
 function startCron() {
   // Run every 24 hours
   const interval = 24 * 60 * 60 * 1000;
-  console.log(`[Cron] Auto-scron started, runs every 24 hours`);
+  console.log(`[Cron] Auto-suspend cron started, runs every 24 hours`);
 
-  // Run immediately on start
-  runAutoSuspend();
+  // Run after 5 minutes on start (give database time to be ready)
+  setTimeout(() => {
+    runAutoSuspend();
+  }, 5 * 60 * 1000);
 
   setInterval(runAutoSuspend, interval);
 }
