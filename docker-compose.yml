@@ -33,14 +33,21 @@ services:
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
       - "5000:5000"
+    # Improved startup: use wait-for-it script with timeout
     command: >
       sh -c "
-        echo 'Waiting for database...' &&
-        until nc -z ${DB_HOST:-postgres} ${DB_PORT:-5432}; do sleep 1; done &&
-        echo 'Database is ready!' &&
-        npm run db:migrate &&
-        npm run db:seed &&
-        npm start
+        echo 'Waiting for database to be ready...' &&
+        for i in $(seq 1 30); do
+          if nc -z ${DB_HOST:-postgres} ${DB_PORT:-5432} 2>/dev/null; then
+            echo 'Database is ready!' &&
+            npm run db:migrate &&
+            npm run db:seed &&
+            npm start &&
+            break
+          fi
+          echo \"Waiting for database... attempt $$i/30\"
+          sleep 2
+        done
       "
     restart: unless-stopped
     deploy:

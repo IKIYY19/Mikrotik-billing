@@ -34,19 +34,44 @@ services:
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
-      - "3001:80"
-    # Run migrations before starting
+      - "3000:80"
+    # Improved startup with better error handling
     command: >
       sh -c "
+        echo '=========================================' &&
+        echo 'MikroTik Config Builder - Starting...' &&
+        echo '=========================================' &&
+        echo 'Database: $$DB_HOST:$$DB_PORT' &&
+        echo 'Waiting for database...' &&
+        for i in $(seq 1 60); do
+          if nc -z $$DB_HOST $$DB_PORT 2>/dev/null; then
+            echo 'Database connection successful!' &&
+            break
+          fi
+          if [ $$i -eq 60 ]; then
+            echo 'ERROR: Database not available after 60 attempts' &&
+            exit 1
+          fi
+          echo \"Waiting for database... attempt $$i/60\" &&
+          sleep 2
+        done &&
         echo 'Running database migrations...' &&
         cd /app/server &&
-        npm run db:migrate &&
-        npm run db:seed &&
-        echo 'Starting application...' &&
-        /usr/bin/supervisord -c /etc/supervisor.d/supervisord.ini
+        (npm run db:migrate || echo 'WARNING: Migration failed, continuing...') &&
+        (npm run db:seed || echo 'WARNING: Seed failed, continuing...') &&
+        echo 'Starting application with supervisor...' &&
+        exec /usr/bin/supervisord -c /etc/supervisor.d/supervisord.ini
       "
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
           memory: 768M
+        reservations:
+          memory: 256M
