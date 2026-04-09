@@ -25,14 +25,20 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
-# Copy server
+# Copy all source code for migrations
 COPY --from=build /app/server ./server
 COPY --from=build /app/client/dist ./client/dist
+COPY --from=build /app/package.json ./package.json
 
 # Install server dependencies
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
-EXPOSE 5000
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-5000}/api/health || exit 1
+
+# Don't hardcode port - Railway sets PORT env variable
+# EXPOSE 5000  <- Removed, let Railway handle this
 
 CMD ["node", "server/src/index.js"]
