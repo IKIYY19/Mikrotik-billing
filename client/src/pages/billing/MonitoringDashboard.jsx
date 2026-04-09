@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { Activity, Network, Download, Upload, Cpu, MemoryStick, Users, RefreshCw, Server, Wifi } from 'lucide-react';
 
@@ -8,14 +8,24 @@ export function MonitoringDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedBranch, setSelectedBranch] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const intervalRef = useRef(null);
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(fetchData, 60000); // Refresh every minute
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [autoRefresh]);
+
   const fetchData = async () => {
-    setLoading(true);
     try {
       const { data } = await axios.get(`${API}/features/monitoring/dashboard`);
       setData(data);
+      setLastUpdated(new Date());
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -41,11 +51,29 @@ export function MonitoringDashboard() {
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Activity className="w-6 h-6 text-green-400" /> Network Monitoring
           </h2>
-          <p className="text-sm text-slate-400">Real-time network status across all branches</p>
+          <p className="text-sm text-slate-400">
+            Real-time network status across all branches
+            {lastUpdated && (
+              <span className="ml-2 text-xs text-slate-500">
+                (Updated: {lastUpdated.toLocaleTimeString()})
+              </span>
+            )}
+          </p>
         </div>
-        <button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
+              autoRefresh ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-slate-700 text-slate-400'
+            }`}
+          >
+            <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+            Auto
+          </button>
+          <button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -155,6 +183,7 @@ export function MonitoringDashboard() {
                 <tr>
                   <th className="text-left p-3">Username</th>
                   <th className="text-left p-3">Customer</th>
+                  <th className="text-left p-3">Router</th>
                   <th className="text-left p-3">IP Address</th>
                   <th className="text-left p-3">Upload</th>
                   <th className="text-left p-3">Download</th>
@@ -167,6 +196,7 @@ export function MonitoringDashboard() {
                   <tr key={session.id} className="border-t border-slate-700 hover:bg-slate-700/50">
                     <td className="p-3 text-blue-400 font-mono text-xs">{session.username}</td>
                     <td className="p-3 text-white">{session.customer_name}</td>
+                    <td className="p-3 text-slate-400 text-xs">{session.router_name || '—'}</td>
                     <td className="p-3 text-slate-300 font-mono text-xs">{session.ip_address}</td>
                     <td className="p-3 text-blue-300">{(session.bytes_in / (1024 * 1024)).toFixed(0)} MB</td>
                     <td className="p-3 text-purple-300">{(session.bytes_out / (1024 * 1024)).toFixed(0)} MB</td>

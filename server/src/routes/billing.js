@@ -393,11 +393,174 @@ router.get('/usage/:customerId', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/usage', async (req, res) => {
+router.post('/usage/record', async (req, res) => {
   try {
     const record = await billing.recordUsage(req.body);
     res.status(201).json(record);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// Get aggregated usage history for bandwidth graphs
+router.get('/usage/history', async (req, res) => {
+  try {
+    const { time_range = '1h', customer_id = '', connection_id = '' } = req.query;
+
+    // Determine time window and grouping
+    const now = new Date();
+    let startTime, groupBy;
+    switch (time_range) {
+      case '6h':
+        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+        groupBy = '5m';
+        break;
+      case '24h':
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        groupBy = '15m';
+        break;
+      case '7d':
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        groupBy = '1h';
+        break;
+      default: // 1h
+        startTime = new Date(now.getTime() - 60 * 60 * 1000);
+        groupBy = '1m';
+    }
+
+    // Get all usage records within the time window
+    let records = billing.store.usage_records.filter(r => {
+      const recordedAt = new Date(r.recorded_at);
+      return recordedAt >= startTime && recordedAt <= now;
+    });
+
+    // Filter by customer if specified
+    if (customer_id) {
+      records = records.filter(r => r.customer_id === customer_id);
+    }
+
+    // If connection_id specified, get PPPoE sessions from MikroTik for real-time data
+    let pppoeSessions = [];
+    let pppoeBandwidth = { total_in: 0, total_out: 0 };
+
+    if (connection_id) {
+      try {
+        const db = global.db || require('../db/memory');
+        const crypto = require('crypto');
+        const algorithm = 'aes-256-gcm';
+        const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
+
+        const connResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [connection_id]);
+        if (connResult.rows.length > 0) {
+          const device = connResult.rows[0];
+          const [ivHex, authTagHex, encrypted] = device.password_encrypted.split(':');
+          const iv = Buffer.from(ivHex, 'hex');
+          const authTag = Buffer.from(authTagHex, 'hex');
+          const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+          decipher.setAuthTag(authTag);
+          let password = decipher.update(encrypted, 'hex', 'utf8');
+          password += decipher.final('utf8');
+
+          const MikroNode = require('mikronode');
+          const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
+          const connection = await mikrotik.connect(device.username, password);
+          const close = connection.closeOnDone(true);
+
+          const pppoeChan = connection.openChannel();
+          pppoeChan.write('/ppp/active/print');
+          pppoeSessions = await pppoeChan.done;
+          close();
+
+          // Calculate total bandwidth from PPPoE sessions
+          for (const session of (Array.isArray(pppoeSessions) ? pppoeSessions : [])) {
+            const bytesIn = parseBytes(session['bytes-in'] || session.bytes_in);
+            const bytesOut = parseBytes(session['bytes-out'] || session.bytes_out);
+            pppoeBandwidth.total_in += bytesIn;
+            pppoeBandwidth.total_out += bytesOut;
+          }
+        }
+      } catch (e) {
+        console.warn('[Billing] Failed to get PPPoE data:', e.message);
+      }
+    }
+
+    // Aggregate records by time bucket
+    const aggregated = aggregateByTimeRange(records, startTime, now, groupBy);
+
+    // If no historical data, use current PPPoE session data to populate latest point
+    if (aggregated.length === 0 && pppoeSessions.length > 0) {
+      aggregated.push({
+        time: now.toISOString(),
+        download: pppoeBandwidth.total_out,
+        upload: pppoeBandwidth.total_in,
+        total: pppoeBandwidth.total_in + pppoeBandwidth.total_out,
+        sessions: pppoeSessions.length,
+      });
+    }
+
+    res.json({
+      data: aggregated,
+      time_range: time_range,
+      group_by: groupBy,
+      total_sessions: pppoeSessions.length,
+      total_bandwidth_in: pppoeBandwidth.total_in,
+      total_bandwidth_out: pppoeBandwidth.total_out,
+    });
+  } catch (e) {
+    console.error('[Billing] Usage history error:', e);
+    res.status(500).json({ error: e.message, data: [] });
+  }
+});
+
+// Helper: parse MikroTik bytes string to integer
+function parseBytes(bytesStr) {
+  if (!bytesStr) return 0;
+  const str = String(bytesStr);
+  if (/^\d+$/.test(str)) return parseInt(str);
+  const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
+  if (!match) return 0;
+  const value = parseFloat(match[1]);
+  const unit = (match[2] || '').toLowerCase().replace('ib', '');
+  const multipliers = { '': 1, k: 1024, m: 1048576, g: 1073741824, t: 1099511627776, p: 1125899906842624 };
+  return Math.round(value * (multipliers[unit] || 1));
+}
+
+// Helper: aggregate usage records into time buckets
+function aggregateByTimeRange(records, startTime, endTime, groupBy) {
+  const buckets = [];
+  let current = new Date(startTime);
+
+  // Determine bucket size in milliseconds
+  let bucketSize;
+  switch (groupBy) {
+    case '1m': bucketSize = 60 * 1000; break;
+    case '5m': bucketSize = 5 * 60 * 1000; break;
+    case '15m': bucketSize = 15 * 60 * 1000; break;
+    case '1h': bucketSize = 60 * 60 * 1000; break;
+    default: bucketSize = 60 * 1000;
+  }
+
+  while (current < endTime) {
+    const bucketEnd = new Date(current.getTime() + bucketSize);
+    const bucketRecords = records.filter(r => {
+      const t = new Date(r.recorded_at);
+      return t >= current && t < bucketEnd;
+    });
+
+    const download = bucketRecords.reduce((sum, r) => sum + (parseInt(r.bytes_out) || 0), 0);
+    const upload = bucketRecords.reduce((sum, r) => sum + (parseInt(r.bytes_in) || 0), 0);
+    const uniqueSessions = new Set(bucketRecords.map(r => r.session_id).filter(Boolean)).size;
+
+    buckets.push({
+      time: current.toISOString(),
+      download,
+      upload,
+      total: download + upload,
+      sessions: Math.max(uniqueSessions, bucketRecords.length),
+    });
+
+    current = bucketEnd;
+  }
+
+  return buckets;
+}
 
 module.exports = router;

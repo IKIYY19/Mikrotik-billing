@@ -140,8 +140,16 @@ const startServer = async () => {
         startCron();
         cronStarted = true;
       } catch (e) {
-        console.warn('⚠️  Could not start cron:', e.message);
+        console.warn('⚠️  Could not start auto-suspend cron:', e.message);
       }
+    }
+
+    // Start metrics collection cron
+    try {
+      const { startCron: startMetricsCron } = require('./cron/collectMetrics');
+      startMetricsCron();
+    } catch (e) {
+      console.warn('⚠️  Could not start metrics collection cron:', e.message);
     }
 
     app.listen(PORT, () => {

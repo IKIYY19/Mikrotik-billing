@@ -95,10 +95,17 @@ export function BandwidthGraphs() {
 
   useEffect(() => {
     if (polling && selectedConnection) {
-      intervalRef.current = setInterval(fetchBandwidthData, 5000);
+      intervalRef.current = setInterval(fetchBandwidthData, 30000); // Poll every 30s for real data
     }
     return () => clearInterval(intervalRef.current);
   }, [polling, selectedConnection, timeRange]);
+
+  // Refetch usage history when timeRange changes
+  useEffect(() => {
+    if (selectedConnection || usageData.length > 0) {
+      fetchUsageHistory();
+    }
+  }, [timeRange]);
 
   const fetchBandwidthData = async () => {
     setLoading(true);
@@ -114,31 +121,34 @@ export function BandwidthGraphs() {
       ];
       setActiveSessions(sessions);
 
-      // Generate fake historical data for demo (replace with real polling)
-      generateHistoricalData(sessions);
+      // Fetch REAL historical usage data from backend
+      await fetchUsageHistory();
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  const generateHistoricalData = (sessions) => {
-    const points = timeRange === '1h' ? 60 : timeRange === '6h' ? 72 : timeRange === '24h' ? 96 : 168;
-    const interval = timeRange === '1h' ? 60000 : timeRange === '6h' ? 300000 : timeRange === '24h' ? 900000 : 3600000;
-    const now = Date.now();
+  const fetchUsageHistory = async () => {
+    try {
+      const params = new URLSearchParams({ time_range: timeRange });
+      if (selectedConnection) params.append('connection_id', selectedConnection);
+      if (selectedCustomer) params.append('customer_id', selectedCustomer);
 
-    const data = [];
-    for (let i = points - 1; i >= 0; i--) {
-      const timestamp = new Date(now - i * interval);
-      const download = Math.random() * 50000000 + 10000000;
-      const upload = Math.random() * 20000000 + 5000000;
-      data.push({
-        time: timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        download: parseInt(download),
-        upload: parseInt(upload),
-        total: parseInt(download + upload),
-        sessions: sessions.length + Math.floor(Math.random() * 3),
-      });
+      const { data } = await axios.get(`${API}/billing/usage/history?${params.toString()}`).catch(() => ({ data: { data: [] } }));
+
+      // Transform backend data to match frontend format
+      const historyData = (data.data || []).map(d => ({
+        time: new Date(d.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        download: d.download || 0,
+        upload: d.upload || 0,
+        total: d.total || 0,
+        sessions: d.sessions || 0,
+      }));
+
+      setUsageData(historyData);
+    } catch (e) {
+      console.error('Failed to fetch usage history:', e);
+      setUsageData([]);
     }
-    setUsageData(data);
   };
 
   const totalDownload = usageData.reduce((s, d) => s + d.download, 0);

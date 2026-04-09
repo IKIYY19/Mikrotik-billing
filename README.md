@@ -1,399 +1,326 @@
-# MikroTik Config Builder
+# 🚀 MikroTik Billing Platform
 
-A full-stack web application that generates MikroTik RouterOS scripts automatically. Designed for network engineers and ISPs to create complete MikroTik configurations without manually typing commands.
+Complete ISP management platform with MikroTik RouterOS integration, billing system, customer portal, and network monitoring.
 
-![MikroTik Config Builder](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Features
+## ✨ Features
 
-### 10 Configuration Modules
+### 🔐 Security (NEW!)
+- **JWT Authentication** - Secure login for all users
+- **Protected API** - All routes require authentication
+- **Password Hashing** - Bcrypt with salt
+- **Token Management** - Auto-refresh and expiry handling
 
-| Module | Description |
-|--------|-------------|
-| **Interfaces & Switching** | Bridge creation, VLAN setup, bridge ports, VLAN filtering (RouterOS v7 style) |
-| **IP Configuration** | IPv4/IPv6 addressing, DNS settings, DHCP client/server |
-| **Routing** | Static routes, OSPF, BGP, Policy Based Routing (PBR), VRF support |
-| **Firewall & NAT** | Filter rules, NAT masquerade, port forwarding, FastTrack, mangle, address-lists |
-| **ISP Services** | PPPoE server, PPP profiles/secrets, Hotspot setup, RADIUS integration |
-| **Bandwidth Management** | Simple queues, queue trees, PCQ profiles, predefined speed profiles |
-| **VPN & Tunnels** | WireGuard, L2TP/IPsec, SSTP, IPsec site-to-site, GRE, EoIP, IPIP |
-| **Load Balancing** | PCC load balancing (2/3 WAN), ECMP, recursive routing, netwatch failover |
-| **Wireless** | Wireless SSID, security profiles, CAPsMAN controller config |
-| **System & Monitoring** | NTP, SNMP, logging, backup scheduler, service management, user creation |
+### 💰 Billing & Invoicing
+- Customer management with online status polling
+- Service plans (speed, quota, priority)
+- Subscription lifecycle management
+- Automated invoice generation
+- Multiple payment methods (Cash, Bank, M-Pesa, Card)
+- M-Pesa STK Push integration
+- Customer self-service portal
+- Prepaid wallet system
+- Auto-suspension for non-payment
 
-### Key Features
+### 🌐 Network Management
+- **MikroTik API Integration** - Direct router control
+- PPPoE server management
+- Hotspot management with vouchers
+- Real-time PPPoE session monitoring
+- Network queues and bandwidth management
+- DHCP/DNS/Firewall configuration
+- FreeRADIUS integration
 
-- **RouterOS v6 & v7 Support**: Generate scripts compatible with both RouterOS versions
-- **Input Validation**: Validates configurations before generating scripts
-- **Script Output**: Clean, commented MikroTik CLI commands
-- **Export as .rsc**: Download generated scripts as RouterOS script files
-- **Copy to Clipboard**: One-click copy functionality
-- **Project Management**: Create and manage multiple configuration projects
-- **Reusable Templates**: Save and apply common configurations
-- **MikroTik API Push**: Push generated scripts directly to MikroTik devices via API
-- **Version History**: Track changes per project (optional)
+### 📊 Monitoring & Analytics (IMPROVED!)
+- **Real PPPoE monitoring** (no more fake data!)
+- **Real bandwidth graphs** with historical data
+- **Live network map** with customer locations
+- Revenue and churn analytics
+- Customer growth tracking
+- Financial reports (daily, monthly, debtors, tax)
 
-## Tech Stack
+### 📱 Communication
+- SMS notifications via Africa's Talking
+- WhatsApp Business integration
+- Bulk messaging
+- Payment reminders
+- Service alerts
 
-- **Frontend**: React 18 + Vite + TailwindCSS + Zustand
-- **Backend**: Node.js + Express
-- **Database**: PostgreSQL 15
-- **Deployment**: Docker + Docker Compose
+### 🎫 Support & Operations
+- Ticket system with SLA tracking
+- Device inventory management
+- Auto backup & restore
+- Multi-router support
+- Topology builder
+- Captive portal designer
 
-## Prerequisites
+## 🚀 Quick Start
 
+### Prerequisites
 - Node.js 18+
-- PostgreSQL 15+
-- Docker & Docker Compose (optional, for containerized deployment)
-
-## Quick Start
+- PostgreSQL 15+ (or use in-memory mode)
 
 ### Option 1: Local Development
 
-1. **Clone the repository**
+```bash
+# 1. Clone repository
+git clone https://github.com/IKIYY19/Mikrotik-billing.git
+cd Mikrotik-billing
+
+# 2. Install dependencies
+npm install
+cd server && npm install && cd ..
+cd client && npm install && cd ..
+
+# 3. Setup environment
+cp .env.template .env
+# Edit .env and fill in values (or leave defaults for testing)
+
+# 4. Start PostgreSQL (optional - app works without it)
+# If PostgreSQL is not running, app will use in-memory storage
+
+# 5. Run migrations (if using PostgreSQL)
+cd server
+npm run db:migrate
+npm run db:seed  # Creates default admin user
+
+# 6. Start development servers
+cd ..
+npm run dev
+```
+
+**Default Admin Credentials:**
+- Email: `admin@example.com`
+- Password: `admin123`
+
+### Option 2: Railway Deployment
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=Mikrotik-billing)
+
+1. Click button above or go to Railway.app
+2. Deploy from GitHub repo
+3. Add PostgreSQL database
+4. Set environment variables:
+   ```env
+   JWT_SECRET=<generate-random-64-chars>
+   ENCRYPTION_KEY=<generate-random-32-chars>
+   CORS_ORIGIN=https://your-domain.railway.app
+   ```
+5. Run migrations in Railway shell:
    ```bash
-   git clone <repository-url>
-   cd mikrotik-config-builder
+   cd server && npm run db:migrate && npm run db:seed
    ```
 
-2. **Install dependencies**
-   ```bash
-   # Root dependencies
-   npm install
+See [RAILWAY.md](RAILWAY.md) for detailed instructions.
 
-   # Server dependencies
-   cd server
-   npm install
-
-   # Client dependencies
-   cd ../client
-   npm install
-   cd ..
-   ```
-
-3. **Set up PostgreSQL**
-   ```bash
-   # Create database
-   createdb mikrotik_config_builder
-   ```
-
-4. **Configure environment**
-   ```bash
-   cd server
-   cp .env.example .env
-   # Edit .env with your database credentials
-   ```
-
-5. **Run database migrations**
-   ```bash
-   npm run db:migrate
-   npm run db:seed  # Optional: Load example templates
-   ```
-
-6. **Start development servers**
-   ```bash
-   # From project root
-   npm run dev
-   ```
-
-   This starts:
-   - Backend API on `http://localhost:5000`
-   - Frontend on `http://localhost:5173`
-
-### Option 2: Docker Compose
-
-1. **Build and start all services**
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **Access the application**
-   - Frontend: `http://localhost`
-   - Backend API: `http://localhost:5000`
-   - Database: `localhost:5432`
-
-3. **Stop services**
-   ```bash
-   docker-compose down
-   ```
-
-## Project Structure
-
-```
-mikrotik-config-builder/
-├── client/                      # React frontend
-│   ├── src/
-│   │   ├── components/          # Reusable UI components
-│   │   │   └── Sidebar.jsx
-│   │   ├── modules/             # Configuration module forms
-│   │   │   ├── InterfacesModule.jsx
-│   │   │   ├── IPConfigModule.jsx
-│   │   │   ├── RoutingModule.jsx
-│   │   │   ├── FirewallModule.jsx
-│   │   │   ├── ISPModule.jsx
-│   │   │   ├── BandwidthModule.jsx
-│   │   │   ├── VPNModule.jsx
-│   │   │   ├── LoadBalancingModule.jsx
-│   │   │   ├── WirelessModule.jsx
-│   │   │   └── SystemModule.jsx
-│   │   ├── pages/               # Page components
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── ProjectDetail.jsx
-│   │   │   ├── Templates.jsx
-│   │   │   ├── MikroTikAPI.jsx
-│   │   │   └── ScriptOutput.jsx
-│   │   ├── App.jsx
-│   │   ├── store.js             # Zustand state management
-│   │   └── index.css
-│   ├── index.html
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── package.json
-│
-├── server/                      # Express backend
-│   ├── src/
-│   │   ├── db/                  # Database layer
-│   │   │   ├── index.js         # PostgreSQL connection pool
-│   │   │   ├── migrate.js       # Database migrations
-│   │   │   └── seed.js          # Seed data (example templates)
-│   │   ├── generators/          # Script generators
-│   │   │   ├── index.js         # Main orchestrator
-│   │   │   ├── interfaces.js    # Interfaces & switching
-│   │   │   ├── ipconfig.js      # IP configuration
-│   │   │   ├── routing.js       # Routing (OSPF, BGP, etc.)
-│   │   │   ├── firewall.js      # Firewall & NAT
-│   │   │   ├── isp.js           # ISP services
-│   │   │   ├── bandwidth.js     # Bandwidth management
-│   │   │   ├── vpn.js           # VPN & tunnels
-│   │   │   ├── loadbalancing.js # Load balancing
-│   │   │   ├── wireless.js      # Wireless & CAPsMAN
-│   │   │   └── system.js        # System & monitoring
-│   │   ├── routes/              # API routes
-│   │   │   ├── projects.js
-│   │   │   ├── modules.js
-│   │   │   ├── generator.js
-│   │   │   ├── templates.js
-│   │   │   └── mikrotik.js
-│   │   └── index.js             # Express app entry point
-│   └── package.json
-│
-├── docker-compose.yml           # Docker orchestration
-├── Dockerfile.server            # Backend Docker image
-├── Dockerfile.client            # Frontend Docker image
-└── README.md
-```
-
-## API Endpoints
-
-### Projects
-```
-GET    /api/projects           # List all projects
-POST   /api/projects           # Create project
-GET    /api/projects/:id       # Get project with modules
-PUT    /api/projects/:id       # Update project
-DELETE /api/projects/:id       # Delete project
-```
-
-### Modules
-```
-GET    /api/modules/project/:projectId  # Get modules for project
-POST   /api/modules                     # Create/update module
-DELETE /api/modules/:id                 # Delete module
-```
-
-### Generator
-```
-POST   /api/generator/generate          # Generate script from modules
-POST   /api/generator/project/:id       # Generate script from saved project
-```
-
-### Templates
-```
-GET    /api/templates              # List templates
-GET    /api/templates/:id          # Get single template
-POST   /api/templates              # Create template
-PUT    /api/templates/:id          # Update template
-DELETE /api/templates/:id          # Delete template
-```
-
-### MikroTik API
-```
-GET    /api/mikrotik              # List saved connections
-POST   /api/mikrotik              # Save connection
-POST   /api/mikrotik/test         # Test connection
-POST   /api/mikrotik/push         # Push script to device
-DELETE /api/mikrotik/:id          # Delete connection
-```
-
-## Usage Guide
-
-### Creating a Project
-
-1. Navigate to the Dashboard
-2. Click "New Project"
-3. Enter project name, description, and RouterOS version
-4. Click "Create"
-
-### Configuring Modules
-
-1. Open a project
-2. Select a module from the left sidebar
-3. Fill in configuration fields
-4. Click "Save" to persist configuration
-5. Green checkmarks indicate configured modules
-
-### Generating Scripts
-
-1. Configure desired modules in your project
-2. Click "Generate Script"
-3. Review the generated script
-4. Check validation results for any errors
-5. Copy to clipboard or download as `.rsc` file
-
-### Applying to MikroTik
-
-1. Go to "MikroTik API" page
-2. Add your router connection details (IP, port, credentials)
-3. Test the connection
-4. Save the connection
-5. From project view, generate script
-6. Use the Push button to send script to device
-
-**⚠️ Warning**: Always test configurations in a lab environment before applying to production routers.
-
-## Example Configurations
-
-The seed data includes these example templates:
-
-- **Basic VLAN Setup**: VLAN interfaces with IP addresses
-- **OSPF Single Area**: Basic OSPF configuration
-- **BGP Basic Setup**: BGP with peer configuration
-- **PPPoE Server**: Complete PPPoE setup with profiles
-- **Hotspot Setup**: Hotspot with walled garden
-- **WireGuard VPN**: WireGuard server and peers
-- **Basic Firewall**: Standard firewall with NAT
-
-Load these via: `npm run db:seed`
-
-## MikroTik API Setup
-
-To enable the API push feature on your MikroTik router:
-
-1. Enable API service:
-   ```
-   /ip service enable api
-   /ip service set api port=8728
-   ```
-
-2. Create API user with full permissions:
-   ```
-   /user add name=api-user password=strong-password group=full
-   ```
-
-3. Configure allowed addresses (optional but recommended):
-   ```
-   /ip service set api address=192.168.1.0/24
-   ```
-
-## Production Deployment
-
-### Environment Variables
-
-```env
-# Server
-PORT=5000
-NODE_ENV=production
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=mikrotik_config_builder
-DB_USER=postgres
-DB_PASSWORD=your-secure-password
-CORS_ORIGIN=https://yourdomain.com
-ENCRYPTION_KEY=your-32-character-encryption-key
-
-# Database
-POSTGRES_DB=mikrotik_config_builder
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your-secure-password
-```
-
-### Docker Production
+### Option 3: Docker (VPS)
 
 ```bash
-# Build production images
-docker-compose build
+# Clone repo
+git clone https://github.com/IKIYY19/Mikrotik-billing.git
+cd Mikrotik-billing
 
-# Start services
-docker-compose up -d
+# Setup
+cp .env.example .env
+# Edit .env with your values
 
-# View logs
-docker-compose logs -f server
-
-# Stop services
-docker-compose down
-
-# Stop and remove volumes
-docker-compose down -v
+# Deploy
+docker-compose -f docker-compose-simple.yml up -d
 ```
 
-### Reverse Proxy
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment guide.
 
-For production, place a reverse proxy (nginx/traefik/caddy) in front of the application with SSL/TLS termination.
+## 📁 Project Structure
 
-## Security Considerations
-
-- Passwords for MikroTik connections are encrypted using AES-256-GCM
-- Change the default `ENCRYPTION_KEY` in production
-- Use environment variables for all secrets
-- Enable CORS only for your frontend domain in production
-- Use HTTPS for all production deployments
-- Restrict API access to specific IP ranges on your routers
-
-## Troubleshooting
-
-### Database Connection Issues
-```bash
-# Check PostgreSQL is running
-pg_isready -h localhost -p 5432
-
-# Run migrations manually
-cd server && npm run db:migrate
+```
+Mikrotik-billing/
+├── client/                 # React frontend
+│   └── src/
+│       ├── components/     # Reusable UI components
+│       ├── pages/          # Page components
+│       │   └── billing/    # Billing system pages
+│       ├── modules/        # MikroTik config modules
+│       ├── lib/           # API client with auth
+│       ├── hooks/         # Custom React hooks
+│       └── store.js       # Zustand state management
+│
+├── server/                # Express backend
+│   └── src/
+│       ├── routes/        # API endpoints
+│       ├── middleware/    # Auth middleware
+│       ├── db/            # Database layer
+│       ├── generators/    # MikroTik script generators
+│       ├── services/      # External services (SMS, payments)
+│       ├── cron/          # Scheduled jobs
+│       └── utils/         # Helper functions
+│
+└── Documentation/
+    ├── README.md
+    ├── RAILWAY.md
+    ├── DEPLOYMENT.md
+    ├── PRODUCTION-SETUP.md
+    └── RAILWAY-QUICKSTART.md
 ```
 
-### Port Conflicts
-- Backend: Change `PORT` in `.env`
-- Frontend: Change `server.port` in `client/vite.config.js`
-- Database: Change port mapping in `docker-compose.yml`
+## 🔑 API Endpoints
 
-### Generator Not Producing Output
-- Ensure at least one module is configured
-- Check browser console for errors
-- Verify backend API is accessible
+### Authentication
+```
+POST   /api/auth/register        # Create user account
+POST   /api/auth/login           # Login and get JWT token
+GET    /api/auth/me              # Get current user (requires auth)
+```
 
-## Contributing
+### Billing
+```
+GET    /api/billing/dashboard     # Billing statistics
+GET    /api/billing/customers     # List customers
+POST   /api/billing/customers     # Create customer
+GET    /api/billing/customers/:id # Customer details
+PUT    /api/billing/customers/:id # Update customer
+DELETE /api/billing/customers/:id # Delete customer
+
+GET    /api/billing/plans         # List service plans
+POST   /api/billing/plans         # Create plan
+
+GET    /api/billing/subscriptions # List subscriptions
+POST   /api/billing/subscriptions # Create subscription
+
+GET    /api/billing/invoices      # List invoices
+POST   /api/billing/invoices      # Create invoice
+
+GET    /api/billing/payments      # List payments
+POST   /api/billing/payments      # Record payment
+
+POST   /api/payments/mpesa/stk    # Initiate M-Pesa STK Push
+GET    /api/billing/usage/history # Historical bandwidth data
+POST   /api/billing/usage/record  # Record bandwidth usage
+```
+
+### Network
+```
+GET    /api/network/pppoe/active   # Active PPPoE sessions
+GET    /api/network/hotspot/active # Active hotspot users
+GET    /api/features/monitoring/dashboard # Real monitoring data
+```
+
+### MikroTik Config Builder
+```
+GET    /api/projects               # List projects
+POST   /api/projects               # Create project
+POST   /api/generator/generate     # Generate MikroTik script
+```
+
+## 🗄️ Database
+
+The app works with **PostgreSQL** or **in-memory storage**:
+
+- **PostgreSQL**: Full persistence, recommended for production
+- **In-Memory**: Development/testing, data lost on restart
+
+Migrations are handled automatically by `npm run db:migrate`.
+
+## 🔐 Security
+
+- All API routes require JWT authentication
+- Passwords hashed with bcrypt (10 rounds)
+- JWT tokens expire after 7 days (configurable)
+- CORS restricted to your domain
+- MikroTik passwords encrypted with AES-256-GCM
+- Environment variables for all secrets
+
+## 📊 Monitoring
+
+The app collects real metrics every 5 minutes:
+- PPPoE session data from MikroTik routers
+- Bandwidth usage per customer
+- Online/offline status
+- Historical usage trends
+
+Data is stored in `usage_records` table for reporting.
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- React 18
+- Vite 5
+- TailwindCSS 3
+- Zustand (state management)
+- Axios (HTTP client)
+- React Router 6
+- Lucide React (icons)
+
+**Backend:**
+- Node.js 18
+- Express 4
+- PostgreSQL (via `pg`)
+- JWT authentication
+- mikronode (MikroTik API)
+- bcryptjs (password hashing)
+
+**Deployment:**
+- Railway.app (recommended)
+- Docker Compose
+- Dokploy (self-hosted)
+
+## 📈 Roadmap
+
+### Completed ✅
+- [x] Authentication system
+- [x] Real monitoring data
+- [x] Real bandwidth graphs
+- [x] Customer management
+- [x] Billing & invoicing
+- [x] Payment integration
+- [x] SMS/WhatsApp notifications
+- [x] Network map
+- [x] Captive portal designer
+- [x] Auto-suspension
+- [x] Inventory management
+
+### In Progress 🚧
+- [ ] OLT integration (Huawei/ZTE)
+- [ ] Email notifications
+- [ ] Credit notes
+- [ ] Audit logging
+- [ ] Configuration versioning
+
+### Planned 📋
+- [ ] Mobile app (React Native)
+- [ ] Advanced routing
+- [ ] AI anomaly detection
+- [ ] Multi-tenant resellers
+- [ ] White-label branding
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-## License
+## 📄 License
 
-MIT License - See LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file
 
-## Support
+## 🆘 Support
 
-For issues, feature requests, or questions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review MikroTik official docs for RouterOS syntax
+- **Documentation**: See guides in repository
+- **Issues**: Open GitHub issue
+- **Discussions**: GitHub Discussions
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-This tool generates MikroTik RouterOS configuration scripts. Always review generated scripts before applying them to production devices. The authors are not responsible for network disruptions caused by misconfigurations.
+This tool manages critical network infrastructure. Always:
+- Test configurations in lab environment first
+- Review generated scripts before applying
+- Backup router configs regularly
+- Use strong passwords for all services
+- Keep secrets out of version control
 
 ---
 
-**Built with ❤️ for the Network Engineering Community**
+**Built with ❤️ for ISPs and Network Engineers**

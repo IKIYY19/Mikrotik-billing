@@ -139,49 +139,209 @@ router.post('/vouchers/redeem', (req, res) => {
 // ═══════════════════════════════════════
 // NETWORK MONITORING
 // ═══════════════════════════════════════
-router.get('/monitoring/dashboard', (req, res) => {
-  // Refresh PPPoE sessions from current subscriptions
-  multiStore.pppoeSessions.length = 0;
-  billing.store.subscriptions.filter(s => s.pppoe_username && s.status === 'active').forEach(sub => {
-    multiStore.pppoeSessions.push({
-      id: uuidv4(),
-      username: sub.pppoe_username,
-      customer_name: sub.customer?.name || 'Unknown',
-      plan_name: sub.plan?.name || 'Unknown',
-      ip_address: `10.10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`,
-      bytes_in: Math.floor(Math.random() * 5000000000),
-      bytes_out: Math.floor(Math.random() * 10000000000),
-      uptime_seconds: Math.floor(Math.random() * 86400 * 7),
-      connected_at: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+router.get('/monitoring/dashboard', async (req, res) => {
+  try {
+    // Get all MikroTik connections
+    const db = global.db || require('../db/memory');
+    let connections = [];
+
+    try {
+      if (global.dbAvailable && db) {
+        const result = await db.query('SELECT * FROM mikrotik_connections');
+        connections = result.rows;
+      }
+    } catch (e) {
+      console.warn('[Monitoring] Could not fetch connections:', e.message);
+    }
+
+    // Decrypt password helper
+    function decryptPassword(encryptedPassword) {
+      try {
+        const crypto = require('crypto');
+        const algorithm = 'aes-256-gcm';
+        const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
+        const [ivHex, authTagHex, encrypted] = encryptedPassword.split(':');
+        const iv = Buffer.from(ivHex, 'hex');
+        const authTag = Buffer.from(authTagHex, 'hex');
+        const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+        decipher.setAuthTag(authTag);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+      } catch (e) { return null; }
+    }
+
+    // Parse MikroTik bytes
+    function parseBytes(bytesStr) {
+      if (!bytesStr) return 0;
+      const str = String(bytesStr);
+      if (/^\d+$/.test(str)) return parseInt(str);
+      const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
+      if (!match) return 0;
+      const value = parseFloat(match[1]);
+      const unit = (match[2] || '').toLowerCase().replace('ib', '');
+      const multipliers = { '': 1, k: 1024, m: 1048576, g: 1073741824, t: 1099511627776 };
+      return Math.round(value * (multipliers[unit] || 1));
+    }
+
+    // Parse MikroTik uptime
+    function parseUptime(uptimeStr) {
+      if (!uptimeStr) return 0;
+      const str = String(uptimeStr);
+      let totalSeconds = 0;
+      const daysMatch = str.match(/(\d+)d/);
+      const hoursMatch = str.match(/(\d+)h/);
+      const minsMatch = str.match(/(\d+)m/);
+      const secsMatch = str.match(/(\d+)s/);
+      if (daysMatch) totalSeconds += parseInt(daysMatch[1]) * 86400;
+      if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
+      if (minsMatch) totalSeconds += parseInt(minsMatch[1]) * 60;
+      if (secsMatch) totalSeconds += parseInt(secsMatch[1]);
+      return totalSeconds;
+    }
+
+    const allSessions = [];
+    let totalBandwidthIn = 0;
+    let totalBandwidthOut = 0;
+    const branchMetrics = [];
+
+    // Fetch real PPPoE sessions from each MikroTik router
+    for (const connection of connections) {
+      const device = { ...connection };
+      if (device.password_encrypted) {
+        device.password = decryptPassword(device.password_encrypted);
+      }
+
+      if (!device.password) continue;
+
+      try {
+        const MikroNode = require('mikronode');
+        const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
+        const conn = await mikrotik.connect(device.username, device.password);
+        const close = conn.closeOnDone(true);
+
+        // Get PPPoE active sessions
+        const pppoeChan = conn.openChannel();
+        pppoeChan.write('/ppp/active/print');
+        const pppoeActive = await pppoeChan.done;
+        close();
+
+        let branchIn = 0;
+        let branchOut = 0;
+
+        for (const session of (Array.isArray(pppoeActive) ? pppoeActive : [])) {
+          const username = session.name || session.username;
+          if (!username) continue;
+
+          const bytesIn = parseBytes(session['bytes-in'] || session.bytes_in);
+          const bytesOut = parseBytes(session['bytes-out'] || session.bytes_out);
+          const uptimeSeconds = parseUptime(session.uptime || session['uptime']);
+
+          branchIn += bytesIn;
+          branchOut += bytesOut;
+
+          // Try to find customer
+          let customerName = 'Unknown';
+          try {
+            const billingStore = require('../db/billingStore');
+            const sub = billingStore.store.subscriptions.find(s => s.pppoe_username === username && s.status === 'active');
+            if (sub) {
+              const customer = billingStore.store.customers.find(c => c.id === sub.customer_id);
+              if (customer) customerName = customer.name;
+            }
+          } catch (e) {}
+
+          allSessions.push({
+            id: session['.id'] || session.id || username,
+            username,
+            customer_name: customerName,
+            ip_address: session.address || '',
+            bytes_in: bytesIn,
+            bytes_out: bytesOut,
+            uptime_seconds: uptimeSeconds,
+            uptime: session.uptime || '',
+            connected_at: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
+            router_name: device.name,
+          });
+        }
+
+        totalBandwidthIn += branchIn;
+        totalBandwidthOut += branchOut;
+
+        branchMetrics.push({
+          branch: { id: device.id, name: device.name },
+          active_pppoe: (Array.isArray(pppoeActive) ? pppoeActive : []).length,
+          bandwidth_in: Math.round(branchIn / (1024 * 1024)), // MB
+          bandwidth_out: Math.round(branchOut / (1024 * 1024)),
+          cpu: 0, // Would require /system/resource query
+          memory: 0,
+          online_routers: 1,
+          total_routers: 1,
+        });
+      } catch (e) {
+        console.warn(`[Monitoring] Failed to fetch from ${device.name}: ${e.message}`);
+        branchMetrics.push({
+          branch: { id: device.id, name: device.name },
+          active_pppoe: 0,
+          bandwidth_in: 0,
+          bandwidth_out: 0,
+          cpu: 0,
+          memory: 0,
+          online_routers: 0,
+          total_routers: 1,
+        });
+      }
+    }
+
+    // If no MikroTik connections, fallback to existing fake data generation
+    if (connections.length === 0) {
+      multiStore.pppoeSessions.length = 0;
+      billing.store.subscriptions.filter(s => s.pppoe_username && s.status === 'active').forEach(sub => {
+        multiStore.pppoeSessions.push({
+          id: uuidv4(),
+          username: sub.pppoe_username,
+          customer_name: sub.customer?.name || 'Unknown',
+          plan_name: sub.plan?.name || 'Unknown',
+          ip_address: `10.10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`,
+          bytes_in: Math.floor(Math.random() * 5000000000),
+          bytes_out: Math.floor(Math.random() * 10000000000),
+          uptime_seconds: Math.floor(Math.random() * 86400 * 7),
+          connected_at: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+        });
+      });
+    }
+
+    const totalSessions = allSessions.length > 0 ? allSessions.length : multiStore.pppoeSessions.length;
+    const finalSessions = allSessions.length > 0 ? allSessions : multiStore.pppoeSessions;
+    const totalInGB = (allSessions.length > 0 ? totalBandwidthIn : multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_in, 0)) / (1024 * 1024 * 1024);
+    const totalOutGB = (allSessions.length > 0 ? totalBandwidthOut : multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_out, 0)) / (1024 * 1024 * 1024);
+    const finalBranchMetrics = branchMetrics.length > 0 ? branchMetrics : multiStore.branches.map(b => {
+      const metrics = multiStore.deviceMetrics.filter(m => m.branch_id === b.id);
+      const latest = metrics[metrics.length - 1] || {};
+      return {
+        branch: b,
+        active_pppoe: latest.active_pppoe || 0,
+        bandwidth_in: latest.bandwidth_in_mbps || 0,
+        bandwidth_out: latest.bandwidth_out_mbps || 0,
+        cpu: latest.cpu_usage || 0,
+        memory: latest.memory_usage || 0,
+        online_routers: latest.online_routers || 0,
+        total_routers: latest.total_routers || 0,
+      };
     });
-  });
 
-  const totalSessions = multiStore.pppoeSessions.length;
-  const totalInGB = multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_in, 0) / (1024 * 1024 * 1024);
-  const totalOutGB = multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_out, 0) / (1024 * 1024 * 1024);
-  const branchMetrics = multiStore.branches.map(b => {
-    const metrics = multiStore.deviceMetrics.filter(m => m.branch_id === b.id);
-    const latest = metrics[metrics.length - 1] || {};
-    return {
-      branch: b,
-      active_pppoe: latest.active_pppoe || 0,
-      bandwidth_in: latest.bandwidth_in_mbps || 0,
-      bandwidth_out: latest.bandwidth_out_mbps || 0,
-      cpu: latest.cpu_usage || 0,
-      memory: latest.memory_usage || 0,
-      online_routers: latest.online_routers || 0,
-      total_routers: latest.total_routers || 0,
-    };
-  });
-
-  res.json({
-    total_sessions: totalSessions,
-    total_bandwidth_in_gb: totalInGB.toFixed(1),
-    total_bandwidth_out_gb: totalOutGB.toFixed(1),
-    branch_metrics: branchMetrics,
-    sessions: multiStore.pppoeSessions,
-    metrics_24h: multiStore.deviceMetrics.slice(-72),
-  });
+    res.json({
+      total_sessions: totalSessions,
+      total_bandwidth_in_gb: totalInGB.toFixed(1),
+      total_bandwidth_out_gb: totalOutGB.toFixed(1),
+      branch_metrics: finalBranchMetrics,
+      sessions: finalSessions,
+      metrics_24h: multiStore.deviceMetrics.slice(-72),
+    });
+  } catch (e) {
+    console.error('[Monitoring] Dashboard error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get('/monitoring/branch/:branchId', (req, res) => {
