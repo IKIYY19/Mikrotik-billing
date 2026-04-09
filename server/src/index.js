@@ -124,7 +124,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`💾 Database: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (Preview Mode)'}`);
+      console.log(`💾 Database: ${process.env.DATABASE_URL ? 'Railway PostgreSQL' : process.env.DB_HOST ? 'Custom PostgreSQL' : dbAvailable ? 'PostgreSQL' : 'In-Memory (Preview Mode)'}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
