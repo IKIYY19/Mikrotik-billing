@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -73,6 +74,23 @@ app.use('/mikrotik', require('./routes/provision'));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
 });
+
+// Serve static frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
+  const fallbackPath = path.join(__dirname, '..', 'client', 'dist');
+  
+  // Try both possible paths for the built frontend
+  const staticPath = require('fs').existsSync(clientDistPath) ? clientDistPath : fallbackPath;
+  
+  console.log(`📦 Serving frontend from: ${staticPath}`);
+  app.use(express.static(staticPath));
+  
+  // Catch-all: serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+}
 
 // Global error handler
 app.use((err, req, res, next) => {
