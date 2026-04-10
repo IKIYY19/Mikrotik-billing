@@ -401,4 +401,63 @@ router.put('/customers/:id/branch', (req, res) => {
   res.json(customer);
 });
 
+// ═══════════════════════════════════════
+// SETUP WIZARD
+// ═══════════════════════════════════════
+router.post('/setup', async (req, res) => {
+  try {
+    const { companyName, plans, paymentMethods, mpesa, notifications } = req.body;
+
+    // Save company info
+    multiStore.companyInfo = {
+      name: companyName || 'My ISP',
+      contactEmail: req.body.contactEmail || '',
+      contactPhone: req.body.contactPhone || '',
+      address: req.body.address || '',
+      setupCompleted: true,
+      setupDate: new Date().toISOString(),
+    };
+
+    // Create service plans
+    if (plans && plans.length > 0) {
+      for (const plan of plans) {
+        if (!plan.name) continue;
+        billing.store.plans.push({
+          id: uuidv4(),
+          name: plan.name,
+          speed_up: plan.speedUp || '1M',
+          speed_down: plan.speedDown || '1M',
+          price: plan.price || 0,
+          quota_gb: plan.quotaGb || null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Save payment settings
+    multiStore.paymentSettings = {
+      methods: paymentMethods || { cash: true, bank: true, mpesa: false, card: false },
+      mpesa: mpesa || {},
+    };
+
+    // Save notification settings
+    multiStore.notificationSettings = {
+      sms: notifications?.sms || false,
+      email: notifications?.email || false,
+      reminderDays: notifications?.reminderDays || 3,
+    };
+
+    console.log('✅ Setup wizard completed');
+    res.json({ success: true, message: 'Setup completed successfully' });
+  } catch (error) {
+    console.error('Setup error:', error);
+    res.status(500).json({ error: 'Setup failed' });
+  }
+});
+
+router.get('/setup/status', (req, res) => {
+  res.json({ completed: !!multiStore.companyInfo?.setupCompleted });
+});
+
 module.exports = router;

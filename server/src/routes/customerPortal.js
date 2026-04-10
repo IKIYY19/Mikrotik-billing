@@ -395,42 +395,117 @@ router.get('/reports/export/:type', (req, res) => {
   let rows = [];
 
   switch (type) {
-    case 'daily':
+    case 'daily': {
       headers = ['Time', 'Customer', 'Amount', 'Method', 'Receipt', 'Reference'];
-      const daily = require('./index'); // This would call the daily report
-      rows = [['Manual export - use /reports/daily endpoint']];
+      const { date = new Date().toISOString().split('T')[0] } = req.query;
+      const startOfDay = new Date(date + 'T00:00:00');
+      const endOfDay = new Date(date + 'T23:59:59');
+      const payments = billing.store.payments.filter(p => {
+        const paidAt = new Date(p.received_at);
+        return paidAt >= startOfDay && paidAt <= endOfDay;
+      });
+      rows = payments.map(p => [
+        new Date(p.received_at).toLocaleTimeString(),
+        billing.store.customers.find(c => c.id === p.customer_id)?.name || 'Unknown',
+        p.amount.toFixed(2),
+        p.method,
+        p.receipt_number,
+        p.reference,
+      ]);
       break;
-    case 'debtors':
+    }
+    case 'monthly': {
+      headers = ['Month', 'Total Invoiced', 'Total Collected', 'Outstanding', 'Collection Rate'];
+      const { month = new Date().getMonth(), year = new Date().getFullYear() } = req.query;
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, parseInt(month) + 1, 0, 23, 59, 59);
+      const invoices = billing.store.invoices.filter(i => {
+        const created = new Date(i.created_at);
+        return created >= startDate && created <= endDate;
+      });
+      const payments = billing.store.payments.filter(p => {
+        const paidAt = new Date(p.received_at);
+        return paidAt >= startDate && paidAt <= endDate;
+      });
+      const totalInvoiced = invoices.reduce((sum, i) => sum + i.total, 0);
+      const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+      const outstanding = totalInvoiced - totalCollected;
+      const collectionRate = totalInvoiced > 0 ? ((totalCollected / totalInvoiced) * 100).toFixed(1) + '%' : '0%';
+      rows = [[
+        `${parseInt(month) + 1}/${year}`,
+        totalInvoiced.toFixed(2),
+        totalCollected.toFixed(2),
+        outstanding.toFixed(2),
+        collectionRate,
+      ]];
+      break;
+    }
+    case 'debtors': {
       headers = ['Customer', 'Phone', 'Outstanding', 'Invoices', 'Oldest Due', 'Days Overdue'];
       const debtors = billing.store.customers
         .map(c => {
           const invoices = billing.store.invoices.filter(i => i.customer_id === c.id && i.status !== 'paid');
           const total = invoices.reduce((sum, i) => sum + (i.total - (i.paid_amount || 0)), 0);
-          return { customer: c, total, count: invoices.length };
+          const oldest = invoices.sort((a, b) => new Date(a.due_date) - new Date(b.due_date))[0];
+          const daysOverdue = oldest ? Math.floor((Date.now() - new Date(oldest.due_date).getTime()) / (24 * 60 * 60 * 1000)) : 0;
+          return { customer: c, total, count: invoices.length, oldestDue: oldest?.due_date || '-', daysOverdue: Math.max(0, daysOverdue) };
         })
         .filter(d => d.total > 0);
       rows = debtors.map(d => [
-        d.customer.name, d.customer.phone, d.total.toFixed(2), d.count, '-', '-'
+        d.customer.name, d.customer.phone || '', d.total.toFixed(2), d.count, d.oldestDue, String(d.daysOverdue)
       ]);
       break;
-    case 'tax':
+    }
+    case 'tax': {
       headers = ['Invoice', 'Customer', 'Amount', 'Tax', 'Total', 'Date'];
-      const invoices = billing.store.invoices;
+      const { start_date, end_date } = req.query;
+      const startDate = start_date ? new Date(start_date) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end_date ? new Date(end_date) : new Date();
+      const invoices = billing.store.invoices.filter(i => {
+        const created = new Date(i.created_at);
+        return created >= startDate && created <= endDate;
+      });
       rows = invoices.map(i => [
         i.invoice_number,
-        billing.store.customers.find(c => c.id === i.customer_id)?.name,
+        billing.store.customers.find(c => c.id === i.customer_id)?.name || 'Unknown',
         i.amount.toFixed(2),
         (i.tax || 0).toFixed(2),
         i.total.toFixed(2),
         i.created_at.split('T')[0]
       ]);
       break;
+    }
+    case 'commissions': {
+      headers = ['Agent', 'Vouchers Sold', 'Total Sales', 'Commission Rate', 'Commission Earned', 'Commission Paid', 'Pending Payout'];
+      const multiStore = require('../db/multiFeatureStore');
+      const agentReports = multiStore.agents.map(a => {
+        const soldVouchers = multiStore.vouchers.filter(v => v.sold_by === a.id);
+        const totalSales = soldVouchers.reduce((sum, v) => sum + v.price, 0);
+        const commission = totalSales * (a.commission_rate / 100);
+        return {
+          name: a.name,
+          vouchers_sold: soldVouchers.length,
+          total_sales: totalSales,
+          commission_rate: a.commission_rate,
+          commission_earned: commission,
+          commission_paid: a.commission_paid || 0,
+          pending_payout: commission - (a.commission_paid || 0),
+        };
+      });
+      rows = agentReports.map(a => [
+        a.name, String(a.vouchers_sold), a.total_sales.toFixed(2), a.commission_rate + '%',
+        a.commission_earned.toFixed(2), a.commission_paid.toFixed(2), a.pending_payout.toFixed(2)
+      ]);
+      break;
+    }
+    default:
+      return res.status(400).json({ error: 'Unknown report type. Use: daily, monthly, debtors, tax, commissions' });
   }
 
   // Generate CSV
   let csv = headers.join(',') + '\n';
   rows.forEach(row => {
-    csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+    csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
   });
 
   res.setHeader('Content-Type', 'text/csv');

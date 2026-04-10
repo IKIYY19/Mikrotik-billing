@@ -41,6 +41,7 @@ import { TicketSystem } from './pages/billing/TicketSystem';
 import { CaptivePortalBuilder } from './pages/billing/CaptivePortalBuilder';
 import { BandwidthGraphs } from './pages/billing/BandwidthGraphs';
 import { ResellerPortal } from './pages/billing/ResellerPortal';
+import SetupWizard from './pages/SetupWizard';
 import { UserManagement } from './pages/UserManagement';
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
     <Routes>
       {/* Public route */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/setup" element={<SetupWizard />} />
       
       {/* Customer portal - public (different UI) */}
       <Route path="/portal/:customerId" element={<CustomerPortal />} />
