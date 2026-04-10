@@ -74,22 +74,22 @@ services:
         echo '=========================================' &&
         echo 'Database: $$DB_HOST:$$DB_PORT' &&
         echo 'Waiting for database...' &&
-        for i in $(seq 1 60); do
+        for i in $(seq 1 120); do
           if nc -z $$DB_HOST $$DB_PORT 2>/dev/null; then
             echo 'Database connection successful!' &&
             break
           fi
-          if [ $$i -eq 60 ]; then
-            echo 'ERROR: Database not available after 60 attempts' &&
+          if [ $$i -eq 120 ]; then
+            echo 'ERROR: Database not available after 120 attempts' &&
             exit 1
           fi
-          echo \"Waiting for database... attempt $$i/60\" &&
+          echo 'Waiting for database... attempt $$i/120' &&
           sleep 2
         done &&
         echo 'Running database migrations...' &&
         cd /app/server &&
-        (npm run db:migrate || echo 'WARNING: Migration failed, continuing...') &&
-        (npm run db:seed || echo 'WARNING: Seed failed, continuing...') &&
+        (node src/db/migrate.js || echo 'WARNING: Migration failed, continuing...') &&
+        (node src/db/seed.js || echo 'WARNING: Seed failed, continuing...') &&
         echo 'Starting application with supervisor...' &&
         exec /usr/bin/supervisord -c /etc/supervisor.d/supervisord.ini
       "
@@ -99,13 +99,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     networks:
       - mikrotik-net
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 1024M
         reservations:
           memory: 256M
 
