@@ -1,0 +1,49 @@
+databases:
+  - name: mikrotik-db
+    databaseName: mikrotik_config_builder
+    user: mikrotik_user
+    plan: free
+    ipAllowList: []
+
+services:
+  - type: web
+    name: mikrotik-billing
+    runtime: docker
+    repo: https://github.com/IKIYY19/Mikrotik-billing.git
+    branch: main
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_HOST
+        fromDatabase:
+          name: mikrotik-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: mikrotik-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: mikrotik-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: mikrotik-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: mikrotik-db
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        fromService:
+          name: mikrotik-billing
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
