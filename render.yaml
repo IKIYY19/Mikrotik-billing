@@ -11,6 +11,7 @@ services:
     runtime: docker
     repo: https://github.com/IKIYY19/Mikrotik-billing.git
     branch: master
+    dockerfilePath: ./Dockerfile.render
     plan: free
     healthCheckPath: /api/health
     envVars:
