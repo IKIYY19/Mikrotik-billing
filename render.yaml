@@ -10,7 +10,7 @@ services:
     name: mikrotik-billing
     runtime: docker
     repo: https://github.com/IKIYY19/Mikrotik-billing.git
-    branch: main
+    branch: master
     plan: free
     healthCheckPath: /api/health
     envVars:
