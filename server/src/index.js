@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
+const fs = require('fs');
 
 dotenv.config();
 
@@ -42,13 +43,6 @@ async function initDB() {
   return true;
 }
 
-// Export for routes
-global.db = db;
-global.dbAvailable = dbAvailable;
-global.billingRepo = billingRepo;
-
-const { runMigrations } = { runMigrations: async () => {} };
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -60,88 +54,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Public routes (no auth required)
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
-});
-app.use('/api/auth', require('./routes/auth'));
-app.use('/mikrotik', require('./routes/provision')); // Public provisioning
-app.use('/api/portal/auth', require('./routes/customerAuth')); // Customer auth (public endpoints)
-app.use('/mikrotik', require('./routes/provision')); // Public provisioning
-
-// Protected routes (require authentication)
-const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
-
-app.use(authenticate); // All routes below require auth
-
-// Admin-only routes
-app.use('/api/users', requireRole(ROLES.ADMIN), require('./routes/users'));
-
-// Role-protected routes
-app.use('/api/billing', requirePermission('billing:read'), require('./routes/billing'));
-app.use('/api/network', requirePermission('network:read'), require('./routes/network'));
-app.use('/api/customers', requirePermission('customers:read'), require('./routes/billing'));
-
-// Standard authenticated routes
-app.use('/api/projects', require('./routes/projects'));
-app.use('/api/modules', require('./routes/modules'));
-app.use('/api/generator', require('./routes/generator'));
-app.use('/api/templates', require('./routes/templates'));
-app.use('/api/mikrotik', require('./routes/mikrotik'));
-app.use('/api/devices', require('./routes/devices'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/sms', require('./routes/sms'));
-app.use('/api/features', require('./routes/features'));
-app.use('/api/portal', require('./routes/customerPortal'));
-app.use('/api/advanced', require('./routes/advanced'));
-app.use('/api/inventory', require('./routes/inventory'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/radius', require('./routes/radius'));
-app.use('/api/tickets', require('./routes/tickets'));
-app.use('/api/resellers', require('./routes/resellers'));
-
-// Serve static frontend (frontend is always bundled in Docker)
-const fs = require('fs');
-
-// Try multiple possible paths for the built frontend
-const possiblePaths = [
-  path.join(__dirname, '..', '..', 'client', 'dist'),  // Docker: /app/server/src/../.. -> /app/client/dist
-  path.join(__dirname, '..', 'client', 'dist'),        // Docker alt: /app/server/src/.. -> /app/server/client/dist
-  path.join(process.cwd(), 'client', 'dist'),          // Absolute: /app/client/dist
-];
-
-let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
-
-if (frontendPath) {
-  console.log(`📦 Serving frontend from: ${frontendPath}`);
-  app.use(express.static(frontendPath));
-  
-  // Catch-all: serve index.html for all non-API routes (SPA routing)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  });
-} else {
-  console.warn('⚠️  Frontend dist not found, skipping static file serving');
-}
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
-});
-
-// Start cron jobs
-let cronStarted = false;
-
 // Start server
 const startServer = async () => {
   try {
-    // Validate security before starting
-    const { validateSecrets } = require('./utils/security');
-    validateSecrets();
-
+    // Initialize database FIRST
     await initDB();
 
+    // Export for routes AFTER database is connected
     global.db = db;
     global.dbAvailable = dbAvailable;
     global.billingRepo = billingRepo;
@@ -192,6 +111,75 @@ const startServer = async () => {
     } catch (e) {
       console.warn('⚠️  Admin user creation skipped:', e.message);
     }
+
+    // Public routes (no auth required)
+    app.get('/api/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
+    });
+    app.use('/api/auth', require('./routes/auth'));
+    app.use('/mikrotik', require('./routes/provision'));
+    app.use('/api/portal/auth', require('./routes/customerAuth'));
+
+    // Protected routes (require authentication)
+    const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
+
+    app.use(authenticate);
+
+    // Admin-only routes
+    app.use('/api/users', requireRole(ROLES.ADMIN), require('./routes/users'));
+
+    // Role-protected routes
+    app.use('/api/billing', requirePermission('billing:read'), require('./routes/billing'));
+    app.use('/api/network', requirePermission('network:read'), require('./routes/network'));
+    app.use('/api/customers', requirePermission('customers:read'), require('./routes/billing'));
+
+    // Standard authenticated routes
+    app.use('/api/projects', require('./routes/projects'));
+    app.use('/api/modules', require('./routes/modules'));
+    app.use('/api/generator', require('./routes/generator'));
+    app.use('/api/templates', require('./routes/templates'));
+    app.use('/api/mikrotik', require('./routes/mikrotik'));
+    app.use('/api/devices', require('./routes/devices'));
+    app.use('/api/payments', require('./routes/payments'));
+    app.use('/api/sms', require('./routes/sms'));
+    app.use('/api/features', require('./routes/features'));
+    app.use('/api/portal', require('./routes/customerPortal'));
+    app.use('/api/advanced', require('./routes/advanced'));
+    app.use('/api/inventory', require('./routes/inventory'));
+    app.use('/api/analytics', require('./routes/analytics'));
+    app.use('/api/radius', require('./routes/radius'));
+    app.use('/api/tickets', require('./routes/tickets'));
+    app.use('/api/resellers', require('./routes/resellers'));
+
+    // Serve static frontend (frontend is always bundled in Docker)
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', 'client', 'dist'),
+      path.join(__dirname, '..', 'client', 'dist'),
+      path.join(process.cwd(), 'client', 'dist'),
+    ];
+
+    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+    if (frontendPath) {
+      console.log(`📦 Serving frontend from: ${frontendPath}`);
+      app.use(express.static(frontendPath));
+
+      // Catch-all: serve index.html for all non-API routes (SPA routing)
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(frontendPath, 'index.html'));
+      });
+    } else {
+      console.warn('⚠️  Frontend dist not found, skipping static file serving');
+    }
+
+    // Global error handler
+    app.use((err, req, res, next) => {
+      console.error('Unhandled error:', err);
+      res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
+    });
+
+    // Start cron jobs
+    let cronStarted = false;
 
     // Start auto-suspend cron
     if (!cronStarted) {
