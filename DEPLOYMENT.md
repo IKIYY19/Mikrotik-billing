@@ -100,60 +100,108 @@ docker run --rm -v pgdata:/data -v $(pwd):/backup alpine tar xzf /backup/db-back
 
 ---
 
-## Option 2: Dokploy Deployment
+## Option 2: Dokploy Deployment (with PostgreSQL)
 
-If you prefer using Dokploy for container orchestration.
+Complete self-contained deployment with integrated PostgreSQL database.
+
+### Prerequisites
+
+1. Push your code to GitHub/GitLab
+2. Ensure Dokploy is installed and running on your server
+3. At least 1GB RAM available
 
 ### Step 1: Prepare Your Repository
 
-1. Push your code to GitHub/GitLab
-2. Ensure Dokploy is installed and running
-3. Create a new PostgreSQL database in Dokploy
-
-### Step 2: Create Application in Dokploy
-
-1. Go to **Applications** → **New Application**
+1. Go to **Applications** → **New Application** in Dokploy
 2. Select **Git Repository**
 3. Enter your repository URL
 4. Branch: `main` (or your branch)
 
-### Step 3: Configure Build Settings
+### Step 2: Configure Build Settings
 
 **Build Type:** Docker Compose
 
 **Docker Compose File:** `dokploy-compose.yml`
 
-### Step 4: Add Database Connection
+The compose file includes both:
+- PostgreSQL 15 database (persistent storage)
+- Application server (frontend + backend)
 
-1. Go to **Databases** in Dokploy
-2. Create new PostgreSQL database
-3. Link it to your application
-4. Dokploy will auto-inject the `DB_*` environment variables
+### Step 3: Set Environment Variables
 
-### Step 5: Set Environment Variables
-
-In Dokploy's environment variables section, add:
+In Dokploy's environment variables section, add these required variables:
 
 ```env
-# Security (generate these locally)
-JWT_SECRET=<run: openssl rand -hex 64>
-ENCRYPTION_KEY=<run: openssl rand -hex 32>
+# Database Password (generate: openssl rand -hex 32)
+DB_PASSWORD=your_secure_database_password_here
 
-# CORS - set to your domain
-CORS_ORIGIN=https://your-domain.com
+# Security Keys (generate: openssl rand -hex 64)
+JWT_SECRET=your_jwt_secret_key_change_this_to_random_64_chars
 
-# Optional integrations (leave blank if not using)
-AT_API_KEY=
-MPESA_CONSUMER_KEY=
-WHATSAPP_ACCESS_TOKEN=
+# Encryption Key (generate: openssl rand -hex 32)
+ENCRYPTION_KEY=your_encryption_key_change_this_to_32_chars
+
+# CORS - set to your domain (or http://your-server-ip)
+CORS_ORIGIN=http://your-server-ip:3000
 ```
 
-### Step 6: Deploy
+Optional integrations (leave blank if not using):
+
+```env
+# Africa's Talking SMS
+AT_API_KEY=
+AT_USERNAME=sandbox
+AT_SENDER_ID=MyISP
+
+# M-Pesa Payment
+MPESA_CONSUMER_KEY=
+MPESA_CONSUMER_SECRET=
+MPESA_SHORTCODE=174379
+MPESA_PASSKEY=
+
+# WhatsApp Notifications
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+```
+
+### Step 4: Deploy
 
 1. Click **Deploy**
 2. Wait for build to complete (~2-5 minutes)
 3. Check logs for any errors
-4. Access your app at the Dokploy-provided URL
+4. Access your app at: `http://your-server-ip:3000`
+
+### How PostgreSQL Integration Works
+
+The `dokploy-compose.yml` includes a complete PostgreSQL setup:
+
+- **Database Service**: PostgreSQL 15 Alpine (lightweight)
+- **Persistent Storage**: Data stored in `pgdata` volume (survives restarts)
+- **Health Checks**: App waits for database to be ready before starting
+- **Auto-Migrations**: Database schema created automatically on startup
+- **Network Isolation**: Services communicate via internal Docker network
+
+### Database Management Commands
+
+```bash
+# Access PostgreSQL shell
+docker exec -it mikrotik-db psql -U postgres
+
+# List databases
+docker exec -it mikrotik-db psql -U postgres -c "\l"
+
+# View database size
+docker exec -it mikrotik-db psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('mikrotik_config_builder'));"
+
+# Backup database
+docker exec mikrotik-db pg_dump -U postgres mikrotik_config_builder > backup.sql
+
+# Restore database
+docker exec -i mikrotik-db psql -U postgres mikrotik_config_builder < backup.sql
+
+# View database logs
+docker logs -f mikrotik-db
+```
 
 ---
 
