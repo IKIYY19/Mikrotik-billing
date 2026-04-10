@@ -1,6 +1,26 @@
 const db = require('./index');
 
 const migrations = [
+  // Users table (MUST be first - required for auth)
+  `CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'staff',
+    is_active BOOLEAN DEFAULT true,
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP,
+    password_reset_token VARCHAR(255),
+    password_reset_expires TIMESTAMP,
+    last_password_change TIMESTAMP,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
+
   // Projects table
   `CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,6 +93,25 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_templates_category ON templates(category)`,
   `CREATE INDEX IF NOT EXISTS idx_version_history_project_id ON version_history(project_id)`,
   `CREATE INDEX IF NOT EXISTS idx_script_history_project_id ON script_history(project_id)`,
+
+  // Customers table (for billing)
+  `CREATE TABLE IF NOT EXISTS customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    status VARCHAR(50) DEFAULT 'active',
+    balance NUMERIC(10, 2) DEFAULT 0,
+    portal_pin_hash VARCHAR(255),
+    pin_reset_code VARCHAR(10),
+    pin_reset_expires TIMESTAMP,
+    last_portal_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
 ];
 
 async function runMigrations() {
