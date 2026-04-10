@@ -54,11 +54,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Public health endpoint (defined outside startServer to ensure it's always available)
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), database: global.dbAvailable ? 'postgres' : 'memory' });
-});
-
 // Start server
 const startServer = async () => {
   try {
@@ -118,9 +113,38 @@ const startServer = async () => {
     }
 
     // Public routes (no auth required)
+    app.get('/api/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
+    });
     app.use('/api/auth', require('./routes/auth'));
     app.use('/mikrotik', require('./routes/provision'));
     app.use('/api/portal/auth', require('./routes/customerAuth'));
+
+    // Serve static frontend BEFORE auth middleware (so login page is accessible)
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', 'client', 'dist'),
+      path.join(__dirname, '..', 'client', 'dist'),
+      path.join(process.cwd(), 'client', 'dist'),
+    ];
+
+    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+    if (frontendPath) {
+      console.log(`📦 Serving frontend from: ${frontendPath}`);
+      app.use(express.static(frontendPath));
+
+      // Catch-all: serve index.html for all non-API routes (SPA routing)
+      // This MUST be before auth middleware so /login page loads
+      app.get('*', (req, res) => {
+        // Don't intercept API routes
+        if (req.url.startsWith('/api/') || req.url.startsWith('/mikrotik/')) {
+          return res.status(404).json({ error: 'Not found' });
+        }
+        res.sendFile(path.join(frontendPath, 'index.html'));
+      });
+    } else {
+      console.warn('⚠️  Frontend dist not found, skipping static file serving');
+    }
 
     // Protected routes (require authentication)
     const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
@@ -152,27 +176,6 @@ const startServer = async () => {
     app.use('/api/radius', require('./routes/radius'));
     app.use('/api/tickets', require('./routes/tickets'));
     app.use('/api/resellers', require('./routes/resellers'));
-
-    // Serve static frontend (frontend is always bundled in Docker)
-    const possiblePaths = [
-      path.join(__dirname, '..', '..', 'client', 'dist'),
-      path.join(__dirname, '..', 'client', 'dist'),
-      path.join(process.cwd(), 'client', 'dist'),
-    ];
-
-    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
-
-    if (frontendPath) {
-      console.log(`📦 Serving frontend from: ${frontendPath}`);
-      app.use(express.static(frontendPath));
-
-      // Catch-all: serve index.html for all non-API routes (SPA routing)
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(frontendPath, 'index.html'));
-      });
-    } else {
-      console.warn('⚠️  Frontend dist not found, skipping static file serving');
-    }
 
     // Global error handler
     app.use((err, req, res, next) => {
