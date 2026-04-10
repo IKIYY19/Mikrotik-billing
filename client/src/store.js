@@ -24,9 +24,10 @@ export const useStore = create((set, get) => ({
     set({ loading: true });
     try {
       const { data } = await axios.get(`${API_URL}/projects`);
-      set({ projects: data, loading: false });
+      set({ projects: data, loading: false, error: null });
     } catch (error) {
-      set({ error: error.message, loading: false });
+      console.error('Failed to fetch projects:', error);
+      set({ error: error.message, loading: false, projects: [] });
     }
   },
 

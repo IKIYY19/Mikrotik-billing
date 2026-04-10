@@ -120,32 +120,6 @@ const startServer = async () => {
     app.use('/mikrotik', require('./routes/provision'));
     app.use('/api/portal/auth', require('./routes/customerAuth'));
 
-    // Serve static frontend BEFORE auth middleware (so login page is accessible)
-    const possiblePaths = [
-      path.join(__dirname, '..', '..', 'client', 'dist'),
-      path.join(__dirname, '..', 'client', 'dist'),
-      path.join(process.cwd(), 'client', 'dist'),
-    ];
-
-    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
-
-    if (frontendPath) {
-      console.log(`📦 Serving frontend from: ${frontendPath}`);
-      app.use(express.static(frontendPath));
-
-      // Catch-all: serve index.html for all non-API routes (SPA routing)
-      // This MUST be before auth middleware so /login page loads
-      app.get('*', (req, res) => {
-        // Don't intercept API routes
-        if (req.url.startsWith('/api/') || req.url.startsWith('/mikrotik/')) {
-          return res.status(404).json({ error: 'Not found' });
-        }
-        res.sendFile(path.join(frontendPath, 'index.html'));
-      });
-    } else {
-      console.warn('⚠️  Frontend dist not found, skipping static file serving');
-    }
-
     // Protected routes (require authentication)
     const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
 
@@ -182,6 +156,27 @@ const startServer = async () => {
       console.error('Unhandled error:', err);
       res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
     });
+
+    // Serve static frontend AFTER all API routes
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', 'client', 'dist'),
+      path.join(__dirname, '..', 'client', 'dist'),
+      path.join(process.cwd(), 'client', 'dist'),
+    ];
+
+    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+    if (frontendPath) {
+      console.log(`📦 Serving frontend from: ${frontendPath}`);
+      app.use(express.static(frontendPath));
+
+      // Catch-all: serve index.html for SPA routing (must be last)
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(frontendPath, 'index.html'));
+      });
+    } else {
+      console.warn('⚠️  Frontend dist not found, skipping static file serving');
+    }
 
     // Start cron jobs
     let cronStarted = false;

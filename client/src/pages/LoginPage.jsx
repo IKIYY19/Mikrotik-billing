@@ -29,7 +29,7 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(response.data.user));
 
       toast.success('Login successful!');
-      navigate('/dashboard');
+      setTimeout(() => navigate('/'), 100);
     } catch (error) {
       console.error('Login error:', error);
       toast.error(
