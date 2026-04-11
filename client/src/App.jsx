@@ -43,6 +43,7 @@ import { BandwidthGraphs } from './pages/billing/BandwidthGraphs';
 import { ResellerPortal } from './pages/billing/ResellerPortal';
 import SetupWizard from './pages/SetupWizard';
 import { UserManagement } from './pages/UserManagement';
+import IntegrationsSettings from './pages/IntegrationsSettings';
 
 function App() {
   return (
@@ -102,7 +103,8 @@ function App() {
                   <Route path="/bandwidth" element={<BandwidthGraphs />} />
                   <Route path="/resellers" element={<ResellerPortal />} />
                   <Route path="/users" element={<UserManagement />} />
-                  
+                  <Route path="/integrations" element={<IntegrationsSettings />} />
+
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

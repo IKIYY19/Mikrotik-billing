@@ -92,6 +92,14 @@ const startServer = async () => {
       console.warn('⚠️  Billing migrations skipped:', e.message);
     }
 
+    // Run integrations migration
+    try {
+      const { runIntegrationsMigration } = require('./db/integrationsMigration');
+      await runIntegrationsMigration();
+    } catch (e) {
+      console.warn('⚠️  Integrations migration skipped:', e.message);
+    }
+
     // Create default admin user if no users exist
     try {
       const bcrypt = require('bcryptjs');
@@ -150,6 +158,7 @@ const startServer = async () => {
     app.use('/api/radius', require('./routes/radius'));
     app.use('/api/tickets', require('./routes/tickets'));
     app.use('/api/resellers', require('./routes/resellers'));
+    app.use('/api/integrations', require('./routes/integrations'));
 
     // Global error handler
     app.use((err, req, res, next) => {

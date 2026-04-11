@@ -31,6 +31,7 @@ import {
   Palette,
   LogOut,
   User,
+  Key,
 } from 'lucide-react';
 
 const navItems = [
@@ -40,6 +41,7 @@ const navItems = [
   { to: '/devices', icon: HardDrive, label: 'Provisioning' },
   { to: '/templates', icon: FileCode, label: 'Templates' },
   { to: '/mikrotik-api', icon: Server, label: 'MikroTik API' },
+  { to: '/integrations', icon: Key, label: 'Integrations' },
 ];
 
 const billingItems = [
