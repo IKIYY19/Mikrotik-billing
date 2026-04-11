@@ -49,12 +49,22 @@ export function BillingCustomers() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '' });
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState('');
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
+
+  // Auto-generate account number from company name
+  const generateAccountNumber = (companyName, existingCustomers) => {
+    if (!companyName) return '';
+    // Extract first 3 letters of company name, uppercase
+    const prefix = companyName.trim().substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
+    // Get next sequential number
+    const nextNum = (existingCustomers?.length || 0) + 1;
+    return `${prefix}-${String(nextNum).padStart(4, '0')}`;
+  };
 
   useEffect(() => { fetchCustomers(); fetchConnections(); }, []);
   useEffect(() => { if (selectedConnection) fetchOnlineStatus(); }, [selectedConnection]);
@@ -80,22 +90,45 @@ export function BillingCustomers() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editing) await axios.put(`${API}/billing/customers/${editing.id}`, form);
-    else await axios.post(`${API}/billing/customers`, form);
-    setShowForm(false); setEditing(null);
-    setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' });
-    fetchCustomers();
+    try {
+      const submitData = { ...form };
+      // Auto-generate account number if not provided
+      if (!submitData.account_number && !editing) {
+        submitData.account_number = generateAccountNumber(submitData.name, customers);
+      }
+      
+      if (editing) {
+        await axios.put(`${API}/billing/customers/${editing.id}`, submitData);
+        toast.success('Customer updated successfully');
+      } else {
+        const { data } = await axios.post(`${API}/billing/customers`, submitData);
+        toast.success(`Customer created: ${data.account_number || data.name}`);
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '' });
+      fetchCustomers();
+    } catch (error) {
+      console.error('Failed to save customer:', error);
+      toast.error('Failed to save customer', error.response?.data?.error || error.message);
+    }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this customer?')) return;
-    await axios.delete(`${API}/billing/customers/${id}`);
-    fetchCustomers();
+    try {
+      await axios.delete(`${API}/billing/customers/${id}`);
+      toast.success('Customer deleted');
+      fetchCustomers();
+    } catch (error) {
+      console.error('Failed to delete customer:', error);
+      toast.error('Failed to delete customer', error.response?.data?.error || error.message);
+    }
   };
 
   const editCustomer = (c) => {
     setEditing(c);
-    setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', country: c.country || '', id_number: c.id_number || '', status: c.status, notes: c.notes || '' });
+    setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', country: c.country || '', id_number: c.id_number || '', status: c.status, notes: c.notes || '', account_number: c.account_number || '' });
     setShowForm(true);
   };
 
@@ -178,6 +211,7 @@ export function BillingCustomers() {
                       </div>
                       <div className="min-w-0">
                         <button onClick={() => navigate(`/portal/${c.id}`)} className="text-white font-medium hover:text-blue-400 transition-colors truncate block">{c.name}</button>
+                        {c.account_number && <div className="text-[11px] text-zinc-500 font-mono">{c.account_number}</div>}
                         {c.id_number && <div className="text-[11px] text-zinc-500">ID: {c.id_number}</div>}
                         {onlineData[c.id] && (
                           <div className="flex items-center gap-1 mt-0.5">
@@ -245,7 +279,21 @@ export function BillingCustomers() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1.5">Name *</label>
-                  <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="modern-input" placeholder="John Kamau" />
+                  <input required value={form.name} onChange={e => {
+                    const newName = e.target.value;
+                    // Auto-generate account number when name changes (for new customers)
+                    if (!editing && !form.account_number) {
+                      const newAccountNum = generateAccountNumber(newName, customers);
+                      setForm({...form, name: newName, account_number: newAccountNum});
+                    } else {
+                      setForm({...form, name: newName});
+                    }
+                  }} className="modern-input" placeholder="John Kamau" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Account Number</label>
+                  <input value={form.account_number || generateAccountNumber(form.name, customers)} onChange={e => setForm({...form, account_number: e.target.value})} className="modern-input bg-zinc-800/50 font-mono" placeholder="Auto-generated" />
+                  <p className="text-xs text-zinc-500 mt-1">Auto-generated from name</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1.5">Email</label>
