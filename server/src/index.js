@@ -3,19 +3,28 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
+const logger = require('./utils/logger');
 
 dotenv.config();
 
 // Prevent crashes from unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('⚠️  Unhandled Promise Rejection:', reason?.message || reason);
-  // Don't exit - log and continue
+  logger.error('Unhandled Promise Rejection', { error: reason?.message || reason });
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('⚠️  Uncaught Exception:', error.message);
-  console.error(error.stack);
-  // Don't exit - log and continue
+  logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM signal received: closing HTTP server');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT signal received: closing HTTP server');
+  process.exit(0);
 });
 
 // Try to use PostgreSQL, fall back to in-memory storage
@@ -29,12 +38,12 @@ async function initDB() {
     await pgDb.query('SELECT 1');
     db = pgDb;
     dbAvailable = true;
-    console.log('✅ Using PostgreSQL database');
+    logger.info('Using PostgreSQL database');
 
     // Load billing repo
     billingRepo = require('./db/billingRepository');
   } catch (err) {
-    console.warn('⚠️  PostgreSQL not available, using in-memory storage:', err.message);
+    logger.warn('PostgreSQL not available, using in-memory storage', { error: err.message });
     db = require('./db/memory');
     billingRepo = require('./db/billingStore');
     dbAvailable = false;
@@ -54,6 +63,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Apply general rate limiting to all API routes
+const { apiLimiter } = require('./middleware/rateLimiter');
+app.use('/api', apiLimiter);
+
 // Start server
 const startServer = async () => {
   try {
@@ -69,16 +82,17 @@ const startServer = async () => {
     try {
       const { runMigrations } = require('./db/migrate');
       await runMigrations();
-      console.log('✅ Core migrations done');
+      logger.info('Core migrations done');
     } catch (e) {
-      console.warn('⚠️  Core migrations skipped:', e.message);
+      logger.warn('Core migrations skipped', { error: e.message });
     }
 
     try {
       const { runAuthMigrations } = require('./db/authMigrations');
       await runAuthMigrations();
+      logger.info('Auth migrations done');
     } catch (e) {
-      console.warn('⚠️  Auth migrations skipped:', e.message);
+      logger.warn('Auth migrations skipped', { error: e.message });
     }
 
     // Run billing migrations
@@ -87,17 +101,18 @@ const startServer = async () => {
       for (const migration of billingMigrations) {
         await db.query(migration);
       }
-      console.log('✅ Billing migrations done');
+      logger.info('Billing migrations done');
     } catch (e) {
-      console.warn('⚠️  Billing migrations skipped:', e.message);
+      logger.warn('Billing migrations skipped', { error: e.message });
     }
 
     // Run integrations migration
     try {
       const { runIntegrationsMigration } = require('./db/integrationsMigration');
       await runIntegrationsMigration();
+      logger.info('Integrations migration done');
     } catch (e) {
-      console.warn('⚠️  Integrations migration skipped:', e.message);
+      logger.warn('Integrations migration skipped', { error: e.message });
     }
 
     // Create default admin user if no users exist
@@ -113,24 +128,39 @@ const startServer = async () => {
            VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
           [uuidv4(), 'admin@example.com', adminHash, 'Administrator', 'admin']
         );
-        console.log('✅ Default admin created: admin@example.com');
-        console.log(`🔑 Password: ${process.env.ADMIN_PASSWORD ? '(check env var)' : 'admin123'}`);
+        logger.info('Default admin created', { email: 'admin@example.com', passwordSet: !!process.env.ADMIN_PASSWORD });
       } else {
         // Ensure admin user has correct role
         const adminCheck = await db.query('SELECT id, email, role FROM users WHERE email = $1', ['admin@example.com']);
         if (adminCheck.rows.length > 0 && adminCheck.rows[0].role !== 'admin') {
           await db.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', 'admin@example.com']);
-          console.log('🔧 Fixed admin role to "admin"');
+          logger.info('Fixed admin role to "admin"');
         }
       }
     } catch (e) {
-      console.warn('⚠️  Admin user creation/fix skipped:', e.message);
+      logger.warn('Admin user creation/fix skipped', { error: e.message });
     }
 
-    // Public routes (no auth required)
-    app.get('/api/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString(), database: dbAvailable ? 'postgres' : 'memory' });
+    // Enhanced health check endpoint
+    app.get('/api/health', async (req, res) => {
+      try {
+        const dbCheck = dbAvailable ? 'connected' : 'memory';
+        const uptime = process.uptime();
+        res.json({ 
+          status: 'ok', 
+          timestamp: new Date().toISOString(), 
+          database: dbCheck,
+          uptime: Math.floor(uptime),
+          version: process.env.npm_package_version || '2.0.0',
+          environment: process.env.NODE_ENV || 'development'
+        });
+      } catch (error) {
+        logger.error('Health check failed', { error: error.message });
+        res.status(503).json({ status: 'error', message: 'Service unavailable' });
+      }
     });
+
+    // Public routes (no auth required)
     app.use('/api/auth', require('./routes/auth'));
     app.use('/mikrotik', require('./routes/provision'));
     app.use('/api/portal/auth', require('./routes/customerAuth'));
@@ -145,10 +175,10 @@ const startServer = async () => {
     let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
 
     if (frontendPath) {
-      console.log(`📦 Serving frontend from: ${frontendPath}`);
+      logger.info('Serving frontend', { path: frontendPath });
       app.use(express.static(frontendPath));
     } else {
-      console.warn('⚠️  Frontend dist not found, skipping static file serving');
+      logger.warn('Frontend dist not found, skipping static file serving');
     }
 
     // Protected routes (require authentication)
@@ -161,11 +191,11 @@ const startServer = async () => {
     // Role-protected routes - separate read and write permissions
     // Billing routes - read for GET, write for POST/PUT/DELETE
     app.use('/api/billing', authenticate, requirePermission('billing:read'), require('./routes/billing'));
-    
+
     // Customer routes - check permissions per method
     const { authenticate: auth, requirePermission: perm } = require('./middleware/auth');
     const billingRoutes = require('./routes/billing');
-    
+
     app.get('/api/customers', auth, perm('customers:read'), billingRoutes);
     app.get('/api/customers/:id', auth, perm('customers:read'), billingRoutes);
     app.post('/api/customers', auth, perm('customers:write'), billingRoutes);
@@ -204,7 +234,12 @@ const startServer = async () => {
 
     // Global error handler
     app.use((err, req, res, next) => {
-      console.error('Unhandled error:', err);
+      logger.error('Unhandled error', { 
+        error: err.message, 
+        stack: err.stack,
+        path: req.path,
+        method: req.method,
+      });
       res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
     });
 
@@ -223,9 +258,10 @@ const startServer = async () => {
       try {
         const { startCron } = require('./cron/autoSuspend');
         startCron();
+        logger.info('Auto-suspend cron started');
         cronStarted = true;
       } catch (e) {
-        console.warn('⚠️  Could not start auto-suspend cron:', e.message);
+        logger.warn('Could not start auto-suspend cron', { error: e.message });
       }
     }
 
@@ -233,17 +269,20 @@ const startServer = async () => {
     try {
       const { startCron: startMetricsCron } = require('./cron/collectMetrics');
       startMetricsCron();
+      logger.info('Metrics collection cron started');
     } catch (e) {
-      console.warn('⚠️  Could not start metrics collection cron:', e.message);
+      logger.warn('Could not start metrics collection cron', { error: e.message });
     }
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`💾 Database: ${process.env.DATABASE_URL ? 'Railway PostgreSQL' : process.env.DB_HOST ? 'Custom PostgreSQL' : dbAvailable ? 'PostgreSQL' : 'In-Memory (Preview Mode)'}`);
+      logger.info('Server started', { 
+        port: PORT, 
+        environment: process.env.NODE_ENV || 'development',
+        database: dbAvailable ? 'postgres' : 'memory'
+      });
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 };

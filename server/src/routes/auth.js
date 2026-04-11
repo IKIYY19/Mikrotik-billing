@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { JWT_SECRET } = require('../middleware/auth');
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
+const logger = require('../utils/logger');
+const { authLimiter } = require('../middleware/rateLimiter');
+const { audit } = require('../utils/audit');
 
 // Valid RBAC roles
 const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
@@ -13,7 +16,7 @@ const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
 
 // ─── REGISTER ───
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name required' });
@@ -32,41 +35,49 @@ router.post('/register', async (req, res) => {
     );
 
     const token = jwt.sign({ id: result.rows[0].id, email: result.rows[0].email, role: result.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    
+    logger.info('User registered', { email, userId: result.rows[0].id, role: userRole });
+    audit.userCreated(result.rows[0], { id: 'system', name: 'Self-registration', role: 'system' }, req);
+    
     res.status(201).json({ user: result.rows[0], token });
-  } catch (e) { console.error('Auth register error:', JSON.stringify(e)); res.status(500).json({ error: e.message || String(e) }); }
+  } catch (e) { 
+    logger.error('Registration error', { error: e.message, email: req.body.email }); 
+    res.status(500).json({ error: e.message || String(e) }); 
+  }
 });
 
 // ─── LOGIN ───
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
-    console.log('🔐 Login attempt for:', email);
-    console.log('🔑 JWT_SECRET (first 10 chars):', JWT_SECRET.substring(0, 10) + '...');
-
     const user = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (user.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    if (user.rows.length === 0) {
+      logger.warn('Login failed - user not found', { email, ip: req.ip });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const valid = await bcrypt.compare(password, user.rows[0].password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!valid) {
+      logger.warn('Login failed - invalid password', { email, userId: user.rows[0].id, ip: req.ip });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     await db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.rows[0].id]);
 
     const token = jwt.sign({ id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
-    console.log('✅ Login successful. Token created');
-    console.log('  User ID:', user.rows[0].id);
-    console.log('  Role:', user.rows[0].role);
-    console.log('  Token payload:', { id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role });
+    logger.info('User logged in', { email, userId: user.rows[0].id, role: user.rows[0].role, ip: req.ip });
+    audit.userLogin({ id: user.rows[0].id, email: user.rows[0].email, name: user.rows[0].name, role: user.rows[0].role }, req);
 
     res.json({
       user: { id: user.rows[0].id, email: user.rows[0].email, name: user.rows[0].name, role: user.rows[0].role },
       token,
     });
-  } catch (e) { 
-    console.error('❌ Login error:', e.message);
-    res.status(500).json({ error: e.message }); 
+  } catch (e) {
+    logger.error('Login error', { error: e.message, email: req.body.email });
+    res.status(500).json({ error: e.message });
   }
 });
 

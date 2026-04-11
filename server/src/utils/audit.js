@@ -4,6 +4,7 @@
  */
 
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./logger');
 
 const db = global.dbAvailable ? global.db : require('../db/memory');
 
@@ -23,8 +24,8 @@ async function logAudit({
 }) {
   try {
     await db.query(
-      `INSERT INTO audit_logs 
-       (id, action, entity_type, entity_id, user_id, user_name, user_role, 
+      `INSERT INTO audit_logs
+       (id, action, entity_type, entity_id, user_id, user_name, user_role,
         ip_address, user_agent, details, before_data, after_data, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)`,
       [
@@ -42,8 +43,9 @@ async function logAudit({
         after ? JSON.stringify(after) : null,
       ]
     );
+    logger.debug('Audit log created', { action, entityType, entityId });
   } catch (error) {
-    console.error('Audit log error:', error.message);
+    logger.error('Audit log error', { error: error.message, action, entityType });
     // Don't throw - audit logging shouldn't break the main flow
   }
 }
@@ -72,7 +74,7 @@ const auditMiddleware = (action, entityType) => {
             statusCode: res.statusCode,
           },
           after: req.body,
-        }).catch(err => console.error('Async audit error:', err));
+        }).catch(err => logger.error('Async audit error', { error: err.message }));
       }
 
       // Call original end

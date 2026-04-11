@@ -5,8 +5,16 @@
 
 const crypto = require('crypto');
 
-// Use ENCRYPTION_KEY from env or a default (CHANGE IN PRODUCTION!)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-encryption-key-change-this-32ch';
+// ENCRYPTION_KEY must be set via environment variable - no fallback for security
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Fail fast if ENCRYPTION_KEY is not configured
+if (!ENCRYPTION_KEY) {
+  console.error('❌ CRITICAL: ENCRYPTION_KEY environment variable is not set!');
+  console.error('❌ Please set ENCRYPTION_KEY in your .env file or environment');
+  console.error('❌ Generate a secure key with: openssl rand -base64 32');
+  process.exit(1);
+}
 
 // Ensure key is exactly 32 bytes
 function getKey() {
