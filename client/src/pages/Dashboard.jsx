@@ -5,7 +5,7 @@ import {
   FolderPlus, TrendingUp, Users, UserCheck, AlertTriangle,
   RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign,
   FileCode, Router, Settings, Network, Plus, Clock,
-  FolderOpen, Trash2, Sparkles, Shield, MapPin, Activity, UserPlus
+  FolderOpen, Trash2, Sparkles, Shield, MapPin, Activity, UserPlus, Key
 } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useStore } from '../store';

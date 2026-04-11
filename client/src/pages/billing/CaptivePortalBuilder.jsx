@@ -5,7 +5,8 @@ import {
   MoveUp, MoveDown, Download, Settings, Monitor, Smartphone, RefreshCw,
   Palette as PaletteIcon, Layout, FileText, Send, Undo, Redo, GripVertical,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Layers,
-  ArrowUp, ArrowDown, Maximize2, Minimize2, Copy, Clipboard, Check
+  ArrowUp, ArrowDown, Maximize2, Minimize2, Copy, Clipboard, Check,
+  Wifi, Bell, Globe, Clock
 } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
