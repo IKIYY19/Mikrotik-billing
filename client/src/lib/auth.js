@@ -13,12 +13,12 @@ export function setAuth(token, user) {
   console.log('💾 setAuth() called');
   console.log('  Token length:', token?.length || 0);
   console.log('  User:', user?.email);
-  
+
   if (!token) {
     console.error('❌ setAuth() called with NULL token!');
-    return;
+    return false;
   }
-  
+
   try {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));

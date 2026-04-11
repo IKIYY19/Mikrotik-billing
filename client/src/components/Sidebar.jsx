@@ -80,9 +80,15 @@ export function Sidebar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem('auth_user');
-    if (userData) {
-      setUser(JSON.parse(userData));
+    try {
+      const userData = localStorage.getItem('auth_user');
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+      }
+    } catch (err) {
+      console.error('Failed to parse user data:', err);
+      setUser(null);
     }
   }, []);
 
@@ -191,8 +197,8 @@ export function Sidebar() {
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-zinc-300 truncate">{user.name}</p>
-              <p className="text-xs text-zinc-500 truncate">{user.email}{user.role ? ` (${user.role})` : ''}</p>
+              <p className="text-xs font-medium text-zinc-300 truncate">{user?.name || 'User'}</p>
+              <p className="text-xs text-zinc-500 truncate">{user?.email || ''}{user?.role ? ` (${user.role})` : ''}</p>
             </div>
           </div>
         )}
