@@ -234,10 +234,10 @@ export function PPPoEManagement() {
         axios.get(`${API}/pppoe/active${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`).catch(() => ({ data: [] })),
         axios.get(`${API}/mikrotik`).catch(() => ({ data: [] })),
       ]);
-      setSecrets(secretsRes.data);
-      setProfiles(profilesRes.data);
-      setActive(activeRes.data);
-      setConnections(connRes.data);
+      setSecrets(Array.isArray(secretsRes.data) ? secretsRes.data : []);
+      setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []);
+      setActive(Array.isArray(activeRes.data) ? activeRes.data : []);
+      setConnections(Array.isArray(connRes.data) ? connRes.data : []);
     } catch (e) {
       console.error('PPPoE fetch error:', e);
     }
