@@ -5,7 +5,15 @@
  */
 
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'mikrotik-billing-secret-' + require('crypto').randomBytes(32).toString('hex');
+
+// IMPORTANT: JWT_SECRET must be consistent across restarts!
+// If not set in env, use a fixed default (change this in production!)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-this-in-production-do-not-use-random-keys';
+
+// Warn if using default secret
+if (JWT_SECRET === 'your-jwt-secret-change-this-in-production-do-not-use-random-keys') {
+  console.warn('⚠️  WARNING: Using default JWT_SECRET! Set JWT_SECRET environment variable for production!');
+}
 
 // Role hierarchy
 const ROLES = {
