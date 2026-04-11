@@ -245,10 +245,10 @@ export function HotspotManagement() {
         axios.get(`${API}/hotspot/active${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`).catch(() => ({ data: [] })),
         axios.get(`${API}/mikrotik`).catch(() => ({ data: [] })),
       ]);
-      setUsers(usersRes.data);
-      setProfiles(profilesRes.data);
-      setActive(activeRes.data);
-      setConnections(connRes.data);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []);
+      setActive(Array.isArray(activeRes.data) ? activeRes.data : []);
+      setConnections(Array.isArray(connRes.data) ? connRes.data : []);
     } catch (e) { console.error('Hotspot fetch error:', e); }
     setLoading(false);
   };
