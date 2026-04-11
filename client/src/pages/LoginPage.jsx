@@ -57,9 +57,15 @@ export default function LoginPage() {
       }, 200);
     } catch (error) {
       console.error('Login error:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
+      console.error('Request URL:', error.config?.url);
+      
+      const errorMsg = error.response?.data?.error || error.message || 'Unknown error';
+      
       toast.error(
         'Login failed',
-        error.response?.data?.error || 'Invalid email or password'
+        errorMsg
       );
     } finally {
       setLoading(false);
