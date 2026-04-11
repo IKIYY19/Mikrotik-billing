@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import api from './lib/api';
+import { getToken } from './lib/auth';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+// Log token status when store initializes
+console.log('📦 Store initializing. Token:', getToken() ? 'PRESENT' : 'ABSENT');
 
 export const useStore = create((set, get) => ({
   // Project state

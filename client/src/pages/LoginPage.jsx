@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
+import { setAuth } from '../lib/auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -24,18 +25,36 @@ export default function LoginPage() {
         password,
       });
 
-      // Store token
-      console.log('💾 Saving token to localStorage...');
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      console.log('🔐 Login response received');
+      console.log('  Token:', response.data.token ? `YES (${response.data.token.substring(0, 25)}...)` : 'NO!');
+      console.log('  User:', response.data.user);
+
+      // Save token using centralized auth manager
+      const saved = setAuth(response.data.token, response.data.user);
       
-      // Verify token was saved
-      const savedToken = localStorage.getItem('token');
-      console.log('✅ Token saved:', savedToken ? 'YES' : 'NO');
-      console.log('👤 User:', response.data.user);
+      if (!saved) {
+        console.error('❌ CRITICAL: Failed to save token!');
+        toast.error('Login failed - could not save token');
+        return;
+      }
+
+      // Verify token is actually in localStorage
+      const verifyToken = localStorage.getItem('auth_token');
+      console.log('🔍 Verification - Token in storage:', verifyToken ? 'YES' : 'NO');
+
+      if (!verifyToken) {
+        console.error('❌ VERIFICATION FAILED: Token not in localStorage after setAuth!');
+        toast.error('Login failed - storage error');
+        return;
+      }
 
       toast.success('Login successful!');
-      setTimeout(() => navigate('/'), 100);
+      
+      // Navigate to dashboard
+      setTimeout(() => {
+        console.log('🚀 Navigating to /');
+        navigate('/');
+      }, 200);
     } catch (error) {
       console.error('Login error:', error);
       toast.error(
