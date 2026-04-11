@@ -115,9 +115,16 @@ const startServer = async () => {
         );
         console.log('✅ Default admin created: admin@example.com');
         console.log(`🔑 Password: ${process.env.ADMIN_PASSWORD ? '(check env var)' : 'admin123'}`);
+      } else {
+        // Ensure admin user has correct role
+        const adminCheck = await db.query('SELECT id, email, role FROM users WHERE email = $1', ['admin@example.com']);
+        if (adminCheck.rows.length > 0 && adminCheck.rows[0].role !== 'admin') {
+          await db.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', 'admin@example.com']);
+          console.log('🔧 Fixed admin role to "admin"');
+        }
       }
     } catch (e) {
-      console.warn('⚠️  Admin user creation skipped:', e.message);
+      console.warn('⚠️  Admin user creation/fix skipped:', e.message);
     }
 
     // Public routes (no auth required)
@@ -151,10 +158,25 @@ const startServer = async () => {
     // Admin-only routes
     app.use('/api/users', authenticate, requireRole(ROLES.ADMIN), require('./routes/users'));
 
-    // Role-protected routes
+    // Role-protected routes - separate read and write permissions
+    // Billing routes - read for GET, write for POST/PUT/DELETE
     app.use('/api/billing', authenticate, requirePermission('billing:read'), require('./routes/billing'));
-    app.use('/api/network', authenticate, requirePermission('network:read'), require('./routes/network'));
-    app.use('/api/customers', authenticate, requirePermission('customers:read'), require('./routes/billing'));
+    
+    // Customer routes - check permissions per method
+    const { authenticate: auth, requirePermission: perm } = require('./middleware/auth');
+    const billingRoutes = require('./routes/billing');
+    
+    app.get('/api/customers', auth, perm('customers:read'), billingRoutes);
+    app.get('/api/customers/:id', auth, perm('customers:read'), billingRoutes);
+    app.post('/api/customers', auth, perm('customers:write'), billingRoutes);
+    app.put('/api/customers/:id', auth, perm('customers:write'), billingRoutes);
+    app.delete('/api/customers/:id', auth, perm('customers:write'), billingRoutes);
+
+    // Network routes - separate read and write
+    app.get('/api/network', authenticate, requirePermission('network:read'), require('./routes/network'));
+    app.post('/api/network', authenticate, requirePermission('network:write'), require('./routes/network'));
+    app.put('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
+    app.delete('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
 
     // Standard authenticated routes
     app.use('/api/projects', authenticate, require('./routes/projects'));

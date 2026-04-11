@@ -101,11 +101,17 @@ const requirePermission = (permission) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    console.log(`🔑 Permission check - User: ${req.user.email}, Role: ${req.user.role}, Required: ${permission}`);
+    
     const userPerms = PERMISSIONS[req.user.role] || [];
+    console.log(`📋 User permissions:`, userPerms);
+    
     if (userPerms.includes('*') || userPerms.includes(permission)) {
+      console.log('✅ Permission granted');
       return next();
     }
 
+    console.log(`❌ Permission denied - User has ${JSON.stringify(userPerms)}, needs ${permission}`);
     return res.status(403).json({ error: 'Insufficient permissions' });
   };
 };

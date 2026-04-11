@@ -54,9 +54,12 @@ router.post('/login', async (req, res) => {
     await db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.rows[0].id]);
 
     const token = jwt.sign({ id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-    
+
     console.log('✅ Login successful. Token created');
-    
+    console.log('  User ID:', user.rows[0].id);
+    console.log('  Role:', user.rows[0].role);
+    console.log('  Token payload:', { id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role });
+
     res.json({
       user: { id: user.rows[0].id, email: user.rows[0].email, name: user.rows[0].name, role: user.rows[0].role },
       token,
