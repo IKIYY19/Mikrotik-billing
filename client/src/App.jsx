@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import './lib/axios-setup'; // Global auth interceptor for all axios calls
 import { Sidebar } from './components/Sidebar';
 import { Toast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';

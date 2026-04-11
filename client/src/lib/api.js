@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with auth and retry logic
 const api = axios.create({
@@ -14,9 +14,18 @@ const api = axios.create({
 // Add auth token to all requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  
+  // Debug logging
+  console.log('🔍 API Request to:', config.baseURL, config.url);
+  console.log('🔑 Token from localStorage:', token ? token.substring(0, 20) + '...' : 'NULL');
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log('✅ Authorization header attached');
+  } else {
+    console.warn('⚠️ NO TOKEN FOUND in localStorage!');
   }
+  
   return config;
 });
 

@@ -25,8 +25,14 @@ export default function LoginPage() {
       });
 
       // Store token
+      console.log('💾 Saving token to localStorage...');
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      // Verify token was saved
+      const savedToken = localStorage.getItem('token');
+      console.log('✅ Token saved:', savedToken ? 'YES' : 'NO');
+      console.log('👤 User:', response.data.user);
 
       toast.success('Login successful!');
       setTimeout(() => navigate('/'), 100);
