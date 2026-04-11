@@ -38,16 +38,25 @@ const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('❌ Auth failed: No Bearer token in header');
       return res.status(401).json({ error: 'Authentication required' });
     }
 
     const token = authHeader.split(' ')[1];
+    
+    // Debug logging
+    console.log('🔍 Authenticating token...');
+    console.log('🔑 JWT_SECRET (first 10 chars):', JWT_SECRET.substring(0, 10) + '...');
+    console.log('📝 Token (first 20 chars):', token.substring(0, 20) + '...');
+    
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Attach user info to request
     req.user = decoded;
+    console.log('✅ Auth successful. User:', decoded.email);
     next();
   } catch (error) {
+    console.error('❌ Token verification failed:', error.name, '-', error.message);
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired, please login again' });
     }

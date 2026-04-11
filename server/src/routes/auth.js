@@ -42,6 +42,9 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
+    console.log('🔐 Login attempt for:', email);
+    console.log('🔑 JWT_SECRET (first 10 chars):', JWT_SECRET.substring(0, 10) + '...');
+
     const user = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (user.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
 
@@ -51,11 +54,17 @@ router.post('/login', async (req, res) => {
     await db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.rows[0].id]);
 
     const token = jwt.sign({ id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    
+    console.log('✅ Login successful. Token created');
+    
     res.json({
       user: { id: user.rows[0].id, email: user.rows[0].email, name: user.rows[0].name, role: user.rows[0].role },
       token,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    console.error('❌ Login error:', e.message);
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
 // ─── GET ME ───
