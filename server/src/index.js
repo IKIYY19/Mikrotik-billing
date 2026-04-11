@@ -159,6 +159,7 @@ const startServer = async () => {
     app.use('/api/tickets', require('./routes/tickets'));
     app.use('/api/resellers', require('./routes/resellers'));
     app.use('/api/integrations', require('./routes/integrations'));
+    app.use('/api/dashboard', require('./routes/dashboard'));
 
     // Global error handler
     app.use((err, req, res, next) => {
