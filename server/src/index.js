@@ -178,6 +178,10 @@ const startServer = async () => {
     app.put('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
     app.delete('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
 
+    // PPPoE and Hotspot route aliases (frontend calls these directly)
+    app.use('/api/pppoe', authenticate, require('./routes/network'));
+    app.use('/api/hotspot', authenticate, require('./routes/network'));
+
     // Standard authenticated routes
     app.use('/api/projects', authenticate, require('./routes/projects'));
     app.use('/api/modules', authenticate, require('./routes/modules'));

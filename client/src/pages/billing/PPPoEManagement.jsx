@@ -438,7 +438,7 @@ export function PPPoEManagement() {
       {activeTab === 'profiles' && (
         <div className="relative glass rounded-2xl overflow-hidden">
           <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-zinc-300">PPPoE Profiles ({filteredSecrets.length})</h3>
+            <h3 className="text-sm font-medium text-zinc-300">PPPoE Profiles ({profiles.length})</h3>
             <button onClick={() => { setEditingProfile(null); setShowProfileForm(true); }} className="btn-primary text-xs py-2 px-3">
               <Plus className="w-3.5 h-3.5" /> New Profile
             </button>

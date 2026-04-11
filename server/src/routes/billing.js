@@ -427,7 +427,7 @@ router.get('/usage/history', async (req, res) => {
     }
 
     // Get all usage records within the time window
-    let records = billing.store.usage_records.filter(r => {
+    let records = (billing.store.usage_records || []).filter(r => {
       const recordedAt = new Date(r.recorded_at);
       return recordedAt >= startTime && recordedAt <= now;
     });

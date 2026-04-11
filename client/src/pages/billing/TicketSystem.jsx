@@ -226,7 +226,7 @@ function TicketDetailModal({ ticket, onClose, onRefresh }) {
   const sendReply = async () => {
     if (!reply.trim()) return;
     try {
-      await axios.post(`${API}/tickets/${ticket.id}/messages`, { message: reply, is_internal });
+      await axios.post(`${API}/tickets/${ticket.id}/messages`, { message: reply, is_internal: isInternal });
       setReply('');
       onRefresh();
     } catch (e) { alert('Failed to send reply'); }
