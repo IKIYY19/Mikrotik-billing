@@ -128,46 +128,7 @@ const startServer = async () => {
     app.use('/mikrotik', require('./routes/provision'));
     app.use('/api/portal/auth', require('./routes/customerAuth'));
 
-    // Protected routes (require authentication)
-    const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
-
-    app.use(authenticate);
-
-    // Admin-only routes
-    app.use('/api/users', requireRole(ROLES.ADMIN), require('./routes/users'));
-
-    // Role-protected routes
-    app.use('/api/billing', requirePermission('billing:read'), require('./routes/billing'));
-    app.use('/api/network', requirePermission('network:read'), require('./routes/network'));
-    app.use('/api/customers', requirePermission('customers:read'), require('./routes/billing'));
-
-    // Standard authenticated routes
-    app.use('/api/projects', require('./routes/projects'));
-    app.use('/api/modules', require('./routes/modules'));
-    app.use('/api/generator', require('./routes/generator'));
-    app.use('/api/templates', require('./routes/templates'));
-    app.use('/api/mikrotik', require('./routes/mikrotik'));
-    app.use('/api/devices', require('./routes/devices'));
-    app.use('/api/payments', require('./routes/payments'));
-    app.use('/api/sms', require('./routes/sms'));
-    app.use('/api/features', require('./routes/features'));
-    app.use('/api/portal', require('./routes/customerPortal'));
-    app.use('/api/advanced', require('./routes/advanced'));
-    app.use('/api/inventory', require('./routes/inventory'));
-    app.use('/api/analytics', require('./routes/analytics'));
-    app.use('/api/radius', require('./routes/radius'));
-    app.use('/api/tickets', require('./routes/tickets'));
-    app.use('/api/resellers', require('./routes/resellers'));
-    app.use('/api/integrations', require('./routes/integrations'));
-    app.use('/api/dashboard', require('./routes/dashboard'));
-
-    // Global error handler
-    app.use((err, req, res, next) => {
-      console.error('Unhandled error:', err);
-      res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
-    });
-
-    // Serve static frontend AFTER all API routes
+    // Serve static frontend files
     const possiblePaths = [
       path.join(__dirname, '..', '..', 'client', 'dist'),
       path.join(__dirname, '..', 'client', 'dist'),
@@ -179,13 +140,53 @@ const startServer = async () => {
     if (frontendPath) {
       console.log(`📦 Serving frontend from: ${frontendPath}`);
       app.use(express.static(frontendPath));
+    } else {
+      console.warn('⚠️  Frontend dist not found, skipping static file serving');
+    }
 
-      // Catch-all: serve index.html for SPA routing (must be last)
+    // Protected routes (require authentication)
+    // Each route has auth middleware applied individually
+    const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
+
+    // Admin-only routes
+    app.use('/api/users', authenticate, requireRole(ROLES.ADMIN), require('./routes/users'));
+
+    // Role-protected routes
+    app.use('/api/billing', authenticate, requirePermission('billing:read'), require('./routes/billing'));
+    app.use('/api/network', authenticate, requirePermission('network:read'), require('./routes/network'));
+    app.use('/api/customers', authenticate, requirePermission('customers:read'), require('./routes/billing'));
+
+    // Standard authenticated routes
+    app.use('/api/projects', authenticate, require('./routes/projects'));
+    app.use('/api/modules', authenticate, require('./routes/modules'));
+    app.use('/api/generator', authenticate, require('./routes/generator'));
+    app.use('/api/templates', authenticate, require('./routes/templates'));
+    app.use('/api/mikrotik', authenticate, require('./routes/mikrotik'));
+    app.use('/api/devices', authenticate, require('./routes/devices'));
+    app.use('/api/payments', authenticate, require('./routes/payments'));
+    app.use('/api/sms', authenticate, require('./routes/sms'));
+    app.use('/api/features', authenticate, require('./routes/features'));
+    app.use('/api/portal', authenticate, require('./routes/customerPortal'));
+    app.use('/api/advanced', authenticate, require('./routes/advanced'));
+    app.use('/api/inventory', authenticate, require('./routes/inventory'));
+    app.use('/api/analytics', authenticate, require('./routes/analytics'));
+    app.use('/api/radius', authenticate, require('./routes/radius'));
+    app.use('/api/tickets', authenticate, require('./routes/tickets'));
+    app.use('/api/resellers', authenticate, require('./routes/resellers'));
+    app.use('/api/integrations', authenticate, require('./routes/integrations'));
+    app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
+
+    // Global error handler
+    app.use((err, req, res, next) => {
+      console.error('Unhandled error:', err);
+      res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
+    });
+
+    // SPA catch-all route MUST be last - serves index.html for all non-API routes
+    if (frontendPath) {
       app.get('*', (req, res) => {
         res.sendFile(path.join(frontendPath, 'index.html'));
       });
-    } else {
-      console.warn('⚠️  Frontend dist not found, skipping static file serving');
     }
 
     // Start cron jobs
