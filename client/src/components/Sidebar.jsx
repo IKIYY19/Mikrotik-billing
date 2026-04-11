@@ -33,6 +33,7 @@ import {
   User,
   Key,
 } from 'lucide-react';
+import { clearAuth } from '../lib/auth';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -79,15 +80,14 @@ export function Sidebar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem('auth_user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuth();
     navigate('/login');
   };
 

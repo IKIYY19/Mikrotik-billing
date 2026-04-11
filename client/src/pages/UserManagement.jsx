@@ -14,6 +14,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
+import { getToken } from '../lib/auth';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -90,7 +91,7 @@ function CreateUserModal({ onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const { data } = await axios.post(`${API}/users`, form, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -212,7 +213,7 @@ function EditUserModal({ user, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       await axios.put(`${API}/users/${user.id}`, form, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -234,7 +235,7 @@ function EditUserModal({ user, onClose, onSuccess }) {
 
     setResetLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       await axios.post(
         `${API}/users/${user.id}/reset-password`,
         { new_password: newPassword },
@@ -426,7 +427,7 @@ export function UserManagement() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const params = new URLSearchParams();
       if (roleFilter) params.set('role', roleFilter);
       if (statusFilter) params.set('status', statusFilter);
@@ -445,7 +446,7 @@ export function UserManagement() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const { data } = await axios.get(`${API}/users/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -457,7 +458,7 @@ export function UserManagement() {
 
   const handleDisableUser = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       await axios.delete(`${API}/users/${disablingUser.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -632,7 +633,7 @@ export function UserManagement() {
                           <button
                             onClick={async () => {
                               try {
-                                const token = localStorage.getItem('token');
+                                const token = getToken();
                                 await axios.post(`${API}/users/${user.id}/enable`, {}, {
                                   headers: { Authorization: `Bearer ${token}` },
                                 });
