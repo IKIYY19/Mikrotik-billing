@@ -1,3 +1,4 @@
+import './lib/axios-setup'; // Global auth interceptor - MUST be first!
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
