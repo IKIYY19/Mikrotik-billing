@@ -15,8 +15,16 @@ export function BillingPayments() {
 
   useEffect(() => {
     fetchPayments();
-    axios.get(`${API}/billing/invoices`).then(r => setInvoices(r.data.filter(i => i.status !== 'paid')));
-    axios.get(`${API}/billing/customers`).then(r => setCustomers(r.data));
+    axios.get(`${API}/billing/invoices`).then(r => {
+      if (Array.isArray(r.data)) {
+        setInvoices(r.data.filter(i => i.status !== 'paid'));
+      }
+    }).catch(err => console.error('Failed to load invoices:', err));
+    axios.get(`${API}/billing/customers`).then(r => {
+      if (Array.isArray(r.data)) {
+        setCustomers(r.data);
+      }
+    }).catch(err => console.error('Failed to load customers:', err));
   }, []);
 
   const fetchPayments = async () => {

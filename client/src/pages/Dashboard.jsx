@@ -129,14 +129,16 @@ export function Dashboard() {
         axios.get(`${API_URL}/dashboard/stats`),
         axios.get(`${API_URL}/dashboard/quick-actions`),
       ]);
-      
+
       if (statsRes.data.success) {
-        setStats(statsRes.data.stats);
+        setStats(statsRes.data.stats || {});
       }
-      if (actionsRes.data.success) {
+      if (actionsRes.data.success && Array.isArray(actionsRes.data.actions)) {
         setQuickActions(actionsRes.data.actions);
+      } else {
+        setQuickActions([]);
       }
-      
+
       setLastRefresh(new Date());
       setLoading(false);
     } catch (error) {

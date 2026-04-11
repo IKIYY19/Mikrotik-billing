@@ -47,16 +47,18 @@ export function MapView() {
   };
 
   const renderMarkers = () => {
-    if (!mapInstanceRef.current || !window.L || !data) return;
+    if (!mapInstanceRef.current || !window.L || !data || !data.customers) return;
 
     // Clear existing markers
     markersRef.current.forEach(m => mapInstanceRef.current.removeLayer(m));
     markersRef.current = [];
 
-    const filteredCustomers = filter === 'all' ? data.customers : data.customers.filter(c => c.status === filter);
+    const customers = Array.isArray(data.customers) ? data.customers : [];
+    const branches = Array.isArray(data.branches) ? data.branches : [];
+    const filteredCustomers = filter === 'all' ? customers : customers.filter(c => c.status === filter);
 
     // Branch markers (larger)
-    data.branches.forEach(branch => {
+    branches.forEach(branch => {
       const icon = window.L.divIcon({
         html: `<div style="background:#3b82f6;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
         className: '',
