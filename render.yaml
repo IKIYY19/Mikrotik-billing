@@ -41,10 +41,8 @@ services:
           property: password
       - key: JWT_SECRET
         value: mikrotik-billing-jwt-secret-key-v1-do-not-change-unless-you-know-what-youre-doing
-        sync: false
       - key: ENCRYPTION_KEY
         value: mikrotik-billing-encryption-key-32chars-v1
-        sync: false
       - key: CORS_ORIGIN
         fromService:
           name: mikrotik-billing
