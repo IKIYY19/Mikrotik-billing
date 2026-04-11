@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
+import {
   FolderPlus, TrendingUp, Users, UserCheck, AlertTriangle,
   RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign,
   FileCode, Router, Settings, Network, Plus, Clock,
-  FolderOpen, Trash2, Sparkles, Shield, MapPin, Activity
+  FolderOpen, Trash2, Sparkles, Shield, MapPin, Activity, UserPlus
 } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useStore } from '../store';
