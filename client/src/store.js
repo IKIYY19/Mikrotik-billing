@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';
+import api from './lib/api';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -23,7 +23,7 @@ export const useStore = create((set, get) => ({
   fetchProjects: async () => {
     set({ loading: true });
     try {
-      const { data } = await axios.get(`${API_URL}/projects`);
+      const { data } = await api.get('/projects');
       set({ projects: data, loading: false, error: null });
     } catch (error) {
       console.error('Failed to fetch projects:', error);
@@ -34,7 +34,7 @@ export const useStore = create((set, get) => ({
   createProject: async (projectData) => {
     set({ loading: true });
     try {
-      const { data } = await axios.post(`${API_URL}/projects`, projectData);
+      const { data } = await api.post('/projects', projectData);
       set((state) => ({
         projects: [...state.projects, data],
         currentProject: data,
@@ -50,7 +50,7 @@ export const useStore = create((set, get) => ({
   selectProject: async (projectId) => {
     set({ loading: true });
     try {
-      const { data } = await axios.get(`${API_URL}/projects/${projectId}`);
+      const { data } = await api.get(`/projects/${projectId}`);
       const modules = {};
       if (data.modules) {
         data.modules.forEach((mod) => {
@@ -69,8 +69,8 @@ export const useStore = create((set, get) => ({
     
     set({ loading: true });
     try {
-      const { data } = await axios.put(
-        `${API_URL}/projects/${currentProject.id}`,
+      const { data } = await api.put(
+        `/projects/${currentProject.id}`,
         projectData
       );
       set({ currentProject: data, loading: false });
@@ -82,7 +82,7 @@ export const useStore = create((set, get) => ({
   deleteProject: async (projectId) => {
     set({ loading: true });
     try {
-      await axios.delete(`${API_URL}/projects/${projectId}`);
+      await api.delete(`/projects/${projectId}`);
       set((state) => ({
         projects: state.projects.filter((p) => p.id !== projectId),
         currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
@@ -111,7 +111,7 @@ export const useStore = create((set, get) => ({
     try {
       for (const [moduleType, configData] of Object.entries(modules)) {
         if (Object.keys(configData).length > 0) {
-          await axios.post(`${API_URL}/modules`, {
+          await api.post('/modules', {
             project_id: currentProject.id,
             module_type: moduleType,
             config_data: configData,
@@ -129,7 +129,7 @@ export const useStore = create((set, get) => ({
     const { modules, currentProject } = get();
     set({ loading: true });
     try {
-      const { data } = await axios.post(`${API_URL}/generator/generate`, {
+      const { data } = await api.post('/generator/generate', {
         modules,
         routeros_version: currentProject?.routeros_version || 'v7',
       });
@@ -152,7 +152,7 @@ export const useStore = create((set, get) => ({
       const url = category
         ? `${API_URL}/templates?category=${category}`
         : `${API_URL}/templates`;
-      const { data } = await axios.get(url);
+      const { data } = await api.get(url);
       set({ templates: data, loading: false });
     } catch (error) {
       set({ error: error.message, loading: false });
@@ -162,7 +162,7 @@ export const useStore = create((set, get) => ({
   applyTemplate: async (templateId) => {
     set({ loading: true });
     try {
-      const { data } = await axios.get(`${API_URL}/templates/${templateId}`);
+      const { data } = await api.get(`/templates/${templateId}`);
       set((state) => ({
         modules: {
           ...state.modules,
@@ -181,7 +181,7 @@ export const useStore = create((set, get) => ({
   fetchConnections: async () => {
     set({ loading: true });
     try {
-      const { data } = await axios.get(`${API_URL}/mikrotik`);
+      const { data } = await api.get('/mikrotik');
       set({ connections: data, loading: false });
     } catch (error) {
       set({ error: error.message, loading: false });
@@ -190,7 +190,7 @@ export const useStore = create((set, get) => ({
 
   testConnection: async (connectionData) => {
     try {
-      const { data } = await axios.post(`${API_URL}/mikrotik/test`, connectionData);
+      const { data } = await api.post('/mikrotik/test', connectionData);
       return data;
     } catch (error) {
       set({ error: error.message });
@@ -201,7 +201,7 @@ export const useStore = create((set, get) => ({
   pushScript: async (connectionId, script, dryRun = false) => {
     set({ loading: true });
     try {
-      const { data } = await axios.post(`${API_URL}/mikrotik/push`, {
+      const { data } = await api.post('/mikrotik/push', {
         connection_id: connectionId,
         script,
         dry_run,
