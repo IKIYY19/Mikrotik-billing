@@ -1,16 +1,19 @@
 FROM node:18-alpine
 
+# Build cache bust - 2026-04-12
+ARG CACHEBUST=1
+
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (better caching)
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-# Install dependencies (including dev for client build)
+# Install dependencies
 RUN cd server && npm ci --omit=dev
 RUN cd client && npm ci
 
-# Copy source code
+# Copy ALL source code (forces fresh copy)
 COPY server/ ./server/
 COPY client/ ./client/
 
