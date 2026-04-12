@@ -32,6 +32,7 @@ import {
   LogOut,
   User,
   Key,
+  Radio,
 } from 'lucide-react';
 import { clearAuth } from '../lib/auth';
 
@@ -65,6 +66,7 @@ const billingItems = [
   { to: '/hotspot', icon: Wifi, label: 'Hotspot' },
   { to: '/hotspot-vouchers', icon: Ticket, label: 'Vouchers' },
   { to: '/network-services', icon: Server, label: 'Network' },
+  { to: '/olt', icon: Radio, label: 'OLT/Fiber' },
   { to: '/radius', icon: Shield, label: 'RADIUS' },
   { to: '/tickets', icon: LifeBuoy, label: 'Support' },
   { to: '/captive-portal', icon: Palette, label: 'Portal Builder' },

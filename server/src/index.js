@@ -229,6 +229,7 @@ const startServer = async () => {
     app.use('/api/radius', authenticate, require('./routes/radius'));
     app.use('/api/tickets', authenticate, require('./routes/tickets'));
     app.use('/api/resellers', authenticate, require('./routes/resellers'));
+    app.use('/api/olt', authenticate, require('./routes/olt'));
     app.use('/api/integrations', authenticate, require('./routes/integrations'));
     app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
 

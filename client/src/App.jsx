@@ -41,6 +41,7 @@ import { TicketSystem } from './pages/billing/TicketSystem';
 import { CaptivePortalBuilder } from './pages/billing/CaptivePortalBuilder';
 import { BandwidthGraphs } from './pages/billing/BandwidthGraphs';
 import { ResellerPortal } from './pages/billing/ResellerPortal';
+import { OLTManagement } from './pages/billing/OLTManagement';
 import SetupWizard from './pages/SetupWizard';
 import { UserManagement } from './pages/UserManagement';
 import IntegrationsSettings from './pages/IntegrationsSettings';
@@ -97,6 +98,7 @@ function App() {
                   <Route path="/hotspot" element={<HotspotManagement />} />
                   <Route path="/hotspot-vouchers" element={<HotspotVouchers />} />
                   <Route path="/network-services" element={<NetworkServices />} />
+                  <Route path="/olt" element={<OLTManagement />} />
                   <Route path="/radius" element={<RadiusManagement />} />
                   <Route path="/tickets" element={<TicketSystem />} />
                   <Route path="/captive-portal" element={<CaptivePortalBuilder />} />

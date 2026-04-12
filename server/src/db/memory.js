@@ -19,6 +19,7 @@ const store = {
   resellers: [],
   customers: [],
   payments: [],
+  olt_connections: [],
 };
 
 // Seed example templates
@@ -450,6 +451,66 @@ module.exports = {
       const idx = store.payments.findIndex(p => p.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.payments.splice(idx, 1) };
+    }
+
+    // SELECT olt_connections
+    if (lowerText.includes('select') && lowerText.includes('from olt_connections')) {
+      if (lowerText.includes('where id =')) {
+        const olt = store.olt_connections.find(o => o.id === params[0]);
+        return { rows: olt ? [olt] : [] };
+      }
+      return { rows: store.olt_connections.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    }
+
+    // INSERT olt_connections
+    if (lowerText.includes('insert into olt_connections')) {
+      const olt = {
+        id: params[0],
+        name: params[1],
+        vendor: params[2],
+        model: params[3],
+        ip_address: params[4],
+        telnet_port: params[5] || 23,
+        snmp_port: params[6] || 161,
+        username: params[7],
+        password_encrypted: params[8],
+        snmp_community_encrypted: params[9],
+        location: params[10],
+        status: params[11] || 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.olt_connections.push(olt);
+      return { rows: [olt] };
+    }
+
+    // UPDATE olt_connections
+    if (lowerText.includes('update olt_connections') && lowerText.includes('where id =')) {
+      const idx = store.olt_connections.findIndex(o => o.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      store.olt_connections[idx] = {
+        ...store.olt_connections[idx],
+        name: params[1] || store.olt_connections[idx].name,
+        vendor: params[2] || store.olt_connections[idx].vendor,
+        model: params[3] || store.olt_connections[idx].model,
+        ip_address: params[4] || store.olt_connections[idx].ip_address,
+        telnet_port: params[5] || store.olt_connections[idx].telnet_port,
+        snmp_port: params[6] || store.olt_connections[idx].snmp_port,
+        username: params[7] || store.olt_connections[idx].username,
+        password_encrypted: params[8] || store.olt_connections[idx].password_encrypted,
+        snmp_community_encrypted: params[9] || store.olt_connections[idx].snmp_community_encrypted,
+        location: params[10] !== undefined ? params[10] : store.olt_connections[idx].location,
+        status: params[11] || store.olt_connections[idx].status,
+        updated_at: new Date().toISOString(),
+      };
+      return { rows: [store.olt_connections[idx]] };
+    }
+
+    // DELETE olt_connections
+    if (lowerText.includes('delete from olt_connections')) {
+      const idx = store.olt_connections.findIndex(o => o.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.olt_connections.splice(idx, 1) };
     }
 
     // INSERT/UPDATE anything else (generic fallback)
