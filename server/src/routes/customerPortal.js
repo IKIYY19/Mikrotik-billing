@@ -513,4 +513,98 @@ router.get('/reports/export/:type', (req, res) => {
   res.send(csv);
 });
 
+// ═══════════════════════════════════════
+// ENHANCED PORTAL ENDPOINTS
+// ═══════════════════════════════════════
+
+// Get payment history for customer
+router.get('/:customerId/payments', (req, res) => {
+  try {
+    const payments = billing.store.payments
+      .filter(p => p.customer_id === req.params.customerId)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    res.json(payments);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get customer support tickets
+router.get('/:customerId/tickets', (req, res) => {
+  try {
+    const tickets = billing.store.tickets
+      .filter(t => t.customer_id === req.params.customerId)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    res.json(tickets);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Create support ticket
+router.post('/:customerId/tickets', (req, res) => {
+  try {
+    const { subject, description, category } = req.body;
+    const ticket = {
+      id: uuidv4(),
+      customer_id: req.params.customerId,
+      subject,
+      description,
+      category: category || 'general',
+      status: 'open',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    billing.store.tickets.push(ticket);
+    res.status(201).json(ticket);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get bandwidth usage history
+router.get('/:customerId/bandwidth', (req, res) => {
+  try {
+    // Generate daily usage data for last 30 days
+    const usage = [];
+    const now = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Simulate daily usage (in production, get from RADIUS accounting)
+      const dailyGB = Math.random() * 5 + 1; // 1-6 GB per day
+      usage.push({
+        date: dateStr,
+        total_gb: dailyGB,
+        download_gb: dailyGB * 0.8,
+        upload_gb: dailyGB * 0.2,
+      });
+    }
+    
+    res.json(usage);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Ping test (for speed test)
+router.get('/:customerId/ping', (req, res) => {
+  res.json({ success: true, timestamp: Date.now() });
+});
+
+// Speed test endpoints
+router.get('/:customerId/speedtest', (req, res) => {
+  // Generate test data for download speed measurement
+  const data = Buffer.alloc(1024 * 1024, 'x'); // 1MB
+  res.send(data);
+});
+
+router.post('/:customerId/speedtest', (req, res) => {
+  // Accept upload data for upload speed measurement
+  res.json({ success: true, received: Date.now() });
+});
+
 module.exports = router;

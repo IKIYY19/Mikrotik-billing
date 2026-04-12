@@ -24,7 +24,7 @@ import { SMSPage } from './pages/billing/SMSPage';
 import { MonitoringDashboard } from './pages/billing/MonitoringDashboard';
 import { AgentResellerPage } from './pages/billing/AgentResellerPage';
 import { AutoSuspendPage } from './pages/billing/AutoSuspendPage';
-import { CustomerPortal } from './pages/billing/CustomerPortal';
+import { CustomerPortal } from './pages/billing/EnhancedCustomerPortal';
 import { FinancialReports } from './pages/billing/FinancialReports';
 import { WhatsAppPage } from './pages/billing/WhatsAppPage';
 import { MapView } from './pages/billing/MapView';
