@@ -86,12 +86,21 @@ function initSentry() {
 
 // Express response handler (must be after all routes)
 function sentryErrorHandler() {
-  return Sentry.express.errorHandler({
-    // Should handle all 5xx errors
-    shouldHandleError(error) {
-      return error.statusCode >= 500;
-    },
-  });
+  return function sentryErrorMiddleware(err, req, res, next) {
+    // Manually capture the error
+    Sentry.captureException(err, {
+      extra: {
+        request: {
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+        },
+      },
+    });
+    
+    // Pass to next error handler
+    next(err);
+  };
 }
 
 // Manual error capture helper
