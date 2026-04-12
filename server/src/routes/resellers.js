@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = global.dbAvailable ? global.db : require('../db/memory');
 const { v4: uuidv4 } = require('uuid');
+const { resellerValidation } = require('../middleware/validation');
+const logger = require('../utils/logger');
 
 // ═══════════════════════════════════════
 // RESELLERS
@@ -26,7 +28,7 @@ router.get('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', resellerValidation, async (req, res) => {
   try {
     const { name, company, email, phone, commission_rate, credit_limit, status } = req.body;
     const id = uuidv4();
@@ -35,11 +37,15 @@ router.post('/', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [id, name, company, email, phone, commission_rate || 10, credit_limit || 0, status || 'active']
     );
+    logger.info('Reseller created', { id, name, email });
     res.status(201).json(result.rows[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    logger.error('Failed to create reseller', { error: e.message });
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', [...resellerValidation.slice(0, -1)], async (req, res) => {
   try {
     const { name, company, email, phone, commission_rate, credit_limit, status } = req.body;
     const result = await db.query(
@@ -50,8 +56,12 @@ router.put('/:id', async (req, res) => {
       [name, company, email, phone, commission_rate, credit_limit, status, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    logger.info('Reseller updated', { id: req.params.id });
     res.json(result.rows[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    logger.error('Failed to update reseller', { error: e.message });
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
 router.delete('/:id', async (req, res) => {
