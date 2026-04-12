@@ -32,7 +32,9 @@
       "Bash(git push *)",
       "Bash(docker-compose *)",
       "Bash(git ls-remote *)",
-      "Bash(ping *)"
+      "Bash(ping *)",
+      "Bash(dir *)",
+      "Bash(select-object *)"
     ]
   },
   "$version": 3

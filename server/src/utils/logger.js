@@ -53,22 +53,34 @@ const transports = [
 
 // File logging for errors (only if not in test mode)
 if (process.env.NODE_ENV !== 'test') {
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/error.log'),
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+  try {
+    // Ensure logs directory exists
+    const fs = require('fs');
+    const logsDir = path.join(__dirname, '../../logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
 
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/combined.log'),
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+    transports.push(
+      new winston.transports.File({
+        filename: path.join(__dirname, '../../logs/error.log'),
+        level: 'error',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
+
+    transports.push(
+      new winston.transports.File({
+        filename: path.join(__dirname, '../../logs/combined.log'),
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
+  } catch (e) {
+    // If can't create log files (e.g., permissions), just use console
+    console.warn('Warning: Could not create log files, using console only');
+  }
 }
 
 // Create the logger
