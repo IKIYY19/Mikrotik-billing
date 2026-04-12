@@ -6,7 +6,7 @@
 
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 // Initialize Sentry
 function initSentry() {
