@@ -4,16 +4,28 @@ const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
 const logger = require('./utils/logger');
+const { initSentry, sentryErrorHandler, setUser, clearUser, addBreadcrumb } = require('./services/sentry');
 
 dotenv.config();
+
+// Initialize Sentry FIRST (before any other code)
+initSentry();
 
 // Prevent crashes from unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Promise Rejection', { error: reason?.message || reason });
+  const Sentry = require('./services/sentry').Sentry;
+  Sentry.captureException(reason, {
+    tags: { type: 'unhandledRejection' },
+  });
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+  const Sentry = require('./services/sentry').Sentry;
+  Sentry.captureException(error, {
+    tags: { type: 'uncaughtException' },
+  });
 });
 
 // Graceful shutdown handling
@@ -232,6 +244,9 @@ const startServer = async () => {
     app.use('/api/olt', authenticate, require('./routes/olt'));
     app.use('/api/integrations', authenticate, require('./routes/integrations'));
     app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
+
+    // Sentry error handler (MUST be before global error handler)
+    app.use(sentryErrorHandler());
 
     // Global error handler
     app.use((err, req, res, next) => {

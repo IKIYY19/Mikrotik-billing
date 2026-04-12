@@ -26,6 +26,17 @@ class ErrorBoundary extends React.Component {
       console.error('🔴 Error Boundary caught an error:', error);
       console.error('Component stack:', errorInfo.componentStack);
     }
+
+    // Report to Sentry for production monitoring
+    try {
+      const { captureError } = require('../services/sentry');
+      captureError(error, {
+        componentStack: errorInfo.componentStack,
+        location: window.location.href,
+      });
+    } catch (e) {
+      // Sentry might not be initialized, ignore
+    }
   }
 
   handleReset = () => {
