@@ -1,9 +1,10 @@
 FROM node:18-alpine
 
-# Build cache bust - 2026-04-12
-ARG CACHEBUST=1
+# Force complete cache invalidation - change this number to force rebuild
+ARG CACHEBUST=2
 
-WORKDIR /app
+# Use unique workdir to invalidate all cached layers
+WORKDIR /app-v2
 
 # Copy package files first (better caching)
 COPY server/package*.json ./server/
@@ -24,7 +25,7 @@ RUN cd client && npm run build
 EXPOSE 5000
 
 # Run server with migrations and seed (ignore seed errors)
-CMD cd /app/server && \
+CMD cd /app-v2/server && \
   (node src/db/migrate.js || echo "Migration warning") && \
   (node src/db/seed.js || echo "Seed warning") && \
   NODE_ENV=production node src/index.js
