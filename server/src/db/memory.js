@@ -477,6 +477,7 @@ module.exports = {
         snmp_community_encrypted: params[9],
         location: params[10],
         status: params[11] || 'active',
+        custom_oids: params[12],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -501,6 +502,7 @@ module.exports = {
         snmp_community_encrypted: params[9] || store.olt_connections[idx].snmp_community_encrypted,
         location: params[10] !== undefined ? params[10] : store.olt_connections[idx].location,
         status: params[11] || store.olt_connections[idx].status,
+        custom_oids: params[12] !== undefined ? params[12] : store.olt_connections[idx].custom_oids,
         updated_at: new Date().toISOString(),
       };
       return { rows: [store.olt_connections[idx]] };

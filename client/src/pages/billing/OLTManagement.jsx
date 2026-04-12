@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useToast } from '../../hooks/useToast';
 import {
   Network, Plus, Search, Pencil, Trash2, RefreshCw, AlertTriangle,
-  CheckCircle2, XCircle, Activity, Server, Radio, Zap, Eye, Terminal
+  CheckCircle2, XCircle, Activity, Server, Radio, Zap, Eye, Terminal, Settings
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -12,6 +12,8 @@ const VENDOR_CONFIG = {
   huawei: { label: 'Huawei', models: ['MA5600T', 'MA5800', 'MA5608T'], color: 'text-red-400' },
   zte: { label: 'ZTE', models: ['C300', 'C320', 'C600'], color: 'text-blue-400' },
   fiberhome: { label: 'FiberHome', models: ['AN5516', 'AN5116'], color: 'text-green-400' },
+  nokia: { label: 'Nokia', models: ['ISAM 7302', 'ISAM 7330'], color: 'text-purple-400' },
+  generic: { label: 'Generic', models: [], color: 'text-zinc-400' },
 };
 
 function StatCard({ title, value, icon: Icon, bg, ring, textColor, sub }) {
@@ -185,11 +187,11 @@ export function OLTManagement() {
             </div>
             OLT Management
           </h1>
-          <p className="text-zinc-400 mt-1">Manage Fiber Home, Huawei & ZTE OLTs with SNMP monitoring</p>
+          <p className="text-zinc-400 mt-1">Monitor Huawei, ZTE, FiberHome, Nokia & Generic OLTs with SNMP</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={fetchConnections} className="btn-ghost"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={() => { setEditing({ name: '', vendor: 'huawei', model: '', ip_address: '', telnet_port: 23, snmp_port: 161, username: 'admin', password: '', snmp_community: 'public', location: '', status: 'active' }); setShowForm(true); }} className="btn-primary">
+          <button onClick={() => { setEditing({ name: '', vendor: 'huawei', model: '', ip_address: '', telnet_port: 23, snmp_port: 161, username: 'admin', password: '', snmp_community: 'public', location: '', status: 'active', custom_oids: { ponPorts: '', onuList: '', opticalPower: '' } }); setShowForm(true); }} className="btn-primary">
             <Plus className="w-4 h-4" /> Add OLT
           </button>
         </div>
@@ -395,6 +397,8 @@ export function OLTManagement() {
                     <option value="huawei">Huawei</option>
                     <option value="zte">ZTE</option>
                     <option value="fiberhome">FiberHome</option>
+                    <option value="nokia">Nokia</option>
+                    <option value="generic">Generic (Custom OIDs)</option>
                   </select>
                 </div>
                 <div>
@@ -438,6 +442,56 @@ export function OLTManagement() {
                   </select>
                 </div>
               </div>
+
+              {/* Custom OIDs for Generic OLTs */}
+              {editing.vendor === 'generic' && (
+                <div className="border-t border-zinc-700/50 pt-4 mt-4">
+                  <h4 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+                    <Settings className="w-4 h-4" />
+                    Custom SNMP OIDs (Optional)
+                  </h4>
+                  <p className="text-xs text-zinc-500 mb-3">Enter your OLT's SNMP OIDs for monitoring. Leave empty for basic system info only.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">PON Ports OID</label>
+                      <input 
+                        value={editing.custom_oids?.ponPorts || ''} 
+                        onChange={e => setEditing({ ...editing, custom_oids: { ...editing.custom_oids, ponPorts: e.target.value } })} 
+                        className="modern-input font-mono text-sm" 
+                        placeholder="1.3.6.1.4.1.XXXX.X.X.X" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">ONU List OID</label>
+                      <input 
+                        value={editing.custom_oids?.onuList || ''} 
+                        onChange={e => setEditing({ ...editing, custom_oids: { ...editing.custom_oids, onuList: e.target.value } })} 
+                        className="modern-input font-mono text-sm" 
+                        placeholder="1.3.6.1.4.1.XXXX.X.X.X" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Optical Power OID</label>
+                      <input 
+                        value={editing.custom_oids?.opticalPower || ''} 
+                        onChange={e => setEditing({ ...editing, custom_oids: { ...editing.custom_oids, opticalPower: e.target.value } })} 
+                        className="modern-input font-mono text-sm" 
+                        placeholder="1.3.6.1.4.1.XXXX.X.X.X" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">ONU State OID</label>
+                      <input 
+                        value={editing.custom_oids?.onuState || ''} 
+                        onChange={e => setEditing({ ...editing, custom_oids: { ...editing.custom_oids, onuState: e.target.value } })} 
+                        className="modern-input font-mono text-sm" 
+                        placeholder="1.3.6.1.4.1.XXXX.X.X.X" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2 border-t border-zinc-800/50">
                 <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="btn-secondary flex-1">Cancel</button>
                 <button type="submit" className="btn-primary flex-1">{editing.id ? 'Update' : 'Create'}</button>

@@ -57,10 +57,56 @@ const OLT_OIDS = {
     onuState: '1.3.6.1.4.1.5875.800.10.2.1.1.5',
     vendor: '1.3.6.1.4.1.5875.800.10.2.1.1.2',
   },
+  nokia: {
+    // ISAM 7302/7330 OIDs
+    systemName: '1.3.6.1.2.1.1.5.0',
+    systemDesc: '1.3.6.1.2.1.1.1.0',
+    ponPorts: '1.3.6.1.4.1.637.61.1.21.1.1',
+    onuList: '1.3.6.1.4.1.637.61.1.21.2.1',
+    opticalPower: '1.3.6.1.4.1.637.61.1.21.3.1',
+    onuState: '1.3.6.1.4.1.637.61.1.21.2.1.5',
+    vendor: '1.3.6.1.4.1.637.61.1.21.2.1.2',
+  },
+  generic: {
+    // Generic OLT - uses standard MIB-II + custom OIDs from database
+    systemName: '1.3.6.1.2.1.1.5.0',
+    systemDesc: '1.3.6.1.2.1.1.1.0',
+    // Custom OIDs will be loaded from olt_connections.custom_oids field
+    ponPorts: null,
+    onuList: null,
+    opticalPower: null,
+    onuState: null,
+    vendor: null,
+  },
 };
 
 // OLT connection manager
 class OLTService {
+  /**
+   * Get OIDs for connection (supports custom OIDs for Generic OLTs)
+   */
+  static getOIDs(conn) {
+    const baseOIDs = OLT_OIDS[conn.vendor] || OLT_OIDS.generic;
+    
+    // If Generic OLT with custom OIDs, override from database
+    if (conn.vendor === 'generic' && conn.custom_oids) {
+      try {
+        const customOIDs = typeof conn.custom_oids === 'string' 
+          ? JSON.parse(conn.custom_oids) 
+          : conn.custom_oids;
+        
+        return {
+          ...baseOIDs,
+          ...customOIDs, // Override with custom values
+        };
+      } catch (e) {
+        logger.warn('Failed to parse custom OIDs', { id: conn.id });
+      }
+    }
+    
+    return baseOIDs;
+  }
+
   /**
    * Save OLT connection to database
    */
@@ -70,22 +116,23 @@ class OLTService {
     
     const encryptedPassword = encrypt(data.password);
     const encryptedCommunity = encrypt(data.snmp_community || 'public');
+    const customOIDs = data.custom_oids ? JSON.stringify(data.custom_oids) : null;
 
     const query = `
       INSERT INTO olt_connections (id, name, vendor, model, ip_address, telnet_port, snmp_port,
-        username, password_encrypted, snmp_community_encrypted, location, status, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        username, password_encrypted, snmp_community_encrypted, location, status, custom_oids, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
         name = $2, vendor = $3, model = $4, ip_address = $5, telnet_port = $6, snmp_port = $7,
         username = $8, password_encrypted = $9, snmp_community_encrypted = $10,
-        location = $11, status = $12, updated_at = CURRENT_TIMESTAMP
+        location = $11, status = $12, custom_oids = $13, updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;
 
     const result = await db.query(query, [
       id,
       data.name,
-      data.vendor, // 'huawei', 'zte', 'fiberhome'
+      data.vendor, // 'huawei', 'zte', 'fiberhome', 'nokia', 'generic'
       data.model || '',
       data.ip_address,
       data.telnet_port || 23,
@@ -95,6 +142,7 @@ class OLTService {
       encryptedCommunity,
       data.location || '',
       data.status || 'active',
+      customOIDs,
     ]);
 
     // Return without sensitive data
@@ -143,7 +191,7 @@ class OLTService {
           retries: 1,
         });
 
-        const oids = OLT_OIDS[conn.vendor] || OLT_OIDS.huawei;
+        const oids = this.getOIDs(conn);
         const result = await new Promise((resolve, reject) => {
           session.get([oids.systemName, oids.systemDesc], (error, varbinds) => {
             if (error) reject(error);
@@ -184,7 +232,7 @@ class OLTService {
         retries: 2,
       });
 
-      const oids = OLT_OIDS[conn.vendor] || OLT_OIDS.huawei;
+      const oids = this.getOIDs(conn);
       
       // Walk ONU table
       const onus = await new Promise((resolve, reject) => {
@@ -262,7 +310,7 @@ class OLTService {
         retries: 2,
       });
 
-      const oids = OLT_OIDS[conn.vendor] || OLT_OIDS.huawei;
+      const oids = this.getOIDs(conn);
 
       const ports = await new Promise((resolve, reject) => {
         const ports = [];
@@ -301,7 +349,7 @@ class OLTService {
         retries: 1,
       });
 
-      const oids = OLT_OIDS[conn.vendor] || OLT_OIDS.huawei;
+      const oids = this.getOIDs(conn);
 
       const result = await new Promise((resolve, reject) => {
         session.get([oids.systemName, oids.systemDesc], (error, varbinds) => {
