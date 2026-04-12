@@ -29,31 +29,69 @@ export function ResellerPortal() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
+  const [formLoading, setFormLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { fetchResellers(); }, []);
 
   const fetchResellers = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${API}/resellers`).catch(() => ({ data: [] }));
-      setResellers(data);
-    } catch (e) { console.error(e); }
+      const token = localStorage.getItem('token');
+      const { data } = await axios.get(`${API}/resellers`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      setResellers(Array.isArray(data) ? data : []);
+      setError('');
+    } catch (e) {
+      console.error('Failed to fetch resellers:', e);
+      setError('Failed to load resellers. Please refresh the page.');
+      setResellers([]);
+    }
     setLoading(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormLoading(true);
+    setError('');
+    
     try {
-      if (editing) await axios.put(`${API}/resellers/${editing.id}`, editing);
-      else await axios.post(`${API}/resellers`, editing || {});
-      setShowForm(false); setEditing(null); fetchResellers();
-    } catch (e) { alert('Failed'); }
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      if (editing && editing.id) {
+        await axios.put(`${API}/resellers/${editing.id}`, editing, { headers });
+      } else {
+        await axios.post(`${API}/resellers`, editing || {}, { headers });
+      }
+      
+      setShowForm(false);
+      setEditing(null);
+      await fetchResellers();
+    } catch (e) {
+      console.error('Failed to save reseller:', e);
+      const errorMsg = e.response?.data?.error || e.message || 'Failed to save reseller';
+      setError(errorMsg);
+      alert(`Error: ${errorMsg}`);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this reseller?')) return;
-    await axios.delete(`${API}/resellers/${id}`);
-    fetchResellers();
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API}/resellers/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      await fetchResellers();
+    } catch (e) {
+      console.error('Failed to delete reseller:', e);
+      alert('Failed to delete reseller');
+    }
   };
 
   const filtered = resellers.filter(r => r.name?.toLowerCase().includes(search.toLowerCase()));
@@ -84,11 +122,20 @@ export function ResellerPortal() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={fetchResellers} className="btn-ghost"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={() => { setEditing({ name: '', email: '', phone: '', commission_rate: 10, status: 'active', credit_limit: 0 }); setShowForm(true); }} className="btn-primary">
+          <button onClick={() => { setEditing({ name: '', company: '', email: '', phone: '', commission_rate: 10, status: 'active', credit_limit: 0 }); setShowForm(true); }} className="btn-primary">
             <Plus className="w-4 h-4" /> New Reseller
           </button>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="relative mb-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <p className="text-sm text-red-300 flex-1">{error}</p>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-300">×</button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="relative grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -276,8 +323,18 @@ export function ResellerPortal() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2 border-t border-zinc-800/50">
-                <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" className="btn-primary flex-1">{editing.id ? 'Update' : 'Create'}</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="btn-secondary flex-1" disabled={formLoading}>Cancel</button>
+                <button type="submit" className="btn-primary flex-1" disabled={formLoading}>
+                  {formLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : (editing.id ? 'Update' : 'Create')}
+                </button>
               </div>
             </form>
           </div>

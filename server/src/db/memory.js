@@ -16,6 +16,9 @@ const store = {
   provision_logs: [],
   provision_events: [],
   users: [],
+  resellers: [],
+  customers: [],
+  payments: [],
 };
 
 // Seed example templates
@@ -307,6 +310,146 @@ module.exports = {
     // INSERT script_history
     if (lowerText.includes('insert into script_history')) {
       return { rows: [] };
+    }
+
+    // SELECT resellers
+    if (lowerText.includes('select') && lowerText.includes('from resellers')) {
+      if (lowerText.includes('where id =')) {
+        const reseller = store.resellers.find(r => r.id === params[0]);
+        return { rows: reseller ? [reseller] : [] };
+      }
+      // Handle COUNT and COALESCE subqueries for customer_count and total_revenue
+      const resellersWithStats = store.resellers.map(r => {
+        const customers = store.customers.filter(c => c.reseller_id === r.id);
+        const customerCount = customers.length;
+        const totalRevenue = store.payments
+          .filter(p => customers.some(c => c.id === p.customer_id))
+          .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        return { ...r, customer_count: customerCount, total_revenue: totalRevenue };
+      });
+      return { rows: resellersWithStats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    }
+
+    // INSERT resellers
+    if (lowerText.includes('insert into resellers')) {
+      const reseller = {
+        id: params[0],
+        name: params[1],
+        company: params[2],
+        email: params[3],
+        phone: params[4],
+        commission_rate: params[5] || 10,
+        credit_limit: params[6] || 0,
+        status: params[7] || 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.resellers.push(reseller);
+      return { rows: [reseller] };
+    }
+
+    // UPDATE resellers
+    if (lowerText.includes('update resellers')) {
+      const idx = store.resellers.findIndex(r => r.id === params[7]);
+      if (idx === -1) return { rows: [] };
+      const reseller = {
+        ...store.resellers[idx],
+        name: params[0] || store.resellers[idx].name,
+        company: params[1] !== undefined ? params[1] : store.resellers[idx].company,
+        email: params[2] !== undefined ? params[2] : store.resellers[idx].email,
+        phone: params[3] !== undefined ? params[3] : store.resellers[idx].phone,
+        commission_rate: params[4] !== undefined ? params[4] : store.resellers[idx].commission_rate,
+        credit_limit: params[5] !== undefined ? params[5] : store.resellers[idx].credit_limit,
+        status: params[6] !== undefined ? params[6] : store.resellers[idx].status,
+        updated_at: new Date().toISOString(),
+      };
+      store.resellers[idx] = reseller;
+      return { rows: [reseller] };
+    }
+
+    // DELETE resellers
+    if (lowerText.includes('delete from resellers')) {
+      const idx = store.resellers.findIndex(r => r.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      const deleted = store.resellers.splice(idx, 1)[0];
+      // Set reseller_id to null for associated customers
+      store.customers.forEach(c => {
+        if (c.reseller_id === params[0]) c.reseller_id = null;
+      });
+      return { rows: [deleted] };
+    }
+
+    // SELECT customers (for customer routes)
+    if (lowerText.includes('select') && lowerText.includes('from customers')) {
+      if (lowerText.includes('where id =')) {
+        const customer = store.customers.find(c => c.id === params[0]);
+        return { rows: customer ? [customer] : [] };
+      }
+      return { rows: store.customers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    }
+
+    // INSERT customers
+    if (lowerText.includes('insert into customers')) {
+      const customer = {
+        id: params[0],
+        name: params[1] || '',
+        email: params[2] || '',
+        phone: params[3] || '',
+        address: params[4] || '',
+        status: params[5] || 'active',
+        service_plan_id: params[6],
+        reseller_id: params[7],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.customers.push(customer);
+      return { rows: [customer] };
+    }
+
+    // UPDATE customers
+    if (lowerText.includes('update customers') && lowerText.includes('where id =')) {
+      const idx = store.customers.findIndex(c => c.id === params[params.length - 1]);
+      if (idx === -1) return { rows: [] };
+      store.customers[idx] = { ...store.customers[idx], ...params[0], updated_at: new Date().toISOString() };
+      return { rows: [store.customers[idx]] };
+    }
+
+    // DELETE customers
+    if (lowerText.includes('delete from customers')) {
+      const idx = store.customers.findIndex(c => c.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.customers.splice(idx, 1) };
+    }
+
+    // SELECT payments
+    if (lowerText.includes('select') && lowerText.includes('from payments')) {
+      if (lowerText.includes('where id =')) {
+        const payment = store.payments.find(p => p.id === params[0]);
+        return { rows: payment ? [payment] : [] };
+      }
+      return { rows: store.payments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    }
+
+    // INSERT payments
+    if (lowerText.includes('insert into payments')) {
+      const payment = {
+        id: params[0],
+        customer_id: params[1],
+        amount: params[2],
+        method: params[3],
+        reference: params[4],
+        notes: params[5],
+        created_at: new Date().toISOString(),
+      };
+      store.payments.push(payment);
+      return { rows: [payment] };
+    }
+
+    // DELETE payments
+    if (lowerText.includes('delete from payments')) {
+      const idx = store.payments.findIndex(p => p.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.payments.splice(idx, 1) };
     }
 
     // INSERT/UPDATE anything else (generic fallback)
