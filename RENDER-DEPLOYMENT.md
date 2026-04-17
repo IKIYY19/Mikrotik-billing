@@ -58,7 +58,7 @@ If Blueprint doesn't work, do it manually:
 3. **Configure:**
    - **Name:** `mikrotik-billing`
    - **Region:** Same as database
-   - **Branch:** `main`
+   - **Branch:** `master`
    - **Root Directory:** Leave blank
    - **Runtime:** `Docker`
    - **Dockerfile:** `Dockerfile.render`
@@ -80,6 +80,8 @@ If Blueprint doesn't work, do it manually:
    ```
 
 5. **Click:** "Create Web Service"
+
+If you deploy with the Blueprint in `render.yaml`, Render will prompt you for secret values like `JWT_SECRET` and `ENCRYPTION_KEY` during the initial setup because they are marked with `sync: false`.
 
 ---
 
@@ -131,6 +133,8 @@ Look for:
 🚀 Server running on port 5000
 ```
 
+If migrations or seed fail, the deploy now stops instead of silently booting with a partial schema.
+
 ### 2. Test Health Endpoint
 ```bash
 curl https://your-app.onrender.com/api/health
@@ -147,12 +151,12 @@ Expected: `{"status":"ok","timestamp":"...","database":"postgres"}`
 
 ## 🔄 Auto-Deploy on Git Push
 
-Render automatically deploys when you push to `main`!
+Render automatically deploys when you push to `master`!
 
 ```bash
 git add .
 git commit -m "update"
-git push origin main
+git push origin master
 # Render will rebuild automatically
 ```
 

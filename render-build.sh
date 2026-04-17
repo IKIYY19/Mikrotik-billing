@@ -2,19 +2,19 @@
 # Render deployment build script
 # This runs automatically on Render
 
-set -e
+set -eu
 
 echo "🚀 Starting Render deployment..."
 
 # Run migrations
 echo "📦 Running database migrations..."
 cd /app/server
-node src/db/migrate.js || echo "⚠️  Migrations failed, continuing..."
+node src/db/migrate.js
 
 # Seed database
 echo "🌱 Seeding database..."
-node src/db/seed.js || echo "⚠️  Seed failed, continuing..."
+node src/db/seed.js
 
 # Start server
 echo "🚀 Starting server..."
-node src/index.js
+exec node src/index.js

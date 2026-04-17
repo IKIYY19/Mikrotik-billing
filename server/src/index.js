@@ -9,6 +9,7 @@ const { initSentry, sentryErrorHandler, setUser, clearUser, addBreadcrumb } = re
 dotenv.config();
 
 const isTestEnv = process.env.NODE_ENV === 'test';
+const isProductionEnv = process.env.NODE_ENV === 'production';
 
 // Initialize Sentry FIRST (before any other code)
 initSentry();
@@ -57,6 +58,10 @@ async function initDB() {
     // Load billing repo
     billingRepo = require('./db/billingRepository');
   } catch (err) {
+    if (isProductionEnv) {
+      logger.error('PostgreSQL is required in production startup', { error: err.message });
+      throw err;
+    }
     logger.warn('PostgreSQL not available, using in-memory storage', { error: err.message });
     db = require('./db/memory');
     billingRepo = require('./db/billingStore');
@@ -68,6 +73,14 @@ async function initDB() {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+function handleStartupFailure(step, error) {
+  if (isProductionEnv) {
+    throw new Error(`${step} failed: ${error.message}`);
+  }
+
+  logger.warn(`${step} skipped`, { error: error.message });
+}
 
 // Middleware
 app.use(cors({
@@ -98,15 +111,18 @@ const startServer = async () => {
       await runMigrations();
       logger.info('Core migrations done');
     } catch (e) {
-      logger.warn('Core migrations skipped', { error: e.message });
+      handleStartupFailure('Core migrations', e);
     }
 
     try {
       const { runAuthMigrations } = require('./db/authMigrations');
-      await runAuthMigrations();
+      const authMigrationsOk = await runAuthMigrations();
+      if (!authMigrationsOk) {
+        throw new Error('Auth migrations reported failure');
+      }
       logger.info('Auth migrations done');
     } catch (e) {
-      logger.warn('Auth migrations skipped', { error: e.message });
+      handleStartupFailure('Auth migrations', e);
     }
 
     // Run billing migrations
@@ -117,16 +133,19 @@ const startServer = async () => {
       }
       logger.info('Billing migrations done');
     } catch (e) {
-      logger.warn('Billing migrations skipped', { error: e.message });
+      handleStartupFailure('Billing migrations', e);
     }
 
     // Run integrations migration
     try {
       const { runIntegrationsMigration } = require('./db/integrationsMigration');
-      await runIntegrationsMigration();
+      const integrationsOk = await runIntegrationsMigration();
+      if (!integrationsOk) {
+        throw new Error('Integrations migration reported failure');
+      }
       logger.info('Integrations migration done');
     } catch (e) {
-      logger.warn('Integrations migration skipped', { error: e.message });
+      handleStartupFailure('Integrations migration', e);
     }
 
     // Create default admin user if no users exist
