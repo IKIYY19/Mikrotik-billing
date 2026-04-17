@@ -20,6 +20,44 @@ router.get('/', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════
+// CAPTIVE PORTALS
+// ═══════════════════════════════════════
+router.get('/captive-portals', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM captive_portals ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/captive-portals', async (req, res) => {
+  try {
+    const { name, elements, styles, hotspot_profile, connection_id } = req.body;
+    const id = uuidv4();
+    const result = await db.query(
+      `INSERT INTO captive_portals (id, name, elements, styles, hotspot_profile, connection_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, name, JSON.stringify(elements), JSON.stringify(styles), hotspot_profile, connection_id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/captive-portals/push', async (req, res) => {
+  try {
+    const { connection_id, html, profile } = req.body;
+    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+
+    // Get connection
+    const connResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [connection_id]);
+    if (connResult.rows.length === 0) return res.status(404).json({ error: 'Connection not found' });
+
+    // In production, would use mikronode to push HTML to /ip/hotspot/www
+    // For now, just save and return success
+    res.json({ success: true, message: 'Portal HTML ready for deployment. Connect MikroTik API to auto-push.' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const result = await db.query('SELECT * FROM resellers WHERE id = $1', [req.params.id]);
@@ -68,44 +106,6 @@ router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM resellers WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ═══════════════════════════════════════
-// CAPTIVE PORTALS
-// ═══════════════════════════════════════
-router.get('/captive-portals', async (req, res) => {
-  try {
-    const result = await db.query('SELECT * FROM captive_portals ORDER BY created_at DESC');
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-router.post('/captive-portals', async (req, res) => {
-  try {
-    const { name, elements, styles, hotspot_profile, connection_id } = req.body;
-    const id = uuidv4();
-    const result = await db.query(
-      `INSERT INTO captive_portals (id, name, elements, styles, hotspot_profile, connection_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, name, JSON.stringify(elements), JSON.stringify(styles), hotspot_profile, connection_id]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-router.post('/captive-portals/push', async (req, res) => {
-  try {
-    const { connection_id, html, profile } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
-
-    // Get connection
-    const connResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [connection_id]);
-    if (connResult.rows.length === 0) return res.status(404).json({ error: 'Connection not found' });
-
-    // In production, would use mikronode to push HTML to /ip/hotspot/www
-    // For now, just save and return success
-    res.json({ success: true, message: 'Portal HTML ready for deployment. Connect MikroTik API to auto-push.' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

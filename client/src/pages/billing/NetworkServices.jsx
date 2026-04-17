@@ -100,13 +100,13 @@ export function NetworkServices() {
         axios.get(`${API}/network/firewall${params}`).catch(() => ({ data: [] })),
         axios.get(`${API}/mikrotik`).catch(() => ({ data: [] })),
       ]);
-      setQueues(queuesRes.data);
-      setDhcpLeases(leasesRes.data);
-      setDhcpNetworks(networksRes.data);
-      setDhcpServers(serversRes.data);
+      setQueues(Array.isArray(queuesRes.data) ? queuesRes.data : []);
+      setDhcpLeases(Array.isArray(leasesRes.data) ? leasesRes.data : []);
+      setDhcpNetworks(Array.isArray(networksRes.data) ? networksRes.data : []);
+      setDhcpServers(Array.isArray(serversRes.data) ? serversRes.data : []);
       setDnsSettings(dnsRes.data);
-      setFirewallRules(firewallRes.data);
-      setConnections(connRes.data);
+      setFirewallRules(Array.isArray(firewallRes.data) ? firewallRes.data : []);
+      setConnections(Array.isArray(connRes.data) ? connRes.data : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   };

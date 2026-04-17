@@ -74,6 +74,46 @@ router.get('/', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════
+// TICKET DASHBOARD STATS
+// ═══════════════════════════════════════
+router.get('/dashboard/stats', async (req, res) => {
+  try {
+    const [openRes, inProgressRes, resolvedRes, overdueRes, avgResponseRes] = await Promise.all([
+      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'open'`),
+      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'in_progress'`),
+      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'resolved'`),
+      db.query(`SELECT COUNT(*) FROM tickets WHERE status != 'closed' AND sla_deadline < NOW()`),
+      db.query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (tm.created_at - t.created_at))/3600), 0) as avg_hours
+                FROM tickets t
+                JOIN ticket_messages tm ON tm.ticket_id = t.id AND tm.user_id IS NOT NULL
+                WHERE tm.created_at > NOW() - INTERVAL '30 days'`),
+    ]);
+
+    res.json({
+      open: parseInt(openRes.rows[0].count),
+      in_progress: parseInt(inProgressRes.rows[0].count),
+      resolved: parseInt(resolvedRes.rows[0].count),
+      overdue: parseInt(overdueRes.rows[0].count),
+      avg_response_hours: parseFloat(avgResponseRes.rows[0].avg_hours).toFixed(1),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════
+// TECHNICIANS (Users with technician role)
+// ═══════════════════════════════════════
+router.get('/technicians', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, name, email, phone, role,
+              (SELECT COUNT(*) FROM tickets WHERE assignee_id = users.id AND status != 'closed') as active_tickets
+       FROM users WHERE role IN ('admin', 'technician', 'support') ORDER BY name ASC`
+    );
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const result = await db.query(
@@ -171,43 +211,4 @@ router.post('/:id/messages', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// TICKET DASHBOARD STATS
-// ═══════════════════════════════════════
-router.get('/dashboard/stats', async (req, res) => {
-  try {
-    const [openRes, inProgressRes, resolvedRes, overdueRes, avgResponseRes] = await Promise.all([
-      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'open'`),
-      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'in_progress'`),
-      db.query(`SELECT COUNT(*) FROM tickets WHERE status = 'resolved'`),
-      db.query(`SELECT COUNT(*) FROM tickets WHERE status != 'closed' AND sla_deadline < NOW()`),
-      db.query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (tm.created_at - t.created_at))/3600), 0) as avg_hours
-                FROM tickets t
-                JOIN ticket_messages tm ON tm.ticket_id = t.id AND tm.user_id IS NOT NULL
-                WHERE tm.created_at > NOW() - INTERVAL '30 days'`),
-    ]);
-
-    res.json({
-      open: parseInt(openRes.rows[0].count),
-      in_progress: parseInt(inProgressRes.rows[0].count),
-      resolved: parseInt(resolvedRes.rows[0].count),
-      overdue: parseInt(overdueRes.rows[0].count),
-      avg_response_hours: parseFloat(avgResponseRes.rows[0].avg_hours).toFixed(1),
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ═══════════════════════════════════════
-// TECHNICIANS (Users with technician role)
-// ═══════════════════════════════════════
-router.get('/technicians', async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT id, name, email, phone, role,
-              (SELECT COUNT(*) FROM tickets WHERE assignee_id = users.id AND status != 'closed') as active_tickets
-       FROM users WHERE role IN ('admin', 'technician', 'support') ORDER BY name ASC`
-    );
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 module.exports = router;

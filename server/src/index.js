@@ -229,6 +229,8 @@ const startServer = async () => {
     const { authenticate: auth, requirePermission: perm } = require('./middleware/auth');
     const billingRoutes = require('./routes/billing');
     const customerAliasRouter = express.Router();
+    const resellerRoutes = require('./routes/resellers');
+    const networkRoutes = require('./routes/network');
 
     customerAliasRouter.use((req, res, next) => {
       req.url = `/customers${req.url === '/' ? '' : req.url}`;
@@ -241,15 +243,36 @@ const startServer = async () => {
       return perm(permission)(req, res, next);
     }, customerAliasRouter);
 
-    // Network routes - separate read and write
-    app.get('/api/network', authenticate, requirePermission('network:read'), require('./routes/network'));
-    app.post('/api/network', authenticate, requirePermission('network:write'), require('./routes/network'));
-    app.put('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
-    app.delete('/api/network/*', authenticate, requirePermission('network:write'), require('./routes/network'));
+    const createPrefixedAliasRouter = (prefixResolver, targetRouter) => {
+      const aliasRouter = express.Router();
+      aliasRouter.use((req, res, next) => {
+        const suffix = req.url === '/' ? '' : req.url;
+        req.url = prefixResolver(suffix);
+        next();
+      });
+      aliasRouter.use(targetRouter);
+      return aliasRouter;
+    };
 
-    // PPPoE and Hotspot route aliases (frontend calls these directly)
-    app.use('/api/pppoe', authenticate, require('./routes/network'));
-    app.use('/api/hotspot', authenticate, require('./routes/network'));
+    const requireNetworkPermission = (req, res, next) => {
+      const permission = req.method === 'GET' ? 'network:read' : 'network:write';
+      return perm(permission)(req, res, next);
+    };
+
+    const networkAliasRouter = createPrefixedAliasRouter((suffix) => {
+      if (suffix.startsWith('/pppoe/') || suffix.startsWith('/hotspot/')) {
+        return suffix;
+      }
+      return `/network${suffix}`;
+    }, networkRoutes);
+    const pppoeAliasRouter = createPrefixedAliasRouter((suffix) => `/pppoe${suffix}`, networkRoutes);
+    const hotspotAliasRouter = createPrefixedAliasRouter((suffix) => `/hotspot${suffix}`, networkRoutes);
+    const captivePortalAliasRouter = createPrefixedAliasRouter((suffix) => `/captive-portals${suffix}`, resellerRoutes);
+
+    app.use('/api/network', authenticate, requireNetworkPermission, networkAliasRouter);
+    app.use('/api/pppoe', authenticate, requireNetworkPermission, pppoeAliasRouter);
+    app.use('/api/hotspot', authenticate, requireNetworkPermission, hotspotAliasRouter);
+    app.use('/api/captive-portals', authenticate, captivePortalAliasRouter);
 
     // Standard authenticated routes
     app.use('/api/projects', authenticate, require('./routes/projects'));
@@ -267,7 +290,7 @@ const startServer = async () => {
     app.use('/api/analytics', authenticate, require('./routes/analytics'));
     app.use('/api/radius', authenticate, require('./routes/radius'));
     app.use('/api/tickets', authenticate, require('./routes/tickets'));
-    app.use('/api/resellers', authenticate, require('./routes/resellers'));
+    app.use('/api/resellers', authenticate, resellerRoutes);
     app.use('/api/olt', authenticate, require('./routes/olt'));
     app.use('/api/integrations', authenticate, require('./routes/integrations'));
     app.use('/api/dashboard', authenticate, require('./routes/dashboard'));

@@ -3,6 +3,7 @@
  */
 
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 
 // Set environment variables before importing app
 process.env.JWT_SECRET = 'test-jwt-secret-key-that-is-long-enough-for-testing-purposes-only';
@@ -11,6 +12,7 @@ process.env.NODE_ENV = 'test';
 
 describe('API Endpoints', () => {
   let app;
+  let adminToken;
 
   beforeAll(async () => {
     // Mock database to prevent crashes during tests
@@ -21,6 +23,11 @@ describe('API Endpoints', () => {
     
     app = require('../src/index');
     await app.ready;
+    adminToken = jwt.sign(
+      { id: 'test-admin-id', email: 'admin@test.com', role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
   });
 
   describe('GET /api/health', () => {
@@ -76,6 +83,23 @@ describe('API Endpoints', () => {
       
       // CORS should be enabled
       expect(res.statusCode).toBe(200);
+    });
+  });
+
+  describe('Feature Route Regression Checks', () => {
+    test.each([
+      '/api/pppoe/secrets',
+      '/api/hotspot/users',
+      '/api/network/queues',
+      '/api/captive-portals',
+      '/api/tickets/technicians',
+    ])('should return JSON for %s', async (route) => {
+      const res = await request(app)
+        .get(route)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
     });
   });
 });

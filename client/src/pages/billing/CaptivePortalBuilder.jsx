@@ -206,7 +206,7 @@ export function CaptivePortalBuilder() {
   const fetchPortals = async () => {
     try {
       const { data } = await axios.get(`${API}/captive-portals`).catch(() => ({ data: [] }));
-      setPortals(data);
+      setPortals(Array.isArray(data) ? data : []);
     } catch (error) { console.error('Failed to fetch portals:', error); toast.error('Failed to load portals', error.response?.data?.error || error.message); }
   };
 
