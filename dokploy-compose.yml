@@ -66,9 +66,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Improved startup with better error handling
+    # Production startup: fail fast if the database, migrations, or seed step fail
     command: >
-      sh -c "
+      sh -eu -c "
         echo '=========================================' &&
         echo 'MikroTik Config Builder - Starting...' &&
         echo '=========================================' &&
@@ -86,10 +86,11 @@ services:
           echo 'Waiting for database... attempt $$i/120' &&
           sleep 2
         done &&
-        echo 'Running database migrations...' &&
+        echo 'Running database migrations (deployment will stop on failure)...' &&
         cd /app/server &&
-        (node src/db/migrate.js || echo 'WARNING: Migration failed, continuing...') &&
-        (node src/db/seed.js || echo 'WARNING: Seed failed, continuing...') &&
+        node src/db/migrate.js &&
+        echo 'Running database seed (deployment will stop on failure)...' &&
+        node src/db/seed.js &&
         echo 'Starting application with supervisor...' &&
         exec /usr/bin/supervisord -c /etc/supervisor.d/supervisord.ini
       "

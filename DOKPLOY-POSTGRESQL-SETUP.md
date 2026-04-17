@@ -34,7 +34,7 @@ git push origin main
 1. **Go to:** Applications → New Application
 2. **Source:** Git Repository
 3. **Repository URL:** `https://github.com/your-username/your-repo.git`
-4. **Branch:** `main`
+4. **Branch:** `master`
 5. **Build Type:** Docker Compose
 6. **Docker Compose File:** `dokploy-compose.yml`
 
@@ -106,6 +106,7 @@ Optional (leave blank if not using):
 ### Integration Features
 - ✅ App waits for database before starting
 - ✅ Auto-run migrations on deployment
+- ✅ Deployment stops immediately if migrations or seed fail
 - ✅ Internal Docker network (secure)
 - ✅ Graceful error handling
 
@@ -223,7 +224,7 @@ docker volume rm mikrotik-config-builder_pgdata
 
 ### Migration Failures
 
-**Problem:** "WARNING: Migration failed"
+**Problem:** Deployment stops after migration or seed step fails
 
 **Solution:**
 ```bash
@@ -237,6 +238,8 @@ exit
 # Check migration logs
 docker logs mikrotik-app | grep -i migrat
 ```
+
+Dokploy now fails fast on these steps by design. That is safer for production because the app will not boot against a partially initialized database.
 
 ### Out of Memory
 

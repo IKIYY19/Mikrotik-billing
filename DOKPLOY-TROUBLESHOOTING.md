@@ -55,7 +55,7 @@ docker restart mikrotik-db
 
 ### ❌ Error 3: Migration Failures
 
-**Problem:** "npm run db:migrate failed"
+**Problem:** Deployment exits when `npm run db:migrate` or `npm run db:seed` fails
 
 **Solution:**
 ```bash
@@ -66,6 +66,8 @@ node src/db/migrate.js
 node src/db/seed.js
 exit
 ```
+
+This is expected in the current Dokploy setup. The container now fails fast so a bad migration cannot silently boot the app in a broken state.
 
 ---
 
