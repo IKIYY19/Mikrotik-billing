@@ -8,6 +8,8 @@ const { initSentry, sentryErrorHandler, setUser, clearUser, addBreadcrumb } = re
 
 dotenv.config();
 
+const isTestEnv = process.env.NODE_ENV === 'test';
+
 // Initialize Sentry FIRST (before any other code)
 initSentry();
 
@@ -207,12 +209,18 @@ const startServer = async () => {
     // Customer routes - check permissions per method
     const { authenticate: auth, requirePermission: perm } = require('./middleware/auth');
     const billingRoutes = require('./routes/billing');
+    const customerAliasRouter = express.Router();
 
-    app.get('/api/customers', auth, perm('customers:read'), billingRoutes);
-    app.get('/api/customers/:id', auth, perm('customers:read'), billingRoutes);
-    app.post('/api/customers', auth, perm('customers:write'), billingRoutes);
-    app.put('/api/customers/:id', auth, perm('customers:write'), billingRoutes);
-    app.delete('/api/customers/:id', auth, perm('customers:write'), billingRoutes);
+    customerAliasRouter.use((req, res, next) => {
+      req.url = `/customers${req.url === '/' ? '' : req.url}`;
+      next();
+    });
+    customerAliasRouter.use(billingRoutes);
+
+    app.use('/api/customers', auth, (req, res, next) => {
+      const permission = req.method === 'GET' ? 'customers:read' : 'customers:write';
+      return perm(permission)(req, res, next);
+    }, customerAliasRouter);
 
     // Network routes - separate read and write
     app.get('/api/network', authenticate, requirePermission('network:read'), require('./routes/network'));
@@ -266,43 +274,49 @@ const startServer = async () => {
       });
     }
 
-    // Start cron jobs
-    let cronStarted = false;
+    if (!isTestEnv) {
+      // Start cron jobs
+      let cronStarted = false;
 
-    // Start auto-suspend cron
-    if (!cronStarted) {
-      try {
-        const { startCron } = require('./cron/autoSuspend');
-        startCron();
-        logger.info('Auto-suspend cron started');
-        cronStarted = true;
-      } catch (e) {
-        logger.warn('Could not start auto-suspend cron', { error: e.message });
+      // Start auto-suspend cron
+      if (!cronStarted) {
+        try {
+          const { startCron } = require('./cron/autoSuspend');
+          startCron();
+          logger.info('Auto-suspend cron started');
+          cronStarted = true;
+        } catch (e) {
+          logger.warn('Could not start auto-suspend cron', { error: e.message });
+        }
       }
-    }
 
-    // Start metrics collection cron
-    try {
-      const { startCron: startMetricsCron } = require('./cron/collectMetrics');
-      startMetricsCron();
-      logger.info('Metrics collection cron started');
-    } catch (e) {
-      logger.warn('Could not start metrics collection cron', { error: e.message });
-    }
+      // Start metrics collection cron
+      try {
+        const { startCron: startMetricsCron } = require('./cron/collectMetrics');
+        startMetricsCron();
+        logger.info('Metrics collection cron started');
+      } catch (e) {
+        logger.warn('Could not start metrics collection cron', { error: e.message });
+      }
 
-    app.listen(PORT, () => {
-      logger.info('Server started', { 
-        port: PORT, 
-        environment: process.env.NODE_ENV || 'development',
-        database: dbAvailable ? 'postgres' : 'memory'
+      app.listen(PORT, () => {
+        logger.info('Server started', { 
+          port: PORT, 
+          environment: process.env.NODE_ENV || 'development',
+          database: dbAvailable ? 'postgres' : 'memory'
+        });
       });
-    });
+    }
   } catch (error) {
     logger.error('Failed to start server', { error: error.message, stack: error.stack });
+    if (isTestEnv) {
+      throw error;
+    }
     process.exit(1);
   }
 };
 
-startServer();
+const ready = startServer();
 
 module.exports = app;
+module.exports.ready = ready;

@@ -12,7 +12,7 @@ process.env.NODE_ENV = 'test';
 describe('API Endpoints', () => {
   let app;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Mock database to prevent crashes during tests
     global.dbAvailable = false;
     global.db = {
@@ -20,6 +20,7 @@ describe('API Endpoints', () => {
     };
     
     app = require('../src/index');
+    await app.ready;
   });
 
   describe('GET /api/health', () => {

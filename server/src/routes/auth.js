@@ -18,6 +18,7 @@ const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
 // ─── REGISTER ───
 router.post('/register', authLimiter, async (req, res) => {
   try {
+    const db = getDb();
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name required' });
 
@@ -49,6 +50,7 @@ router.post('/register', authLimiter, async (req, res) => {
 // ─── LOGIN ───
 router.post('/login', authLimiter, async (req, res) => {
   try {
+    const db = getDb();
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
@@ -84,6 +86,7 @@ router.post('/login', authLimiter, async (req, res) => {
 // ─── GET ME ───
 router.get('/me', async (req, res) => {
   try {
+    const db = getDb();
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
 

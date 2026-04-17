@@ -10,10 +10,12 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 // Fail fast if ENCRYPTION_KEY is not configured
 if (!ENCRYPTION_KEY) {
+  const missingKeyError = new Error('ENCRYPTION_KEY environment variable is not set');
   console.error('❌ CRITICAL: ENCRYPTION_KEY environment variable is not set!');
   console.error('❌ Please set ENCRYPTION_KEY in your .env file or environment');
   console.error('❌ Generate a secure key with: openssl rand -base64 32');
   process.exit(1);
+  throw missingKeyError;
 }
 
 // Ensure key is exactly 32 bytes

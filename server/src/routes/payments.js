@@ -22,6 +22,46 @@ const mpesa = new MpesaService({
 const pendingPayments = {};
 
 // ═══════════════════════════════════════
+// GENERIC PAYMENTS API
+// ═══════════════════════════════════════
+router.get('/', async (req, res) => {
+  try {
+    const payments = billing.store.payments.map((payment) => {
+      const customer = billing.store.customers.find((item) => item.id === payment.customer_id) || null;
+      const invoice = billing.store.invoices.find((item) => item.id === payment.invoice_id) || null;
+      return { ...payment, customer, invoice };
+    });
+
+    res.json(payments.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/', async (req, res) => {
+  try {
+    const { customer_id, amount, method, reference, invoice_id, notes } = req.body || {};
+
+    if (!customer_id || amount === undefined || amount === null) {
+      return res.status(400).json({ error: 'customer_id and amount are required' });
+    }
+
+    const payment = await billing.createPayment({
+      customer_id,
+      amount: parseFloat(amount),
+      method: method || 'cash',
+      reference,
+      invoice_id,
+      notes,
+    });
+
+    res.status(201).json(payment);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
 // PAYMENT METHODS CONFIG
 // ═══════════════════════════════════════
 router.get('/methods', (req, res) => {

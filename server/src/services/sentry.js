@@ -5,12 +5,33 @@
  */
 
 const Sentry = require('@sentry/node');
-const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 const logger = require('../utils/logger');
+
+function getSentryIntegrations() {
+  const integrations = [];
+
+  if (typeof Sentry.requestDataIntegration === 'function') {
+    integrations.push(Sentry.requestDataIntegration());
+  }
+
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+      integrations.push(nodeProfilingIntegration());
+    } catch (error) {
+      logger.warn('Sentry profiling unavailable, continuing without profiling', {
+        error: error.message,
+      });
+    }
+  }
+
+  return integrations;
+}
 
 // Initialize Sentry
 function initSentry() {
   const SENTRY_DSN = process.env.SENTRY_DSN;
+  const release = process.env.SENTRY_RELEASE || `mikrotik-billing@${process.env.npm_package_version || '2.0.0'}`;
   
   if (!SENTRY_DSN) {
     logger.warn('Sentry DSN not configured. Error tracking is disabled.');
@@ -21,7 +42,7 @@ function initSentry() {
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
-    release: process.env.SENTRY_RELEASE || `mikrotik-billing@${process.env.npm_package_version || '2.0.0'}`,
+    release,
     
     // Performance monitoring - sample 20% of transactions
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
@@ -29,19 +50,7 @@ function initSentry() {
     // Profile sample rate
     profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
     
-    // Integrations
-    integrations: [
-      // Express integration (auto-captures HTTP errors)
-      Sentry.express.requestHandler({
-        // Capture request data
-        request: true,
-        // Capture user data
-        user: true,
-      }),
-      
-      // Profiling integration
-      nodeProfilingIntegration(),
-    ],
+    integrations: getSentryIntegrations(),
     
     // Filter out sensitive data
     beforeSend(event, hint) {
@@ -78,7 +87,7 @@ function initSentry() {
 
   logger.info('Sentry initialized', {
     environment: process.env.NODE_ENV,
-    release: Sentry.getCurrentScope()._transactionName,
+    release,
   });
 
   return true;

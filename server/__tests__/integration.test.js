@@ -17,7 +17,7 @@ describe('Critical User Flow Integration Tests', () => {
   let testCustomerId;
   let testInvoiceId;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Mock database
     global.dbAvailable = false;
     global.db = {
@@ -25,6 +25,7 @@ describe('Critical User Flow Integration Tests', () => {
     };
     
     app = require('../src/index');
+    await app.ready;
   });
 
   // Flow 1: User Authentication
