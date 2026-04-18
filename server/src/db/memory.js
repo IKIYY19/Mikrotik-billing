@@ -529,6 +529,9 @@ module.exports.query = async function(text, params) {
   // Users handler
   const lower = text.toLowerCase();
   if (lower.includes('users')) {
+    if (lower.includes('select count(*) from users')) {
+      return { rows: [{ count: String(store.users.length) }] };
+    }
     if (lower.includes('from users') && lower.includes('where email')) {
       const user = store.users.find(u => u.email === params[0]);
       return { rows: user ? [user] : [] };

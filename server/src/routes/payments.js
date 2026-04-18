@@ -4,34 +4,83 @@
  */
 
 const express = require('express');
-const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const MpesaService = require('../services/mpesa');
-const billing = require('../db/billingStore');
+const billing = require('../services/billingData');
+const paymentSessions = require('../services/paymentSessions');
+const { paymentLimiter } = require('../middleware/rateLimiter');
+const { triggerSMS } = require('./sms');
 
-// Initialize M-Pesa (sandbox mode by default)
+const router = express.Router();
+const isProductionEnv = process.env.NODE_ENV === 'production';
+
+// Initialize M-Pesa
 const mpesa = new MpesaService({
   consumerKey: process.env.MPESA_CONSUMER_KEY || '',
   consumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
   shortcode: process.env.MPESA_SHORTCODE || '174379',
   passkey: process.env.MPESA_PASSKEY || '',
   callbackUrl: process.env.MPESA_CALLBACK_URL || '',
+  environment: process.env.MPESA_ENVIRONMENT,
 });
 
-// In-memory storage for pending payments (use DB in production)
-const pendingPayments = {};
+const mpesaConfigured = Boolean(
+  process.env.MPESA_CONSUMER_KEY &&
+  process.env.MPESA_CONSUMER_SECRET &&
+  process.env.MPESA_PASSKEY &&
+  process.env.MPESA_CALLBACK_URL
+);
+
+router.use(paymentLimiter);
+
+async function getCustomerAndInvoice(customerId, invoiceId) {
+  const invoice = invoiceId ? await billing.getInvoiceById(invoiceId) : null;
+  const resolvedCustomerId = customerId || invoice?.customer_id || null;
+  const customer = resolvedCustomerId ? await billing.getCustomerById(resolvedCustomerId) : null;
+  return {
+    customer,
+    invoice,
+    customerId: resolvedCustomerId,
+  };
+}
+
+async function finalizeSessionPayment(session, mpesaReceipt, phone) {
+  if (session.payment_id) {
+    return billing.getPaymentById(session.payment_id);
+  }
+
+  const payment = await billing.createPayment({
+    invoice_id: session.invoice_id,
+    customer_id: session.customer_id,
+    amount: session.amount,
+    method: session.method || 'mpesa_stk',
+    reference: mpesaReceipt,
+    gateway_transaction_id: session.checkout_request_id || session.checkoutRequestId,
+    notes: `M-Pesa STK Push - ${phone || session.phone}`,
+  });
+
+  await paymentSessions.markCompleted(session.checkout_request_id || session.checkoutRequestId, {
+    payment_id: payment.id,
+    mpesaReceipt,
+  });
+
+  const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
+  const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
+  if (customer?.phone) {
+    triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+      console.error('SMS error:', error.message);
+    });
+  }
+
+  return payment;
+}
 
 // ═══════════════════════════════════════
 // GENERIC PAYMENTS API
 // ═══════════════════════════════════════
 router.get('/', async (req, res) => {
   try {
-    const payments = billing.store.payments.map((payment) => {
-      const customer = billing.store.customers.find((item) => item.id === payment.customer_id) || null;
-      const invoice = billing.store.invoices.find((item) => item.id === payment.invoice_id) || null;
-      return { ...payment, customer, invoice };
-    });
-
+    const payments = await billing.listPayments();
     res.json(payments.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -55,6 +104,14 @@ router.post('/', async (req, res) => {
       notes,
     });
 
+    const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
+    const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
+    if (customer?.phone) {
+      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+        console.error('SMS error:', error.message);
+      });
+    }
+
     res.status(201).json(payment);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -75,7 +132,7 @@ router.get('/methods', (req, res) => {
         min: 1,
         max: 150000,
         fee: 0,
-        enabled: true,
+        enabled: mpesaConfigured || !isProductionEnv,
       },
       {
         id: 'mpesa_paybill',
@@ -150,24 +207,27 @@ router.post('/mpesa/stk', async (req, res) => {
       return res.status(400).json({ error: 'phone and amount required' });
     }
 
-    const invoice = invoice_id ? billing.store.invoices.find(i => i.id === invoice_id) : null;
-    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
+    if (!mpesaConfigured && isProductionEnv) {
+      return res.status(503).json({ error: 'M-Pesa is not configured for production' });
+    }
+
+    const { invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
+    const accountRef = invoice?.invoice_number || `PAY-${Date.now()}`;
     const description = `Payment for ${accountRef}`;
 
-    // In sandbox mode, simulate STK push
-    if (!process.env.MPESA_CONSUMER_KEY) {
+    // Sandbox mode for local/test environments only
+    if (!mpesaConfigured) {
       const checkoutId = `sandbox-${uuidv4()}`;
-      pendingPayments[checkoutId] = {
+      await paymentSessions.savePending({
         id: uuidv4(),
         invoice_id,
-        customer_id,
+        customer_id: customerId,
         phone,
         amount: parseFloat(amount),
         method: 'mpesa_stk',
         status: 'pending',
         checkoutRequestId: checkoutId,
-        created_at: new Date().toISOString(),
-      };
+      });
 
       return res.json({
         success: true,
@@ -183,17 +243,17 @@ router.post('/mpesa/stk', async (req, res) => {
     const result = await mpesa.stkPush(phone, amount, accountRef, description);
 
     if (result.success) {
-      pendingPayments[result.checkoutRequestId] = {
+      await paymentSessions.savePending({
         id: uuidv4(),
         invoice_id,
-        customer_id,
+        customer_id: customerId,
         phone,
         amount: parseFloat(amount),
         method: 'mpesa_stk',
         status: 'pending',
         checkoutRequestId: result.checkoutRequestId,
-        created_at: new Date().toISOString(),
-      };
+        provider_response: result,
+      });
     }
 
     res.json(result);
@@ -209,28 +269,25 @@ router.post('/mpesa/stk/check', async (req, res) => {
   try {
     const { checkoutRequestId } = req.body;
 
-    const pending = pendingPayments[checkoutRequestId];
+    const pending = await paymentSessions.findByCheckoutRequestId(checkoutRequestId);
     if (!pending) {
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    // In sandbox mode, simulate payment confirmation
-    if (!process.env.MPESA_CONSUMER_KEY) {
-      const mpesaReceipt = `QKH${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-      pending.status = 'completed';
-      pending.mpesaReceipt = mpesaReceipt;
-      pending.completed_at = new Date().toISOString();
-
-      // Record payment
-      const payment = await billing.createPayment({
-        invoice_id: pending.invoice_id,
-        customer_id: pending.customer_id,
-        amount: pending.amount,
-        method: 'mpesa_stk',
-        reference: mpesaReceipt,
-        notes: `M-Pesa STK Push - ${pending.phone}`,
+    if (pending.payment_id) {
+      const payment = await billing.getPaymentById(pending.payment_id);
+      return res.json({
+        success: true,
+        status: 'completed',
+        mpesaReceipt: pending.mpesa_receipt || pending.mpesaReceipt || payment?.reference,
+        payment,
       });
+    }
+
+    // Sandbox mode for local/test environments only
+    if (!mpesaConfigured) {
+      const mpesaReceipt = `QKH${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const payment = await finalizeSessionPayment(pending, mpesaReceipt, pending.phone);
 
       return res.json({
         success: true,
@@ -245,23 +302,27 @@ router.post('/mpesa/stk/check', async (req, res) => {
     const result = await mpesa.checkStkStatus(checkoutRequestId);
 
     if (result.success && result.mpesaReceipt) {
-      pending.status = 'completed';
-      pending.mpesaReceipt = result.mpesaReceipt;
-      pending.completed_at = new Date().toISOString();
-
-      const payment = await billing.createPayment({
-        invoice_id: pending.invoice_id,
-        customer_id: pending.customer_id,
-        amount: pending.amount,
-        method: 'mpesa_stk',
-        reference: result.mpesaReceipt,
-        notes: `M-Pesa STK Push - ${result.phone}`,
+      const payment = await finalizeSessionPayment(pending, result.mpesaReceipt, result.phone || pending.phone);
+      return res.json({
+        success: true,
+        status: 'completed',
+        mpesaReceipt: result.mpesaReceipt,
+        payment,
       });
-
-      res.json({ success: true, status: 'completed', mpesaReceipt: result.mpesaReceipt, payment });
-    } else {
-      res.json({ success: false, status: 'pending', message: result.description || 'Waiting for payment' });
     }
+
+    if (result.resultCode && result.resultCode !== '0') {
+      await paymentSessions.markFailed(checkoutRequestId, {
+        status: 'failed',
+        provider_response: result,
+      });
+    }
+
+    return res.json({
+      success: false,
+      status: pending.status || 'pending',
+      message: result.description || result.message || 'Waiting for payment',
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -273,15 +334,22 @@ router.post('/mpesa/stk/check', async (req, res) => {
 router.post('/mpesa/paybill/confirm', async (req, res) => {
   try {
     const { phone, receipt, amount, invoice_id, customer_id } = req.body;
+    const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
 
     const payment = await billing.createPayment({
       invoice_id,
-      customer_id,
+      customer_id: customerId,
       amount: parseFloat(amount),
       method: 'mpesa_paybill',
       reference: receipt,
       notes: `M-Pesa Paybill - ${phone}`,
     });
+
+    if (customer?.phone) {
+      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+        console.error('SMS error:', error.message);
+      });
+    }
 
     res.json({ success: true, payment });
   } catch (e) {
@@ -303,25 +371,42 @@ router.post('/mpesa/callback', async (req, res) => {
     }
 
     const checkoutRequestId = body.CheckoutRequestID;
-    const pending = pendingPayments[checkoutRequestId];
+    const pending = await paymentSessions.findByCheckoutRequestId(checkoutRequestId);
 
     if (body.ResultCode === 0 && pending) {
-      // Payment successful
-      const result = body.CallbackMetadata?.Item || [];
-      const mpesaReceipt = result.find(i => i.Name === 'MpesaReceiptNumber')?.Value;
-      const amount = result.find(i => i.Name === 'Amount')?.Value;
+      const resultItems = body.CallbackMetadata?.Item || [];
+      const mpesaReceipt = resultItems.find((item) => item.Name === 'MpesaReceiptNumber')?.Value;
+      const amount = resultItems.find((item) => item.Name === 'Amount')?.Value;
 
-      pending.status = 'completed';
-      pending.mpesaReceipt = mpesaReceipt;
-      pending.completed_at = new Date().toISOString();
+      if (!pending.payment_id) {
+        const payment = await billing.createPayment({
+          invoice_id: pending.invoice_id,
+          customer_id: pending.customer_id,
+          amount: amount || pending.amount,
+          method: 'mpesa_stk',
+          reference: mpesaReceipt,
+          gateway_transaction_id: checkoutRequestId,
+          notes: `M-Pesa STK Push - ${pending.phone}`,
+        });
 
-      await billing.createPayment({
-        invoice_id: pending.invoice_id,
-        customer_id: pending.customer_id,
-        amount: amount || pending.amount,
-        method: 'mpesa_stk',
-        reference: mpesaReceipt,
-        notes: `M-Pesa STK Push - ${pending.phone}`,
+        await paymentSessions.markCompleted(checkoutRequestId, {
+          payment_id: payment.id,
+          mpesaReceipt,
+          provider_response: callback,
+        });
+
+        const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
+        const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
+        if (customer?.phone) {
+          triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+            console.error('SMS error:', error.message);
+          });
+        }
+      }
+    } else if (pending) {
+      await paymentSessions.markFailed(checkoutRequestId, {
+        status: 'failed',
+        provider_response: callback,
       });
     }
 

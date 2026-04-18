@@ -12,7 +12,7 @@ services:
     environment:
       - POSTGRES_DB=${DB_NAME:-mikrotik_config_builder}
       - POSTGRES_USER=${DB_USER:-postgres}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_secure_password_change_me}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -45,20 +45,24 @@ services:
       - DB_PORT=5432
       - DB_NAME=${DB_NAME:-mikrotik_config_builder}
       - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres_secure_password_change_me}
+      - DB_PASSWORD=${DB_PASSWORD}
       # Security
-      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-change-in-production}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-encryption-key-change-in-production}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL}
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
       # CORS
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
       # Optional integrations (leave blank if not using)
       - AT_API_KEY=${AT_API_KEY:-}
-      - AT_USERNAME=${AT_USERNAME:-sandbox}
+      - AT_USERNAME=${AT_USERNAME:-}
       - AT_SENDER_ID=${AT_SENDER_ID:-MyISP}
       - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY:-}
       - MPESA_CONSUMER_SECRET=${MPESA_CONSUMER_SECRET:-}
       - MPESA_SHORTCODE=${MPESA_SHORTCODE:-174379}
       - MPESA_PASSKEY=${MPESA_PASSKEY:-}
+      - MPESA_CALLBACK_URL=${MPESA_CALLBACK_URL:-}
+      - MPESA_ENVIRONMENT=${MPESA_ENVIRONMENT:-live}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
@@ -89,8 +93,6 @@ services:
         echo 'Running database migrations (deployment will stop on failure)...' &&
         cd /app/server &&
         node src/db/migrate.js &&
-        echo 'Running database seed (deployment will stop on failure)...' &&
-        node src/db/seed.js &&
         echo 'Starting application with supervisor...' &&
         exec /usr/bin/supervisord -c /etc/supervisor.d/supervisord.ini
       "

@@ -46,6 +46,44 @@ process.on('SIGINT', () => {
 let db;
 let dbAvailable = false;
 let billingRepo = null;
+const defaultDevCorsOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+
+function parseAllowedOrigins(rawOrigins) {
+  const values = (rawOrigins || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (values.length > 0) {
+    return values;
+  }
+
+  return isProductionEnv ? [] : defaultDevCorsOrigins;
+}
+
+function createCorsOriginHandler() {
+  const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
+
+  return (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Origin not allowed by CORS'));
+  };
+}
+
+function applySecurityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+}
 
 async function initDB() {
   try {
@@ -73,20 +111,15 @@ async function initDB() {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-function handleStartupFailure(step, error) {
-  if (isProductionEnv) {
-    throw new Error(`${step} failed: ${error.message}`);
-  }
-
-  logger.warn(`${step} skipped`, { error: error.message });
-}
+app.disable('x-powered-by');
+app.set('trust proxy', isProductionEnv ? 1 : false);
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: createCorsOriginHandler(),
   credentials: true,
 }));
+app.use(applySecurityHeaders);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -106,86 +139,92 @@ const startServer = async () => {
     global.billingRepo = billingRepo;
 
     // Run database migrations automatically
-    try {
+    if (dbAvailable) {
       const { runMigrations } = require('./db/migrate');
       await runMigrations();
-      logger.info('Core migrations done');
-    } catch (e) {
-      handleStartupFailure('Core migrations', e);
+      logger.info('Database migrations done');
+    } else {
+      logger.info('Skipping SQL migrations while running in memory mode');
     }
 
-    try {
-      const { runAuthMigrations } = require('./db/authMigrations');
-      const authMigrationsOk = await runAuthMigrations();
-      if (!authMigrationsOk) {
-        throw new Error('Auth migrations reported failure');
-      }
-      logger.info('Auth migrations done');
-    } catch (e) {
-      handleStartupFailure('Auth migrations', e);
-    }
-
-    // Run billing migrations
-    try {
-      const { billingMigrations } = require('./db/billingMigrations');
-      for (const migration of billingMigrations) {
-        await db.query(migration);
-      }
-      logger.info('Billing migrations done');
-    } catch (e) {
-      handleStartupFailure('Billing migrations', e);
-    }
-
-    // Run integrations migration
-    try {
-      const { runIntegrationsMigration } = require('./db/integrationsMigration');
-      const integrationsOk = await runIntegrationsMigration();
-      if (!integrationsOk) {
-        throw new Error('Integrations migration reported failure');
-      }
-      logger.info('Integrations migration done');
-    } catch (e) {
-      handleStartupFailure('Integrations migration', e);
-    }
-
-    // Create default admin user if no users exist
+    // Bootstrap initial admin only when the user table is empty
     try {
       const bcrypt = require('bcryptjs');
       const { v4: uuidv4 } = require('uuid');
       const userCount = await db.query('SELECT COUNT(*) FROM users');
       if (parseInt(userCount.rows[0].count) === 0) {
-        const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const configuredAdminEmail = process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '';
+        const configuredAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '';
+
+        if (isProductionEnv && (!configuredAdminEmail || !configuredAdminPassword)) {
+          throw new Error('INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are required for a fresh production deployment');
+        }
+
+        const adminEmail = configuredAdminEmail || 'admin@example.com';
+        const adminPassword = configuredAdminPassword || 'admin123';
         const adminHash = await bcrypt.hash(adminPassword, 10);
         await db.query(
           `INSERT INTO users (id, email, password_hash, name, role, is_active, created_at)
            VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
-          [uuidv4(), 'admin@example.com', adminHash, 'Administrator', 'admin']
+          [uuidv4(), adminEmail, adminHash, 'Administrator', 'admin']
         );
-        logger.info('Default admin created', { email: 'admin@example.com', passwordSet: !!process.env.ADMIN_PASSWORD });
+        logger.info('Initial admin created', { email: adminEmail, passwordConfigured: Boolean(configuredAdminPassword) });
       } else {
-        // Ensure admin user has correct role
-        const adminCheck = await db.query('SELECT id, email, role FROM users WHERE email = $1', ['admin@example.com']);
+        const adminEmail = process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@example.com';
+        const adminCheck = await db.query('SELECT id, email, role FROM users WHERE email = $1', [adminEmail]);
         if (adminCheck.rows.length > 0 && adminCheck.rows[0].role !== 'admin') {
-          await db.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', 'admin@example.com']);
+          await db.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', adminEmail]);
           logger.info('Fixed admin role to "admin"');
         }
       }
     } catch (e) {
+      if (isProductionEnv) {
+        throw e;
+      }
       logger.warn('Admin user creation/fix skipped', { error: e.message });
     }
+
+    app.get('/api/live', (req, res) => {
+      res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+      });
+    });
+
+    app.get('/api/ready', async (req, res) => {
+      try {
+        const ready = !isProductionEnv || dbAvailable;
+        const payload = {
+          status: ready ? 'ok' : 'degraded',
+          timestamp: new Date().toISOString(),
+          database: dbAvailable ? 'connected' : 'memory',
+          environment: process.env.NODE_ENV || 'development',
+        };
+
+        if (!ready) {
+          return res.status(503).json(payload);
+        }
+
+        return res.json(payload);
+      } catch (error) {
+        logger.error('Readiness check failed', { error: error.message });
+        return res.status(503).json({ status: 'error', message: 'Service unavailable' });
+      }
+    });
 
     // Enhanced health check endpoint
     app.get('/api/health', async (req, res) => {
       try {
-        const dbCheck = dbAvailable ? 'connected' : 'memory';
         const uptime = process.uptime();
-        res.json({ 
-          status: 'ok', 
-          timestamp: new Date().toISOString(), 
-          database: dbCheck,
+        res.json({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          database: dbAvailable ? 'connected' : 'memory',
+          readiness: !isProductionEnv || dbAvailable ? 'ready' : 'degraded',
           uptime: Math.floor(uptime),
           version: process.env.npm_package_version || '2.0.0',
-          environment: process.env.NODE_ENV || 'development'
+          environment: process.env.NODE_ENV || 'development',
         });
       } catch (error) {
         logger.error('Health check failed', { error: error.message });

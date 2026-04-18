@@ -133,13 +133,16 @@ const billingMigrations = [
   // Notification Templates
   `CREATE TABLE IF NOT EXISTS notification_templates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_type VARCHAR(100) UNIQUE NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
     channel VARCHAR(20) NOT NULL,
     subject VARCHAR(255),
     body TEXT,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+  `ALTER TABLE notification_templates DROP CONSTRAINT IF EXISTS notification_templates_event_type_key`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_templates_event_channel
+   ON notification_templates(event_type, channel)`,
 
   // Users (for auth)
   `CREATE TABLE IF NOT EXISTS users (
@@ -372,6 +375,44 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,
+
+  // Payment sessions - keeps pending gateway state out of process memory
+  `CREATE TABLE IF NOT EXISTS payment_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+    customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+    payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+    phone VARCHAR(50) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    method VARCHAR(50) NOT NULL DEFAULT 'mpesa_stk',
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    checkout_request_id VARCHAR(255) UNIQUE NOT NULL,
+    mpesa_receipt VARCHAR(255),
+    provider_response JSONB,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_payment_sessions_checkout ON payment_sessions(checkout_request_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_payment_sessions_status ON payment_sessions(status)`,
+
+  // Message logs - persists SMS/WhatsApp history
+  `CREATE TABLE IF NOT EXISTS message_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel VARCHAR(20) NOT NULL DEFAULT 'sms',
+    event_type VARCHAR(100),
+    template_id VARCHAR(100),
+    recipients TEXT[] NOT NULL DEFAULT '{}',
+    message TEXT NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'queued',
+    message_id VARCHAR(255),
+    cost DECIMAL(10,2) DEFAULT 0,
+    is_sandbox BOOLEAN DEFAULT false,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_message_logs_channel ON message_logs(channel)`,
+  `CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at)`,
 ];
 
 // Seed data
@@ -386,7 +427,7 @@ const seedData = async (db) => {
         ('plan-gold-25m-fixed-uuid-000003', 'Gold 25M', '25M', '25M', 45.00, NULL, 4, 'Streaming and gaming'),
         ('plan-platinum-50m-fixed-uuid-000004', 'Platinum 50M', '50M', '50M', 75.00, 500, 2, 'Heavy usage plan'),
         ('plan-enterprise-100m-fixed-uuid-000005', 'Enterprise 100M', '100M', '100M', 150.00, NULL, 1, 'Business unlimited')
-      `);
+      ON CONFLICT (id) DO NOTHING`);
     }
 
     // Seed tax rate
@@ -398,31 +439,33 @@ const seedData = async (db) => {
     }
 
     // Seed notification templates
-    const existingNotifs = await db.query('SELECT id FROM notification_templates LIMIT 1');
-    if (existingNotifs.rows.length === 0) {
-      await db.query(`INSERT INTO notification_templates (event_type, channel, subject, body) VALUES
-        ('invoice_due_soon', 'email', 'Invoice {{invoice_number}} is due', 'Dear {{customer_name}}, your invoice {{invoice_number}} for ${{amount}} is due on {{due_date}}.'),
-        ('invoice_overdue', 'email', 'Invoice {{invoice_number}} is overdue', 'Dear {{customer_name}}, your invoice {{invoice_number}} for ${{amount}} is now overdue.'),
-        ('payment_received', 'email', 'Payment received - Receipt {{receipt_number}}', 'Dear {{customer_name}}, we received your payment of ${{amount}}. Receipt: {{receipt_number}}.'),
-        ('subscription_suspended', 'email', 'Service suspended', 'Dear {{customer_name}}, your internet service has been suspended due to non-payment.'),
-        ('subscription_activated', 'email', 'Service activated', 'Dear {{customer_name}}, your internet service has been reactivated.'),
-        ('invoice_due_soon', 'sms', null, '{{customer_name}}, invoice {{invoice_number}} (${{amount}}) is due {{due_date}}.'),
-        ('invoice_overdue', 'sms', null, '{{customer_name}}, invoice {{invoice_number}} (${{amount}}) is OVERDUE. Service will be suspended.')
-      `);
-    }
-
-    // Seed admin user (password: admin123)
-    const bcrypt = require('bcrypt');
-    const existingUser = await db.query('SELECT id FROM users LIMIT 1');
-    if (existingUser.rows.length === 0) {
-      const hash = await bcrypt.hash('admin123', 10);
-      await db.query(`INSERT INTO users (email, password_hash, name, role) VALUES
-        ('admin@mikrotik.local', '${hash}', 'Admin User', 'admin')
-      `);
-    }
+    await db.query(`INSERT INTO notification_templates (event_type, channel, subject, body, is_active) VALUES
+      ('invoice_due_soon', 'email', 'Invoice {{invoice_number}} is due', 'Dear {{customer_name}}, your invoice {{invoice_number}} for KES {{amount}} is due on {{due_date}}.', true),
+      ('invoice_overdue', 'email', 'Invoice {{invoice_number}} is overdue', 'Dear {{customer_name}}, your invoice {{invoice_number}} for KES {{amount}} is now overdue.', true),
+      ('payment_received', 'email', 'Payment received - Receipt {{receipt_number}}', 'Dear {{customer_name}}, we received your payment of KES {{amount}}. Receipt: {{receipt_number}}.', true),
+      ('subscription_suspended', 'email', 'Service suspended', 'Dear {{customer_name}}, your internet service has been suspended due to non-payment.', true),
+      ('subscription_activated', 'email', 'Service activated', 'Dear {{customer_name}}, your internet service has been reactivated.', true),
+      ('invoice_due_soon', 'sms', 'Invoice Due Soon', 'Hi {customer_name}, your invoice {invoice_number} for KES {amount} is due on {due_date}. Pay via M-Pesa: {paybill}, Acc: {invoice_number}. Thank you - {company_name}', true),
+      ('invoice_overdue', 'sms', 'Invoice Overdue', 'URGENT: {customer_name}, your invoice {invoice_number} of KES {amount} is {days_overdue} days overdue. Your service may be suspended. Pay via M-Pesa: {paybill}, Acc: {invoice_number} - {company_name}', true),
+      ('payment_received', 'sms', 'Payment Received', 'Payment received! KES {amount} for {invoice_number}. Receipt: {mpesa_receipt}. New balance: KES {balance}. Thank you - {company_name}', true),
+      ('service_suspended', 'sms', 'Service Suspended', 'NOTICE: {customer_name}, your internet service has been SUSPENDED due to unpaid invoice {invoice_number} of KES {amount}. Pay KES {amount} via M-Pesa: {paybill}, Acc: {invoice_number} to restore - {company_name}', true),
+      ('service_restored', 'sms', 'Service Restored', 'GOOD NEWS: {customer_name}, your internet service has been RESTORED after payment of KES {amount}. Receipt: {mpesa_receipt}. Enjoy! - {company_name}', true),
+      ('welcome', 'sms', 'Welcome New Customer', 'Welcome to {company_name}! Your internet is active. Plan: {plan_name}, Speed: {speed}. PPPoE: {pppoe_user}/{pppoe_pass}. Support: {support_phone} - {company_name}', true)
+    ON CONFLICT (event_type, channel) DO UPDATE
+    SET subject = EXCLUDED.subject,
+        body = EXCLUDED.body,
+        is_active = EXCLUDED.is_active`);
   } catch (error) {
     console.error('Seed error:', error.message);
+    throw error;
   }
 };
 
-module.exports = { billingMigrations, seedData };
+async function runBillingMigrations(db) {
+  for (const migration of billingMigrations) {
+    await db.query(migration);
+  }
+  await seedData(db);
+}
+
+module.exports = { billingMigrations, seedData, runBillingMigrations };

@@ -43,6 +43,12 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: MPESA_ENVIRONMENT
+        value: live
       - key: CORS_ORIGIN
         fromService:
           name: mikrotik-billing

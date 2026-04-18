@@ -1,6 +1,9 @@
 const db = require('./index');
+const { runAuthMigrations } = require('./authMigrations');
+const { runBillingMigrations } = require('./billingMigrations');
+const { runIntegrationsMigration } = require('./integrationsMigration');
 
-const migrations = [
+const coreMigrations = [
   // Users table (MUST be first - required for auth)
   `CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,9 +120,24 @@ const migrations = [
 async function runMigrations() {
   console.log('Running database migrations...');
   try {
-    for (const migration of migrations) {
+    for (const migration of coreMigrations) {
       await db.query(migration);
     }
+    console.log('Core migrations completed successfully');
+
+    const authOk = await runAuthMigrations();
+    if (!authOk) {
+      throw new Error('Auth migrations reported failure');
+    }
+
+    await runBillingMigrations(db);
+    console.log('Billing migrations completed successfully');
+
+    const integrationsOk = await runIntegrationsMigration();
+    if (!integrationsOk) {
+      throw new Error('Integrations migration reported failure');
+    }
+
     console.log('All migrations completed successfully');
   } catch (error) {
     console.error('Migration failed:', error);
@@ -133,4 +151,4 @@ if (require.main === module) {
     .catch(() => process.exit(1));
 }
 
-module.exports = { runMigrations, migrations };
+module.exports = { runMigrations, migrations: coreMigrations, coreMigrations };

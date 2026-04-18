@@ -130,19 +130,23 @@ const exampleTemplates = [
 async function seed() {
   console.log('Seeding database...');
   try {
-    // Create default admin user
-    console.log('Creating default admin user...');
-    const adminEmail = 'admin@example.com';
-    const adminPassword = 'admin123';
-    const adminHash = await bcrypt.hash(adminPassword, 10);
-    
-    await db.query(
-      `INSERT INTO users (id, email, password_hash, name, role, created_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-       ON CONFLICT (email) DO NOTHING`,
-      [uuidv4(), adminEmail, adminHash, 'Administrator', 'admin']
-    );
-    console.log('✅ Default admin created: admin@example.com / admin123');
+    const seedAdminEmail = process.env.SEED_ADMIN_EMAIL || process.env.INITIAL_ADMIN_EMAIL || '';
+    const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD || '';
+
+    if (seedAdminEmail && seedAdminPassword) {
+      console.log(`Creating explicit admin user for ${seedAdminEmail}...`);
+      const adminHash = await bcrypt.hash(seedAdminPassword, 10);
+
+      await db.query(
+        `INSERT INTO users (id, email, password_hash, name, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+         ON CONFLICT (email) DO NOTHING`,
+        [uuidv4(), seedAdminEmail, adminHash, 'Administrator', 'admin']
+      );
+      console.log('✅ Explicit admin seed completed');
+    } else {
+      console.log('Skipping admin seed - set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD to create one');
+    }
 
     // Seed example templates
     console.log('Seeding example templates...');

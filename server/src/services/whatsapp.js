@@ -13,6 +13,7 @@ const axios = require('axios');
 
 class WhatsAppService {
   constructor(config = {}) {
+    this.isProduction = process.env.NODE_ENV === 'production';
     this.accessToken = config.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '';
     this.phoneNumberId = config.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
     this.verifyToken = config.verifyToken || process.env.WHATSAPP_VERIFY_TOKEN || '';
@@ -28,6 +29,14 @@ class WhatsAppService {
    */
   async sendMessage(to, message) {
     if (!this.isConfigured) {
+      if (this.isProduction) {
+        return {
+          success: false,
+          messageId: null,
+          message: 'WhatsApp Business is not configured for production',
+          isSandbox: false,
+        };
+      }
       console.log('[WhatsApp Sandbox]', to, '-', message.substring(0, 80));
       return {
         success: true,
@@ -77,6 +86,13 @@ class WhatsAppService {
    */
   async sendTemplate(to, templateName, language = 'en', variables = []) {
     if (!this.isConfigured) {
+      if (this.isProduction) {
+        return {
+          success: false,
+          message: 'WhatsApp Business is not configured for production',
+          isSandbox: false,
+        };
+      }
       console.log('[WhatsApp Template Sandbox]', to, templateName, variables);
       return { success: true, messageId: `wa-tpl-${Date.now()}`, isSandbox: true };
     }

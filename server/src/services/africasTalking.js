@@ -12,8 +12,9 @@ const axios = require('axios');
 
 class AfricaTalkingService {
   constructor(config = {}) {
+    this.isProduction = process.env.NODE_ENV === 'production';
     this.apiKey = config.apiKey || process.env.AT_API_KEY || '';
-    this.username = config.username || process.env.AT_USERNAME || 'sandbox';
+    this.username = config.username || process.env.AT_USERNAME || (this.isProduction ? '' : 'sandbox');
     this.senderId = config.senderId || process.env.AT_SENDER_ID || 'MyISP';
     this.baseUrl = this.username === 'sandbox'
       ? 'https://api.sandbox.africastalking.com'
@@ -28,6 +29,14 @@ class AfricaTalkingService {
    */
   async sendSMS(to, message) {
     if (!this.apiKey) {
+      if (this.isProduction) {
+        return {
+          success: false,
+          results: [],
+          message: 'Africa\'s Talking is not configured for production',
+          isSandbox: false,
+        };
+      }
       console.log('[SMS Sandbox]', typeof to === 'string' ? to : to.join(', '), '-', message.substring(0, 50));
       return {
         success: true,
@@ -94,6 +103,14 @@ class AfricaTalkingService {
   async sendBulkSMS(messages) {
     // messages: [{ to: '+254...', message: '...' }, ...]
     if (!this.apiKey) {
+      if (this.isProduction) {
+        return {
+          success: false,
+          results: [],
+          message: 'Africa\'s Talking is not configured for production',
+          isSandbox: false,
+        };
+      }
       console.log('[SMS Sandbox Bulk]', messages.length, 'messages');
       return {
         success: true,
@@ -148,6 +165,9 @@ class AfricaTalkingService {
    */
   async checkBalance() {
     if (!this.apiKey || this.username === 'sandbox') {
+      if (this.isProduction && !this.apiKey) {
+        return { success: false, message: 'Africa\'s Talking is not configured for production', isSandbox: false };
+      }
       return { success: true, balance: 999, unit: 'credits (sandbox)', isSandbox: true };
     }
 

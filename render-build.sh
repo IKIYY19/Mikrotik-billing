@@ -11,10 +11,6 @@ echo "📦 Running database migrations..."
 cd /app/server
 node src/db/migrate.js
 
-# Seed database
-echo "🌱 Seeding database..."
-node src/db/seed.js
-
 # Start server
 echo "🚀 Starting server..."
 exec node src/index.js

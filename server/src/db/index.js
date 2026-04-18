@@ -3,6 +3,19 @@ require('dotenv').config();
 
 // Support multiple database URL formats (Railway, Render, etc.)
 let dbConfig;
+const isProductionEnv = process.env.NODE_ENV === 'production';
+
+function getFirstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+}
+
+function requireProductionValue(label, ...values) {
+  const value = getFirstDefined(...values);
+  if (!value && isProductionEnv) {
+    throw new Error(`${label} must be configured in production`);
+  }
+  return value;
+}
 
 if (process.env.DATABASE_URL) {
   // Railway, Heroku, Render style
@@ -16,16 +29,19 @@ if (process.env.DATABASE_URL) {
 } else if (process.env.DB_HOST || process.env.PGHOST) {
   // Manual config or Dokploy style
   dbConfig = {
-    host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
-    port: process.env.DB_PORT || process.env.PGPORT || 5432,
-    database: process.env.DB_NAME || process.env.PGDATABASE || 'mikrotik_config_builder',
-    user: process.env.DB_USER || process.env.PGUSER || 'postgres',
-    password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
+    host: requireProductionValue('DB host', process.env.DB_HOST, process.env.PGHOST) || 'localhost',
+    port: requireProductionValue('DB port', process.env.DB_PORT, process.env.PGPORT) || 5432,
+    database: requireProductionValue('DB name', process.env.DB_NAME, process.env.PGDATABASE) || 'mikrotik_config_builder',
+    user: requireProductionValue('DB user', process.env.DB_USER, process.env.PGUSER) || 'postgres',
+    password: requireProductionValue('DB password', process.env.DB_PASSWORD, process.env.PGPASSWORD) || 'postgres',
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   };
 } else {
+  if (isProductionEnv) {
+    throw new Error('DATABASE_URL or DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD are required in production');
+  }
   // Fallback to localhost for local development
   dbConfig = {
     host: 'localhost',
@@ -48,7 +64,6 @@ pool.on('connect', () => {
 // Handle pool errors gracefully (don't crash the server)
 pool.on('error', (err) => {
   console.error('⚠️  Database pool error:', err.message);
-  // Don't exit - let the server continue with fallback behavior
 });
 
 module.exports = {

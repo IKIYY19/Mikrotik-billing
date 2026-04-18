@@ -12,7 +12,10 @@ class MpesaService {
     this.shortcode = config.shortcode || process.env.MPESA_SHORTCODE || '174379';
     this.passkey = config.passkey || process.env.MPESA_PASSKEY || '';
     this.callbackUrl = config.callbackUrl || process.env.MPESA_CALLBACK_URL || '';
-    this.baseUrl = 'https://sandbox.safaricom.co.ke';
+    this.environment = config.environment || process.env.MPESA_ENVIRONMENT || (process.env.NODE_ENV === 'production' ? 'live' : 'sandbox');
+    this.baseUrl = this.environment === 'live'
+      ? 'https://api.safaricom.co.ke'
+      : 'https://sandbox.safaricom.co.ke';
     this.accessToken = null;
     this.tokenExpiry = null;
   }
