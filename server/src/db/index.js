@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const { loadEnv } = require('../config/loadEnv');
+loadEnv();
 
 // Support multiple database URL formats (Railway, Render, etc.)
 let dbConfig;

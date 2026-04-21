@@ -13,14 +13,9 @@ const api = axios.create({
 // Add auth interceptor
 api.interceptors.request.use((config) => {
   const token = getToken();
-  console.log(`📡 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-  console.log(`🔑 Token from auth module:`, token ? `YES (${token.substring(0, 20)}...)` : 'NO');
-  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('✅ Auth header attached');
   }
-  
   return config;
 });
 
@@ -29,7 +24,6 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error.response?.status === 401) {
-      console.error('❌ 401 - redirecting to login');
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       window.location.href = '/login';

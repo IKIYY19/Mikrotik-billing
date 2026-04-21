@@ -4,18 +4,32 @@
  */
 
 const crypto = require('crypto');
+const { generateSecret, isDefaultSecret } = require('./security');
+const isProductionEnv = process.env.NODE_ENV === 'production';
 
 // ENCRYPTION_KEY must be set via environment variable - no fallback for security
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+let ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-// Fail fast if ENCRYPTION_KEY is not configured
 if (!ENCRYPTION_KEY) {
-  const missingKeyError = new Error('ENCRYPTION_KEY environment variable is not set');
-  console.error('❌ CRITICAL: ENCRYPTION_KEY environment variable is not set!');
-  console.error('❌ Please set ENCRYPTION_KEY in your .env file or environment');
-  console.error('❌ Generate a secure key with: openssl rand -base64 32');
-  process.exit(1);
-  throw missingKeyError;
+  if (isProductionEnv || process.env.NODE_ENV === 'test') {
+    throw new Error('ENCRYPTION_KEY environment variable is required in production and test environments');
+  }
+
+  ENCRYPTION_KEY = generateSecret(32).slice(0, 32);
+  process.env.ENCRYPTION_KEY = ENCRYPTION_KEY;
+  console.warn('ENCRYPTION_KEY not set; generated an ephemeral key for non-production runtime');
+}
+
+if (isProductionEnv && isDefaultSecret(ENCRYPTION_KEY)) {
+  throw new Error('ENCRYPTION_KEY cannot use a default or placeholder value in production');
+}
+
+if (ENCRYPTION_KEY.length < 32) {
+  const message = 'ENCRYPTION_KEY must be at least 32 characters';
+  if (isProductionEnv) {
+    throw new Error(message);
+  }
+  console.warn(`${message}; using weak key only because NODE_ENV is not production`);
 }
 
 // Ensure key is exactly 32 bytes

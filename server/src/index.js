@@ -1,18 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const dotenv = require('dotenv');
 const fs = require('fs');
+const { loadEnv } = require('./config/loadEnv');
+loadEnv();
 const logger = require('./utils/logger');
-const { initSentry, sentryErrorHandler, setUser, clearUser, addBreadcrumb } = require('./services/sentry');
-
-dotenv.config();
+const { validateSecrets } = require('./utils/security');
+const { initSentry, sentryErrorHandler } = require('./services/sentry');
 
 const isTestEnv = process.env.NODE_ENV === 'test';
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
-// Initialize Sentry FIRST (before any other code)
-initSentry();
 
 // Prevent crashes from unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
@@ -130,6 +128,15 @@ app.use('/api', apiLimiter);
 // Start server
 const startServer = async () => {
   try {
+    if (!isTestEnv) {
+      const secretsValid = validateSecrets();
+      if (!secretsValid && isProductionEnv) {
+        throw new Error('Security validation failed: configure non-default JWT_SECRET and ENCRYPTION_KEY');
+      }
+    }
+
+    // Initialize Sentry as early as possible after env validation
+    initSentry();
     // Initialize database FIRST
     await initDB();
 

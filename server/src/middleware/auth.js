@@ -6,21 +6,32 @@
 
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
+const { generateSecret, isDefaultSecret } = require('../utils/security');
+const isProductionEnv = process.env.NODE_ENV === 'production';
 
 // JWT_SECRET must be set via environment variable - no fallback for security
-const JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET = process.env.JWT_SECRET;
 
-// Fail fast if JWT_SECRET is not configured
 if (!JWT_SECRET) {
-  console.error('❌ CRITICAL: JWT_SECRET environment variable is not set!');
-  console.error('❌ Please set JWT_SECRET in your .env file or environment');
-  console.error('❌ Generate a secure secret with: openssl rand -base64 64');
-  process.exit(1);
+  if (isProductionEnv) {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+
+  JWT_SECRET = generateSecret(64);
+  process.env.JWT_SECRET = JWT_SECRET;
+  logger.warn('JWT_SECRET not set; generated an ephemeral secret for non-production runtime');
 }
 
-// Validate JWT_SECRET strength (should be at least 32 characters)
+if (isProductionEnv && isDefaultSecret(JWT_SECRET)) {
+  throw new Error('JWT_SECRET cannot use a default or placeholder value in production');
+}
+
 if (JWT_SECRET.length < 32) {
-  console.warn('⚠️  WARNING: JWT_SECRET is less than 32 characters. Consider using a stronger secret.');
+  const message = 'JWT_SECRET must be at least 32 characters';
+  if (isProductionEnv) {
+    throw new Error(message);
+  }
+  logger.warn(`${message}; using weak secret only because NODE_ENV is not production`);
 }
 
 // Role hierarchy
