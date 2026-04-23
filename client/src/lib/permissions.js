@@ -41,10 +41,10 @@ export const FEATURE_ACCESS = {
     'network-map', 'monitoring', 'reports', 'analytics', 'pppoe', 'hotspot', 'vouchers', 'tickets',
   ],
   [ROLES.TECHNICIAN]: [
-    // Main navigation
-    'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations',
-    // Network
-    'network-services', 'olt', 'radius', 'monitoring', 'bandwidth',
+    // Main navigation - limited
+    'dashboard', 'devices', 'templates',
+    // Network - read-only access
+    'monitoring', 'bandwidth',
   ],
   [ROLES.RESELLER]: [
     // Main navigation
