@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon } from 'lucide-react';
+import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -32,9 +33,33 @@ export function SettingsPage() {
 
   const [logoPreview, setLogoPreview] = useState(null);
 
+  // Permissions state
+  const [permissions, setPermissions] = useState(DEFAULT_FEATURE_ACCESS);
+  const [selectedRole, setSelectedRole] = useState(ROLES.ADMIN);
+
+  const allFeatures = [
+    'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
+    'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
+    'network-map', 'monitoring', 'agents', 'auto-suspend', 'reports', 'analytics', 'pppoe', 'hotspot',
+    'vouchers', 'network-services', 'olt', 'radius', 'tickets', 'captive-portal', 'bandwidth', 'resellers',
+    'backups', 'inventory', 'users',
+  ];
+
   useEffect(() => {
     fetchSettings();
+    fetchPermissions();
   }, []);
+
+  const fetchPermissions = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings/permissions`);
+      if (data) {
+        setPermissions(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch permissions:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -86,6 +111,32 @@ export function SettingsPage() {
     setSaving(false);
   };
 
+  const handleSavePermissions = async () => {
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await axios.put(`${API}/settings/permissions`, permissions);
+      setMessage({ type: 'success', text: 'Permissions saved successfully. Reloading page...' });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to save permissions:', error);
+      setMessage({ type: 'error', text: 'Failed to save permissions' });
+      setSaving(false);
+    }
+  };
+
+  const toggleFeature = (role, feature) => {
+    setPermissions(prev => ({
+      ...prev,
+      [role]: prev[role].includes(feature)
+        ? prev[role].filter(f => f !== feature)
+        : [...prev[role], feature]
+    }));
+  };
+
   const timezones = [
     'Africa/Nairobi', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
@@ -119,7 +170,7 @@ export function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        {['general', 'billing', 'network', 'notifications'].map(tab => (
+        {['general', 'permissions', 'billing', 'network', 'notifications'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -366,8 +417,70 @@ export function SettingsPage() {
         </form>
       )}
 
+      {/* Permissions Settings */}
+      {activeTab === 'permissions' && (
+        <div className="space-y-6">
+          <div className="glass rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5" /> Role-Based Permissions
+            </h2>
+            <p className="text-zinc-400 text-sm mb-6">Configure which features each user role can access.</p>
+
+            {/* Role Selector */}
+            <div className="flex gap-2 mb-6">
+              {Object.values(ROLES).map(role => (
+                <button
+                  key={role}
+                  onClick={() => setSelectedRole(role)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                    selectedRole === role
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {allFeatures.map(feature => {
+                const hasAccess = permissions[selectedRole]?.includes(feature);
+                return (
+                  <button
+                    key={feature}
+                    onClick={() => toggleFeature(selectedRole, feature)}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      hasAccess
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700 hover:border-zinc-600'
+                    }`}
+                  >
+                    {hasAccess ? <Check className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
+                    <span className="capitalize">{feature.replace(/-/g, ' ')}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSavePermissions}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save Permissions'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Other tabs - placeholder */}
-      {activeTab !== 'general' && (
+      {activeTab !== 'general' && activeTab !== 'permissions' && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="text-zinc-500">
             <p className="text-lg font-medium mb-2">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings</p>

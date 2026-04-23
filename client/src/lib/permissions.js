@@ -3,6 +3,10 @@
  * Mirrors backend permissions defined in server/src/middleware/auth.js
  */
 
+import axios from 'axios';
+
+const API = import.meta.env.VITE_API_URL || '/api';
+
 export const ROLES = {
   ADMIN: 'admin',
   STAFF: 'staff',
@@ -11,51 +15,67 @@ export const ROLES = {
   CUSTOMER: 'customer',
 };
 
-// Permission matrix - matches backend
-export const PERMISSIONS = {
-  [ROLES.ADMIN]: ['*'], // all permissions
+// Default permissions - used as fallback if backend fails
+const DEFAULT_PERMISSIONS = {
+  [ROLES.ADMIN]: ['*'],
   [ROLES.STAFF]: ['billing:read', 'billing:write', 'customers:read', 'customers:write', 'reports:read'],
   [ROLES.TECHNICIAN]: ['network:read', 'network:write', 'monitoring:read', 'devices:read', 'devices:write'],
   [ROLES.RESELLER]: ['customers:read', 'customers:write', 'billing:read', 'invoices:write'],
   [ROLES.CUSTOMER]: ['own:read', 'billing:read', 'tickets:write'],
 };
 
-// Feature access by role - which pages/features each role can see
-export const FEATURE_ACCESS = {
+// Default feature access - used as fallback
+const DEFAULT_FEATURE_ACCESS = {
   [ROLES.ADMIN]: [
-    // Main navigation
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
-    // Billing
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
     'network-map', 'monitoring', 'agents', 'auto-suspend', 'reports', 'analytics', 'pppoe', 'hotspot',
     'vouchers', 'network-services', 'olt', 'radius', 'tickets', 'captive-portal', 'bandwidth', 'resellers',
-    'backups', 'inventory',
-    // Admin only
-    'users',
+    'backups', 'inventory', 'users',
   ],
   [ROLES.STAFF]: [
-    // Main navigation
     'dashboard', 'topology', 'router-linking',
-    // Billing
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
     'network-map', 'monitoring', 'reports', 'analytics', 'pppoe', 'hotspot', 'vouchers', 'tickets',
   ],
   [ROLES.TECHNICIAN]: [
-    // Main navigation - limited
     'dashboard', 'devices', 'templates',
-    // Network - read-only access
     'monitoring', 'bandwidth',
   ],
   [ROLES.RESELLER]: [
-    // Main navigation
     'dashboard',
-    // Billing
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet',
   ],
-  [ROLES.CUSTOMER]: [
-    // Customer portal only - separate UI
-  ],
+  [ROLES.CUSTOMER]: [],
 };
+
+// Cached permissions from backend
+let cachedPermissions = null;
+let cachedFeatureAccess = null;
+
+/**
+ * Fetch permissions from backend
+ */
+export async function fetchPermissions() {
+  try {
+    const { data } = await axios.get(`${API}/settings/permissions`);
+    cachedFeatureAccess = data;
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch permissions:', error);
+    return DEFAULT_FEATURE_ACCESS;
+  }
+}
+
+/**
+ * Get permissions (from cache or fetch)
+ */
+export async function getPermissions() {
+  if (!cachedFeatureAccess) {
+    await fetchPermissions();
+  }
+  return cachedFeatureAccess || DEFAULT_FEATURE_ACCESS;
+}
 
 /**
  * Check if user has a specific permission
@@ -64,7 +84,7 @@ export function hasPermission(user, permission) {
   if (!user) return false;
   if (user.role === ROLES.ADMIN) return true;
   
-  const userPerms = PERMISSIONS[user.role] || [];
+  const userPerms = DEFAULT_PERMISSIONS[user.role] || [];
   return userPerms.includes('*') || userPerms.includes(permission);
 }
 
@@ -75,7 +95,8 @@ export function canAccessFeature(user, feature) {
   if (!user) return false;
   if (user.role === ROLES.ADMIN) return true;
   
-  const features = FEATURE_ACCESS[user.role] || [];
+  // Use cached permissions if available, otherwise use defaults
+  const features = (cachedFeatureAccess?.[user.role]) || DEFAULT_FEATURE_ACCESS[user.role] || [];
   return features.includes(feature);
 }
 
@@ -108,3 +129,7 @@ export function hasRoleLevel(user, minRole) {
   if (!user) return false;
   return getRoleLevel(user.role) >= getRoleLevel(minRole);
 }
+
+// Export defaults for SettingsPage
+export const PERMISSIONS = DEFAULT_PERMISSIONS;
+export const FEATURE_ACCESS = DEFAULT_FEATURE_ACCESS;
