@@ -372,6 +372,17 @@ const billingMigrations = [
 
   // Indexes for tickets
   `CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`,
+
+  // Add missing city column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='city'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN city VARCHAR(100);
+    END IF;
+  END $$`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,
