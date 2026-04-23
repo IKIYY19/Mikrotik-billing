@@ -54,3 +54,5 @@ services:
           name: mikrotik-billing
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+      - key: ALLOW_HTTP_PROVISION
+        value: "true"
