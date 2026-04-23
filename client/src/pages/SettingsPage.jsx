@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock, Palette, Sun, Moon } from 'lucide-react';
 import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
+import { useTheme } from '../contexts/ThemeContext';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function SettingsPage() {
+  const { theme, setTheme, mode, setMode, themes } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -462,6 +464,53 @@ export function SettingsPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Theme Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" /> Appearance
+              </CardTitle>
+              <CardDescription>Customize the look and feel of your application.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Color Theme */}
+              <div>
+                <Label className="text-base font-semibold mb-3 block">Color Theme</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {themes.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        theme === t.id
+                          ? 'border-primary bg-primary/10'
+                          : 'border-zinc-700 hover:border-zinc-600'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-white mb-1">{t.name}</div>
+                      <div className="text-xs text-zinc-400">{t.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Light/Dark Mode */}
+              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  {mode === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                  <div>
+                    <div className="font-medium text-white">Dark Mode</div>
+                    <div className="text-sm text-zinc-400">Toggle between light and dark theme</div>
+                  </div>
+                </div>
+                <Switch
+                  checked={mode === 'dark'}
+                  onCheckedChange={(checked) => setMode(checked ? 'dark' : 'light')}
+                />
               </div>
             </CardContent>
           </Card>
