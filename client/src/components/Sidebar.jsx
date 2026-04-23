@@ -36,46 +36,47 @@ import {
 } from 'lucide-react';
 import { clearAuth } from '../lib/auth';
 import { SearchButton } from './GlobalSearch';
+import { canAccessFeature, ROLES } from '../lib/permissions';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/topology', icon: Network, label: 'Topology' },
-  { to: '/router-linking', icon: Link, label: 'Router Linking' },
-  { to: '/devices', icon: HardDrive, label: 'Provisioning' },
-  { to: '/templates', icon: FileCode, label: 'Templates' },
-  { to: '/mikrotik-api', icon: Server, label: 'MikroTik API' },
-  { to: '/integrations', icon: Key, label: 'Integrations' },
-  { to: '/settings', icon: SettingsIcon, label: 'Settings' },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', feature: 'dashboard' },
+  { to: '/topology', icon: Network, label: 'Topology', feature: 'topology' },
+  { to: '/router-linking', icon: Link, label: 'Router Linking', feature: 'router-linking' },
+  { to: '/devices', icon: HardDrive, label: 'Provisioning', feature: 'devices' },
+  { to: '/templates', icon: FileCode, label: 'Templates', feature: 'templates' },
+  { to: '/mikrotik-api', icon: Server, label: 'MikroTik API', feature: 'mikrotik-api' },
+  { to: '/integrations', icon: Key, label: 'Integrations', feature: 'integrations' },
+  { to: '/settings', icon: SettingsIcon, label: 'Settings', feature: 'settings' },
 ];
 
 const billingItems = [
-  { to: '/billing', icon: DollarSign, label: 'Overview' },
-  { to: '/billing-customers', icon: Users, label: 'Customers' },
-  { to: '/billing-plans', icon: Package, label: 'Plans' },
-  { to: '/billing-subscriptions', icon: Activity, label: 'Subscriptions' },
-  { to: '/billing-invoices', icon: Receipt, label: 'Invoices' },
-  { to: '/billing-payments', icon: CreditCard, label: 'Payments' },
-  { to: '/billing-wallet', icon: Wallet, label: 'Wallet' },
-  { to: '/billing-sms', icon: MessageSquare, label: 'SMS' },
-  { to: '/billing-whatsapp', icon: MessageCircle, label: 'WhatsApp' },
-  { to: '/billing-map', icon: MapPin, label: 'Network Map' },
-  { to: '/billing-monitoring', icon: Activity, label: 'Monitoring' },
-  { to: '/billing-agents', icon: UserCheck, label: 'Agents' },
-  { to: '/billing-auto-suspend', icon: Shield, label: 'Auto-Suspend' },
-  { to: '/billing-reports', icon: FileText2, label: 'Reports' },
-  { to: '/analytics', icon: TrendingUp, label: 'Analytics' },
-  { to: '/pppoe', icon: Network, label: 'PPPoE' },
-  { to: '/hotspot', icon: Wifi, label: 'Hotspot' },
-  { to: '/hotspot-vouchers', icon: Ticket, label: 'Vouchers' },
-  { to: '/network-services', icon: Server, label: 'Network' },
-  { to: '/olt', icon: Radio, label: 'OLT/Fiber' },
-  { to: '/radius', icon: Shield, label: 'RADIUS' },
-  { to: '/tickets', icon: LifeBuoy, label: 'Support' },
-  { to: '/captive-portal', icon: Palette, label: 'Portal Builder' },
-  { to: '/bandwidth', icon: Activity, label: 'Bandwidth' },
-  { to: '/resellers', icon: UserCheck, label: 'Resellers' },
-  { to: '/billing-backup', icon: Database, label: 'Backups' },
-  { to: '/inventory', icon: Package, label: 'Inventory' },
+  { to: '/billing', icon: DollarSign, label: 'Overview', feature: 'billing' },
+  { to: '/billing-customers', icon: Users, label: 'Customers', feature: 'customers' },
+  { to: '/billing-plans', icon: Package, label: 'Plans', feature: 'plans' },
+  { to: '/billing-subscriptions', icon: Activity, label: 'Subscriptions', feature: 'subscriptions' },
+  { to: '/billing-invoices', icon: Receipt, label: 'Invoices', feature: 'invoices' },
+  { to: '/billing-payments', icon: CreditCard, label: 'Payments', feature: 'payments' },
+  { to: '/billing-wallet', icon: Wallet, label: 'Wallet', feature: 'wallet' },
+  { to: '/billing-sms', icon: MessageSquare, label: 'SMS', feature: 'sms' },
+  { to: '/billing-whatsapp', icon: MessageCircle, label: 'WhatsApp', feature: 'whatsapp' },
+  { to: '/billing-map', icon: MapPin, label: 'Network Map', feature: 'network-map' },
+  { to: '/billing-monitoring', icon: Activity, label: 'Monitoring', feature: 'monitoring' },
+  { to: '/billing-agents', icon: UserCheck, label: 'Agents', feature: 'agents' },
+  { to: '/billing-auto-suspend', icon: Shield, label: 'Auto-Suspend', feature: 'auto-suspend' },
+  { to: '/billing-reports', icon: FileText2, label: 'Reports', feature: 'reports' },
+  { to: '/analytics', icon: TrendingUp, label: 'Analytics', feature: 'analytics' },
+  { to: '/pppoe', icon: Network, label: 'PPPoE', feature: 'pppoe' },
+  { to: '/hotspot', icon: Wifi, label: 'Hotspot', feature: 'hotspot' },
+  { to: '/hotspot-vouchers', icon: Ticket, label: 'Vouchers', feature: 'vouchers' },
+  { to: '/network-services', icon: Server, label: 'Network', feature: 'network-services' },
+  { to: '/olt', icon: Radio, label: 'OLT/Fiber', feature: 'olt' },
+  { to: '/radius', icon: Shield, label: 'RADIUS', feature: 'radius' },
+  { to: '/tickets', icon: LifeBuoy, label: 'Support', feature: 'tickets' },
+  { to: '/captive-portal', icon: Palette, label: 'Portal Builder', feature: 'captive-portal' },
+  { to: '/bandwidth', icon: Activity, label: 'Bandwidth', feature: 'bandwidth' },
+  { to: '/resellers', icon: UserCheck, label: 'Resellers', feature: 'resellers' },
+  { to: '/billing-backup', icon: Database, label: 'Backups', feature: 'backups' },
+  { to: '/inventory', icon: Package, label: 'Inventory', feature: 'inventory' },
 ];
 
 export function Sidebar({ onSearchOpen }) {
@@ -119,7 +120,7 @@ export function Sidebar({ onSearchOpen }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {navItems.map((item) => (
+        {navItems.filter(item => canAccessFeature(user, item.feature)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -135,26 +136,30 @@ export function Sidebar({ onSearchOpen }) {
           </NavLink>
         ))}
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 px-3 py-3">
-          <div className="h-px flex-1 bg-zinc-800/60" />
-          <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Billing</div>
-          <div className="h-px flex-1 bg-zinc-800/60" />
-        </div>
+        {/* Divider - only show if user has billing access */}
+        {billingItems.some(item => canAccessFeature(user, item.feature)) && (
+          <div className="flex items-center gap-3 px-3 py-3">
+            <div className="h-px flex-1 bg-zinc-800/60" />
+            <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Billing</div>
+            <div className="h-px flex-1 bg-zinc-800/60" />
+          </div>
+        )}
 
-        {/* Billing items */}
-        <button
-          onClick={() => setBillingOpen(!billingOpen)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 w-full transition-all"
-        >
-          <DollarSign className="w-[18px] h-[18px] flex-shrink-0" />
-          <span className="flex-1 text-left">All Billing</span>
-          {billingOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        </button>
+        {/* Billing items - only show if user has billing access */}
+        {billingItems.some(item => canAccessFeature(user, item.feature)) && (
+          <button
+            onClick={() => setBillingOpen(!billingOpen)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 w-full transition-all"
+          >
+            <DollarSign className="w-[18px] h-[18px] flex-shrink-0" />
+            <span className="flex-1 text-left">All Billing</span>
+            {billingOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          </button>
+        )}
 
         {billingOpen && (
           <div className="ml-4 pl-3 border-l border-zinc-800/50 space-y-0.5">
-            {billingItems.map((item) => (
+            {billingItems.filter(item => canAccessFeature(user, item.feature)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
