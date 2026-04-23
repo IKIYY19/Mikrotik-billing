@@ -26,6 +26,7 @@
     "jsonwebtoken": "^9.0.3",
     "mikronode": "^2.3.11",
     "net-snmp": "^3.8.0",
+    "node-ssh": "^13.1.0",
     "pg": "^8.11.3",
     "stripe": "^14.0.0",
     "telnet-client": "^2.1.1",

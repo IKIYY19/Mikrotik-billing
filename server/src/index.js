@@ -326,6 +326,7 @@ const startServer = async () => {
     app.use('/api/generator', authenticate, require('./routes/generator'));
     app.use('/api/templates', authenticate, require('./routes/templates'));
     app.use('/api/mikrotik', authenticate, require('./routes/mikrotik'));
+    app.use('/api/mikrotik-automation', authenticate, require('./routes/mikrotikAutomation'));
     app.use('/api/devices', authenticate, require('./routes/devices'));
     app.use('/api/payments', authenticate, require('./routes/payments'));
     app.use('/api/sms', authenticate, require('./routes/sms'));
