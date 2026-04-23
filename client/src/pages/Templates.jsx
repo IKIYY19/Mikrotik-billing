@@ -13,6 +13,9 @@ export function Templates() {
     fetchTemplates(selectedCategory === 'all' ? undefined : selectedCategory);
   }, [selectedCategory]);
 
+  // Ensure templates is always an array
+  const templatesArray = Array.isArray(templates) ? templates : [];
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
@@ -43,7 +46,7 @@ export function Templates() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {templates.map((template) => (
+        {templatesArray.map((template) => (
           <div
             key={template.id}
             className="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:border-blue-500 transition-colors"
@@ -66,7 +69,7 @@ export function Templates() {
         ))}
       </div>
 
-      {templates.length === 0 && (
+      {templatesArray.length === 0 && (
         <div className="text-center py-16">
           <FileCode className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400 text-lg">No templates found.</p>
