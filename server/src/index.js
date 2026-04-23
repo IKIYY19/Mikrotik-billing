@@ -387,12 +387,18 @@ const startServer = async () => {
         logger.warn('Could not start metrics collection cron', { error: e.message });
       }
 
-      app.listen(PORT, () => {
+      const server = app.listen(PORT, () => {
         logger.info('Server started', { 
           port: PORT, 
           environment: process.env.NODE_ENV || 'development',
           database: dbAvailable ? 'postgres' : 'memory'
         });
+        
+        // Initialize WebSocket service for real-time monitoring
+        const websocketService = require('./services/websocketService');
+        websocketService.initialize(server);
+        
+        logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });
     }
   } catch (error) {
