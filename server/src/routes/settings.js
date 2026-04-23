@@ -25,6 +25,17 @@ const settingsStore = {
   tax_rate: '16',
 };
 
+// WireGuard settings store
+const wireguardStore = {
+  enabled: false,
+  server_port: '51820',
+  server_private_key: '',
+  server_public_key: '',
+  server_address: '10.0.0.1',
+  server_dns: '1.1.1.1',
+  peers: [],
+};
+
 // Default permissions (can be overridden via API)
 const permissionsStore = {
   admin: ['*'],
@@ -182,8 +193,76 @@ router.put('/bank-paybills', (req, res) => {
   res.json(bankPaybillStore);
 });
 
+// Get WireGuard settings
+router.get('/wireguard', (req, res) => {
+  res.json(wireguardStore);
+});
+
+// Update WireGuard settings
+router.put('/wireguard', (req, res) => {
+  Object.assign(wireguardStore, req.body);
+  res.json(wireguardStore);
+});
+
+// Add WireGuard peer
+router.post('/wireguard/peers', (req, res) => {
+  const { name, public_key, allowed_ips, preshared_key } = req.body;
+  const peer = {
+    id: Date.now().toString(),
+    name,
+    public_key,
+    allowed_ips,
+    preshared_key,
+    enabled: true,
+    created_at: new Date().toISOString(),
+  };
+  wireguardStore.peers.push(peer);
+  res.json(peer);
+});
+
+// Update WireGuard peer
+router.put('/wireguard/peers/:id', (req, res) => {
+  const { id } = req.params;
+  const peerIndex = wireguardStore.peers.findIndex(p => p.id === id);
+  if (peerIndex === -1) {
+    return res.status(404).json({ error: 'Peer not found' });
+  }
+  Object.assign(wireguardStore.peers[peerIndex], req.body);
+  res.json(wireguardStore.peers[peerIndex]);
+});
+
+// Delete WireGuard peer
+router.delete('/wireguard/peers/:id', (req, res) => {
+  const { id } = req.params;
+  wireguardStore.peers = wireguardStore.peers.filter(p => p.id !== id);
+  res.json({ success: true });
+});
+
+// Generate WireGuard client config
+router.post('/wireguard/config/:id', (req, res) => {
+  const { id } = req.params;
+  const peer = wireguardStore.peers.find(p => p.id === id);
+  if (!peer) {
+    return res.status(404).json({ error: 'Peer not found' });
+  }
+
+  const config = `[Interface]
+PrivateKey = ${peer.private_key || 'YOUR_PRIVATE_KEY'}
+Address = ${peer.allowed_ips}
+DNS = ${wireguardStore.server_dns}
+
+[Peer]
+PublicKey = ${wireguardStore.server_public_key}
+Endpoint = ${req.body.endpoint || 'YOUR_SERVER_IP:51820'}
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25`;
+
+  res.json({ config });
+});
+
 // Export the stores for use in other modules
 module.exports = router;
 module.exports.paymentGatewayStore = paymentGatewayStore;
 module.exports.bankPaybillStore = bankPaybillStore;
 module.exports.settingsStore = settingsStore;
+module.exports.wireguardStore = wireguardStore;
