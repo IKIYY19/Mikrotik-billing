@@ -136,8 +136,21 @@ export function InventoryPage() {
     fetchData();
   };
 
-  const exportCSV = () => {
-    window.open(`${API}/inventory/export`, '_blank');
+  const exportCSV = async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/export`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `inventory-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export inventory. Please try again.');
+    }
   };
 
   /* ─── Detail View ─── */
