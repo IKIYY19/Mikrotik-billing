@@ -9,17 +9,54 @@ const AfricaTalkingService = require('../services/africasTalking');
 const WhatsAppService = require('../services/whatsapp');
 const messagingStore = require('../services/messagingStore');
 const { messagingLimiter } = require('../middleware/rateLimiter');
+const { decryptObject } = require('../utils/encryption');
 
 const router = express.Router();
 const whatsapp = new WhatsAppService();
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
-function getATService() {
+async function getIntegrationConfig(serviceName) {
+  try {
+    if (!global.db) return null;
+    const result = await global.db.query(
+      'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
+      [serviceName]
+    );
+    if (result.rows.length === 0) return null;
+    const decrypted = decryptObject(result.rows[0].config_data);
+    return decrypted;
+  } catch (error) {
+    console.error('Error fetching integration config:', error);
+    return null;
+  }
+}
+
+async function getATService() {
+  const integrationConfig = await getIntegrationConfig('africas_talking');
+  if (integrationConfig) {
+    return new AfricaTalkingService({
+      apiKey: integrationConfig.api_key,
+      username: integrationConfig.username || (isProductionEnv ? '' : 'sandbox'),
+      senderId: integrationConfig.sender_id || 'MyISP',
+    });
+  }
   return new AfricaTalkingService({
     apiKey: process.env.AT_API_KEY,
     username: process.env.AT_USERNAME || (isProductionEnv ? '' : 'sandbox'),
     senderId: process.env.AT_SENDER_ID || 'MyISP',
   });
+}
+
+async function getWhatsAppService() {
+  const integrationConfig = await getIntegrationConfig('whatsapp');
+  if (integrationConfig) {
+    return new WhatsAppService({
+      accessToken: integrationConfig.access_token,
+      phoneNumberId: integrationConfig.phone_number_id,
+      verifyToken: integrationConfig.verify_token,
+    });
+  }
+  return new WhatsAppService();
 }
 
 function getCompanyInfo() {
@@ -86,7 +123,7 @@ router.post('/send', messagingLimiter, async (req, res) => {
     if (!to || !message) return res.status(400).json({ error: 'to and message required' });
 
     const recipients = (Array.isArray(to) ? to : [to]).map((item) => AfricaTalkingService.formatPhone(item));
-    const at = getATService();
+    const at = await getATService();
     const result = await at.sendSMS(recipients, message);
 
     await logMessage({
@@ -116,7 +153,7 @@ router.post('/send-template', messagingLimiter, async (req, res) => {
     if (!message) return res.status(404).json({ error: 'Template not found or inactive' });
 
     const recipients = (Array.isArray(to) ? to : [to]).map((item) => AfricaTalkingService.formatPhone(item));
-    const at = getATService();
+    const at = await getATService();
     const result = await at.sendSMS(recipients, message);
 
     await logMessage({
@@ -154,7 +191,7 @@ router.post('/bulk-send', messagingLimiter, async (req, res) => {
       return res.json({ success: true, sent: 0, message: 'No valid messages' });
     }
 
-    const at = getATService();
+    const at = await getATService();
     const result = await at.sendBulkSMS(messages);
 
     await Promise.all(messages.map((item, index) => logMessage({
@@ -211,7 +248,7 @@ router.get('/logs', async (req, res) => {
 // ═══════════════════════════════════════
 router.get('/balance', async (req, res) => {
   try {
-    const at = getATService();
+    const at = await getATService();
     res.json(await at.checkBalance());
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -250,7 +287,7 @@ async function triggerSMS(event, data) {
     if (!message) return { success: false, message: 'Template not found' };
 
     const recipient = AfricaTalkingService.formatPhone(phone);
-    const at = getATService();
+    const at = await getATService();
     const result = await at.sendSMS(recipient, message);
 
     await logMessage({
@@ -280,7 +317,8 @@ router.post('/whatsapp/send', messagingLimiter, async (req, res) => {
     const { to, message } = req.body;
     if (!to || !message) return res.status(400).json({ error: 'to and message required' });
 
-    const result = await whatsapp.sendMessage(to, message);
+    const wa = await getWhatsAppService();
+    const result = await wa.sendMessage(to, message);
 
     await logMessage({
       channel: 'whatsapp',
@@ -296,14 +334,16 @@ router.post('/whatsapp/send', messagingLimiter, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/whatsapp/webhook', (req, res) => {
-  const challenge = whatsapp.verifyWebhook(req);
+router.get('/whatsapp/webhook', async (req, res) => {
+  const wa = await getWhatsAppService();
+  const challenge = wa.verifyWebhook(req);
   if (challenge) return res.send(challenge.toString());
   return res.sendStatus(403);
 });
 
 router.post('/whatsapp/webhook', async (req, res) => {
-  const events = whatsapp.handleWebhook(req.body);
+  const wa = await getWhatsAppService();
+  const events = wa.handleWebhook(req.body);
 
   for (const event of events) {
     if (event.type === 'message_received') {
@@ -328,7 +368,8 @@ router.post('/whatsapp/send-template', messagingLimiter, async (req, res) => {
     const message = await renderTemplate(template_id, variables || {});
     if (!message) return res.status(404).json({ error: 'Template not found' });
 
-    const result = await whatsapp.sendMessage(to, message);
+    const wa = await getWhatsAppService();
+    const result = await wa.sendMessage(to, message);
 
     await logMessage({
       channel: 'whatsapp',
@@ -379,7 +420,8 @@ async function triggerMessage(event, data, channel = 'both') {
     if (templateId) {
       const message = await renderTemplate(templateId, buildMessageVariables(data));
       if (message) {
-        results.whatsapp = await whatsapp.sendMessage(phone, message);
+        const wa = await getWhatsAppService();
+        results.whatsapp = await wa.sendMessage(phone, message);
 
         await logMessage({
           channel: 'whatsapp',

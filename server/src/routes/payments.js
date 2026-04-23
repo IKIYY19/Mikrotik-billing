@@ -13,19 +13,48 @@ const billing = require('../services/billingData');
 const paymentSessions = require('../services/paymentSessions');
 const { paymentLimiter } = require('../middleware/rateLimiter');
 const { triggerSMS } = require('./sms');
+const { decryptObject } = require('../utils/encryption');
 
 const router = express.Router();
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
-// Initialize M-Pesa
-const mpesa = new MpesaService({
-  consumerKey: process.env.MPESA_CONSUMER_KEY || '',
-  consumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
-  shortcode: process.env.MPESA_SHORTCODE || '174379',
-  passkey: process.env.MPESA_PASSKEY || '',
-  callbackUrl: process.env.MPESA_CALLBACK_URL || '',
-  environment: process.env.MPESA_ENVIRONMENT,
-});
+async function getIntegrationConfig(serviceName) {
+  try {
+    if (!global.db) return null;
+    const result = await global.db.query(
+      'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
+      [serviceName]
+    );
+    if (result.rows.length === 0) return null;
+    const decrypted = decryptObject(result.rows[0].config_data);
+    return decrypted;
+  } catch (error) {
+    console.error('Error fetching integration config:', error);
+    return null;
+  }
+}
+
+async function getMpesaService() {
+  const integrationConfig = await getIntegrationConfig('mpesa');
+  if (integrationConfig) {
+    return new MpesaService({
+      consumerKey: integrationConfig.consumer_key,
+      consumerSecret: integrationConfig.consumer_secret,
+      shortcode: integrationConfig.shortcode || '174379',
+      passkey: integrationConfig.passkey,
+      callbackUrl: integrationConfig.callback_url,
+      environment: integrationConfig.environment || 'sandbox',
+    });
+  }
+  return new MpesaService({
+    consumerKey: process.env.MPESA_CONSUMER_KEY || '',
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
+    shortcode: process.env.MPESA_SHORTCODE || '174379',
+    passkey: process.env.MPESA_PASSKEY || '',
+    callbackUrl: process.env.MPESA_CALLBACK_URL || '',
+    environment: process.env.MPESA_ENVIRONMENT,
+  });
+}
 
 const mpesaConfigured = Boolean(
   process.env.MPESA_CONSUMER_KEY &&
@@ -229,20 +258,16 @@ router.get('/methods', (req, res) => {
 router.post('/mpesa/stk', async (req, res) => {
   try {
     const { phone, amount, invoice_id, customer_id } = req.body;
+    if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
 
-    if (!phone || !amount) {
-      return res.status(400).json({ error: 'phone and amount required' });
-    }
+    const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
+    if (!customerId) return res.status(404).json({ error: 'Customer not found' });
 
-    if (!mpesaConfigured && isProductionEnv) {
-      return res.status(503).json({ error: 'M-Pesa is not configured for production' });
-    }
+    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
+    const description = invoice ? `Payment for ${invoice.invoice_number}` : 'Wallet top-up';
 
-    const { invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
-    const accountRef = invoice?.invoice_number || `PAY-${Date.now()}`;
-    const description = `Payment for ${accountRef}`;
+    const mpesaService = await getMpesaService();
 
-    // Sandbox mode for local/test environments only
     if (!mpesaConfigured) {
       const checkoutId = `sandbox-${uuidv4()}`;
       await paymentSessions.savePending({
@@ -260,14 +285,14 @@ router.post('/mpesa/stk', async (req, res) => {
         success: true,
         checkoutRequestId: checkoutId,
         message: 'STK Push sent (sandbox mode)',
-        phone: mpesa.formatPhone(phone),
+        phone: mpesaService.formatPhone(phone),
         amount: parseFloat(amount),
         instructions: 'Enter M-Pesa PIN 1234 to confirm payment',
       });
     }
 
     // Production STK Push
-    const result = await mpesa.stkPush(phone, amount, accountRef, description);
+    const result = await mpesaService.stkPush(phone, amount, accountRef, description);
 
     if (result.success) {
       await paymentSessions.savePending({
@@ -326,7 +351,8 @@ router.post('/mpesa/stk/check', async (req, res) => {
     }
 
     // Production status check
-    const result = await mpesa.checkStkStatus(checkoutRequestId);
+    const mpesaService = await getMpesaService();
+    const result = await mpesaService.checkStkStatus(checkoutRequestId);
 
     if (result.success && result.mpesaReceipt) {
       const payment = await finalizeSessionPayment(pending, result.mpesaReceipt, result.phone || pending.phone);
