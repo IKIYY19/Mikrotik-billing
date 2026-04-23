@@ -47,7 +47,20 @@ export function ProjectDetail() {
     if (result) navigate('/output');
   };
 
-  const ActiveModuleComponent = MODULES.find((m) => m.id === activeModule);
+  const moduleComponents = {
+    interfaces: InterfacesModule,
+    ipconfig: IPConfigModule,
+    routing: RoutingModule,
+    firewall: FirewallModule,
+    isp: ISPModule,
+    bandwidth: BandwidthModule,
+    vpn: VPNModule,
+    loadbalancing: LoadBalancingModule,
+    wireless: WirelessModule,
+    system: SystemModule,
+  };
+
+  const ActiveModuleComponent = moduleComponents[activeModule];
 
   if (!currentProject) return <div className="p-8 text-zinc-400">Loading...</div>;
 
@@ -137,7 +150,6 @@ export function ProjectDetail() {
           <div className="max-w-4xl animate-fade-in" key={activeModule}>
             {ActiveModuleComponent && (
               <ActiveModuleComponent
-                moduleType={activeModule}
                 config={modules[activeModule] || {}}
                 onUpdate={(config) => updateModule(activeModule, config)}
               />
