@@ -98,15 +98,16 @@ export function BillingDashboard() {
     );
   }
 
+  const s = stats || {};
   const statCards = [
-    { label: 'Monthly Revenue', value: stats.monthly_revenue, icon: DollarSign, gradient: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20', textColor: 'text-emerald-400', prefix: '$' },
-    { label: 'MRR', value: stats.mrr, icon: TrendingUp, gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-500/10', ring: 'ring-blue-500/20', textColor: 'text-blue-400', prefix: '$' },
-    { label: 'ARPU', value: stats.arpu, icon: Activity, gradient: 'from-violet-500 to-violet-600', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20', textColor: 'text-violet-400', prefix: '$' },
-    { label: 'Active Customers', value: stats.active_customers, icon: Users, gradient: 'from-cyan-500 to-cyan-600', bg: 'bg-cyan-500/10', ring: 'ring-cyan-500/20', textColor: 'text-cyan-400', sub: `of ${stats.total_customers}` },
-    { label: 'Active Subs', value: stats.active_subscriptions, icon: Package, gradient: 'from-green-500 to-green-600', bg: 'bg-green-500/10', ring: 'ring-green-500/20', textColor: 'text-green-400', sub: `of ${stats.total_subscriptions}` },
-    { label: 'Suspended', value: stats.suspended_subscriptions, icon: Clock, gradient: 'from-red-500 to-red-600', bg: 'bg-red-500/10', ring: 'ring-red-500/20', textColor: 'text-red-400' },
-    { label: 'Outstanding', value: stats.total_outstanding, icon: AlertTriangle, gradient: 'from-amber-500 to-amber-600', bg: 'bg-amber-500/10', ring: 'ring-amber-500/20', textColor: 'text-amber-400', prefix: '$' },
-    { label: 'Overdue Invoices', value: stats.overdue_invoices, icon: FileText, gradient: 'from-orange-500 to-orange-600', bg: 'bg-orange-500/10', ring: 'ring-orange-500/20', textColor: 'text-orange-400' },
+    { label: 'Monthly Revenue', value: s.monthly_revenue ?? 0, icon: DollarSign, gradient: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20', textColor: 'text-emerald-400', prefix: '$' },
+    { label: 'MRR', value: s.mrr ?? 0, icon: TrendingUp, gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-500/10', ring: 'ring-blue-500/20', textColor: 'text-blue-400', prefix: '$' },
+    { label: 'ARPU', value: s.arpu ?? 0, icon: Activity, gradient: 'from-violet-500 to-violet-600', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20', textColor: 'text-violet-400', prefix: '$' },
+    { label: 'Active Customers', value: s.active_customers ?? 0, icon: Users, gradient: 'from-cyan-500 to-cyan-600', bg: 'bg-cyan-500/10', ring: 'ring-cyan-500/20', textColor: 'text-cyan-400', sub: `of ${s.total_customers ?? 0}` },
+    { label: 'Active Subs', value: s.active_subscriptions ?? 0, icon: Package, gradient: 'from-green-500 to-green-600', bg: 'bg-green-500/10', ring: 'ring-green-500/20', textColor: 'text-green-400', sub: `of ${s.total_subscriptions ?? 0}` },
+    { label: 'Suspended', value: s.suspended_subscriptions ?? 0, icon: Clock, gradient: 'from-red-500 to-red-600', bg: 'bg-red-500/10', ring: 'ring-red-500/20', textColor: 'text-red-400' },
+    { label: 'Outstanding', value: s.total_outstanding ?? 0, icon: AlertTriangle, gradient: 'from-amber-500 to-amber-600', bg: 'bg-amber-500/10', ring: 'ring-amber-500/20', textColor: 'text-amber-400', prefix: '$' },
+    { label: 'Overdue Invoices', value: s.overdue_invoices ?? 0, icon: FileText, gradient: 'from-orange-500 to-orange-600', bg: 'bg-orange-500/10', ring: 'ring-orange-500/20', textColor: 'text-orange-400' },
   ];
 
   return (
@@ -181,7 +182,7 @@ export function BillingDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-white font-semibold">${inv.total.toFixed(2)}</div>
+                    <div className="text-sm text-white font-semibold">${(inv.total ?? 0).toFixed(2)}</div>
                     <span className={`badge ${inv.status === 'paid' ? 'badge-green' : inv.status === 'partial' ? 'badge-blue' : 'badge-amber'}`}>{inv.status}</span>
                   </div>
                 </div>
@@ -220,7 +221,7 @@ export function BillingDashboard() {
                       <div className="text-xs text-zinc-500 capitalize">{pay.method?.replace('_', ' ')} • {pay.receipt_number}</div>
                     </div>
                   </div>
-                  <div className="text-emerald-400 font-semibold text-sm">+${pay.amount.toFixed(2)}</div>
+                  <div className="text-emerald-400 font-semibold text-sm">+${(pay.amount ?? 0).toFixed(2)}</div>
                 </div>
               ))}
             </div>
