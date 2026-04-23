@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HardDrive, Plus, Play, Download, Eye, Trash2, Clock, CheckCircle, XCircle, Settings } from 'lucide-react';
+import { HardDrive, Plus, Play, Download, Eye, Trash2, Clock, CheckCircle, XCircle, Settings, RotateCcw, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -13,6 +17,9 @@ export function BackupPage() {
   const [form, setForm] = useState({ name: '', ip_address: '', api_port: 8728, username: '', schedule: 'daily', time: '02:00' });
   const [viewBackup, setViewBackup] = useState(null);
   const [running, setRunning] = useState(false);
+  const [showRestore, setShowRestore] = useState(null);
+  const [restoreForm, setRestoreForm] = useState({ target_ip: '', target_port: 8728, target_username: '', target_password: '' });
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     fetchSchedules();
@@ -77,6 +84,26 @@ export function BackupPage() {
     a.download = `backup-${backup.device_name}-${backup.created_at.split('T')[0]}.rsc`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleRestore = async (backup) => {
+    setShowRestore(backup);
+    setRestoreForm({ target_ip: '', target_port: 8728, target_username: '', target_password: '' });
+  };
+
+  const executeRestore = async (e) => {
+    e.preventDefault();
+    setRestoring(true);
+    try {
+      await axios.post(`${API}/advanced/backup/restore/${showRestore.id}`, restoreForm);
+      toast.success('Backup restored successfully');
+      setShowRestore(null);
+      setRestoreForm({ target_ip: '', target_port: 8728, target_username: '', target_password: '' });
+    } catch (error) {
+      console.error('Failed to restore backup:', error);
+      toast.error('Restore failed', error.response?.data?.error || error.message);
+    }
+    setRestoring(false);
   };
 
   return (
@@ -193,7 +220,8 @@ export function BackupPage() {
                     {b.status === 'success' && (
                       <>
                         <button onClick={() => viewBackupContent(b.id)} className="text-blue-400 hover:text-blue-300 mr-2"><Eye className="w-4 h-4 inline" /></button>
-                        <button onClick={() => downloadBackup(b)} className="text-green-400 hover:text-green-300"><Download className="w-4 h-4 inline" /></button>
+                        <button onClick={() => downloadBackup(b)} className="text-green-400 hover:text-green-300 mr-2"><Download className="w-4 h-4 inline" /></button>
+                        <button onClick={() => handleRestore(b)} className="text-amber-400 hover:text-amber-300"><RotateCcw className="w-4 h-4 inline" /></button>
                       </>
                     )}
                   </td>
@@ -242,18 +270,94 @@ export function BackupPage() {
       {/* View Backup Content */}
       {viewBackup && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Backup: {viewBackup.device_name} ({viewBackup.created_at.split('T')[0]})</h3>
-              <div className="flex gap-2">
-                <button onClick={() => downloadBackup(viewBackup)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                  <Download className="w-4 h-4" /> Download
-                </button>
-                <button onClick={() => setViewBackup(null)} className="text-slate-400 hover:text-white">✕</button>
+          <Card className="w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle>Backup: {viewBackup.device_name} ({viewBackup.created_at.split('T')[0]})</CardTitle>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => downloadBackup(viewBackup)} className="flex items-center gap-1">
+                    <Download className="w-4 h-4" /> Download
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setViewBackup(null)}><X className="w-5 h-5" /></Button>
+                </div>
               </div>
-            </div>
-            <pre className="flex-1 p-6 text-sm text-green-400 font-mono overflow-auto whitespace-pre-wrap">{viewBackup.content}</pre>
-          </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto p-6">
+              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">{viewBackup.content}</pre>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Restore Modal */}
+      {showRestore && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <RotateCcw className="w-5 h-5 text-amber-400" /> Restore Backup
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowRestore(null)}><X className="w-5 h-5" /></Button>
+              </div>
+              <CardDescription>
+                Restore {showRestore.device_name} backup from {new Date(showRestore.created_at).toLocaleDateString()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={executeRestore} className="space-y-4 pt-6">
+                <div>
+                  <Label htmlFor="target-ip">Target Router IP *</Label>
+                  <Input
+                    id="target-ip"
+                    required
+                    value={restoreForm.target_ip}
+                    onChange={e => setRestoreForm({...restoreForm, target_ip: e.target.value})}
+                    placeholder="192.168.88.1"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="target-port">API Port</Label>
+                    <Input
+                      id="target-port"
+                      type="number"
+                      value={restoreForm.target_port}
+                      onChange={e => setRestoreForm({...restoreForm, target_port: e.target.value})}
+                      placeholder="8728"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="target-username">Username *</Label>
+                    <Input
+                      id="target-username"
+                      required
+                      value={restoreForm.target_username}
+                      onChange={e => setRestoreForm({...restoreForm, target_username: e.target.value})}
+                      placeholder="admin"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="target-password">Password *</Label>
+                  <Input
+                    id="target-password"
+                    type="password"
+                    required
+                    value={restoreForm.target_password}
+                    onChange={e => setRestoreForm({...restoreForm, target_password: e.target.value})}
+                    placeholder="Router password"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowRestore(null)} className="flex-1">Cancel</Button>
+                  <Button type="submit" disabled={restoring} className="flex-1">
+                    {restoring ? 'Restoring...' : 'Restore Backup'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
