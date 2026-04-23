@@ -35,6 +35,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { clearAuth } from '../lib/auth';
+import { SearchButton } from './GlobalSearch';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -76,7 +77,7 @@ const billingItems = [
   { to: '/inventory', icon: Package, label: 'Inventory' },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onSearchOpen }) {
   const [billingOpen, setBillingOpen] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -102,7 +103,7 @@ export function Sidebar() {
   return (
     <aside className="relative z-10 w-64 flex flex-col bg-[#09090b]/95 backdrop-blur-xl border-r border-zinc-800/50">
       {/* Header */}
-      <div className="h-16 flex items-center px-4 border-b border-zinc-800/50">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800/50">
         <NavLink to="/" className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Settings className="w-4 h-4 text-white" />
@@ -112,6 +113,7 @@ export function Sidebar() {
             <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">ISP Platform</div>
           </div>
         </NavLink>
+        <SearchButton onClick={onSearchOpen} />
       </div>
 
       {/* Nav */}
