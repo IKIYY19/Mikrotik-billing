@@ -20,6 +20,7 @@ const store = {
   customers: [],
   payments: [],
   olt_connections: [],
+  integrations: [],
 };
 
 // Seed example templates
@@ -116,6 +117,114 @@ const seedTemplates = () => {
 };
 
 seedTemplates();
+
+// Seed integrations
+const seedIntegrations = () => {
+  store.integrations = [
+    {
+      id: uuidv4(),
+      service_name: 'africas_talking',
+      display_name: "Africa's Talking",
+      category: 'sms',
+      config_data: { username: 'sandbox', api_key: '', sender_id: 'MyISP' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'mpesa',
+      display_name: 'M-Pesa',
+      category: 'payment',
+      config_data: { consumer_key: '', consumer_secret: '', shortcode: '174379', passkey: '', environment: 'sandbox' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'whatsapp',
+      display_name: 'WhatsApp Business',
+      category: 'messaging',
+      config_data: { access_token: '', phone_number_id: '', verify_token: '' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'sendgrid',
+      display_name: 'SendGrid',
+      category: 'email',
+      config_data: { api_key: '', from_email: '', from_name: '' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'twilio',
+      display_name: 'Twilio SMS',
+      category: 'sms',
+      config_data: { account_sid: '', auth_token: '', phone_number: '' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'stripe',
+      display_name: 'Stripe',
+      category: 'payment',
+      config_data: { secret_key: '', publishable_key: '', webhook_secret: '', currency: 'usd' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'paypal',
+      display_name: 'PayPal',
+      category: 'payment',
+      config_data: { client_id: '', client_secret: '', environment: 'sandbox', webhook_id: '' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'flutterwave',
+      display_name: 'Flutterwave',
+      category: 'payment',
+      config_data: { secret_key: '', public_key: '', encryption_key: '', environment: 'sandbox' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'slack',
+      display_name: 'Slack Notifications',
+      category: 'monitoring',
+      config_data: { webhook_url: '', channel: '#alerts' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: 'discord',
+      display_name: 'Discord Webhook',
+      category: 'monitoring',
+      config_data: { webhook_url: '' },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ];
+};
+
+seedIntegrations();
 
 module.exports = {
   query: async (text, params) => {
@@ -513,6 +622,28 @@ module.exports = {
       const idx = store.olt_connections.findIndex(o => o.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.olt_connections.splice(idx, 1) };
+    }
+
+    // SELECT integrations
+    if (lowerText.includes('select') && lowerText.includes('from integrations')) {
+      if (lowerText.includes('where id =')) {
+        const integration = store.integrations.find(i => i.id === params[0]);
+        return { rows: integration ? [integration] : [] };
+      }
+      return { rows: store.integrations.sort((a, b) => a.category.localeCompare(b.category)) };
+    }
+
+    // UPDATE integrations
+    if (lowerText.includes('update integrations')) {
+      const idx = store.integrations.findIndex(i => i.id === params[2]);
+      if (idx === -1) return { rows: [] };
+      store.integrations[idx] = {
+        ...store.integrations[idx],
+        config_data: params[0],
+        is_active: params[1] !== undefined ? params[1] : store.integrations[idx].is_active,
+        updated_at: new Date().toISOString(),
+      };
+      return { rows: [store.integrations[idx]] };
     }
 
     // INSERT/UPDATE anything else (generic fallback)
