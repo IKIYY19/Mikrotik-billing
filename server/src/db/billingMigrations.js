@@ -394,6 +394,61 @@ const billingMigrations = [
       ALTER TABLE customers ADD COLUMN country VARCHAR(100);
     END IF;
   END $$`,
+
+  // Add missing lat column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='lat'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN lat DECIMAL(10,8);
+    END IF;
+  END $$`,
+
+  // Add missing lng column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='lng'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN lng DECIMAL(11,8);
+    END IF;
+  END $$`,
+
+  // Add missing id_number column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='id_number'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN id_number VARCHAR(100);
+    END IF;
+  END $$`,
+
+  // Add missing notes column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='notes'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN notes TEXT;
+    END IF;
+  END $$`,
+
+  // Add missing updated_at column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='updated_at'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+  END $$`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,
