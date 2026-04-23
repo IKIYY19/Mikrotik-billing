@@ -5,6 +5,11 @@ import {
   Router, Plus, Trash2, Copy, Download, Eye, RefreshCw,
   Terminal, Shield, Settings, CheckCircle, Clock, X, Code, FileText, Zap
 } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Switch } from '../components/ui/switch';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -141,10 +146,9 @@ export function Devices() {
           <h2 className="text-2xl font-bold text-white">Zero-Touch Provisioning</h2>
           <p className="text-slate-400 mt-1">Add routers, generate one-line provision commands</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+        <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2">
           <Plus className="w-5 h-5" /> Add Device
-        </button>
+        </Button>
       </div>
 
       {/* Devices Grid */}
@@ -156,26 +160,28 @@ export function Devices() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {devices.map(dev => (
-            <div key={dev.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <Card key={dev.id} className="overflow-hidden">
               {/* Header */}
-              <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Router className="w-6 h-6 text-blue-500" />
-                  <div>
-                    <h3 className="text-white font-semibold">{dev.name}</h3>
-                    <p className="text-xs text-slate-400">{dev.identity || dev.name} • {dev.model || 'Unknown model'}</p>
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Router className="w-6 h-6 text-blue-500" />
+                    <div>
+                      <CardTitle className="text-lg">{dev.name}</CardTitle>
+                      <CardDescription>{dev.identity || dev.name} • {dev.model || 'Unknown model'}</CardDescription>
+                    </div>
                   </div>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    dev.provision_status === 'provisioned' ? 'bg-green-600/20 text-green-400' : 'bg-amber-600/20 text-amber-400'
+                  }`}>
+                    {dev.provision_status === 'provisioned' ? '✓ Provisioned' : '⏳ Pending'}
+                  </span>
                 </div>
-                <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                  dev.provision_status === 'provisioned' ? 'bg-green-600/20 text-green-400' : 'bg-amber-600/20 text-amber-400'
-                }`}>
-                  {dev.provision_status === 'provisioned' ? '✓ Provisioned' : '⏳ Pending'}
-                </span>
-              </div>
+              </CardHeader>
 
               {/* Provision Command */}
-              <div className="p-4 bg-slate-900">
-                <h4 className="text-xs text-slate-400 uppercase mb-2 flex items-center gap-1">
+              <CardContent className="p-4 bg-zinc-900/50">
+                <h4 className="text-xs text-zinc-400 uppercase mb-2 flex items-center gap-1">
                   <Terminal className="w-3 h-3" /> One-Line Provision Command
                 </h4>
                 <div className="space-y-2">
@@ -183,72 +189,63 @@ export function Devices() {
                     {provisionMethods.map(method => {
                       const Icon = method.icon;
                       return (
-                        <button
+                        <Button
                           key={method.id}
+                          variant={provisionMethod === method.id ? 'default' : 'outline'}
+                          size="sm"
                           onClick={() => getProvisionCommand(dev, method.id)}
                           disabled={commandLoading[dev.id]}
-                          className={`flex-1 px-2 py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all ${
-                            provisionMethod === method.id
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          } disabled:opacity-50`}
+                          className="flex-1"
                           title={method.description}
                         >
-                          <Icon className="w-3 h-3" /> {method.name}
-                        </button>
+                          <Icon className="w-3 h-3 mr-1" /> {method.name}
+                        </Button>
                       );
                     })}
                   </div>
-                  <pre className="text-xs text-green-400 bg-slate-800 p-3 rounded border border-slate-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[60px]">
+                  <pre className="text-xs text-green-400 bg-zinc-800 p-3 rounded border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[60px]">
                     {commandLoading[dev.id] ? 'Loading...' : (showCommand?.id === dev.id ? showCommand.copyText : 'Select a method above')}
                   </pre>
                   {showCommand?.id === dev.id && (
                     <div className="flex gap-2">
-                      <button onClick={() => copyCommand(showCommand.copyText)}
-                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                      <Button variant="outline" size="sm" onClick={() => copyCommand(showCommand.copyText)} className="flex items-center gap-1">
                         <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
-                      </button>
-                      <button onClick={() => getProvisionCommand(dev, showCommand.method)}
-                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => getProvisionCommand(dev, showCommand.method)} className="flex items-center gap-1">
                         <RefreshCw className="w-3 h-3" /> Regenerate Token
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
-              </div>
+              </CardContent>
 
               {/* Settings */}
-              <div className="p-4 grid grid-cols-2 gap-3 text-sm">
-                <div className="text-slate-400">WAN: <span className="text-white">{dev.wan_interface}</span></div>
-                <div className="text-slate-400">DNS: <span className="text-white">{dev.dns_servers?.join(', ')}</span></div>
-                <div className="text-slate-400">RADIUS: <span className="text-white">{dev.radius_server || 'Not set'}</span></div>
-                <div className="text-slate-400">PPPoE: <span className="text-white">{dev.pppoe_enabled ? 'Yes' : 'No'}</span></div>
-              </div>
+              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
+                <div className="text-zinc-400">WAN: <span className="text-white">{dev.wan_interface}</span></div>
+                <div className="text-zinc-400">DNS: <span className="text-white">{dev.dns_servers?.join(', ')}</span></div>
+                <div className="text-zinc-400">RADIUS: <span className="text-white">{dev.radius_server || 'Not set'}</span></div>
+                <div className="text-zinc-400">PPPoE: <span className="text-white">{dev.pppoe_enabled ? 'Yes' : 'No'}</span></div>
+              </CardContent>
 
               {/* Actions */}
-              <div className="p-4 border-t border-slate-700 flex gap-2">
-                <button onClick={() => viewScript(dev)}
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+              <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => viewScript(dev)} className="flex items-center gap-1">
                   <Eye className="w-3 h-3" /> Preview
-                </button>
-                <button onClick={() => viewLogs(dev)}
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => viewLogs(dev)} className="flex items-center gap-1">
                   <FileText className="w-3 h-3" /> Logs
-                </button>
-                <button onClick={() => regenerateToken(dev.id)}
-                  className="bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => regenerateToken(dev.id)} className="flex items-center gap-1 text-amber-400">
                   <RefreshCw className="w-3 h-3" /> New Token
-                </button>
-                <button onClick={() => downloadScript(dev)}
-                  className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => downloadScript(dev)} className="flex items-center gap-1 text-green-400">
                   <Download className="w-3 h-3" /> .rsc
-                </button>
-                <button onClick={() => handleDelete(dev.id)}
-                  className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1.5 rounded text-sm flex items-center gap-1 ml-auto">
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(dev.id)} className="flex items-center gap-1 text-red-400 ml-auto">
                   <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+                </Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -256,134 +253,191 @@ export function Devices() {
       {/* Create Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-white font-semibold text-lg">Add New Device</h3>
-              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Name *</label>
-                  <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="Branch-Router-01" />
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle>Add New Device</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}><X className="w-5 h-5" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreate} className="space-y-4 pt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="device-name">Name *</Label>
+                    <Input
+                      id="device-name"
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      placeholder="Branch-Router-01"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-identity">Identity</Label>
+                    <Input
+                      id="device-identity"
+                      value={formData.identity}
+                      onChange={e => setFormData({...formData, identity: e.target.value})}
+                      placeholder="MY-BRANCH-01"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="device-model">Model</Label>
+                    <select
+                      id="device-model"
+                      value={formData.model}
+                      onChange={e => setFormData({...formData, model: e.target.value})}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    >
+                      <option value="">Select model</option>
+                      <option value="CCR2004">CCR2004</option>
+                      <option value="CCR2116">CCR2116</option>
+                      <option value="RB5009">RB5009</option>
+                      <option value="RB4011">RB4011</option>
+                      <option value="hEX">hEX RB750Gr3</option>
+                      <option value="hAP-ax2">hAP ax²</option>
+                      <option value="CHR">Cloud Hosted Router</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="device-wan">WAN Interface</Label>
+                    <Input
+                      id="device-wan"
+                      value={formData.wan_interface}
+                      onChange={e => setFormData({...formData, wan_interface: e.target.value})}
+                      placeholder="ether1"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Identity</label>
-                  <input value={formData.identity} onChange={e => setFormData({...formData, identity: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="MY-BRANCH-01" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Model</label>
-                  <select value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                    <option value="">Select model</option>
-                    <option value="CCR2004">CCR2004</option>
-                    <option value="CCR2116">CCR2116</option>
-                    <option value="RB5009">RB5009</option>
-                    <option value="RB4011">RB4011</option>
-                    <option value="hEX">hEX RB750Gr3</option>
-                    <option value="hAP-ax2">hAP ax²</option>
-                    <option value="CHR">Cloud Hosted Router</option>
-                  </select>
+                  <Label htmlFor="device-dns">DNS Servers (comma-separated)</Label>
+                  <Input
+                    id="device-dns"
+                    value={formData.dns_servers.join(', ')}
+                    onChange={e => setFormData({...formData, dns_servers: e.target.value.split(',').map(s => s.trim())})}
+                    placeholder="8.8.8.8, 8.8.4.4"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">WAN Interface</label>
-                  <input value={formData.wan_interface} onChange={e => setFormData({...formData, wan_interface: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="ether1" />
+                  <Label htmlFor="device-ntp">NTP Servers (comma-separated)</Label>
+                  <Input
+                    id="device-ntp"
+                    value={formData.ntp_servers.join(', ')}
+                    onChange={e => setFormData({...formData, ntp_servers: e.target.value.split(',').map(s => s.trim())})}
+                    placeholder="pool.ntp.org"
+                  />
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">DNS Servers (comma-separated)</label>
-                <input value={formData.dns_servers.join(', ')} onChange={e => setFormData({...formData, dns_servers: e.target.value.split(',').map(s => s.trim())})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="8.8.8.8, 8.8.4.4" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">NTP Servers (comma-separated)</label>
-                <input value={formData.ntp_servers.join(', ')} onChange={e => setFormData({...formData, ntp_servers: e.target.value.split(',').map(s => s.trim())})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="pool.ntp.org" />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="device-radius-ip">RADIUS Server IP</Label>
+                    <Input
+                      id="device-radius-ip"
+                      value={formData.radius_server}
+                      onChange={e => setFormData({...formData, radius_server: e.target.value})}
+                      placeholder="10.0.0.100"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-radius-secret">RADIUS Secret</Label>
+                    <Input
+                      id="device-radius-secret"
+                      type="password"
+                      value={formData.radius_secret}
+                      onChange={e => setFormData({...formData, radius_secret: e.target.value})}
+                      placeholder="shared-secret"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-radius-port">RADIUS Port</Label>
+                    <Input
+                      id="device-radius-port"
+                      type="number"
+                      value={1812}
+                      onChange={e => setFormData({...formData, radius_port: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={formData.hotspot_enabled}
+                      onCheckedChange={checked => setFormData({...formData, hotspot_enabled: checked})}
+                    />
+                    <Label className="text-zinc-300">Enable Hotspot</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={formData.pppoe_enabled}
+                      onCheckedChange={checked => setFormData({...formData, pppoe_enabled: checked})}
+                    />
+                    <Label className="text-zinc-300">Enable PPPoE Server</Label>
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">RADIUS Server IP</label>
-                  <input value={formData.radius_server} onChange={e => setFormData({...formData, radius_server: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="10.0.0.100" />
+                  <Label htmlFor="device-notes">Notes</Label>
+                  <textarea
+                    id="device-notes"
+                    value={formData.notes}
+                    onChange={e => setFormData({...formData, notes: e.target.value})}
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    rows="2"
+                    placeholder="Location, contact, etc."
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">RADIUS Secret</label>
-                  <input type="password" value={formData.radius_secret} onChange={e => setFormData({...formData, radius_secret: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="shared-secret" />
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => setShowCreate(false)} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">Create Device</Button>
                 </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">RADIUS Port</label>
-                  <input type="number" value={1812} onChange={e => setFormData({...formData, radius_port: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-                </div>
-              </div>
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-slate-300">
-                  <input type="checkbox" checked={formData.hotspot_enabled} onChange={e => setFormData({...formData, hotspot_enabled: e.target.checked})} />
-                  Enable Hotspot
-                </label>
-                <label className="flex items-center gap-2 text-slate-300">
-                  <input type="checkbox" checked={formData.pppoe_enabled} onChange={e => setFormData({...formData, pppoe_enabled: e.target.checked})} />
-                  Enable PPPoE Server
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Notes</label>
-                <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" rows="2" placeholder="Location, contact, etc." />
-              </div>
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button type="button" onClick={() => setShowCreate(false)}
-                  className="flex-1 px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600">Cancel</button>
-                <button type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Device</button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Script Preview Modal */}
       {showScript && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <Code className="w-5 h-5 text-green-500" /> Provision Script: {showScript.name}
-              </h3>
-              <div className="flex gap-2">
-                <button onClick={() => downloadScript(showScript)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                  <Download className="w-4 h-4" /> Download
-                </button>
-                <button onClick={() => setShowScript(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+          <Card className="w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Code className="w-5 h-5 text-green-500" /> Provision Script: {showScript.name}
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => downloadScript(showScript)} className="flex items-center gap-1">
+                    <Download className="w-4 h-4" /> Download
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowScript(null)}><X className="w-5 h-5" /></Button>
+                </div>
               </div>
-            </div>
-            <pre className="flex-1 p-6 text-sm text-green-400 font-mono overflow-auto">{showScript.content}</pre>
-          </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto p-6">
+              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">{showScript.content}</pre>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Logs Modal */}
       {showLogs && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-2/3 max-w-3xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Provision Logs: {showLogs.name}</h3>
-              <button onClick={() => setShowLogs(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
+          <Card className="w-2/3 max-w-3xl max-h-[80vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle>Provision Logs: {showLogs.name}</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowLogs(null)}><X className="w-5 h-5" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-4">
               {logs.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">No provisioning logs yet.</p>
+                <p className="text-zinc-500 text-center py-8">No provisioning logs yet.</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-slate-400 border-b border-slate-700">
+                    <tr className="text-zinc-400 border-b border-zinc-800">
                       <th className="text-left p-2">Time</th>
                       <th className="text-left p-2">Action</th>
                       <th className="text-left p-2">Status</th>
@@ -393,23 +447,23 @@ export function Devices() {
                   </thead>
                   <tbody>
                     {logs.map(log => (
-                      <tr key={log.id} className="border-b border-slate-700/50">
-                        <td className="p-2 text-slate-400">{new Date(log.created_at).toLocaleString()}</td>
+                      <tr key={log.id} className="border-b border-zinc-800/50">
+                        <td className="p-2 text-zinc-400">{new Date(log.created_at).toLocaleString()}</td>
                         <td className="p-2 text-white">{log.action}</td>
                         <td className="p-2">
                           <span className={`px-2 py-0.5 rounded text-xs ${
                             log.status === 'success' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
                           }`}>{log.status}</span>
                         </td>
-                        <td className="p-2 text-slate-300">{log.ip_address}</td>
-                        <td className="p-2 text-slate-400">{log.details}</td>
+                        <td className="p-2 text-zinc-300">{log.ip_address}</td>
+                        <td className="p-2 text-zinc-400">{log.details}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
