@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock } from 'lucide-react';
 import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Switch } from '../components/ui/switch';
+import { Label } from '../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -295,221 +300,232 @@ export function SettingsPage() {
       {activeTab === 'general' && (
         <form onSubmit={handleSave} className="space-y-6">
           {/* Company Info */}
-          <div className="glass rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Building2 className="w-5 h-5" /> Company Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Company Name *</label>
-                <input
-                  type="text"
-                  value={settings.company_name}
-                  onChange={e => setSettings({...settings, company_name: e.target.value})}
-                  className="modern-input"
-                  placeholder="Your ISP Name"
-                  required
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Company Logo</label>
-                <div className="flex items-center gap-4">
-                  {logoPreview ? (
-                    <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-zinc-800">
-                      <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600"
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5" /> Company Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="company-name">Company Name *</Label>
+                  <Input
+                    id="company-name"
+                    type="text"
+                    value={settings.company_name}
+                    onChange={e => setSettings({...settings, company_name: e.target.value})}
+                    placeholder="Your ISP Name"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Company Logo</Label>
+                  <div className="flex items-center gap-4">
+                    {logoPreview ? (
+                      <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-zinc-800">
+                        <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg bg-zinc-800 flex items-center justify-center border-2 border-dashed border-zinc-700">
+                        <Building2 className="w-8 h-8 text-zinc-600" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        id="logo-upload"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg cursor-pointer transition-colors"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
+                        <Upload className="w-4 h-4" />
+                        Upload Logo
+                      </label>
+                      <p className="text-xs text-zinc-500 mt-1">Recommended: 200x200px, PNG or JPG</p>
                     </div>
-                  ) : (
-                    <div className="w-20 h-20 rounded-lg bg-zinc-800 flex items-center justify-center border-2 border-dashed border-zinc-700">
-                      <Building2 className="w-8 h-8 text-zinc-600" />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      id="logo-upload"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="logo-upload"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg cursor-pointer transition-colors"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Upload Logo
-                    </label>
-                    <p className="text-xs text-zinc-500 mt-1">Recommended: 200x200px, PNG or JPG</p>
                   </div>
                 </div>
+                <div>
+                  <Label htmlFor="contact-email">Contact Email</Label>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    value={settings.contact_email}
+                    onChange={e => setSettings({...settings, contact_email: e.target.value})}
+                    placeholder="support@yourisp.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contact-phone">Contact Phone</Label>
+                  <Input
+                    id="contact-phone"
+                    type="tel"
+                    value={settings.contact_phone}
+                    onChange={e => setSettings({...settings, contact_phone: e.target.value})}
+                    placeholder="+254 700 000 000"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    type="text"
+                    value={settings.address}
+                    onChange={e => setSettings({...settings, address: e.target.value})}
+                    placeholder="Street address"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    type="text"
+                    value={settings.city}
+                    onChange={e => setSettings({...settings, city: e.target.value})}
+                    placeholder="Nairobi"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    id="country"
+                    type="text"
+                    value={settings.country}
+                    onChange={e => setSettings({...settings, country: e.target.value})}
+                    placeholder="Kenya"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Contact Email</label>
-                <input
-                  type="email"
-                  value={settings.contact_email}
-                  onChange={e => setSettings({...settings, contact_email: e.target.value})}
-                  className="modern-input"
-                  placeholder="support@yourisp.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Contact Phone</label>
-                <input
-                  type="tel"
-                  value={settings.contact_phone}
-                  onChange={e => setSettings({...settings, contact_phone: e.target.value})}
-                  className="modern-input"
-                  placeholder="+254 700 000 000"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Address</label>
-                <input
-                  type="text"
-                  value={settings.address}
-                  onChange={e => setSettings({...settings, address: e.target.value})}
-                  className="modern-input"
-                  placeholder="Street address"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">City</label>
-                <input
-                  type="text"
-                  value={settings.city}
-                  onChange={e => setSettings({...settings, city: e.target.value})}
-                  className="modern-input"
-                  placeholder="Nairobi"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Country</label>
-                <input
-                  type="text"
-                  value={settings.country}
-                  onChange={e => setSettings({...settings, country: e.target.value})}
-                  className="modern-input"
-                  placeholder="Kenya"
-                />
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Formatting */}
-          <div className="glass rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5" /> Date & Currency Formatting
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Timezone</label>
-                <select
-                  value={settings.timezone}
-                  onChange={e => setSettings({...settings, timezone: e.target.value})}
-                  className="modern-input"
-                >
-                  {timezones.map(tz => (
-                    <option key={tz} value={tz}>{tz}</option>
-                  ))}
-                </select>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5" /> Date & Currency Formatting
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <select
+                    id="timezone"
+                    value={settings.timezone}
+                    onChange={e => setSettings({...settings, timezone: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {timezones.map(tz => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="currency">Currency</Label>
+                  <select
+                    id="currency"
+                    value={settings.currency}
+                    onChange={e => {
+                      const currency = currencies.find(c => c.code === e.target.value);
+                      setSettings({...settings, currency: e.target.value, currency_symbol: currency?.symbol || e.target.value});
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {currencies.map(c => (
+                      <option key={c.code} value={c.code}>{c.name} ({c.symbol})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="date-format">Date Format</Label>
+                  <select
+                    id="date-format"
+                    value={settings.date_format}
+                    onChange={e => setSettings({...settings, date_format: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {dateFormats.map(df => (
+                      <option key={df} value={df}>{df}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Currency</label>
-                <select
-                  value={settings.currency}
-                  onChange={e => {
-                    const currency = currencies.find(c => c.code === e.target.value);
-                    setSettings({...settings, currency: e.target.value, currency_symbol: currency?.symbol || e.target.value});
-                  }}
-                  className="modern-input"
-                >
-                  {currencies.map(c => (
-                    <option key={c.code} value={c.code}>{c.name} ({c.symbol})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Date Format</label>
-                <select
-                  value={settings.date_format}
-                  onChange={e => setSettings({...settings, date_format: e.target.value})}
-                  className="modern-input"
-                >
-                  {dateFormats.map(df => (
-                    <option key={df} value={df}>{df}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Invoice Settings */}
-          <div className="glass rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5" /> Invoice Settings
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Invoice Prefix</label>
-                <input
-                  type="text"
-                  value={settings.invoice_prefix}
-                  onChange={e => setSettings({...settings, invoice_prefix: e.target.value})}
-                  className="modern-input"
-                  placeholder="INV-"
-                />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" /> Invoice Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="invoice-prefix">Invoice Prefix</Label>
+                  <Input
+                    id="invoice-prefix"
+                    type="text"
+                    value={settings.invoice_prefix}
+                    onChange={e => setSettings({...settings, invoice_prefix: e.target.value})}
+                    placeholder="INV-"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="invoice-start">Starting Number</Label>
+                  <Input
+                    id="invoice-start"
+                    type="number"
+                    value={settings.invoice_start_number}
+                    onChange={e => setSettings({...settings, invoice_start_number: e.target.value})}
+                    placeholder="1001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="payment-terms">Payment Terms (Days)</Label>
+                  <Input
+                    id="payment-terms"
+                    type="number"
+                    value={settings.payment_terms}
+                    onChange={e => setSettings({...settings, payment_terms: e.target.value})}
+                    placeholder="14"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tax-rate">Tax Rate (%)</Label>
+                  <Input
+                    id="tax-rate"
+                    type="number"
+                    step="0.1"
+                    value={settings.tax_rate}
+                    onChange={e => setSettings({...settings, tax_rate: e.target.value})}
+                    placeholder="16"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Starting Number</label>
-                <input
-                  type="number"
-                  value={settings.invoice_start_number}
-                  onChange={e => setSettings({...settings, invoice_start_number: e.target.value})}
-                  className="modern-input"
-                  placeholder="1001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Payment Terms (Days)</label>
-                <input
-                  type="number"
-                  value={settings.payment_terms}
-                  onChange={e => setSettings({...settings, payment_terms: e.target.value})}
-                  className="modern-input"
-                  placeholder="14"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Tax Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.tax_rate}
-                  onChange={e => setSettings({...settings, tax_rate: e.target.value})}
-                  className="modern-input"
-                  placeholder="16"
-                />
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn-primary flex items-center gap-2"
-            >
+            <Button type="submit" disabled={saving} className="flex items-center gap-2">
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Settings'}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -517,61 +533,54 @@ export function SettingsPage() {
       {/* Permissions Settings */}
       {activeTab === 'permissions' && (
         <div className="space-y-6">
-          <div className="glass rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5" /> Role-Based Permissions
-            </h2>
-            <p className="text-zinc-400 text-sm mb-6">Configure which features each user role can access.</p>
-
-            {/* Role Selector */}
-            <div className="flex gap-2 mb-6">
-              {Object.values(ROLES).map(role => (
-                <button
-                  key={role}
-                  onClick={() => setSelectedRole(role)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
-                    selectedRole === role
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
-
-            {/* Features Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {allFeatures.map(feature => {
-                const hasAccess = permissions[selectedRole]?.includes(feature);
-                return (
-                  <button
-                    key={feature}
-                    onClick={() => toggleFeature(selectedRole, feature)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      hasAccess
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700 hover:border-zinc-600'
-                    }`}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" /> Role-Based Permissions
+              </CardTitle>
+              <CardDescription>Configure which features each user role can access.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Role Selector */}
+              <div className="flex gap-2 mb-6">
+                {Object.values(ROLES).map(role => (
+                  <Button
+                    key={role}
+                    variant={selectedRole === role ? 'default' : 'outline'}
+                    onClick={() => setSelectedRole(role)}
+                    className="capitalize"
                   >
-                    {hasAccess ? <Check className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
-                    <span className="capitalize">{feature.replace(/-/g, ' ')}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    {role}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Features Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {allFeatures.map(feature => {
+                  const hasAccess = permissions[selectedRole]?.includes(feature);
+                  return (
+                    <Button
+                      key={feature}
+                      variant={hasAccess ? 'default' : 'outline'}
+                      onClick={() => toggleFeature(selectedRole, feature)}
+                      className="justify-start"
+                    >
+                      {hasAccess ? <Check className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
+                      <span className="capitalize ml-2">{feature.replace(/-/g, ' ')}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button
-              onClick={handleSavePermissions}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2"
-            >
+            <Button onClick={handleSavePermissions} disabled={saving} className="flex items-center gap-2">
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Permissions'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -579,195 +588,181 @@ export function SettingsPage() {
       {/* Payment Gateways Settings */}
       {activeTab === 'payment-gateways' && (
         <div className="space-y-6">
-          <div className="glass rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <CreditCard className="w-5 h-5" /> Payment Gateways
-            </h2>
-            <p className="text-zinc-400 text-sm mb-6">Configure payment gateways for accepting customer payments.</p>
-
-            {/* M-Pesa */}
-            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-md font-semibold text-white flex items-center gap-2">
-                  <Globe className="w-4 h-4" /> M-Pesa
-                </h3>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" /> Payment Gateways
+              </CardTitle>
+              <CardDescription>Configure payment gateways for accepting customer payments.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* M-Pesa */}
+              <div className="p-4 bg-zinc-800/50 rounded-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                    <Globe className="w-4 h-4" /> M-Pesa
+                  </h3>
+                  <Switch
                     checked={paymentGateways.mpesa.enabled}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'enabled', e.target.checked)}
-                    className="sr-only peer"
+                    onCheckedChange={(checked) => updatePaymentGateway('mpesa', 'enabled', checked)}
                   />
-                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="mpesa-consumer-key">Consumer Key</Label>
+                    <Input
+                      id="mpesa-consumer-key"
+                      type="text"
+                      value={paymentGateways.mpesa.consumer_key}
+                      onChange={(e) => updatePaymentGateway('mpesa', 'consumer_key', e.target.value)}
+                      placeholder="Enter consumer key"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mpesa-consumer-secret">Consumer Secret</Label>
+                    <Input
+                      id="mpesa-consumer-secret"
+                      type="password"
+                      value={paymentGateways.mpesa.consumer_secret}
+                      onChange={(e) => updatePaymentGateway('mpesa', 'consumer_secret', e.target.value)}
+                      placeholder="Enter consumer secret"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mpesa-passkey">Passkey</Label>
+                    <Input
+                      id="mpesa-passkey"
+                      type="password"
+                      value={paymentGateways.mpesa.passkey}
+                      onChange={(e) => updatePaymentGateway('mpesa', 'passkey', e.target.value)}
+                      placeholder="Enter passkey"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mpesa-shortcode">Shortcode</Label>
+                    <Input
+                      id="mpesa-shortcode"
+                      type="text"
+                      value={paymentGateways.mpesa.shortcode}
+                      onChange={(e) => updatePaymentGateway('mpesa', 'shortcode', e.target.value)}
+                      placeholder="174379"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mpesa-environment">Environment</Label>
+                    <select
+                      id="mpesa-environment"
+                      value={paymentGateways.mpesa.environment}
+                      onChange={(e) => updatePaymentGateway('mpesa', 'environment', e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="sandbox">Sandbox</option>
+                      <option value="production">Production</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Consumer Key</label>
-                  <input
-                    type="text"
-                    value={paymentGateways.mpesa.consumer_key}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'consumer_key', e.target.value)}
-                    className="modern-input"
-                    placeholder="Enter consumer key"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Consumer Secret</label>
-                  <input
-                    type="password"
-                    value={paymentGateways.mpesa.consumer_secret}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'consumer_secret', e.target.value)}
-                    className="modern-input"
-                    placeholder="Enter consumer secret"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Passkey</label>
-                  <input
-                    type="password"
-                    value={paymentGateways.mpesa.passkey}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'passkey', e.target.value)}
-                    className="modern-input"
-                    placeholder="Enter passkey"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Shortcode</label>
-                  <input
-                    type="text"
-                    value={paymentGateways.mpesa.shortcode}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'shortcode', e.target.value)}
-                    className="modern-input"
-                    placeholder="174379"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Environment</label>
-                  <select
-                    value={paymentGateways.mpesa.environment}
-                    onChange={(e) => updatePaymentGateway('mpesa', 'environment', e.target.value)}
-                    className="modern-input"
-                  >
-                    <option value="sandbox">Sandbox</option>
-                    <option value="production">Production</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {/* Stripe */}
-            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-md font-semibold text-white flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" /> Stripe
-                </h3>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              {/* Stripe */}
+              <div className="p-4 bg-zinc-800/50 rounded-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" /> Stripe
+                  </h3>
+                  <Switch
                     checked={paymentGateways.stripe.enabled}
-                    onChange={(e) => updatePaymentGateway('stripe', 'enabled', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Publishable Key</label>
-                  <input
-                    type="text"
-                    value={paymentGateways.stripe.publishable_key}
-                    onChange={(e) => updatePaymentGateway('stripe', 'publishable_key', e.target.value)}
-                    className="modern-input"
-                    placeholder="pk_test_..."
+                    onCheckedChange={(checked) => updatePaymentGateway('stripe', 'enabled', checked)}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Secret Key</label>
-                  <input
-                    type="password"
-                    value={paymentGateways.stripe.secret_key}
-                    onChange={(e) => updatePaymentGateway('stripe', 'secret_key', e.target.value)}
-                    className="modern-input"
-                    placeholder="sk_test_..."
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Webhook Secret</label>
-                  <input
-                    type="password"
-                    value={paymentGateways.stripe.webhook_secret}
-                    onChange={(e) => updatePaymentGateway('stripe', 'webhook_secret', e.target.value)}
-                    className="modern-input"
-                    placeholder="whsec_..."
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="stripe-publishable">Publishable Key</Label>
+                    <Input
+                      id="stripe-publishable"
+                      type="text"
+                      value={paymentGateways.stripe.publishable_key}
+                      onChange={(e) => updatePaymentGateway('stripe', 'publishable_key', e.target.value)}
+                      placeholder="pk_test_..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="stripe-secret">Secret Key</Label>
+                    <Input
+                      id="stripe-secret"
+                      type="password"
+                      value={paymentGateways.stripe.secret_key}
+                      onChange={(e) => updatePaymentGateway('stripe', 'secret_key', e.target.value)}
+                      placeholder="sk_test_..."
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="stripe-webhook">Webhook Secret</Label>
+                    <Input
+                      id="stripe-webhook"
+                      type="password"
+                      value={paymentGateways.stripe.webhook_secret}
+                      onChange={(e) => updatePaymentGateway('stripe', 'webhook_secret', e.target.value)}
+                      placeholder="whsec_..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* PayPal */}
-            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-md font-semibold text-white flex items-center gap-2">
-                  <Globe className="w-4 h-4" /> PayPal
-                </h3>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              {/* PayPal */}
+              <div className="p-4 bg-zinc-800/50 rounded-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                    <Globe className="w-4 h-4" /> PayPal
+                  </h3>
+                  <Switch
                     checked={paymentGateways.paypal.enabled}
-                    onChange={(e) => updatePaymentGateway('paypal', 'enabled', e.target.checked)}
-                    className="sr-only peer"
+                    onCheckedChange={(checked) => updatePaymentGateway('paypal', 'enabled', checked)}
                   />
-                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="paypal-client-id">Client ID</Label>
+                    <Input
+                      id="paypal-client-id"
+                      type="text"
+                      value={paymentGateways.paypal.client_id}
+                      onChange={(e) => updatePaymentGateway('paypal', 'client_id', e.target.value)}
+                      placeholder="Enter PayPal client ID"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="paypal-client-secret">Client Secret</Label>
+                    <Input
+                      id="paypal-client-secret"
+                      type="password"
+                      value={paymentGateways.paypal.client_secret}
+                      onChange={(e) => updatePaymentGateway('paypal', 'client_secret', e.target.value)}
+                      placeholder="Enter PayPal client secret"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="paypal-mode">Mode</Label>
+                    <select
+                      id="paypal-mode"
+                      value={paymentGateways.paypal.mode}
+                      onChange={(e) => updatePaymentGateway('paypal', 'mode', e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="sandbox">Sandbox</option>
+                      <option value="live">Live</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Client ID</label>
-                  <input
-                    type="text"
-                    value={paymentGateways.paypal.client_id}
-                    onChange={(e) => updatePaymentGateway('paypal', 'client_id', e.target.value)}
-                    className="modern-input"
-                    placeholder="Enter PayPal client ID"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Client Secret</label>
-                  <input
-                    type="password"
-                    value={paymentGateways.paypal.client_secret}
-                    onChange={(e) => updatePaymentGateway('paypal', 'client_secret', e.target.value)}
-                    className="modern-input"
-                    placeholder="Enter PayPal client secret"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mode</label>
-                  <select
-                    value={paymentGateways.paypal.mode}
-                    onChange={(e) => updatePaymentGateway('paypal', 'mode', e.target.value)}
-                    className="modern-input"
-                  >
-                    <option value="sandbox">Sandbox</option>
-                    <option value="live">Live</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button
-              onClick={handleSavePaymentGateways}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2"
-            >
+            <Button onClick={handleSavePaymentGateways} disabled={saving} className="flex items-center gap-2">
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Payment Gateways'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -775,73 +770,61 @@ export function SettingsPage() {
       {/* Bank Paybills Settings */}
       {activeTab === 'bank-paybills' && (
         <div className="space-y-6">
-          <div className="glass rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Globe className="w-5 h-5" /> Bank Paybills
-              </h2>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="w-5 h-5" /> Bank Paybills
+                </CardTitle>
+                <Switch
                   checked={bankPaybills.enabled}
-                  onChange={(e) => setBankPaybills(prev => ({ ...prev, enabled: e.target.checked }))}
-                  className="sr-only peer"
+                  onCheckedChange={(checked) => setBankPaybills(prev => ({ ...prev, enabled: checked }))}
                 />
-                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-            <p className="text-zinc-400 text-sm mb-6">Configure Kenyan bank paybill numbers for customers to pay directly to their bank accounts.</p>
-
-            {bankPaybills.banks.map((bank, index) => (
-              <div key={index} className="mb-4 p-4 bg-zinc-800/50 rounded-xl">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-md font-semibold text-white">{bank.name}</h3>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+              </div>
+              <CardDescription>Configure Kenyan bank paybill numbers for customers to pay directly to their bank accounts.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {bankPaybills.banks.map((bank, index) => (
+                <div key={index} className="mb-4 p-4 bg-zinc-800/50 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-md font-semibold text-white">{bank.name}</h3>
+                    <Switch
                       checked={bank.enabled}
-                      onChange={(e) => updateBankPaybill(index, 'enabled', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-1.5">Paybill Number</label>
-                    <input
-                      type="text"
-                      value={bank.paybill}
-                      onChange={(e) => updateBankPaybill(index, 'paybill', e.target.value)}
-                      className="modern-input"
-                      placeholder="e.g., 247247"
+                      onCheckedChange={(checked) => updateBankPaybill(index, 'enabled', checked)}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-1.5">Account Number</label>
-                    <input
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`bank-paybill-${index}`}>Paybill Number</Label>
+                      <Input
+                        id={`bank-paybill-${index}`}
+                        type="text"
+                        value={bank.paybill}
+                        onChange={(e) => updateBankPaybill(index, 'paybill', e.target.value)}
+                        placeholder="e.g., 247247"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`bank-account-${index}`}>Account Number</Label>
+                      <Input
                       type="text"
                       value={bank.account_number}
                       onChange={(e) => updateBankPaybill(index, 'account_number', e.target.value)}
-                      className="modern-input"
                       placeholder="Your business account number"
                     />
                   </div>
                 </div>
               </div>
             ))}
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button
-              onClick={handleSaveBankPaybills}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2"
-            >
+            <Button onClick={handleSaveBankPaybills} disabled={saving} className="flex items-center gap-2">
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Bank Paybills'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
