@@ -16,11 +16,17 @@ router.get('/categories', async (req, res) => {
 router.post('/categories', async (req, res) => {
   try {
     const { name, description, sla_hours, color } = req.body;
+
+    // Validation
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'Category name is required' });
+    }
+
     const id = uuidv4();
     const result = await db.query(
       `INSERT INTO ticket_categories (id, name, description, sla_hours, color)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [id, name, description, sla_hours || 24, color || '#3b82f6']
+      [id, name.trim(), description || null, sla_hours || 24, color || '#3b82f6']
     );
     res.status(201).json(result.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -152,23 +158,35 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { customer_id, category_id, subject, description, priority, assignee_id } = req.body;
+
+    // Validation
+    if (!subject || subject.trim() === '') {
+      return res.status(400).json({ error: 'Subject is required' });
+    }
+    if (!description || description.trim() === '') {
+      return res.status(400).json({ error: 'Description is required' });
+    }
+
     const id = uuidv4();
     const ticketNumber = `TKT-${Date.now().toString().slice(-8)}`;
 
     const result = await db.query(
       `INSERT INTO tickets (id, ticket_number, customer_id, category_id, subject, description, priority, status, assignee_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8) RETURNING *`,
-      [id, ticketNumber, customer_id || null, category_id || null, subject, description, priority || 'medium', assignee_id || null]
+      [id, ticketNumber, customer_id || null, category_id || null, subject.trim(), description.trim(), priority || 'medium', assignee_id || null]
     );
 
     // Auto-message from customer
     await db.query(
       `INSERT INTO ticket_messages (ticket_id, user_id, message, is_internal) VALUES ($1, NULL, $2, false)`,
-      [id, description]
+      [id, description.trim()]
     );
 
     res.status(201).json(result.rows[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('Ticket creation error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put('/:id', async (req, res) => {
