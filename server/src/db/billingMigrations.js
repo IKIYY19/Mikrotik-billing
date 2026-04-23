@@ -422,11 +422,11 @@ const seedData = async (db) => {
     const existingPlans = await db.query('SELECT id FROM service_plans LIMIT 1');
     if (existingPlans.rows.length === 0) {
       await db.query(`INSERT INTO service_plans (id, name, speed_up, speed_down, price, quota_gb, priority, description) VALUES
-        ('plan-bronze-5m-fixed-uuid-000001', 'Bronze 5M', '5M', '5M', 15.00, NULL, 8, 'Basic browsing and email'),
-        ('plan-silver-10m-fixed-uuid-000002', 'Silver 10M', '10M', '10M', 25.00, NULL, 6, 'Standard home internet'),
-        ('plan-gold-25m-fixed-uuid-000003', 'Gold 25M', '25M', '25M', 45.00, NULL, 4, 'Streaming and gaming'),
-        ('plan-platinum-50m-fixed-uuid-000004', 'Platinum 50M', '50M', '50M', 75.00, 500, 2, 'Heavy usage plan'),
-        ('plan-enterprise-100m-fixed-uuid-000005', 'Enterprise 100M', '100M', '100M', 150.00, NULL, 1, 'Business unlimited')
+        ('550e8400-e29b-41d4-a716-446655440001', 'Bronze 5M', '5M', '5M', 15.00, NULL, 8, 'Basic browsing and email'),
+        ('550e8400-e29b-41d4-a716-446655440002', 'Silver 10M', '10M', '10M', 25.00, NULL, 6, 'Standard home internet'),
+        ('550e8400-e29b-41d4-a716-446655440003', 'Gold 25M', '25M', '25M', 45.00, NULL, 4, 'Streaming and gaming'),
+        ('550e8400-e29b-41d4-a716-446655440004', 'Platinum 50M', '50M', '50M', 75.00, 500, 2, 'Heavy usage plan'),
+        ('550e8400-e29b-41d4-a716-446655440005', 'Enterprise 100M', '100M', '100M', 150.00, NULL, 1, 'Business unlimited')
       ON CONFLICT (id) DO NOTHING`);
     }
 
