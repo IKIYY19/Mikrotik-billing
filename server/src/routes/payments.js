@@ -18,8 +18,23 @@ const { decryptObject } = require('../utils/encryption');
 const router = express.Router();
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
+// Import settings store for payment gateway config
+const settingsRoutes = require('./settings');
+
 async function getIntegrationConfig(serviceName) {
   try {
+    // First try to get from settings store
+    if (serviceName === 'mpesa' && settingsRoutes.paymentGatewayStore?.mpesa?.enabled) {
+      return settingsRoutes.paymentGatewayStore.mpesa;
+    }
+    if (serviceName === 'stripe' && settingsRoutes.paymentGatewayStore?.stripe?.enabled) {
+      return settingsRoutes.paymentGatewayStore.stripe;
+    }
+    if (serviceName === 'paypal' && settingsRoutes.paymentGatewayStore?.paypal?.enabled) {
+      return settingsRoutes.paymentGatewayStore.paypal;
+    }
+
+    // Fallback to database if available
     if (!global.db) return null;
     const result = await global.db.query(
       'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
@@ -36,7 +51,7 @@ async function getIntegrationConfig(serviceName) {
 
 async function getMpesaService() {
   const integrationConfig = await getIntegrationConfig('mpesa');
-  if (integrationConfig) {
+  if (integrationConfig && integrationConfig.enabled) {
     return new MpesaService({
       consumerKey: integrationConfig.consumer_key,
       consumerSecret: integrationConfig.consumer_secret,
@@ -56,15 +71,35 @@ async function getMpesaService() {
   });
 }
 
-const mpesaConfigured = Boolean(
-  process.env.MPESA_CONSUMER_KEY &&
-  process.env.MPESA_CONSUMER_SECRET &&
-  process.env.MPESA_PASSKEY &&
-  process.env.MPESA_CALLBACK_URL
-);
+async function isMpesaConfigured() {
+  const config = await getIntegrationConfig('mpesa');
+  if (config && config.enabled) {
+    return Boolean(config.consumer_key && config.consumer_secret && config.passkey);
+  }
+  return Boolean(
+    process.env.MPESA_CONSUMER_KEY &&
+    process.env.MPESA_CONSUMER_SECRET &&
+    process.env.MPESA_PASSKEY &&
+    process.env.MPESA_CALLBACK_URL
+  );
+}
 
-const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-const paypalConfigured = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+async function isStripeConfigured() {
+  const config = await getIntegrationConfig('stripe');
+  if (config && config.enabled) {
+    return Boolean(config.secret_key);
+  }
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+
+async function isPaypalConfigured() {
+  const config = await getIntegrationConfig('paypal');
+  if (config && config.enabled) {
+    return Boolean(config.client_id && config.client_secret);
+  }
+  return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+}
+
 const flutterwaveConfigured = Boolean(process.env.FLUTTERWAVE_SECRET_KEY);
 
 router.use(paymentLimiter);
@@ -157,7 +192,11 @@ router.post('/', async (req, res) => {
 // ═══════════════════════════════════════
 // PAYMENT METHODS CONFIG
 // ═══════════════════════════════════════
-router.get('/methods', (req, res) => {
+router.get('/methods', async (req, res) => {
+  const mpesaEnabled = await isMpesaConfigured();
+  const stripeEnabled = await isStripeConfigured();
+  const paypalEnabled = await isPaypalConfigured();
+
   res.json({
     methods: [
       {
@@ -168,7 +207,7 @@ router.get('/methods', (req, res) => {
         min: 1,
         max: 150000,
         fee: 0,
-        enabled: mpesaConfigured || !isProductionEnv,
+        enabled: mpesaEnabled || !isProductionEnv,
       },
       {
         id: 'mpesa_paybill',
@@ -189,7 +228,7 @@ router.get('/methods', (req, res) => {
         min: 1,
         max: 1000000,
         fee: 2.9,
-        enabled: stripeConfigured || !isProductionEnv,
+        enabled: stripeEnabled || !isProductionEnv,
       },
       {
         id: 'paypal',
@@ -199,7 +238,7 @@ router.get('/methods', (req, res) => {
         min: 1,
         max: 1000000,
         fee: 3.4,
-        enabled: paypalConfigured || !isProductionEnv,
+        enabled: paypalEnabled || !isProductionEnv,
       },
       {
         id: 'flutterwave',
@@ -267,6 +306,7 @@ router.post('/mpesa/stk', async (req, res) => {
     const description = invoice ? `Payment for ${invoice.invoice_number}` : 'Wallet top-up';
 
     const mpesaService = await getMpesaService();
+    const mpesaConfigured = await isMpesaConfigured();
 
     if (!mpesaConfigured) {
       const checkoutId = `sandbox-${uuidv4()}`;
@@ -335,6 +375,8 @@ router.post('/mpesa/stk/check', async (req, res) => {
         payment,
       });
     }
+
+    const mpesaConfigured = await isMpesaConfigured();
 
     // Sandbox mode for local/test environments only
     if (!mpesaConfigured) {
@@ -501,6 +543,7 @@ router.post('/stripe/create-intent', async (req, res) => {
       return res.status(400).json({ error: 'amount is required' });
     }
 
+    const stripeConfigured = await isStripeConfigured();
     if (!stripeConfigured && isProductionEnv) {
       return res.status(503).json({ error: 'Stripe is not configured for production' });
     }
@@ -551,6 +594,7 @@ router.post('/paypal/create-order', async (req, res) => {
       return res.status(400).json({ error: 'amount is required' });
     }
 
+    const paypalConfigured = await isPaypalConfigured();
     if (!paypalConfigured && isProductionEnv) {
       return res.status(503).json({ error: 'PayPal is not configured for production' });
     }

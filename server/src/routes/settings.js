@@ -116,4 +116,7 @@ router.put('/payment-gateways', (req, res) => {
   res.json(paymentGatewayStore);
 });
 
+// Export the stores for use in other modules
 module.exports = router;
+module.exports.paymentGatewayStore = paymentGatewayStore;
+module.exports.settingsStore = settingsStore;
