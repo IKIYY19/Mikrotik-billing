@@ -205,7 +205,7 @@ export function TicketSystem() {
 
       {/* Ticket Detail Modal */}
       {ticketDetail && (
-        <TicketDetailModal ticket={ticketDetail} onClose={() => { setTicketDetail(null); setSelectedTicket(null); }}
+        <TicketDetailModal ticket={ticketDetail} technicians={technicians} onClose={() => { setTicketDetail(null); setSelectedTicket(null); }}
           onRefresh={() => fetchTicketDetail(ticketDetail.id)} />
       )}
 
@@ -219,7 +219,7 @@ export function TicketSystem() {
 }
 
 /* ─── Ticket Detail Modal ─── */
-function TicketDetailModal({ ticket, onClose, onRefresh }) {
+function TicketDetailModal({ ticket, technicians, onClose, onRefresh }) {
   const [reply, setReply] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
@@ -239,6 +239,12 @@ function TicketDetailModal({ ticket, onClose, onRefresh }) {
 
   const assignTech = async (assigneeId) => {
     await axios.put(`${API}/tickets/${ticket.id}`, { assignee_id: assigneeId });
+    onRefresh();
+  };
+
+  const closeTicket = async () => {
+    if (!confirm('Are you sure you want to close this ticket?')) return;
+    await axios.put(`${API}/tickets/${ticket.id}`, { status: 'closed' });
     onRefresh();
   };
 
@@ -280,8 +286,15 @@ function TicketDetailModal({ ticket, onClose, onRefresh }) {
             </select>
             <select onChange={e => assignTech(e.target.value)} value={ticket.assignee_id || ''} className="modern-input text-xs py-1.5 w-auto">
               <option value="">Assign to...</option>
-              {/* Would need technicians list passed as prop */}
+              {technicians.map(t => (
+                <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+              ))}
             </select>
+            {ticket.status !== 'closed' && (
+              <button onClick={closeTicket} className="btn-secondary text-xs py-1.5 px-3">
+                Close Ticket
+              </button>
+            )}
           </div>
         </div>
 
@@ -381,6 +394,15 @@ function CreateTicketModal({ onClose, categories, technicians, onCreated }) {
                 <option value="critical">Critical</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Assign To</label>
+            <select value={form.assignee_id} onChange={e => setForm({ ...form, assignee_id: e.target.value })} className="modern-input">
+              <option value="">Unassigned</option>
+              {technicians.map(t => (
+                <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Description *</label>
