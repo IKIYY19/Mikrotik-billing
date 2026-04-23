@@ -115,6 +115,23 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
+
+  // Hotspot vouchers table
+  `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(100) NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    profile VARCHAR(100),
+    valid_for VARCHAR(50),
+    rate_limit VARCHAR(50),
+    data_limit VARCHAR(50),
+    price NUMERIC(10, 2) DEFAULT 0,
+    company_name VARCHAR(255),
+    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_hotspot_vouchers_username ON hotspot_vouchers(username)`,
+  `CREATE INDEX IF NOT EXISTS idx_hotspot_vouchers_connection_id ON hotspot_vouchers(connection_id)`,
 ];
 
 async function runMigrations() {

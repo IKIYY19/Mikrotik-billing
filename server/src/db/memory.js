@@ -21,6 +21,7 @@ const store = {
   payments: [],
   olt_connections: [],
   integrations: [],
+  hotspot_vouchers: [],
 };
 
 // Seed example templates
@@ -644,6 +645,37 @@ module.exports = {
         updated_at: new Date().toISOString(),
       };
       return { rows: [store.integrations[idx]] };
+    }
+
+    // SELECT hotspot_vouchers
+    if (lowerText.includes('select') && lowerText.includes('from hotspot_vouchers')) {
+      return { rows: store.hotspot_vouchers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    }
+
+    // INSERT hotspot_vouchers
+    if (lowerText.includes('insert into hotspot_vouchers')) {
+      const voucher = {
+        id: params[0],
+        username: params[1],
+        password: params[2],
+        profile: params[3],
+        valid_for: params[4],
+        rate_limit: params[5],
+        data_limit: params[6],
+        price: params[7],
+        company_name: params[8],
+        connection_id: params[9],
+        created_at: params[10] || new Date().toISOString(),
+      };
+      store.hotspot_vouchers.push(voucher);
+      return { rows: [voucher] };
+    }
+
+    // DELETE hotspot_vouchers
+    if (lowerText.includes('delete from hotspot_vouchers')) {
+      const idx = store.hotspot_vouchers.findIndex(v => v.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.hotspot_vouchers.splice(idx, 1) };
     }
 
     // INSERT/UPDATE anything else (generic fallback)
