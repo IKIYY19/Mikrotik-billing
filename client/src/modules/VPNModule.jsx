@@ -13,18 +13,21 @@ export function VPNModule({ config, onUpdate }) {
   const [deployStatus, setDeployStatus] = useState(null);
 
   useEffect(() => {
+    console.log('VPNModule mounted');
     fetchConnections();
   }, []);
 
   const fetchConnections = async () => {
     try {
       const { data } = await axios.get(`${API}/mikrotik`).catch(() => ({ data: [] }));
+      console.log('Fetched connections:', data);
       setConnections(data);
     } catch (e) { console.error(e); }
   };
 
   // WireGuard key generation (using simple base64 random for demo - in production use proper crypto)
   const generateWireGuardKeys = () => {
+    console.log('Generate button clicked');
     try {
       // Generate 32 random bytes for private key
       const randomBytes = new Uint8Array(32);
@@ -40,6 +43,9 @@ export function VPNModule({ config, onUpdate }) {
       // For demo purposes, public key is derived (in production use proper curve25519)
       // This is a simplified version - real WireGuard uses curve25519
       const publicKey = btoa(privateKey.split('').reverse().join(''));
+
+      console.log('Generated private key:', privateKey);
+      console.log('Generated public key:', publicKey);
 
       updateWGInterface('private-key', privateKey);
       setGeneratedPublicKey(publicKey);
