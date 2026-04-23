@@ -44,6 +44,21 @@ export function SettingsPage() {
     paypal: { enabled: false, client_id: '', client_secret: '', mode: 'sandbox' },
   });
 
+  // Bank paybill state
+  const [bankPaybills, setBankPaybills] = useState({
+    enabled: false,
+    banks: [
+      { name: 'Equity Bank', paybill: '247247', account_number: '', enabled: true },
+      { name: 'KCB Bank', paybill: '522522', account_number: '', enabled: true },
+      { name: 'Co-operative Bank', paybill: '400200', account_number: '', enabled: true },
+      { name: 'Standard Chartered', paybill: '320320', account_number: '', enabled: false },
+      { name: 'Absa Bank', paybill: '303030', account_number: '', enabled: false },
+      { name: 'NCBA Bank', paybill: '880200', account_number: '', enabled: false },
+      { name: 'Diamond Trust Bank', paybill: '444444', account_number: '', enabled: false },
+      { name: 'I&M Bank', paybill: '545500', account_number: '', enabled: false },
+    ],
+  });
+
   const allFeatures = [
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
@@ -56,6 +71,7 @@ export function SettingsPage() {
     fetchSettings();
     fetchPermissions();
     fetchPaymentGateways();
+    fetchBankPaybills();
   }, []);
 
   const fetchPermissions = async () => {
@@ -77,6 +93,17 @@ export function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch payment gateways:', error);
+    }
+  };
+
+  const fetchBankPaybills = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings/bank-paybills`);
+      if (data) {
+        setBankPaybills(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bank paybills:', error);
     }
   };
 
@@ -182,6 +209,31 @@ export function SettingsPage() {
     }));
   };
 
+  const handleSaveBankPaybills = async () => {
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await axios.put(`${API}/settings/bank-paybills`, bankPaybills);
+      setMessage({ type: 'success', text: 'Bank paybill settings saved successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to save bank paybills:', error);
+      setMessage({ type: 'error', text: 'Failed to save bank paybill settings' });
+    }
+
+    setSaving(false);
+  };
+
+  const updateBankPaybill = (index, field, value) => {
+    setBankPaybills(prev => ({
+      ...prev,
+      banks: prev.banks.map((bank, i) =>
+        i === index ? { ...bank, [field]: value } : bank
+      )
+    }));
+  };
+
   const timezones = [
     'Africa/Nairobi', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
@@ -215,7 +267,7 @@ export function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        {['general', 'permissions', 'payment-gateways', 'billing', 'network', 'notifications'].map(tab => (
+        {['general', 'permissions', 'payment-gateways', 'bank-paybills', 'billing', 'network', 'notifications'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -720,8 +772,82 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Bank Paybills Settings */}
+      {activeTab === 'bank-paybills' && (
+        <div className="space-y-6">
+          <div className="glass rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5" /> Bank Paybills
+              </h2>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bankPaybills.enabled}
+                  onChange={(e) => setBankPaybills(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            <p className="text-zinc-400 text-sm mb-6">Configure Kenyan bank paybill numbers for customers to pay directly to their bank accounts.</p>
+
+            {bankPaybills.banks.map((bank, index) => (
+              <div key={index} className="mb-4 p-4 bg-zinc-800/50 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-md font-semibold text-white">{bank.name}</h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bank.enabled}
+                      onChange={(e) => updateBankPaybill(index, 'enabled', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1.5">Paybill Number</label>
+                    <input
+                      type="text"
+                      value={bank.paybill}
+                      onChange={(e) => updateBankPaybill(index, 'paybill', e.target.value)}
+                      className="modern-input"
+                      placeholder="e.g., 247247"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1.5">Account Number</label>
+                    <input
+                      type="text"
+                      value={bank.account_number}
+                      onChange={(e) => updateBankPaybill(index, 'account_number', e.target.value)}
+                      className="modern-input"
+                      placeholder="Your business account number"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveBankPaybills}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save Bank Paybills'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Other tabs - placeholder */}
-      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && (
+      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && activeTab !== 'bank-paybills' && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="text-zinc-500">
             <p className="text-lg font-medium mb-2">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings</p>

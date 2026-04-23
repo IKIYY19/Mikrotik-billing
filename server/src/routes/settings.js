@@ -83,6 +83,61 @@ const paymentGatewayStore = {
   },
 };
 
+// Bank paybill settings - Kenyan banks
+const bankPaybillStore = {
+  enabled: false,
+  banks: [
+    {
+      name: 'Equity Bank',
+      paybill: '247247',
+      account_number: '',
+      enabled: true,
+    },
+    {
+      name: 'KCB Bank',
+      paybill: '522522',
+      account_number: '',
+      enabled: true,
+    },
+    {
+      name: 'Co-operative Bank',
+      paybill: '400200',
+      account_number: '',
+      enabled: true,
+    },
+    {
+      name: 'Standard Chartered',
+      paybill: '320320',
+      account_number: '',
+      enabled: false,
+    },
+    {
+      name: 'Absa Bank',
+      paybill: '303030',
+      account_number: '',
+      enabled: false,
+    },
+    {
+      name: 'NCBA Bank',
+      paybill: '880200',
+      account_number: '',
+      enabled: false,
+    },
+    {
+      name: 'Diamond Trust Bank',
+      paybill: '444444',
+      account_number: '',
+      enabled: false,
+    },
+    {
+      name: 'I&M Bank',
+      paybill: '545500',
+      account_number: '',
+      enabled: false,
+    },
+  ],
+};
+
 // Get settings
 router.get('/', (req, res) => {
   res.json(settingsStore);
@@ -116,7 +171,19 @@ router.put('/payment-gateways', (req, res) => {
   res.json(paymentGatewayStore);
 });
 
+// Get bank paybill settings
+router.get('/bank-paybills', (req, res) => {
+  res.json(bankPaybillStore);
+});
+
+// Update bank paybill settings
+router.put('/bank-paybills', (req, res) => {
+  Object.assign(bankPaybillStore, req.body);
+  res.json(bankPaybillStore);
+});
+
 // Export the stores for use in other modules
 module.exports = router;
 module.exports.paymentGatewayStore = paymentGatewayStore;
+module.exports.bankPaybillStore = bankPaybillStore;
 module.exports.settingsStore = settingsStore;

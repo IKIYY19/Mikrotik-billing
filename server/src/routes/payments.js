@@ -21,6 +21,18 @@ const isProductionEnv = process.env.NODE_ENV === 'production';
 // Import settings store for payment gateway config
 const settingsRoutes = require('./settings');
 
+async function getBankPaybills() {
+  try {
+    if (settingsRoutes.bankPaybillStore?.enabled) {
+      return settingsRoutes.bankPaybillStore.banks.filter(bank => bank.enabled);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching bank paybills:', error);
+    return [];
+  }
+}
+
 async function getIntegrationConfig(serviceName) {
   try {
     // First try to get from settings store
@@ -196,99 +208,121 @@ router.get('/methods', async (req, res) => {
   const mpesaEnabled = await isMpesaConfigured();
   const stripeEnabled = await isStripeConfigured();
   const paypalEnabled = await isPaypalConfigured();
+  const bankPaybills = await getBankPaybills();
 
-  res.json({
-    methods: [
-      {
-        id: 'mpesa_stk',
-        name: 'M-Pesa (STK Push)',
-        icon: '📱',
-        description: 'Pay via M-Pesa - instant prompt on your phone',
-        min: 1,
-        max: 150000,
-        fee: 0,
-        enabled: mpesaEnabled || !isProductionEnv,
-      },
-      {
-        id: 'mpesa_paybill',
-        name: 'M-Pesa Paybill',
-        icon: '🏦',
-        description: 'Send to Paybill: 123456, Account: your invoice number',
-        min: 1,
-        max: 70000,
-        fee: 0,
-        enabled: true,
-        paybill: process.env.MPESA_PAYBILL || '123456',
-      },
-      {
-        id: 'stripe',
-        name: 'Credit/Debit Card (Stripe)',
-        icon: '💳',
-        description: 'Pay securely with Visa, Mastercard, Amex',
-        min: 1,
-        max: 1000000,
-        fee: 2.9,
-        enabled: stripeEnabled || !isProductionEnv,
-      },
-      {
-        id: 'paypal',
-        name: 'PayPal',
-        icon: '🅿️',
-        description: 'Pay with your PayPal account',
-        min: 1,
-        max: 1000000,
-        fee: 3.4,
-        enabled: paypalEnabled || !isProductionEnv,
-      },
-      {
-        id: 'flutterwave',
-        name: 'Flutterwave',
-        icon: '🌍',
-        description: 'Mobile money, card, bank transfer across Africa',
-        min: 1,
-        max: 1000000,
-        fee: 1.4,
-        enabled: flutterwaveConfigured || !isProductionEnv,
-      },
-      {
-        id: 'airtel_money',
-        name: 'Airtel Money',
-        icon: '📲',
-        description: 'Pay via Airtel Money',
-        min: 1,
-        max: 50000,
-        fee: 0,
-        enabled: false,
-      },
-      {
-        id: 'bank_transfer',
-        name: 'Bank Transfer (EFT/RTGS)',
-        icon: '🏛️',
-        description: 'Direct bank transfer',
-        min: 100,
-        max: 10000000,
-        fee: 0,
-        enabled: true,
-        bank_details: {
-          bank_name: process.env.BANK_NAME || 'Example Bank',
-          account_name: process.env.BANK_ACCOUNT_NAME || 'Your Company Ltd',
-          account_number: process.env.BANK_ACCOUNT_NUMBER || '0123456789',
-          branch: process.env.BANK_BRANCH || 'Nairobi',
-          swift_code: process.env.BANK_SWIFT || 'EXKEKENA',
-        },
-      },
-      {
-        id: 'cash',
-        name: 'Cash',
-        icon: '💵',
-        description: 'Pay cash at our office',
-        min: 0,
-        max: 1000000,
-        fee: 0,
-        enabled: true,
-      },
-    ],
+  const methods = [
+    {
+      id: 'mpesa_stk',
+      name: 'M-Pesa (STK Push)',
+      icon: '📱',
+      description: 'Pay via M-Pesa - instant prompt on your phone',
+      min: 1,
+      max: 150000,
+      fee: 0,
+      enabled: mpesaEnabled || !isProductionEnv,
+    },
+    {
+      id: 'mpesa_paybill',
+      name: 'M-Pesa Paybill',
+      icon: '🏦',
+      description: 'Send to Paybill: 123456, Account: your invoice number',
+      min: 1,
+      max: 70000,
+      fee: 0,
+      enabled: true,
+      paybill: process.env.MPESA_PAYBILL || '123456',
+    },
+  ];
+
+  // Add bank paybills
+  bankPaybills.forEach((bank, index) => {
+    methods.push({
+      id: `bank_paybill_${index}`,
+      name: `${bank.name} Paybill`,
+      icon: '🏦',
+      description: `Pay via ${bank.name} Paybill: ${bank.paybill}`,
+      min: 1,
+      max: 150000,
+      fee: 0,
+      enabled: true,
+      paybill: bank.paybill,
+      account_number: bank.account_number,
+      bank_name: bank.name,
+      type: 'bank_paybill',
+    });
   });
+
+  methods.push(
+    {
+      id: 'stripe',
+      name: 'Credit/Debit Card (Stripe)',
+      icon: '💳',
+      description: 'Pay securely with Visa, Mastercard, Amex',
+      min: 1,
+      max: 1000000,
+      fee: 2.9,
+      enabled: stripeEnabled || !isProductionEnv,
+    },
+    {
+      id: 'paypal',
+      name: 'PayPal',
+      icon: '🅿️',
+      description: 'Pay with your PayPal account',
+      min: 1,
+      max: 1000000,
+      fee: 3.4,
+      enabled: paypalEnabled || !isProductionEnv,
+    },
+    {
+      id: 'flutterwave',
+      name: 'Flutterwave',
+      icon: '🌍',
+      description: 'Mobile money, card, bank transfer across Africa',
+      min: 1,
+      max: 1000000,
+      fee: 1.4,
+      enabled: flutterwaveConfigured || !isProductionEnv,
+    },
+    {
+      id: 'airtel_money',
+      name: 'Airtel Money',
+      icon: '📲',
+      description: 'Pay via Airtel Money',
+      min: 1,
+      max: 50000,
+      fee: 0,
+      enabled: false,
+    },
+    {
+      id: 'bank_transfer',
+      name: 'Bank Transfer (EFT/RTGS)',
+      icon: '🏛️',
+      description: 'Direct bank transfer',
+      min: 100,
+      max: 10000000,
+      fee: 0,
+      enabled: true,
+      bank_details: {
+        bank_name: process.env.BANK_NAME || 'Example Bank',
+        account_name: process.env.BANK_ACCOUNT_NAME || 'Your Company Ltd',
+        account_number: process.env.BANK_ACCOUNT_NUMBER || '0123456789',
+        branch: process.env.BANK_BRANCH || 'Nairobi',
+        swift_code: process.env.BANK_SWIFT || 'EXKEKENA',
+      },
+    },
+    {
+      id: 'cash',
+      name: 'Cash',
+      icon: '💵',
+      description: 'Pay cash at our office',
+      min: 0,
+      max: 1000000,
+      fee: 0,
+      enabled: true,
+    }
+  );
+
+  res.json({ methods });
 });
 
 // ═══════════════════════════════════════
@@ -438,6 +472,35 @@ router.post('/mpesa/paybill/confirm', async (req, res) => {
       method: 'mpesa_paybill',
       reference: receipt,
       notes: `M-Pesa Paybill - ${phone}`,
+    });
+
+    if (customer?.phone) {
+      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+        console.error('SMS error:', error.message);
+      });
+    }
+
+    res.json({ success: true, payment });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// BANK PAYBILL CONFIRMATION
+// ═══════════════════════════════════════
+router.post('/bank-paybill/confirm', async (req, res) => {
+  try {
+    const { bank_name, paybill, account_number, receipt, amount, invoice_id, customer_id } = req.body;
+    const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
+
+    const payment = await billing.createPayment({
+      invoice_id,
+      customer_id: customerId,
+      amount: parseFloat(amount),
+      method: 'bank_paybill',
+      reference: receipt,
+      notes: `${bank_name} Paybill - Paybill: ${paybill}, Account: ${account_number}`,
     });
 
     if (customer?.phone) {
