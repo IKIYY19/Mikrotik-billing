@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock, Palette, Sun, Moon } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock, Palette, Sun, Moon, Wifi, Plus, Download, Trash2 } from 'lucide-react';
 import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -66,6 +66,17 @@ export function SettingsPage() {
     ],
   });
 
+  // WireGuard state
+  const [wireguard, setWireguard] = useState({
+    enabled: false,
+    server_port: '51820',
+    server_private_key: '',
+    server_public_key: '',
+    server_address: '10.0.0.1',
+    server_dns: '1.1.1.1',
+    peers: [],
+  });
+
   const allFeatures = [
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
@@ -79,6 +90,7 @@ export function SettingsPage() {
     fetchPermissions();
     fetchPaymentGateways();
     fetchBankPaybills();
+    fetchWireguard();
   }, []);
 
   const fetchPermissions = async () => {
@@ -111,6 +123,17 @@ export function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch bank paybills:', error);
+    }
+  };
+
+  const fetchWireguard = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings/wireguard`);
+      if (data) {
+        setWireguard(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch WireGuard settings:', error);
     }
   };
 
@@ -241,6 +264,78 @@ export function SettingsPage() {
     }));
   };
 
+  const handleSaveWireguard = async () => {
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await axios.put(`${API}/settings/wireguard`, wireguard);
+      setMessage({ type: 'success', text: 'WireGuard settings saved successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to save WireGuard settings:', error);
+      setMessage({ type: 'error', text: 'Failed to save WireGuard settings' });
+    }
+
+    setSaving(false);
+  };
+
+  const updateWireguard = (field, value) => {
+    setWireguard(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddPeer = async () => {
+    const newPeer = {
+      name: `Peer ${wireguard.peers.length + 1}`,
+      public_key: '',
+      allowed_ips: `10.0.0.${wireguard.peers.length + 2}/32`,
+      preshared_key: '',
+    };
+
+    try {
+      const { data } = await axios.post(`${API}/settings/wireguard/peers`, newPeer);
+      setWireguard(prev => ({ ...prev, peers: [...prev.peers, data] }));
+      setMessage({ type: 'success', text: 'Peer added successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to add peer:', error);
+      setMessage({ type: 'error', text: 'Failed to add peer' });
+    }
+  };
+
+  const handleDeletePeer = async (peerId) => {
+    try {
+      await axios.delete(`${API}/settings/wireguard/peers/${peerId}`);
+      setWireguard(prev => ({
+        ...prev,
+        peers: prev.peers.filter(p => p.id !== peerId)
+      }));
+      setMessage({ type: 'success', text: 'Peer deleted successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to delete peer:', error);
+      setMessage({ type: 'error', text: 'Failed to delete peer' });
+    }
+  };
+
+  const handleGenerateConfig = async (peerId, endpoint) => {
+    try {
+      const { data } = await axios.post(`${API}/settings/wireguard/config/${peerId}`, { endpoint });
+      const blob = new Blob([data.config], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `wireguard-${peerId}.conf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'Config file downloaded' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to generate config:', error);
+      setMessage({ type: 'error', text: 'Failed to generate config' });
+    }
+  };
+
   const timezones = [
     'Africa/Nairobi', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
@@ -274,7 +369,7 @@ export function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        {['general', 'permissions', 'payment-gateways', 'bank-paybills', 'billing', 'network', 'notifications'].map(tab => (
+        {['general', 'permissions', 'payment-gateways', 'bank-paybills', 'wireguard', 'billing', 'network', 'notifications'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -878,8 +973,176 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* WireGuard Settings */}
+      {activeTab === 'wireguard' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Wifi className="w-5 h-5" /> WireGuard VPN
+                </CardTitle>
+                <Switch
+                  checked={wireguard.enabled}
+                  onCheckedChange={(checked) => updateWireguard('enabled', checked)}
+                />
+              </div>
+              <CardDescription>Configure WireGuard VPN for secure remote access to your Mikrotik router.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="wg-port">Server Port</Label>
+                  <Input
+                    id="wg-port"
+                    type="number"
+                    value={wireguard.server_port}
+                    onChange={(e) => updateWireguard('server_port', e.target.value)}
+                    placeholder="51820"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="wg-address">Server Address</Label>
+                  <Input
+                    id="wg-address"
+                    type="text"
+                    value={wireguard.server_address}
+                    onChange={(e) => updateWireguard('server_address', e.target.value)}
+                    placeholder="10.0.0.1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="wg-dns">DNS Server</Label>
+                  <Input
+                    id="wg-dns"
+                    type="text"
+                    value={wireguard.server_dns}
+                    onChange={(e) => updateWireguard('server_dns', e.target.value)}
+                    placeholder="1.1.1.1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="wg-private-key">Server Private Key</Label>
+                  <Input
+                    id="wg-private-key"
+                    type="password"
+                    value={wireguard.server_private_key}
+                    onChange={(e) => updateWireguard('server_private_key', e.target.value)}
+                    placeholder="Private key (keep secret)"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="wg-public-key">Server Public Key</Label>
+                  <Input
+                    id="wg-public-key"
+                    type="text"
+                    value={wireguard.server_public_key}
+                    onChange={(e) => updateWireguard('server_public_key', e.target.value)}
+                    placeholder="Public key (share with peers)"
+                  />
+                </div>
+              </div>
+
+              {/* Peers Section */}
+              <div className="border-t border-zinc-700 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-md font-semibold text-white">VPN Peers</h3>
+                  <Button onClick={handleAddPeer} className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Peer
+                  </Button>
+                </div>
+
+                {wireguard.peers.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-500">
+                    <Wifi className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No peers configured yet</p>
+                    <p className="text-sm">Add a peer to start using WireGuard VPN</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {wireguard.peers.map((peer) => (
+                      <div key={peer.id} className="p-4 bg-zinc-800/50 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium text-white">{peer.name}</h4>
+                            <p className="text-sm text-zinc-400">{peer.allowed_ips}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateConfig(peer.id, window.location.hostname)}
+                              className="flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" />
+                              Config
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeletePeer(peer.id)}
+                              className="flex items-center gap-1 text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`peer-key-${peer.id}`} className="text-xs">Public Key</Label>
+                            <Input
+                              id={`peer-key-${peer.id}`}
+                              type="text"
+                              value={peer.public_key}
+                              onChange={(e) => {
+                                const updatedPeers = wireguard.peers.map(p =>
+                                  p.id === peer.id ? { ...p, public_key: e.target.value } : p
+                                );
+                                setWireguard(prev => ({ ...prev, peers: updatedPeers }));
+                              }}
+                              placeholder="Peer public key"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`peer-psk-${peer.id}`} className="text-xs">Preshared Key (optional)</Label>
+                            <Input
+                              id={`peer-psk-${peer.id}`}
+                              type="password"
+                              value={peer.preshared_key}
+                              onChange={(e) => {
+                                const updatedPeers = wireguard.peers.map(p =>
+                                  p.id === peer.id ? { ...p, preshared_key: e.target.value } : p
+                                );
+                                setWireguard(prev => ({ ...prev, peers: updatedPeers }));
+                              }}
+                              placeholder="Preshared key for extra security"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <Button onClick={handleSaveWireguard} disabled={saving} className="flex items-center gap-2">
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save WireGuard Settings'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Other tabs - placeholder */}
-      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && activeTab !== 'bank-paybills' && (
+      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && activeTab !== 'bank-paybills' && activeTab !== 'wireguard' && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="text-zinc-500">
             <p className="text-lg font-medium mb-2">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings</p>
