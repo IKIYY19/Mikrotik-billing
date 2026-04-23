@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Router, Plus, Trash2, Copy, Download, Eye, RefreshCw,
-  Terminal, Shield, Settings, CheckCircle, Clock, X, Code, FileText
+  Terminal, Shield, Settings, CheckCircle, Clock, X, Code, FileText, Zap
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -13,9 +13,12 @@ export function Devices() {
   const [showCreate, setShowCreate] = useState(false);
   const [showScript, setShowScript] = useState(null);
   const [showLogs, setShowLogs] = useState(null);
+  const [showCommand, setShowCommand] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [provisionMethod, setProvisionMethod] = useState('import');
+  const [commandLoading, setCommandLoading] = useState({});
   const [formData, setFormData] = useState({
     name: '', identity: '', model: '', dns_servers: ['8.8.8.8', '8.8.4.4'],
     ntp_servers: ['pool.ntp.org'], wan_interface: 'ether1',
@@ -73,9 +76,43 @@ export function Devices() {
     } catch (e) { console.error(e); }
   };
 
-  const copyCommand = (token) => {
-    const cmd = `/tool fetch mode=https url="https://MYDOMAIN.com/mikrotik/provision/${token}" dst-path=setup.rsc\r\n:delay 2s\r\n/import setup.rsc\r\n/tool fetch mode=https url="https://MYDOMAIN.com/mikrotik/provision/callback/${token}"`;
-    navigator.clipboard.writeText(cmd);
+  const getProvisionCommand = async (device, method = 'import') => {
+    setCommandLoading(prev => ({ ...prev, [device.id]: true }));
+    try {
+      const { data } = await axios.get(`/mikrotik/provision/command/${device.id}`, {
+        params: { method, baseUrl: window.location.origin }
+      });
+      setShowCommand({ ...device, ...data, method });
+    } catch (e) { 
+      console.error(e);
+      // Fallback to manual command
+      const serverUrl = window.location.origin;
+      const token = device.provision_token;
+      let command;
+      switch (method) {
+        case 'import':
+          command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
+          break;
+        case 'script':
+          command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; /import file-name=provision.rsc`;
+          break;
+        case 'fetch':
+          command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
+          break;
+        case 'inline':
+          command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; /import file-name=provision.rsc; /file remove provision.rsc`;
+          break;
+        default:
+          command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
+      }
+      setShowCommand({ ...device, command, copyText: command, method, serverUrl, token });
+    } finally {
+      setCommandLoading(prev => ({ ...prev, [device.id]: false }));
+    }
+  };
+
+  const copyCommand = (text) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -89,6 +126,13 @@ export function Devices() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const provisionMethods = [
+    { id: 'import', name: 'Import', icon: Zap, description: 'Direct import from URL' },
+    { id: 'script', name: 'Script', icon: Code, description: 'Fetch then import' },
+    { id: 'fetch', name: 'Fetch Only', icon: Download, description: 'Download for manual import' },
+    { id: 'inline', name: 'Inline', icon: Terminal, description: 'Fetch, import, cleanup' },
+  ];
 
   return (
     <div className="p-8">
@@ -132,27 +176,44 @@ export function Devices() {
               {/* Provision Command */}
               <div className="p-4 bg-slate-900">
                 <h4 className="text-xs text-slate-400 uppercase mb-2 flex items-center gap-1">
-                  <Terminal className="w-3 h-3" /> Provision Command
+                  <Terminal className="w-3 h-3" /> One-Line Provision Command
                 </h4>
-                <pre className="text-xs text-green-400 bg-slate-800 p-3 rounded border border-slate-700 overflow-x-auto whitespace-pre-wrap font-mono">
-{`/tool fetch mode=https url="https://MYDOMAIN.com/mikrotik/provision/${dev.provision_token}" dst-path=setup.rsc
-:delay 2s
-/import setup.rsc
-/tool fetch mode=https url="https://MYDOMAIN.com/mikrotik/provision/callback/${dev.provision_token}"`}
-                </pre>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => copyCommand(dev.provision_token)}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                    <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                  <button onClick={() => viewScript(dev)}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                    <Eye className="w-3 h-3" /> Preview Script
-                  </button>
-                  <button onClick={() => viewLogs(dev)}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> Logs
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    {provisionMethods.map(method => {
+                      const Icon = method.icon;
+                      return (
+                        <button
+                          key={method.id}
+                          onClick={() => getProvisionCommand(dev, method.id)}
+                          disabled={commandLoading[dev.id]}
+                          className={`flex-1 px-2 py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all ${
+                            provisionMethod === method.id
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          } disabled:opacity-50`}
+                          title={method.description}
+                        >
+                          <Icon className="w-3 h-3" /> {method.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <pre className="text-xs text-green-400 bg-slate-800 p-3 rounded border border-slate-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[60px]">
+                    {commandLoading[dev.id] ? 'Loading...' : (showCommand?.id === dev.id ? showCommand.copyText : 'Select a method above')}
+                  </pre>
+                  {showCommand?.id === dev.id && (
+                    <div className="flex gap-2">
+                      <button onClick={() => copyCommand(showCommand.copyText)}
+                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                        <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
+                      </button>
+                      <button onClick={() => getProvisionCommand(dev, showCommand.method)}
+                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" /> Regenerate Token
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -166,6 +227,14 @@ export function Devices() {
 
               {/* Actions */}
               <div className="p-4 border-t border-slate-700 flex gap-2">
+                <button onClick={() => viewScript(dev)}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                  <Eye className="w-3 h-3" /> Preview
+                </button>
+                <button onClick={() => viewLogs(dev)}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> Logs
+                </button>
                 <button onClick={() => regenerateToken(dev.id)}
                   className="bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 px-3 py-1.5 rounded text-sm flex items-center gap-1">
                   <RefreshCw className="w-3 h-3" /> New Token
