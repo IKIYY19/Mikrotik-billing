@@ -83,11 +83,11 @@ router.get('/provision/callback/:token', async (req, res) => {
 router.get('/provision/command/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { method = 'import', baseUrl } = req.query;
+    const { method = 'import', baseUrl, delay = 0 } = req.query;
 
     // Find router
     const result = await db.query('SELECT * FROM routers WHERE id = $1', [routerId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Router not found' });
     }
@@ -95,6 +95,7 @@ router.get('/provision/command/:routerId', async (req, res) => {
     const router = result.rows[0];
     const serverUrl = baseUrl || req.protocol + '://' + req.get('host');
     const token = router.provision_token;
+    const delaySec = parseInt(delay, 10) || 0;
 
     let command;
 
@@ -103,22 +104,30 @@ router.get('/provision/command/:routerId', async (req, res) => {
         // Import method - fetches and imports directly
         command = `/import file-name=provision.rsc \\\n  url="${serverUrl}/mikrotik/provision/${token}"`;
         break;
-      
+
       case 'script':
-        // Script method - fetches to file then runs
-        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; \\\n  /import file-name=provision.rsc`;
+        // Script method - fetches to file then runs with optional delay
+        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
+        if (delaySec > 0) {
+          command += `; :delay ${delaySec}s`;
+        }
+        command += `; \\\n  /import file-name=provision.rsc`;
         break;
-      
+
       case 'fetch':
         // Fetch only - manual import
         command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
         break;
-      
+
       case 'inline':
         // Inline execution (for smaller configs)
-        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; \\\n  /import file-name=provision.rsc; \\\n  /file remove provision.rsc`;
+        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
+        if (delaySec > 0) {
+          command += `; :delay ${delaySec}s`;
+        }
+        command += `; \\\n  /import file-name=provision.rsc; \\\n  /file remove provision.rsc`;
         break;
-      
+
       default:
         command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
     }
@@ -142,20 +151,21 @@ router.get('/provision/command/:routerId', async (req, res) => {
 router.post('/provision/command/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { method = 'import', baseUrl } = req.body;
+    const { method = 'import', baseUrl, delay = 0 } = req.body;
 
     // Find router
     const result = await db.query('SELECT * FROM routers WHERE id = $1', [routerId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Router not found' });
     }
 
     // Regenerate token
     const router = provisionStore._regenerateToken(routerId);
-    
+
     const serverUrl = baseUrl || req.protocol + '://' + req.get('host');
     const token = router.provision_token;
+    const delaySec = parseInt(delay, 10) || 0;
 
     let command;
 
@@ -163,19 +173,27 @@ router.post('/provision/command/:routerId', async (req, res) => {
       case 'import':
         command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
         break;
-      
+
       case 'script':
-        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; /import file-name=provision.rsc`;
+        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
+        if (delaySec > 0) {
+          command += `; :delay ${delaySec}s`;
+        }
+        command += `; /import file-name=provision.rsc`;
         break;
-      
+
       case 'fetch':
         command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
         break;
-      
+
       case 'inline':
-        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc; /import file-name=provision.rsc; /file remove provision.rsc`;
+        command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
+        if (delaySec > 0) {
+          command += `; :delay ${delaySec}s`;
+        }
+        command += `; /import file-name=provision.rsc; /file remove provision.rsc`;
         break;
-      
+
       default:
         command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
     }
