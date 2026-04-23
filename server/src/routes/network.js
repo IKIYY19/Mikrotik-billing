@@ -553,4 +553,44 @@ router.post('/network/firewall/:id/toggle', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════
+// WIREGUARD ROUTES
+// ═══════════════════════════════════════
+
+// Create WireGuard interface
+router.post('/network/wireguard/interface', async (req, res) => {
+  try {
+    const { connection_id, name, 'private-key': privateKey, 'listen-port': listenPort, mtu } = req.body;
+    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!name) return res.status(400).json({ error: 'Interface name is required' });
+
+    const device = await getMikrotikConnection(connection_id);
+    const args = { name };
+    if (privateKey) args['private-key'] = privateKey;
+    if (listenPort) args['listen-port'] = listenPort;
+    if (mtu) args.mtu = mtu;
+
+    await executeCommand(device, '/interface wireguard add', args);
+    res.json({ success: true, message: 'WireGuard interface created' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Create WireGuard peer
+router.post('/network/wireguard/peer', async (req, res) => {
+  try {
+    const { connection_id, interface: interfaceName, 'public-key': publicKey, 'allowed-address': allowedAddress, endpoint } = req.body;
+    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!publicKey) return res.status(400).json({ error: 'Public key is required' });
+
+    const device = await getMikrotikConnection(connection_id);
+    const args = { 'public-key': publicKey };
+    if (interfaceName) args.interface = interfaceName;
+    if (allowedAddress) args['allowed-address'] = allowedAddress;
+    if (endpoint) args.endpoint = endpoint;
+
+    await executeCommand(device, '/interface wireguard peers add', args);
+    res.json({ success: true, message: 'WireGuard peer added' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
