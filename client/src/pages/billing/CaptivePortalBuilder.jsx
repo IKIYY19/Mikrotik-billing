@@ -6,7 +6,7 @@ import {
   Palette as PaletteIcon, Layout, FileText, Send, Undo, Redo, GripVertical,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Layers,
   ArrowUp, ArrowDown, Maximize2, Minimize2, Copy, Clipboard, Check,
-  Wifi, Bell, Globe, Clock
+  Wifi, Bell, Globe, Clock, Facebook, Twitter, Instagram
 } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
