@@ -102,16 +102,16 @@ router.get('/provision/command/:routerId', async (req, res) => {
     switch (method) {
       case 'import':
         // Import method - fetches and imports directly
-        command = `/import file-name=provision.rsc \\\n  url="${serverUrl}/mikrotik/provision/${token}"`;
+        command = `/import file-name=provision.rsc url="${serverUrl}/mikrotik/provision/${token}"`;
         break;
 
       case 'script':
-        // Script method - fetches to file then runs with optional delay
+        // Script method - fetches to file then runs with optional delay (Centipid-style)
         command = `/tool fetch mode=https url="${serverUrl}/mikrotik/provision/${token}" dst-path=provision.rsc`;
         if (delaySec > 0) {
           command += `; :delay ${delaySec}s`;
         }
-        command += `; \\\n  /import file-name=provision.rsc`;
+        command += `; /import provision.rsc`;
         break;
 
       case 'fetch':
@@ -125,7 +125,7 @@ router.get('/provision/command/:routerId', async (req, res) => {
         if (delaySec > 0) {
           command += `; :delay ${delaySec}s`;
         }
-        command += `; \\\n  /import file-name=provision.rsc; \\\n  /file remove provision.rsc`;
+        command += `; /import provision.rsc; /file remove provision.rsc`;
         break;
 
       default:
