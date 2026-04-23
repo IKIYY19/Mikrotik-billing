@@ -611,7 +611,7 @@ export function SettingsPage() {
                   return (
                     <Button
                       key={feature}
-                      variant={hasAccess ? 'default' : 'outline'}
+                      variant={hasAccess ? 'secondary' : 'outline'}
                       onClick={() => toggleFeature(selectedRole, feature)}
                       className="justify-start"
                     >
