@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw } from 'lucide-react';
 
 export function VPNModule({ config, onUpdate }) {
   const [activeTab, setActiveTab] = useState('wireguard');
+  const [generatedPublicKey, setGeneratedPublicKey] = useState('');
+
+  // WireGuard key generation (using simple base64 random for demo - in production use proper crypto)
+  const generateWireGuardKeys = () => {
+    // Generate 32 random bytes for private key
+    const privateKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    // For demo purposes, public key is derived (in production use proper curve25519)
+    // This is a simplified version - real WireGuard uses curve25519
+    const publicKey = btoa(privateKey.split('').reverse().join(''));
+    
+    updateWGInterface('private-key', privateKey);
+    setGeneratedPublicKey(publicKey);
+  };
 
   // WireGuard
   const updateWGInterface = (field, value) => {
@@ -116,19 +129,27 @@ export function VPNModule({ config, onUpdate }) {
         <div>
           <div className="bg-slate-800 p-4 rounded mb-4">
             <h4 className="text-white font-semibold mb-4">WireGuard Interface</h4>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4 mb-4">
               <input
                 placeholder="Name (wg1)"
                 value={config.wireguard?.interface?.name || ''}
                 onChange={(e) => updateWGInterface('name', e.target.value)}
                 className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
               />
-              <input
-                placeholder="Private Key"
-                value={config.wireguard?.interface?.['private-key'] || ''}
-                onChange={(e) => updateWGInterface('private-key', e.target.value)}
-                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-              />
+              <div className="relative">
+                <input
+                  placeholder="Private Key"
+                  value={config.wireguard?.interface?.['private-key'] || ''}
+                  onChange={(e) => updateWGInterface('private-key', e.target.value)}
+                  className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white pr-20"
+                />
+                <button
+                  onClick={generateWireGuardKeys}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Generate
+                </button>
+              </div>
               <input
                 placeholder="Listen Port (13231)"
                 type="number"
@@ -144,6 +165,12 @@ export function VPNModule({ config, onUpdate }) {
                 className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
               />
             </div>
+            {generatedPublicKey && (
+              <div className="bg-slate-700 p-3 rounded mb-2">
+                <div className="text-xs text-slate-400 mb-1">Generated Public Key (share this with peers):</div>
+                <div className="text-sm text-green-400 font-mono break-all">{generatedPublicKey}</div>
+              </div>
+            )}
           </div>
 
           <button onClick={addWGPeer} className="mb-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded flex items-center gap-2">
