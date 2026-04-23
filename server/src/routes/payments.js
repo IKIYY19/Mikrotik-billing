@@ -6,6 +6,9 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const MpesaService = require('../services/mpesa');
+const stripeService = require('../services/stripe');
+const paypalService = require('../services/paypal');
+const flutterwaveService = require('../services/flutterwave');
 const billing = require('../services/billingData');
 const paymentSessions = require('../services/paymentSessions');
 const { paymentLimiter } = require('../middleware/rateLimiter');
@@ -30,6 +33,10 @@ const mpesaConfigured = Boolean(
   process.env.MPESA_PASSKEY &&
   process.env.MPESA_CALLBACK_URL
 );
+
+const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+const paypalConfigured = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+const flutterwaveConfigured = Boolean(process.env.FLUTTERWAVE_SECRET_KEY);
 
 router.use(paymentLimiter);
 
@@ -146,6 +153,36 @@ router.get('/methods', (req, res) => {
         paybill: process.env.MPESA_PAYBILL || '123456',
       },
       {
+        id: 'stripe',
+        name: 'Credit/Debit Card (Stripe)',
+        icon: '💳',
+        description: 'Pay securely with Visa, Mastercard, Amex',
+        min: 1,
+        max: 1000000,
+        fee: 2.9,
+        enabled: stripeConfigured || !isProductionEnv,
+      },
+      {
+        id: 'paypal',
+        name: 'PayPal',
+        icon: '🅿️',
+        description: 'Pay with your PayPal account',
+        min: 1,
+        max: 1000000,
+        fee: 3.4,
+        enabled: paypalConfigured || !isProductionEnv,
+      },
+      {
+        id: 'flutterwave',
+        name: 'Flutterwave',
+        icon: '🌍',
+        description: 'Mobile money, card, bank transfer across Africa',
+        min: 1,
+        max: 1000000,
+        fee: 1.4,
+        enabled: flutterwaveConfigured || !isProductionEnv,
+      },
+      {
         id: 'airtel_money',
         name: 'Airtel Money',
         icon: '📲',
@@ -171,16 +208,6 @@ router.get('/methods', (req, res) => {
           branch: process.env.BANK_BRANCH || 'Nairobi',
           swift_code: process.env.BANK_SWIFT || 'EXKEKENA',
         },
-      },
-      {
-        id: 'card',
-        name: 'Visa/Mastercard',
-        icon: '💳',
-        description: 'Pay via card (processed by Pesapal/DPO)',
-        min: 10,
-        max: 500000,
-        fee: 2.9,
-        enabled: false,
       },
       {
         id: 'cash',
@@ -435,6 +462,194 @@ router.get('/bank-details', (req, res) => {
       'Send confirmation screenshot to our WhatsApp',
     ],
   });
+});
+
+// ═══════════════════════════════════════
+// STRIPE PAYMENT INTENT
+// ═══════════════════════════════════════
+router.post('/stripe/create-intent', async (req, res) => {
+  try {
+    const { amount, customer_id, invoice_id, description, metadata } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'amount is required' });
+    }
+
+    if (!stripeConfigured && isProductionEnv) {
+      return res.status(503).json({ error: 'Stripe is not configured for production' });
+    }
+
+    const result = await stripeService.createPaymentIntent({
+      amount: parseFloat(amount),
+      customer_id,
+      invoice_id,
+      description,
+      metadata,
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// STRIPE WEBHOOK
+// ═══════════════════════════════════════
+router.post('/stripe/webhook', async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+  const payload = req.body;
+
+  const event = stripeService.verifyWebhookSignature(payload, signature);
+  if (!event) {
+    return res.status(400).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const result = await stripeService.handleWebhook(event);
+    res.json(result);
+  } catch (e) {
+    console.error('Stripe webhook error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// PAYPAL CREATE ORDER
+// ═══════════════════════════════════════
+router.post('/paypal/create-order', async (req, res) => {
+  try {
+    const { amount, currency, customer_id, invoice_id, description, redirect_url, metadata } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'amount is required' });
+    }
+
+    if (!paypalConfigured && isProductionEnv) {
+      return res.status(503).json({ error: 'PayPal is not configured for production' });
+    }
+
+    const result = await paypalService.createOrder({
+      amount: parseFloat(amount),
+      currency: currency || 'USD',
+      customer_id,
+      invoice_id,
+      description,
+      redirect_url,
+      metadata,
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// PAYPAL CAPTURE PAYMENT
+// ═══════════════════════════════════════
+router.post('/paypal/capture', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' });
+    }
+
+    const result = await paypalService.capturePayment(orderId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// PAYPAL WEBHOOK
+// ═══════════════════════════════════════
+router.post('/paypal/webhook', async (req, res) => {
+  const headers = req.headers;
+  const body = req.body;
+
+  if (!paypalService.verifyWebhookSignature(headers, body)) {
+    return res.status(400).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const result = await paypalService.handleWebhook(body);
+    res.json(result);
+  } catch (e) {
+    console.error('PayPal webhook error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// FLUTTERWAVE CREATE PAYMENT LINK
+// ═══════════════════════════════════════
+router.post('/flutterwave/create-link', async (req, res) => {
+  try {
+    const { amount, currency, customer_id, invoice_id, description, redirect_url, metadata } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'amount is required' });
+    }
+
+    if (!flutterwaveConfigured && isProductionEnv) {
+      return res.status(503).json({ error: 'Flutterwave is not configured for production' });
+    }
+
+    const result = await flutterwaveService.createPaymentLink({
+      amount: parseFloat(amount),
+      currency: currency || 'KES',
+      customer_id,
+      invoice_id,
+      description,
+      redirect_url,
+      metadata,
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// FLUTTERWAVE VERIFY TRANSACTION
+// ═══════════════════════════════════════
+router.post('/flutterwave/verify', async (req, res) => {
+  try {
+    const { transactionId } = req.body;
+
+    if (!transactionId) {
+      return res.status(400).json({ error: 'transactionId is required' });
+    }
+
+    const result = await flutterwaveService.verifyTransaction(transactionId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// FLUTTERWAVE WEBHOOK
+// ═══════════════════════════════════════
+router.post('/flutterwave/webhook', async (req, res) => {
+  const headers = req.headers;
+  const body = req.body;
+
+  if (!flutterwaveService.verifyWebhookSignature(headers, body)) {
+    return res.status(400).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const result = await flutterwaveService.handleWebhook(body);
+    res.json(result);
+  } catch (e) {
+    console.error('Flutterwave webhook error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

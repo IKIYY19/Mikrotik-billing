@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const logger = require('../utils/logger');
-const { MikroTikAPI } = require('./mikrotik');
 
 class BandwidthWebSocketService {
   constructor() {

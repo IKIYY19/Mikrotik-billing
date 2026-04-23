@@ -123,6 +123,12 @@ router.post('/:id/test', async (req, res) => {
       case 'stripe':
         testResult = await testStripe(config);
         break;
+      case 'paypal':
+        testResult = await testPayPal(config);
+        break;
+      case 'flutterwave':
+        testResult = await testFlutterwave(config);
+        break;
       case 'slack':
         testResult = await testSlack(config);
         break;
@@ -287,6 +293,56 @@ async function testStripe(config) {
         message: 'Stripe connected successfully',
         details: `Available: ${(data.available[0]?.amount / 100).toFixed(2)} ${config.currency || 'usd'}`
       };
+    }
+    return { success: false, message: 'Invalid secret key' };
+  } catch (error) {
+    return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+async function testPayPal(config) {
+  try {
+    if (!config.client_id || !config.client_secret) {
+      return { success: false, message: 'Client ID and secret are required' };
+    }
+
+    const auth = Buffer.from(`${config.client_id}:${config.client_secret}`).toString('base64');
+    const environment = config.environment || 'sandbox';
+    const baseUrl = environment === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+    const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${auth}`,
+      },
+      body: 'grant_type=client_credentials',
+    });
+
+    if (response.ok) {
+      return { success: true, message: 'PayPal authentication successful' };
+    }
+    return { success: false, message: 'Invalid PayPal credentials' };
+  } catch (error) {
+    return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+async function testFlutterwave(config) {
+  try {
+    if (!config.secret_key) {
+      return { success: false, message: 'Secret key is required' };
+    }
+
+    const response = await fetch('https://api.flutterwave.com/v3/banks/KE', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.secret_key}`,
+      },
+    });
+
+    if (response.ok) {
+      return { success: true, message: 'Flutterwave connected successfully' };
     }
     return { success: false, message: 'Invalid secret key' };
   } catch (error) {
