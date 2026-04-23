@@ -116,6 +116,11 @@ function App() {
                     <Route path="/hotspot-vouchers" element={<HotspotVouchers />} />
                     <Route path="/network-services" element={<NetworkServices />} />
                     <Route path="/olt" element={<OLTManagement />} />
+                    <Route path="/radius" element={<RadiusManagement />} />
+                    <Route path="/tickets" element={<TicketSystem />} />
+                    <Route path="/captive-portal" element={<CaptivePortalBuilder />} />
+                    <Route path="/bandwidth" element={<BandwidthGraphs />} />
+                    <Route path="/resellers" element={<ResellerPortal />} />
                     <Route path="/users" element={<ProtectedRoute feature="users"><UserManagement /></ProtectedRoute>} />
                     <Route path="/integrations" element={<IntegrationsSettings />} />
                     <Route path="/settings" element={<SettingsPage />} />
