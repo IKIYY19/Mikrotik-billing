@@ -95,7 +95,7 @@ export function ResellerPortal() {
   };
 
   const filtered = resellers.filter(r => r.name?.toLowerCase().includes(search.toLowerCase()));
-  const totalRevenue = resellers.reduce((s, r) => s + (r.total_revenue || 0), 0);
+  const totalRevenue = resellers.reduce((s, r) => s + (parseFloat(r.total_revenue) || 0), 0);
   const totalCustomers = resellers.reduce((s, r) => s + (r.customer_count || 0), 0);
   const activeResellers = resellers.filter(r => r.status === 'active').length;
 
@@ -203,8 +203,8 @@ export function ResellerPortal() {
                     </td>
                     <td><span className="badge badge-emerald">{r.commission_rate}%</span></td>
                     <td><span className="badge badge-blue">{r.customer_count || 0}</span></td>
-                    <td className="text-sm text-emerald-400 font-semibold">KES {r.total_revenue?.toFixed(2) || '0.00'}</td>
-                    <td className="text-sm text-zinc-300">KES {r.credit_limit?.toFixed(2) || '0.00'}</td>
+                    <td className="text-sm text-emerald-400 font-semibold">KES {(parseFloat(r.total_revenue) || 0).toFixed(2)}</td>
+                    <td className="text-sm text-zinc-300">KES {(parseFloat(r.credit_limit) || 0).toFixed(2)}</td>
                     <td><span className={`badge ${r.status === 'active' ? 'badge-green' : 'badge-red'}`}>{r.status}</span></td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
@@ -236,14 +236,14 @@ export function ResellerPortal() {
               <div className="text-center text-zinc-500 py-8">No resellers yet</div>
             ) : (
               <div className="space-y-3">
-                {resellers.sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0)).slice(0, 5).map((r, i) => (
+                {resellers.sort((a, b) => (parseFloat(b.total_revenue) || 0) - (parseFloat(a.total_revenue) || 0)).slice(0, 5).map((r, i) => (
                   <div key={i} className="flex items-center justify-between py-2">
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-500 font-mono text-sm w-6">#{i + 1}</span>
                       <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-semibold text-xs">{r.name?.charAt(0)}</div>
                       <span className="text-sm text-white">{r.name}</span>
                     </div>
-                    <span className="text-sm text-emerald-400 font-semibold">KES {r.total_revenue?.toFixed(2) || '0.00'}</span>
+                    <span className="text-sm text-emerald-400 font-semibold">KES {(parseFloat(r.total_revenue) || 0).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -254,8 +254,8 @@ export function ResellerPortal() {
           <div className="glass rounded-2xl p-6">
             <h3 className="text-base font-semibold text-white mb-4">Commission Overview</h3>
             <div className="space-y-4">
-              {resellers.filter(r => r.total_revenue > 0).map((r, i) => {
-                const commission = (r.total_revenue || 0) * (r.commission_rate || 0) / 100;
+              {resellers.filter(r => parseFloat(r.total_revenue) > 0).map((r, i) => {
+                const commission = (parseFloat(r.total_revenue) || 0) * (r.commission_rate || 0) / 100;
                 return (
                   <div key={i} className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -267,12 +267,12 @@ export function ResellerPortal() {
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-zinc-500">Commission: KES {commission.toFixed(2)}</span>
-                      <span className="text-zinc-500">Revenue: KES {r.total_revenue?.toFixed(2)}</span>
+                      <span className="text-zinc-500">Revenue: KES {(parseFloat(r.total_revenue) || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 );
               })}
-              {resellers.filter(r => r.total_revenue > 0).length === 0 && (
+              {resellers.filter(r => parseFloat(r.total_revenue) > 0).length === 0 && (
                 <div className="text-center text-zinc-500 py-8">No commission data yet</div>
               )}
             </div>

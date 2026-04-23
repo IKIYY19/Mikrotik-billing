@@ -135,8 +135,8 @@ export function AgentResellerPage() {
                     <td className="p-3 text-slate-300">{branches.find(b => b.id === a.branch_id)?.name || '—'}</td>
                     <td className="p-3 text-amber-400">{a.commission_rate}%</td>
                     <td className="p-3 text-white">{a.vouchers_sold}</td>
-                    <td className="p-3 text-green-400">KES {a.voucher_revenue.toFixed(2)}</td>
-                    <td className={`p-3 font-semibold ${a.balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {a.balance.toFixed(2)}</td>
+                    <td className="p-3 text-green-400">KES {(parseFloat(a.voucher_revenue) || 0).toFixed(2)}</td>
+                    <td className={`p-3 font-semibold ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
                     </td>
