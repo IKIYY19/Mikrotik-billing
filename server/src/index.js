@@ -341,6 +341,7 @@ const startServer = async () => {
     app.use('/api/olt', authenticate, require('./routes/olt'));
     app.use('/api/integrations', authenticate, require('./routes/integrations'));
     app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
+    app.use('/api/settings', authenticate, require('./routes/settings'));
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());

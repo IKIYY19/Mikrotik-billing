@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, LayoutDashboard, Network, Link, HardDrive, FileCode, Server, DollarSign, Users, Package, CreditCard, Receipt, MessageSquare, MessageCircle, MapPin, Wallet, Activity, UserCheck, Shield, FileText as FileText2, Database, TrendingUp, Wifi, Ticket, LifeBuoy, Palette, Radio } from 'lucide-react';
+import { Search, X, LayoutDashboard, Network, Link, HardDrive, FileCode, Server, DollarSign, Users, Package, CreditCard, Receipt, MessageSquare, MessageCircle, MapPin, Wallet, Activity, UserCheck, Shield, FileText as FileText2, Database, TrendingUp, Wifi, Ticket, LifeBuoy, Palette, Radio, Settings as SettingsIcon } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -13,6 +13,7 @@ const SEARCH_ITEMS = [
   { to: '/templates', icon: FileCode, label: 'Templates', category: 'Main' },
   { to: '/mikrotik-api', icon: Server, label: 'MikroTik API', category: 'Main' },
   { to: '/integrations', icon: Shield, label: 'Integrations', category: 'Main' },
+  { to: '/settings', icon: SettingsIcon, label: 'Settings', category: 'Main' },
   // Billing
   { to: '/billing', icon: DollarSign, label: 'Billing Overview', category: 'Billing' },
   { to: '/billing-customers', icon: Users, label: 'Customers', category: 'Billing' },

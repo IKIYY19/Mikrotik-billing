@@ -23,7 +23,7 @@ import {
   Shield,
   FileText as FileText2,
   Database,
-  Settings,
+  Settings as SettingsIcon,
   TrendingUp,
   Wifi,
   Ticket,
@@ -45,6 +45,7 @@ const navItems = [
   { to: '/templates', icon: FileCode, label: 'Templates' },
   { to: '/mikrotik-api', icon: Server, label: 'MikroTik API' },
   { to: '/integrations', icon: Key, label: 'Integrations' },
+  { to: '/settings', icon: SettingsIcon, label: 'Settings' },
 ];
 
 const billingItems = [

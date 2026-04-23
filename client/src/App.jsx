@@ -46,6 +46,7 @@ import { OLTManagement } from './pages/billing/OLTManagement';
 import SetupWizard from './pages/SetupWizard';
 import { UserManagement } from './pages/UserManagement';
 import IntegrationsSettings from './pages/IntegrationsSettings';
+import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -122,6 +123,7 @@ function App() {
                     <Route path="/resellers" element={<ResellerPortal />} />
                     <Route path="/users" element={<UserManagement />} />
                     <Route path="/integrations" element={<IntegrationsSettings />} />
+                    <Route path="/settings" element={<SettingsPage />} />
 
                     {/* Fallback */}
                     <Route path="*" element={<Navigate to="/" replace />} />
