@@ -1,9 +1,27 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, RefreshCw, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import axios from 'axios';
+
+const API = import.meta.env.VITE_API_URL || '/api';
 
 export function VPNModule({ config, onUpdate }) {
   const [activeTab, setActiveTab] = useState('wireguard');
   const [generatedPublicKey, setGeneratedPublicKey] = useState('');
+  const [connections, setConnections] = useState([]);
+  const [selectedConnection, setSelectedConnection] = useState('');
+  const [deploying, setDeploying] = useState(false);
+  const [deployStatus, setDeployStatus] = useState(null);
+
+  useEffect(() => {
+    fetchConnections();
+  }, []);
+
+  const fetchConnections = async () => {
+    try {
+      const { data } = await axios.get(`${API}/mikrotik`).catch(() => ({ data: [] }));
+      setConnections(data);
+    } catch (e) { console.error(e); }
+  };
 
   // WireGuard key generation (using simple base64 random for demo - in production use proper crypto)
   const generateWireGuardKeys = () => {
@@ -12,9 +30,59 @@ export function VPNModule({ config, onUpdate }) {
     // For demo purposes, public key is derived (in production use proper curve25519)
     // This is a simplified version - real WireGuard uses curve25519
     const publicKey = btoa(privateKey.split('').reverse().join(''));
-    
+
     updateWGInterface('private-key', privateKey);
     setGeneratedPublicKey(publicKey);
+  };
+
+  const deployToMikroTik = async () => {
+    if (!selectedConnection) {
+      setDeployStatus({ type: 'error', message: 'Please select a MikroTik connection' });
+      return;
+    }
+
+    if (!config.wireguard?.interface?.name) {
+      setDeployStatus({ type: 'error', message: 'Please configure WireGuard interface first' });
+      return;
+    }
+
+    setDeploying(true);
+    setDeployStatus(null);
+
+    try {
+      // Deploy WireGuard interface
+      const wg = config.wireguard;
+      const interfaceConfig = {
+        connection_id: selectedConnection,
+        name: wg.interface.name,
+        'private-key': wg.interface['private-key'],
+        'listen-port': wg.interface['listen-port'] || 13231,
+        mtu: wg.interface.mtu || 1420,
+      };
+
+      await axios.post(`${API}/network/wireguard/interface`, interfaceConfig);
+
+      // Deploy peers
+      if (wg.peers && wg.peers.length > 0) {
+        for (const peer of wg.peers) {
+          if (peer['public-key'] && peer['allowed-address']) {
+            await axios.post(`${API}/network/wireguard/peer`, {
+              connection_id: selectedConnection,
+              interface: wg.interface.name,
+              'public-key': peer['public-key'],
+              'allowed-address': peer['allowed-address'],
+              endpoint: peer.endpoint,
+            });
+          }
+        }
+      }
+
+      setDeployStatus({ type: 'success', message: 'WireGuard configuration deployed successfully!' });
+    } catch (e) {
+      setDeployStatus({ type: 'error', message: `Deployment failed: ${e.response?.data?.error || e.message}` });
+    } finally {
+      setDeploying(false);
+    }
   };
 
   // WireGuard
@@ -127,6 +195,44 @@ export function VPNModule({ config, onUpdate }) {
 
       {activeTab === 'wireguard' && (
         <div>
+          {/* MikroTik Connection Selector */}
+          <div className="bg-slate-800 p-4 rounded mb-4">
+            <h4 className="text-white font-semibold mb-4">Deploy to MikroTik</h4>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-xs text-slate-400 mb-1">Select MikroTik Router</label>
+                <select
+                  value={selectedConnection}
+                  onChange={(e) => setSelectedConnection(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                >
+                  <option value="">-- Select a connection --</option>
+                  {connections.map((conn) => (
+                    <option key={conn.id} value={conn.id}>
+                      {conn.name} ({conn.ip_address})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={deployToMikroTik}
+                disabled={deploying}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-slate-600 px-4 py-2 rounded flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                {deploying ? 'Deploying...' : 'Deploy to Router'}
+              </button>
+            </div>
+            {deployStatus && (
+              <div className={`mt-3 p-3 rounded flex items-center gap-2 ${
+                deployStatus.type === 'success' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+              }`}>
+                {deployStatus.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span className="text-sm">{deployStatus.message}</span>
+              </div>
+            )}
+          </div>
+
           <div className="bg-slate-800 p-4 rounded mb-4">
             <h4 className="text-white font-semibold mb-4">WireGuard Interface</h4>
             <div className="grid grid-cols-4 gap-4 mb-4">
