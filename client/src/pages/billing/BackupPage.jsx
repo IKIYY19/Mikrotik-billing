@@ -217,12 +217,20 @@ export function BackupPage() {
                   </td>
                   <td className="p-3 text-slate-400 text-xs">{new Date(b.created_at).toLocaleString()}</td>
                   <td className="p-3 text-right">
-                    {b.status === 'success' && (
+                    {b.status === 'success' ? (
                       <>
-                        <button onClick={() => viewBackupContent(b.id)} className="text-blue-400 hover:text-blue-300 mr-2"><Eye className="w-4 h-4 inline" /></button>
-                        <button onClick={() => downloadBackup(b)} className="text-green-400 hover:text-green-300 mr-2"><Download className="w-4 h-4 inline" /></button>
-                        <button onClick={() => handleRestore(b)} className="text-amber-400 hover:text-amber-300"><RotateCcw className="w-4 h-4 inline" /></button>
+                        <Button variant="ghost" size="sm" onClick={() => viewBackupContent(b.id)} className="mr-1 text-blue-400 hover:text-blue-300">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => downloadBackup(b)} className="mr-1 text-green-400 hover:text-green-300">
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleRestore(b)} className="text-amber-400 hover:text-amber-300">
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
                       </>
+                    ) : (
+                      <span className="text-slate-500 text-xs">N/A</span>
                     )}
                   </td>
                 </tr>
