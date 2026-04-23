@@ -4,11 +4,20 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const walletStore = require('../db/walletStore');
 const backupStore = require('../db/backupStore');
 const billing = require('../db/billingStore');
 const { triggerMessage } = require('./sms');
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
 
 // ═══════════════════════════════════════
 // PREPAID WALLET
@@ -168,6 +177,43 @@ router.get('/backup/backups/:id', (req, res) => {
   const content = backupStore.getBackupContent(req.params.id);
   if (!content) return res.status(404).json({ error: 'Backup not found' });
   res.json(content);
+});
+
+router.post('/backup/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const file = req.file;
+
+  // Read file content
+  const content = file.buffer.toString('utf-8');
+
+  // Create backup entry
+  const backup = backupStore.createUploadedBackup({
+    device_name: file.originalname.replace(/\.(rsc|backup)$/, ''),
+    ip_address: 'uploaded',
+    config_content: content,
+    file_size: file.size,
+    status: 'success'
+  });
+
+  res.json(backup);
+});
+
+router.post('/backup/restore/:id', async (req, res) => {
+  const { target_ip, target_port, target_username, target_password } = req.body;
+  
+  if (!target_ip || !target_username || !target_password) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const backup = backupStore.getBackupContent(req.params.id);
+  if (!backup) return res.status(404).json({ error: 'Backup not found' });
+
+  // TODO: Implement actual MikroTik API restore
+  // For now, just return success
+  res.json({ message: 'Restore initiated', backup_id: req.params.id });
 });
 
 module.exports = router;

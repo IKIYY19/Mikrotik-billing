@@ -193,6 +193,22 @@ function getBackupContent(backupId) {
   };
 }
 
+// ─── Create Uploaded Backup ───
+function createUploadedBackup(data) {
+  const backup = {
+    id: uuidv4(),
+    schedule_id: null,
+    device_name: data.device_name,
+    ip_address: data.ip_address,
+    config_content: data.config_content,
+    file_size: data.file_size,
+    status: data.status || 'success',
+    created_at: new Date().toISOString(),
+  };
+  backupStore.backups.unshift(backup);
+  return backup;
+}
+
 module.exports = {
   backupStore,
   createSchedule,
@@ -204,4 +220,5 @@ module.exports = {
   updateSchedule,
   deleteSchedule,
   getBackupContent,
+  createUploadedBackup,
 };
