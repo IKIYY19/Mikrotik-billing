@@ -383,6 +383,17 @@ const billingMigrations = [
       ALTER TABLE customers ADD COLUMN city VARCHAR(100);
     END IF;
   END $$`,
+
+  // Add missing country column to customers table (if it doesn't exist)
+  `DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='customers' AND column_name='country'
+    ) THEN
+      ALTER TABLE customers ADD COLUMN country VARCHAR(100);
+    END IF;
+  END $$`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,
