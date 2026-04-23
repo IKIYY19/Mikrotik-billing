@@ -59,6 +59,30 @@ const featureAccessStore = {
   customer: [],
 };
 
+// Payment gateway settings
+const paymentGatewayStore = {
+  mpesa: {
+    enabled: false,
+    consumer_key: '',
+    consumer_secret: '',
+    passkey: '',
+    shortcode: '',
+    environment: 'sandbox', // sandbox or production
+  },
+  stripe: {
+    enabled: false,
+    publishable_key: '',
+    secret_key: '',
+    webhook_secret: '',
+  },
+  paypal: {
+    enabled: false,
+    client_id: '',
+    client_secret: '',
+    mode: 'sandbox', // sandbox or live
+  },
+};
+
 // Get settings
 router.get('/', (req, res) => {
   res.json(settingsStore);
@@ -79,6 +103,17 @@ router.get('/permissions', (req, res) => {
 router.put('/permissions', (req, res) => {
   Object.assign(featureAccessStore, req.body);
   res.json(featureAccessStore);
+});
+
+// Get payment gateway settings
+router.get('/payment-gateways', (req, res) => {
+  res.json(paymentGatewayStore);
+});
+
+// Update payment gateway settings
+router.put('/payment-gateways', (req, res) => {
+  Object.assign(paymentGatewayStore, req.body);
+  res.json(paymentGatewayStore);
 });
 
 module.exports = router;

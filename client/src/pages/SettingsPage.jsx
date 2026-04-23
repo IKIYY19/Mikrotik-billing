@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock } from 'lucide-react';
 import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -37,6 +37,13 @@ export function SettingsPage() {
   const [permissions, setPermissions] = useState(DEFAULT_FEATURE_ACCESS);
   const [selectedRole, setSelectedRole] = useState(ROLES.ADMIN);
 
+  // Payment gateway state
+  const [paymentGateways, setPaymentGateways] = useState({
+    mpesa: { enabled: false, consumer_key: '', consumer_secret: '', passkey: '', shortcode: '', environment: 'sandbox' },
+    stripe: { enabled: false, publishable_key: '', secret_key: '', webhook_secret: '' },
+    paypal: { enabled: false, client_id: '', client_secret: '', mode: 'sandbox' },
+  });
+
   const allFeatures = [
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
@@ -48,6 +55,7 @@ export function SettingsPage() {
   useEffect(() => {
     fetchSettings();
     fetchPermissions();
+    fetchPaymentGateways();
   }, []);
 
   const fetchPermissions = async () => {
@@ -58,6 +66,17 @@ export function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch permissions:', error);
+    }
+  };
+
+  const fetchPaymentGateways = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings/payment-gateways`);
+      if (data) {
+        setPaymentGateways(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch payment gateways:', error);
     }
   };
 
@@ -137,6 +156,32 @@ export function SettingsPage() {
     }));
   };
 
+  const handleSavePaymentGateways = async () => {
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      await axios.put(`${API}/settings/payment-gateways`, paymentGateways);
+      setMessage({ type: 'success', text: 'Payment gateway settings saved successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to save payment gateways:', error);
+      setMessage({ type: 'error', text: 'Failed to save payment gateway settings' });
+    }
+
+    setSaving(false);
+  };
+
+  const updatePaymentGateway = (gateway, field, value) => {
+    setPaymentGateways(prev => ({
+      ...prev,
+      [gateway]: {
+        ...prev[gateway],
+        [field]: value
+      }
+    }));
+  };
+
   const timezones = [
     'Africa/Nairobi', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
@@ -170,7 +215,7 @@ export function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
-        {['general', 'permissions', 'billing', 'network', 'notifications'].map(tab => (
+        {['general', 'permissions', 'payment-gateways', 'billing', 'network', 'notifications'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -180,7 +225,7 @@ export function SettingsPage() {
                 : 'text-zinc-500 border-transparent hover:text-zinc-300'
             }`}
           >
-            {tab}
+            {tab.replace('-', ' ')}
           </button>
         ))}
       </div>
@@ -479,8 +524,204 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Payment Gateways Settings */}
+      {activeTab === 'payment-gateways' && (
+        <div className="space-y-6">
+          <div className="glass rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <CreditCard className="w-5 h-5" /> Payment Gateways
+            </h2>
+            <p className="text-zinc-400 text-sm mb-6">Configure payment gateways for accepting customer payments.</p>
+
+            {/* M-Pesa */}
+            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4" /> M-Pesa
+                </h3>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentGateways.mpesa.enabled}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Consumer Key</label>
+                  <input
+                    type="text"
+                    value={paymentGateways.mpesa.consumer_key}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'consumer_key', e.target.value)}
+                    className="modern-input"
+                    placeholder="Enter consumer key"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Consumer Secret</label>
+                  <input
+                    type="password"
+                    value={paymentGateways.mpesa.consumer_secret}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'consumer_secret', e.target.value)}
+                    className="modern-input"
+                    placeholder="Enter consumer secret"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Passkey</label>
+                  <input
+                    type="password"
+                    value={paymentGateways.mpesa.passkey}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'passkey', e.target.value)}
+                    className="modern-input"
+                    placeholder="Enter passkey"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Shortcode</label>
+                  <input
+                    type="text"
+                    value={paymentGateways.mpesa.shortcode}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'shortcode', e.target.value)}
+                    className="modern-input"
+                    placeholder="174379"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Environment</label>
+                  <select
+                    value={paymentGateways.mpesa.environment}
+                    onChange={(e) => updatePaymentGateway('mpesa', 'environment', e.target.value)}
+                    className="modern-input"
+                  >
+                    <option value="sandbox">Sandbox</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Stripe */}
+            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" /> Stripe
+                </h3>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentGateways.stripe.enabled}
+                    onChange={(e) => updatePaymentGateway('stripe', 'enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Publishable Key</label>
+                  <input
+                    type="text"
+                    value={paymentGateways.stripe.publishable_key}
+                    onChange={(e) => updatePaymentGateway('stripe', 'publishable_key', e.target.value)}
+                    className="modern-input"
+                    placeholder="pk_test_..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Secret Key</label>
+                  <input
+                    type="password"
+                    value={paymentGateways.stripe.secret_key}
+                    onChange={(e) => updatePaymentGateway('stripe', 'secret_key', e.target.value)}
+                    className="modern-input"
+                    placeholder="sk_test_..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Webhook Secret</label>
+                  <input
+                    type="password"
+                    value={paymentGateways.stripe.webhook_secret}
+                    onChange={(e) => updatePaymentGateway('stripe', 'webhook_secret', e.target.value)}
+                    className="modern-input"
+                    placeholder="whsec_..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* PayPal */}
+            <div className="mb-6 p-4 bg-zinc-800/50 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-semibold text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4" /> PayPal
+                </h3>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentGateways.paypal.enabled}
+                    onChange={(e) => updatePaymentGateway('paypal', 'enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Client ID</label>
+                  <input
+                    type="text"
+                    value={paymentGateways.paypal.client_id}
+                    onChange={(e) => updatePaymentGateway('paypal', 'client_id', e.target.value)}
+                    className="modern-input"
+                    placeholder="Enter PayPal client ID"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Client Secret</label>
+                  <input
+                    type="password"
+                    value={paymentGateways.paypal.client_secret}
+                    onChange={(e) => updatePaymentGateway('paypal', 'client_secret', e.target.value)}
+                    className="modern-input"
+                    placeholder="Enter PayPal client secret"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mode</label>
+                  <select
+                    value={paymentGateways.paypal.mode}
+                    onChange={(e) => updatePaymentGateway('paypal', 'mode', e.target.value)}
+                    className="modern-input"
+                  >
+                    <option value="sandbox">Sandbox</option>
+                    <option value="live">Live</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSavePaymentGateways}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save Payment Gateways'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Other tabs - placeholder */}
-      {activeTab !== 'general' && activeTab !== 'permissions' && (
+      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="text-zinc-500">
             <p className="text-lg font-medium mb-2">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings</p>
