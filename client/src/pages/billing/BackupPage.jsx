@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HardDrive, Plus, Play, Download, Eye, Trash2, Clock, CheckCircle, XCircle, Settings, RotateCcw, X } from 'lucide-react';
+import { HardDrive, Plus, Play, Download, Eye, Trash2, Clock, CheckCircle, XCircle, Settings, RotateCcw, X, Upload } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -20,6 +20,9 @@ export function BackupPage() {
   const [showRestore, setShowRestore] = useState(null);
   const [restoreForm, setRestoreForm] = useState({ target_ip: '', target_port: 8728, target_username: '', target_password: '' });
   const [restoring, setRestoring] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchSchedules();
@@ -106,6 +109,39 @@ export function BackupPage() {
     setRestoring(false);
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setUploadFile(file);
+    }
+  };
+
+  const executeUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadFile) {
+      toast.error('Please select a file to upload');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+
+    try {
+      await axios.post(`${API}/advanced/backup/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Backup file uploaded successfully');
+      setShowUpload(false);
+      setUploadFile(null);
+      fetchBackups();
+    } catch (error) {
+      console.error('Failed to upload backup:', error);
+      toast.error('Upload failed', error.response?.data?.error || error.message);
+    }
+    setUploading(false);
+  };
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
@@ -116,14 +152,15 @@ export function BackupPage() {
           <p className="text-sm text-slate-400">Schedule and manage MikroTik configuration backups</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={runAll} disabled={running}
-            className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+          <Button onClick={runAll} disabled={running} className="flex items-center gap-2">
             <Play className="w-4 h-4" /> {running ? 'Running...' : 'Run All Backups'}
-          </button>
-          <button onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+          </Button>
+          <Button onClick={() => setShowUpload(true)} variant="outline" className="flex items-center gap-2">
+            <Upload className="w-4 h-4" /> Upload Backup
+          </Button>
+          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Schedule
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -361,6 +398,50 @@ export function BackupPage() {
                   <Button type="button" variant="outline" onClick={() => setShowRestore(null)} className="flex-1">Cancel</Button>
                   <Button type="submit" disabled={restoring} className="flex-1">
                     {restoring ? 'Restoring...' : 'Restore Backup'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Upload Backup Modal */}
+      {showUpload && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-400" /> Upload Backup File
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowUpload(null)}><X className="w-5 h-5" /></Button>
+              </div>
+              <CardDescription>
+                Upload a MikroTik backup file (.rsc, .backup) from your computer
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={executeUpload} className="space-y-4 pt-6">
+                <div>
+                  <Label htmlFor="backup-file">Backup File *</Label>
+                  <Input
+                    id="backup-file"
+                    type="file"
+                    accept=".rsc,.backup"
+                    onChange={handleFileUpload}
+                    className="cursor-pointer"
+                  />
+                  {uploadFile && (
+                    <p className="text-sm text-zinc-400 mt-2">
+                      Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowUpload(null)} className="flex-1">Cancel</Button>
+                  <Button type="submit" disabled={uploading || !uploadFile} className="flex-1">
+                    {uploading ? 'Uploading...' : 'Upload Backup'}
                   </Button>
                 </div>
               </form>
