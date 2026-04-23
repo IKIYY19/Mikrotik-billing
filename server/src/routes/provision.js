@@ -83,7 +83,7 @@ router.get('/provision/callback/:token', async (req, res) => {
 router.get('/provision/command/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { method = 'import', baseUrl, useHttp } = req.query;
+    const { method = 'import', baseUrl } = req.query;
 
     // Find router
     const result = await db.query('SELECT * FROM routers WHERE id = $1', [routerId]);
@@ -93,10 +93,7 @@ router.get('/provision/command/:routerId', async (req, res) => {
     }
 
     const router = result.rows[0];
-    const allowHttp = process.env.ALLOW_HTTP_PROVISION === 'true' || useHttp === 'true';
-    const protocol = allowHttp ? 'http' : (baseUrl ? (baseUrl.startsWith('http') ? baseUrl.split('://')[0] : req.protocol) : req.protocol);
-    const host = baseUrl ? baseUrl.replace(/https?:\/\//, '') : req.get('host');
-    const serverUrl = protocol + '://' + host;
+    const serverUrl = baseUrl || req.protocol + '://' + req.get('host');
     const token = router.provision_token;
 
     let command;
@@ -145,7 +142,7 @@ router.get('/provision/command/:routerId', async (req, res) => {
 router.post('/provision/command/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { method = 'import', baseUrl, useHttp } = req.body;
+    const { method = 'import', baseUrl } = req.body;
 
     // Find router
     const result = await db.query('SELECT * FROM routers WHERE id = $1', [routerId]);
@@ -157,10 +154,7 @@ router.post('/provision/command/:routerId', async (req, res) => {
     // Regenerate token
     const router = provisionStore._regenerateToken(routerId);
     
-    const allowHttp = process.env.ALLOW_HTTP_PROVISION === 'true' || useHttp === 'true';
-    const protocol = allowHttp ? 'http' : (baseUrl ? (baseUrl.startsWith('http') ? baseUrl.split('://')[0] : req.protocol) : req.protocol);
-    const host = baseUrl ? baseUrl.replace(/https?:\/\//, '') : req.get('host');
-    const serverUrl = protocol + '://' + host;
+    const serverUrl = baseUrl || req.protocol + '://' + req.get('host');
     const token = router.provision_token;
 
     let command;
