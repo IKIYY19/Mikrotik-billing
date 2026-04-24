@@ -327,7 +327,7 @@ router.post('/hotspot/active/:address/kick', async (req, res) => {
 });
 
 // Get Hotspot vouchers
-router.get('/hotspot/vouchers', async (req, res) => {
+router.get('/vouchers', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM hotspot_vouchers ORDER BY created_at DESC');
@@ -336,7 +336,7 @@ router.get('/hotspot/vouchers', async (req, res) => {
 });
 
 // Create Hotspot vouchers (batch)
-router.post('/hotspot/vouchers', async (req, res) => {
+router.post('/vouchers', async (req, res) => {
   try {
     const { vouchers, connection_id } = req.body;
     const db = global.db || require('../db/memory');
@@ -351,7 +351,7 @@ router.post('/hotspot/vouchers', async (req, res) => {
       );
     }
 
-    // Also create users on the MikroTik router
+    // Push to Mikrotik if connection selected
     if (connection_id && vouchers.length > 0) {
       const device = await getMikrotikConnection(connection_id);
       for (const v of vouchers) {
@@ -368,7 +368,7 @@ router.post('/hotspot/vouchers', async (req, res) => {
 });
 
 // Delete voucher
-router.delete('/hotspot/vouchers/:id', async (req, res) => {
+router.delete('/vouchers/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     await db.query('DELETE FROM hotspot_vouchers WHERE id = $1', [req.params.id]);
