@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Plus, DollarSign } from 'lucide-react';
+import { Plus, DollarSign, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -53,101 +57,107 @@ export function BillingPayments() {
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-2xl font-bold text-white">Payments ({payments.length})</h2>
-          <p className="text-sm text-slate-400">Total received: <span className="text-green-400 font-semibold">${totalReceived.toFixed(2)}</span></p>
+          <p className="text-slate-400 mt-1">Total received: <span className="text-green-400 font-semibold">${totalReceived.toFixed(2)}</span></p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Record Payment
-        </button>
+        <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Plus className="w-5 h-5" /> Record Payment
+        </Button>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-900 text-slate-400">
-            <tr>
-              <th className="text-left p-3">Receipt</th>
-              <th className="text-left p-3">Customer</th>
-              <th className="text-left p-3">Invoice</th>
-              <th className="text-left p-3">Amount</th>
-              <th className="text-left p-3">Method</th>
-              <th className="text-left p-3">Reference</th>
-              <th className="text-left p-3">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments.map(pay => (
-              <tr key={pay.id} className="border-t border-slate-700 hover:bg-slate-700/50">
-                <td className="p-3 text-blue-400 font-mono text-xs">{pay.receipt_number}</td>
-                <td className="p-3 text-white">{pay.customer?.name || 'Unknown'}</td>
-                <td className="p-3 text-slate-400 text-xs">{pay.invoice?.invoice_number || '-'}</td>
-                <td className="p-3 text-green-400 font-semibold">+${pay.amount.toFixed(2)}</td>
-                <td className={`p-3 capitalize ${methodColors[pay.method] || ''}`}>{pay.method.replace('_', ' ')}</td>
-                <td className="p-3 text-slate-400 text-xs">{pay.reference || '-'}</td>
-                <td className="p-3 text-slate-400 text-xs">{new Date(pay.received_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {payments.length === 0 && <div className="text-center py-8 text-slate-500">No payments recorded</div>}
-      </div>
+      {payments.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg">No payments recorded yet.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {payments.map(pay => (
+            <Card key={pay.id} className="overflow-hidden">
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm text-blue-400 font-mono">{pay.receipt_number}</CardTitle>
+                      <p className="text-xs text-zinc-500">{pay.customer?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${methodColors[pay.method] || 'text-slate-400'}`}>
+                    {pay.method.replace('_', ' ')}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
+                <div className="text-zinc-400">Invoice: <span className="text-white">{pay.invoice?.invoice_number || '-'}</span></div>
+                <div className="text-zinc-400">Amount: <span className="text-green-400 font-semibold">+${pay.amount.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Reference: <span className="text-white">{pay.reference || '-'}</span></div>
+                <div className="text-zinc-400">Date: <span className="text-white">{new Date(pay.received_at).toLocaleDateString()}</span></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-lg">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-white font-semibold flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-400" /> Record Payment</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Invoice *</label>
-                <select required value={form.invoice_id} onChange={e => {
-                  const inv = invoices.find(i => i.id === e.target.value);
-                  setForm({...form, invoice_id: e.target.value, amount: inv ? (inv.total - (inv.paid_amount || 0)).toFixed(2) : ''});
-                }} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="">Select outstanding invoice</option>
-                  {invoices.map(inv => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.invoice_number} — {inv.customer?.name} — Balance: ${(inv.total - (inv.paid_amount || 0)).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-400" /> Record Payment</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="w-5 h-5" /></Button>
               </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Amount *</label>
-                <input type="number" step="0.01" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Payment Method</label>
-                <select value={form.method} onChange={e => setForm({...form, method: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="cash">Cash</option>
-                  <option value="bank">Bank Transfer</option>
-                  <option value="mobile_money">Mobile Money</option>
-                  <option value="card">Card</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Reference / Transaction ID</label>
-                <input value={form.reference} onChange={e => setForm({...form, reference: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="Optional" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows="2"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Record Payment</button>
-              </div>
-            </form>
-          </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-6">
+                <div>
+                  <Label htmlFor="invoice">Invoice *</Label>
+                  <select id="invoice" required value={form.invoice_id} onChange={e => {
+                    const inv = invoices.find(i => i.id === e.target.value);
+                    setForm({...form, invoice_id: e.target.value, amount: inv ? (inv.total - (inv.paid_amount || 0)).toFixed(2) : ''});
+                  }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select outstanding invoice</option>
+                    {invoices.map(inv => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.invoice_number} — {inv.customer?.name} — Balance: ${(inv.total - (inv.paid_amount || 0)).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="amount">Amount *</Label>
+                  <Input id="amount" type="number" step="0.01" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+                </div>
+                <div>
+                  <Label htmlFor="method">Payment Method</Label>
+                  <select id="method" value={form.method} onChange={e => setForm({...form, method: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank Transfer</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="card">Card</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="reference">Reference / Transaction ID</Label>
+                  <Input id="reference" value={form.reference} onChange={e => setForm({...form, reference: e.target.value})} placeholder="Optional" />
+                </div>
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <textarea id="notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows="2"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background resize-none" />
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">Record Payment</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
