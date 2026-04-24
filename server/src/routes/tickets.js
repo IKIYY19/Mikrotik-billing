@@ -114,7 +114,7 @@ router.get('/technicians', async (req, res) => {
     const result = await db.query(
       `SELECT id, name, email, phone, role,
               (SELECT COUNT(*) FROM tickets WHERE assignee_id = users.id AND status != 'closed') as active_tickets
-       FROM users WHERE role IN ('admin', 'technician', 'support', 'staff') ORDER BY name ASC`
+       FROM users WHERE is_active = true ORDER BY name ASC`
     );
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
