@@ -241,9 +241,13 @@ router.post('/:id/messages', async (req, res) => {
       [id, req.params.id, user_id, message, is_internal || false]
     );
 
-    // Update ticket status
+    // Update ticket status to in_progress only if it's currently open
+    // If it's resolved or closed, keep it as is
     await db.query(
-      `UPDATE tickets SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      `UPDATE tickets SET status = CASE 
+         WHEN status = 'open' THEN 'in_progress' 
+         ELSE status 
+       END, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [req.params.id]
     );
 
