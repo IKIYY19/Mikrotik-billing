@@ -116,7 +116,7 @@ export function FinancialReports() {
             </select>
             <select value={year} onChange={e => { setYear(parseInt(e.target.value)); if (activeTab === 'monthly') fetchMonthly(); else fetchTax(); }}
               className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm">
-              {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+              {Array.from({ length: 20 }, (_, i) => 2020 + i).map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         )}
