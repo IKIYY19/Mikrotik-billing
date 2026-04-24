@@ -270,6 +270,8 @@ export function HotspotVouchers() {
   };
 
   const handlePrint = () => {
+    if (!vouchers || !Array.isArray(vouchers) || vouchers.length === 0) return;
+    
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <html>
@@ -466,7 +468,7 @@ export function HotspotVouchers() {
       </div>
 
       {/* Preview */}
-      {vouchers.length > 0 && (
+      {vouchers && vouchers.length > 0 && (
         <div className="relative mb-6">
           <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
             <Eye className="w-5 h-5 text-zinc-400" /> Voucher Preview
@@ -483,12 +485,12 @@ export function HotspotVouchers() {
       )}
 
       {/* Vouchers Table */}
-      {vouchers.length > 0 && (
+      {vouchers && vouchers.length > 0 && (
         <VoucherTable vouchers={vouchers} onDelete={handleDelete} onPrint={handlePrint} />
       )}
 
       {/* Empty state */}
-      {vouchers.length === 0 && (
+      {!vouchers || vouchers.length === 0 && (
         <div className="glass rounded-2xl p-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/20 flex items-center justify-center mx-auto mb-4">
             <Ticket className="w-8 h-8 text-amber-400" />
