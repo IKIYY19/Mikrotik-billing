@@ -119,8 +119,8 @@ export function PaymentPage() {
   const selected = methods.find(m => m.id === selectedMethod);
 
   return (
-    <div className="min-h-screen bg-slate-900 p-4 md:p-8 overflow-y-auto">
-      <div className="max-w-4xl mx-auto w-full">
+    <div className="bg-slate-900 min-h-screen">
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
         <button onClick={() => navigate('/billing-invoices')} className="text-slate-400 hover:text-white mb-6 flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" /> Back to Invoices
         </button>
