@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   LifeBuoy, Plus, Search, Filter, Clock, CheckCircle, AlertCircle, AlertTriangle,
   MessageSquare, User, ArrowUpRight, ArrowDownRight, ChevronDown, RefreshCw,
-  Send, Paperclip, Eye, UserCheck, Tag, Hash
+  Send, Paperclip, Eye, UserCheck, Tag, Hash, Trash2
 } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
@@ -248,6 +248,17 @@ function TicketDetailModal({ ticket, technicians, onClose, onRefresh }) {
     onRefresh();
   };
 
+  const deleteTicket = async () => {
+    if (!confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) return;
+    try {
+      await axios.delete(`${API}/tickets/${ticket.id}`);
+      onClose();
+      onRefresh();
+    } catch (e) {
+      alert('Failed to delete ticket');
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="glass-strong rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in-scale" onClick={e => e.stopPropagation()}>
@@ -293,6 +304,11 @@ function TicketDetailModal({ ticket, technicians, onClose, onRefresh }) {
             {ticket.status !== 'closed' && (
               <button onClick={closeTicket} className="btn-secondary text-xs py-1.5 px-3">
                 Close Ticket
+              </button>
+            )}
+            {!ticket.assignee_id && (
+              <button onClick={deleteTicket} className="btn-danger text-xs py-1.5 px-3 flex items-center gap-1">
+                <Trash2 className="w-3 h-3" /> Delete
               </button>
             )}
           </div>
