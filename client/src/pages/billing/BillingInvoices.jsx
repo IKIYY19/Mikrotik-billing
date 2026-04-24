@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Download, CreditCard, Receipt, FileText } from 'lucide-react';
+import { Plus, Download, CreditCard, Receipt, FileText, X } from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -44,141 +48,130 @@ export function BillingInvoices() {
   const totalOutstanding = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total - (i.paid_amount || 0)), 0);
 
   return (
-    <div className="relative min-h-full p-8 animate-fade-in">
-      <div className="absolute inset-0 bg-mesh" />
-      <div className="absolute inset-0 bg-noise" />
-
+    <div className="p-8">
       {/* Header */}
-      <div className="relative flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Invoices</h1>
-          <p className="text-zinc-400 mt-1">
-            {invoices.length} total • Outstanding: <span className="text-amber-400 font-semibold">${totalOutstanding.toFixed(2)}</span>
+          <h2 className="text-2xl font-bold text-white">Invoices ({invoices.length})</h2>
+          <p className="text-slate-400 mt-1">
+            Outstanding: <span className="text-amber-400 font-semibold">${totalOutstanding.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={generateMonthly} className="btn-success">
+          <Button variant="outline" onClick={generateMonthly} className="flex items-center gap-2 text-green-400">
             <Plus className="w-4 h-4" /> Generate Monthly
-          </button>
-          <button onClick={() => setShowForm(true)} className="btn-primary">
+          </Button>
+          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
             <Receipt className="w-4 h-4" /> New Invoice
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="relative flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6">
         {['all', 'pending', 'paid', 'partial'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 capitalize ${
-              filter === f ? 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-            }`}>
+          <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm" onClick={() => setFilter(f)} className="capitalize">
             {f}
-          </button>
+          </Button>
         ))}
       </div>
 
-      {/* Table */}
-      <div className="relative glass rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-3">{[1,2,3,4].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
-        ) : (
-          <table className="modern-table">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Customer</th>
-                <th>Amount</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th className="text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(inv => (
-                <tr key={inv.id}>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-800/50 flex items-center justify-center">
-                        <FileText className="w-3.5 h-3.5 text-zinc-500" />
-                      </div>
-                      <span className="text-blue-400 font-mono text-xs">{inv.invoice_number}</span>
+      {/* Cards Grid */}
+      {loading ? (
+        <div className="p-6 space-y-3">{[1,2,3,4].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg">No invoices found.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filtered.map(inv => (
+            <Card key={inv.id} className="overflow-hidden">
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-800/50 flex items-center justify-center">
+                      <FileText className="w-3.5 h-3.5 text-zinc-500" />
                     </div>
-                  </td>
-                  <td className="text-white font-medium">{inv.customer?.name || 'Unknown'}</td>
-                  <td className="text-white tabular-nums">KES {inv.total.toFixed(2)}</td>
-                  <td className="text-emerald-400 tabular-nums">KES {(inv.paid_amount || 0).toFixed(2)}</td>
-                  <td className={`font-semibold tabular-nums ${inv.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>KES {inv.balance.toFixed(2)}</td>
-                  <td className="text-zinc-400 text-sm">{inv.due_date}</td>
-                  <td><span className={`badge ${inv.status === 'paid' ? 'badge-green' : inv.status === 'partial' ? 'badge-blue' : inv.status === 'overdue' ? 'badge-red' : 'badge-amber'}`}>{inv.status}</span></td>
-                  <td className="text-right">
-                    {inv.status !== 'paid' && (
-                      <button onClick={() => navigate(`/pay/${inv.id}`)} className="btn-primary text-xs px-3 py-1.5">
-                        <CreditCard className="w-3 h-3" /> Pay
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {!loading && filtered.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon"><Receipt className="w-6 h-6 text-zinc-600" /></div>
-            <div className="empty-state-title">No invoices found</div>
-            <div className="empty-state-desc">{filter !== 'all' ? 'No invoices match this filter' : 'Generate monthly invoices or create one manually'}</div>
-          </div>
-        )}
-      </div>
+                    <div>
+                      <CardTitle className="text-sm text-blue-400 font-mono">{inv.invoice_number}</CardTitle>
+                      <p className="text-xs text-zinc-500">{inv.customer?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    inv.status === 'paid' ? 'bg-green-600/20 text-green-400' : inv.status === 'partial' ? 'bg-blue-600/20 text-blue-400' : inv.status === 'overdue' ? 'bg-red-600/20 text-red-400' : 'bg-amber-600/20 text-amber-400'
+                  }`}>
+                    {inv.status}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
+                <div className="text-zinc-400">Total: <span className="text-white">${inv.total.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Paid: <span className="text-emerald-400">${(inv.paid_amount || 0).toFixed(2)}</span></div>
+                <div className="text-zinc-400">Balance: <span className={`font-semibold ${inv.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${inv.balance.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Due: <span className="text-white">{inv.due_date}</span></div>
+              </CardContent>
+              <CardContent className="p-4 border-t border-zinc-800">
+                {inv.status !== 'paid' && (
+                  <Button size="sm" onClick={() => navigate(`/pay/${inv.id}`)} className="w-full flex items-center justify-center gap-2">
+                    <CreditCard className="w-3 h-3" /> Pay Invoice
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="glass-strong rounded-2xl w-full max-w-lg animate-fade-in-scale" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-zinc-800/50 flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-semibold text-white">New Invoice</h3>
-                <p className="text-sm text-zinc-400 mt-0.5">Bill a customer for their service</p>
-              </div>
-              <button onClick={() => setShowForm(false)} className="btn-ghost p-2">✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Customer *</label>
-                <select required value={form.customer_id} onChange={e => setForm({...form, customer_id: e.target.value})} className="modern-input">
-                  <option value="">Select customer</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Plan (auto-fills price)</label>
-                <select onChange={e => {
-                  const plan = plans.find(p => p.id === e.target.value);
-                  if (plan) setForm({...form, amount: plan.price.toString()});
-                }} className="modern-input">
-                  <option value="">Select plan</option>
-                  {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.price}/mo</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Amount</label>
-                  <input type="number" step="0.01" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="modern-input" />
+                  <CardTitle>New Invoice</CardTitle>
+                  <p className="text-sm text-zinc-400 mt-0.5">Bill a customer for their service</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="w-5 h-5" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-6">
+                <div>
+                  <Label htmlFor="customer">Customer *</Label>
+                  <select id="customer" required value={form.customer_id} onChange={e => setForm({...form, customer_id: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select customer</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Tax</label>
-                  <input type="number" step="0.01" value={form.tax} onChange={e => setForm({...form, tax: e.target.value})} className="modern-input" />
+                  <Label htmlFor="plan">Plan (auto-fills price)</Label>
+                  <select id="plan" onChange={e => {
+                    const plan = plans.find(p => p.id === e.target.value);
+                    if (plan) setForm({...form, amount: plan.price.toString()});
+                  }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select plan</option>
+                    {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.price}/mo</option>)}
+                  </select>
                 </div>
-              </div>
-              <div className="flex gap-3 pt-2 border-t border-zinc-800/50">
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" className="btn-primary flex-1">Create Invoice</button>
-              </div>
-            </form>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="amount">Amount</Label>
+                    <Input id="amount" type="number" step="0.01" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label htmlFor="tax">Tax</Label>
+                    <Input id="tax" type="number" step="0.01" value={form.tax} onChange={e => setForm({...form, tax: e.target.value})} />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">Create Invoice</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
