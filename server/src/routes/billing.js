@@ -154,6 +154,14 @@ router.post('/subscriptions/:id/toggle', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.delete('/subscriptions/:id', async (req, res) => {
+  try {
+    const deleted = await billing.deleteSubscription(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Subscription not found' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ═══════════════════════════════════════
 // INVOICES
 // ═══════════════════════════════════════

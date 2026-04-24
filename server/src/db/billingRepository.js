@@ -241,6 +241,14 @@ const subscriptions = {
     );
     return result.rows;
   },
+
+  async delete(id, userId = null) {
+    const existing = await this.findById(id);
+    if (!existing) return null;
+    const result = await db.query('DELETE FROM subscriptions WHERE id = $1 RETURNING *', [id]);
+    if (userId) await audit.log(userId, 'delete', 'subscription', id, existing, null);
+    return result.rows[0];
+  },
 };
 
 // ─── INVOICES ───
