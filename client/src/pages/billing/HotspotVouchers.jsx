@@ -194,11 +194,17 @@ export function HotspotVouchers() {
     fetchVouchers();
   }, []);
 
+  useEffect(() => {
+    if (selectedConnection) {
+      fetchData();
+    }
+  }, [selectedConnection]);
+
   const fetchData = async () => {
     try {
       const [connRes, profilesRes] = await Promise.all([
         axios.get(`${API}/mikrotik`).catch(() => ({ data: [] })),
-        axios.get(`${API}/hotspot/profiles`).catch(() => ({ data: [] })),
+        selectedConnection ? axios.get(`${API}/hotspot/profiles?connection_id=${selectedConnection}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
       setConnections(connRes.data);
       setProfiles(profilesRes.data);
@@ -208,7 +214,7 @@ export function HotspotVouchers() {
   const fetchVouchers = async () => {
     try {
       const { data } = await axios.get(`${API}/hotspot/vouchers`).catch(() => ({ data: [] }));
-      setVouchers(data);
+      setVouchers(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
   };
 
