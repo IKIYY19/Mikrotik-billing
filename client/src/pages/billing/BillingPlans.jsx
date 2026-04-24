@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, Zap } from 'lucide-react';
+import { Plus, Edit2, Trash2, Zap, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -38,108 +42,122 @@ export function BillingPlans() {
   const speeds = ['1M', '2M', '5M', '10M', '15M', '20M', '25M', '50M', '100M', '200M', '500M', '1G'];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-white">Service Plans ({plans.length})</h2>
-        <button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', speed_up: '10M', speed_down: '10M', price: 25, quota_gb: '', priority: 8, description: '' }); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Add Plan
-        </button>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Service Plans ({plans.length})</h2>
+          <p className="text-slate-400 mt-1">Manage internet service plans and pricing</p>
+        </div>
+        <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', speed_up: '10M', speed_down: '10M', price: 25, quota_gb: '', priority: 8, description: '' }); }} className="flex items-center gap-2">
+          <Plus className="w-5 h-5" /> Add Plan
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plans.map(plan => (
-          <div key={plan.id} className="bg-slate-800 border border-slate-700 rounded-lg p-5 relative group">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-400" />
-                <h3 className="text-white font-semibold">{plan.name}</h3>
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                <button onClick={() => { setEditing(plan); setForm({ name: plan.name, speed_up: plan.speed_up, speed_down: plan.speed_down, price: plan.price, quota_gb: plan.quota_gb, priority: plan.priority, description: plan.description }); setShowForm(true); }}
-                  className="text-slate-400 hover:text-blue-400"><Edit2 className="w-4 h-4" /></button>
-                <button onClick={() => handleDelete(plan.id)} className="text-slate-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-              </div>
-            </div>
-
-            <p className="text-sm text-slate-400 mb-4">{plan.description}</p>
-
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-slate-700 rounded p-2 text-center">
-                <div className="text-xs text-slate-400">Speed</div>
-                <div className="text-white font-bold">{plan.speed_up}/{plan.speed_down}</div>
-              </div>
-              <div className="bg-slate-700 rounded p-2 text-center">
-                <div className="text-xs text-slate-400">Price</div>
-                <div className="text-green-400 font-bold">${plan.price}/mo</div>
-              </div>
-              <div className="bg-slate-700 rounded p-2 text-center">
-                <div className="text-xs text-slate-400">Quota</div>
-                <div className="text-white font-bold">{plan.quota_gb ? `${plan.quota_gb}GB` : 'Unlimited'}</div>
-              </div>
-              <div className="bg-slate-700 rounded p-2 text-center">
-                <div className="text-xs text-slate-400">Priority</div>
-                <div className="text-white font-bold">{plan.priority}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">{plan.active_subscribers} active subscriber{plan.active_subscribers !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      {plans.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg">No plans yet. Create your first service plan.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {plans.map(plan => (
+            <Card key={plan.id} className="overflow-hidden">
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-amber-400" />
+                    <CardTitle className="text-lg">{plan.name}</CardTitle>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => { setEditing(plan); setForm({ name: plan.name, speed_up: plan.speed_up, speed_down: plan.speed_down, price: plan.price, quota_gb: plan.quota_gb, priority: plan.priority, description: plan.description }); setShowForm(true); }}>
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(plan.id)} className="text-red-400">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <p className="text-sm text-slate-400 mb-4">{plan.description}</p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-zinc-800 rounded p-3 text-center">
+                    <div className="text-xs text-zinc-400">Speed</div>
+                    <div className="text-white font-bold">{plan.speed_up}/{plan.speed_down}</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded p-3 text-center">
+                    <div className="text-xs text-zinc-400">Price</div>
+                    <div className="text-green-400 font-bold">${plan.price}/mo</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded p-3 text-center">
+                    <div className="text-xs text-zinc-400">Quota</div>
+                    <div className="text-white font-bold">{plan.quota_gb ? `${plan.quota_gb}GB` : 'Unlimited'}</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded p-3 text-center">
+                    <div className="text-xs text-zinc-400">Priority</div>
+                    <div className="text-white font-bold">{plan.priority}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-zinc-500">{plan.active_subscribers} active subscriber{plan.active_subscribers !== 1 ? 's' : ''}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-lg">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-white font-semibold">{editing ? 'Edit Plan' : 'New Plan'}</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Plan Name *</label>
-                <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="Gold 25M" />
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle>{editing ? 'Edit Plan' : 'New Plan'}</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="w-5 h-5" /></Button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-6">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Upload Speed</label>
-                  <select value={form.speed_up} onChange={e => setForm({...form, speed_up: e.target.value})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                    {speeds.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <Label htmlFor="plan-name">Plan Name *</Label>
+                  <Input id="plan-name" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Gold 25M" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="speed-up">Upload Speed</Label>
+                    <select id="speed-up" value={form.speed_up} onChange={e => setForm({...form, speed_up: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      {speeds.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="speed-down">Download Speed</Label>
+                    <select id="speed-down" value={form.speed_down} onChange={e => setForm({...form, speed_down: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      {speeds.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="price">Monthly Price ($)</Label>
+                    <Input id="price" type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label htmlFor="quota">Quota (GB, blank=unlimited)</Label>
+                    <Input id="quota" type="number" value={form.quota_gb || ''} onChange={e => setForm({...form, quota_gb: e.target.value ? parseInt(e.target.value) : null})} />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Download Speed</label>
-                  <select value={form.speed_down} onChange={e => setForm({...form, speed_down: e.target.value})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                    {speeds.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Monthly Price ($)</label>
-                  <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+                  <Label htmlFor="priority">Priority (1=highest, 8=lowest)</Label>
+                  <Input id="priority" type="number" min="1" max="8" value={form.priority} onChange={e => setForm({...form, priority: parseInt(e.target.value)})} />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Quota (GB, blank=unlimited)</label>
-                  <input type="number" value={form.quota_gb || ''} onChange={e => setForm({...form, quota_gb: e.target.value ? parseInt(e.target.value) : null})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+                  <Label htmlFor="description">Description</Label>
+                  <textarea id="description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows="2" className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background resize-none" />
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Priority (1=highest, 8=lowest)</label>
-                <input type="number" min="1" max="8" value={form.priority} onChange={e => setForm({...form, priority: parseInt(e.target.value)})} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Description</label>
-                <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows="2" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">{editing ? 'Update' : 'Create'}</button>
-              </div>
-            </form>
-          </div>
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">{editing ? 'Update' : 'Create'}</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
