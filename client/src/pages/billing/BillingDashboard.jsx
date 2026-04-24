@@ -118,7 +118,7 @@ export function BillingDashboard() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white">Billing Dashboard</h2>
+        <h2 className="text-2xl font-bold text-white gradient-text">Billing Dashboard</h2>
         <p className="text-slate-400 mt-1">Manage customers, invoices, payments and revenue</p>
       </div>
 
@@ -130,16 +130,16 @@ export function BillingDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <Card className="mb-8">
+      <Card className="card-glow mb-8">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-zinc-300">Quick Actions</h3>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => navigate('/billing-customers')} className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/billing-customers')} className="btn-gradient-success flex items-center gap-2">
               <UserPlus className="w-4 h-4" /> New Customer
             </Button>
-            <Button onClick={() => navigate('/billing-invoices')} className="flex items-center gap-2">
+            <Button onClick={() => navigate('/billing-invoices')} className="btn-gradient-primary flex items-center gap-2">
               <Receipt className="w-4 h-4" /> Generate Invoices
             </Button>
             <Button variant="outline" onClick={() => navigate('/billing-payments')} className="flex items-center gap-2 text-green-400">
@@ -155,7 +155,7 @@ export function BillingDashboard() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Invoices */}
-        <Card>
+        <Card className="card-gradient">
           <CardHeader className="border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -199,7 +199,7 @@ export function BillingDashboard() {
         </Card>
 
         {/* Recent Payments */}
-        <Card>
+        <Card className="card-gradient">
           <CardHeader className="border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2">

@@ -146,17 +146,8 @@ export function BillingCustomers() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Customers ({customers.length})</h2>
-          <p className="text-slate-400 mt-1">Manage customer accounts and subscriptions</p>
-          {selectedConnection && onlineData && (
-            <div className="flex items-center gap-2 mt-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-sm text-emerald-400">{Object.keys(onlineData).length} online</span>
-              <span className="text-sm text-zinc-500">•</span>
-              <span className="text-sm text-zinc-500">{customers.length - Object.keys(onlineData).length} offline</span>
-              {onlineLoading && <RefreshCw className="w-3 h-3 text-zinc-500 animate-spin" />}
-            </div>
-          )}
+          <h2 className="text-2xl font-bold text-white gradient-text">Customers ({customers.length})</h2>
+          <p className="text-slate-400 mt-1">Manage customer accounts and contact info</p>
         </div>
         <div className="flex items-center gap-3">
           {connections.length > 0 && (
@@ -165,7 +156,7 @@ export function BillingCustomers() {
               {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          <Button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' }); setShowForm(true); }} className="flex items-center gap-2">
+          <Button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' }); setShowForm(true); }} className="btn-gradient-primary flex items-center gap-2">
             <UserPlus className="w-5 h-5" /> Add Customer
           </Button>
         </div>
@@ -189,7 +180,7 @@ export function BillingCustomers() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filtered.map(c => (
-            <Card key={c.id} className="overflow-hidden">
+            <Card key={c.id} className="card-gradient overflow-hidden">
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -249,7 +240,7 @@ export function BillingCustomers() {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <Card className="card-glow w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <div>
@@ -318,7 +309,7 @@ export function BillingCustomers() {
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">{editing ? 'Update Customer' : 'Create Customer'}</Button>
+                  <Button type="submit" className="btn-gradient-primary flex-1">{editing ? 'Update Customer' : 'Create Customer'}</Button>
                 </div>
               </form>
             </CardContent>

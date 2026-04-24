@@ -45,10 +45,10 @@ export function BillingPlans() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Service Plans ({plans.length})</h2>
+          <h2 className="text-2xl font-bold text-white gradient-text">Service Plans ({plans.length})</h2>
           <p className="text-slate-400 mt-1">Manage internet service plans and pricing</p>
         </div>
-        <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', speed_up: '10M', speed_down: '10M', price: 25, quota_gb: '', priority: 8, description: '' }); }} className="flex items-center gap-2">
+        <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', speed_up: '10M', speed_down: '10M', price: 25, quota_gb: '', priority: 8, description: '' }); }} className="btn-gradient-primary flex items-center gap-2">
           <Plus className="w-5 h-5" /> Add Plan
         </Button>
       </div>
@@ -60,7 +60,7 @@ export function BillingPlans() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map(plan => (
-            <Card key={plan.id} className="overflow-hidden">
+            <Card key={plan.id} className="card-gradient overflow-hidden">
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ export function BillingPlans() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="card-glow w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle>{editing ? 'Edit Plan' : 'New Plan'}</CardTitle>
@@ -153,7 +153,7 @@ export function BillingPlans() {
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">{editing ? 'Update' : 'Create'}</Button>
+                  <Button type="submit" className="btn-gradient-primary flex-1">{editing ? 'Update' : 'Create'}</Button>
                 </div>
               </form>
             </CardContent>

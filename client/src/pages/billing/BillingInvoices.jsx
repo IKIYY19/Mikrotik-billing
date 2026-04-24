@@ -52,16 +52,16 @@ export function BillingInvoices() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Invoices ({invoices.length})</h2>
+          <h2 className="text-2xl font-bold text-white gradient-text">Invoices ({invoices.length})</h2>
           <p className="text-slate-400 mt-1">
             Outstanding: <span className="text-amber-400 font-semibold">${totalOutstanding.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={generateMonthly} className="flex items-center gap-2 text-green-400">
+          <Button variant="outline" onClick={generateMonthly} className="btn-gradient-success flex items-center gap-2">
             <Plus className="w-4 h-4" /> Generate Monthly
           </Button>
-          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Button onClick={() => setShowForm(true)} className="btn-gradient-primary flex items-center gap-2">
             <Receipt className="w-4 h-4" /> New Invoice
           </Button>
         </div>
@@ -86,7 +86,7 @@ export function BillingInvoices() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filtered.map(inv => (
-            <Card key={inv.id} className="overflow-hidden">
+            <Card key={inv.id} className="card-gradient overflow-hidden">
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export function BillingInvoices() {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="card-glow w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <div>
@@ -167,7 +167,7 @@ export function BillingInvoices() {
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">Create Invoice</Button>
+                  <Button type="submit" className="btn-gradient-primary flex-1">Create Invoice</Button>
                 </div>
               </form>
             </CardContent>

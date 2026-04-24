@@ -59,10 +59,10 @@ export function BillingPayments() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Payments ({payments.length})</h2>
+          <h2 className="text-2xl font-bold text-white gradient-text">Payments ({payments.length})</h2>
           <p className="text-slate-400 mt-1">Total received: <span className="text-green-400 font-semibold">${totalReceived.toFixed(2)}</span></p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+        <Button onClick={() => setShowForm(true)} className="btn-gradient-primary flex items-center gap-2">
           <Plus className="w-5 h-5" /> Record Payment
         </Button>
       </div>
@@ -74,7 +74,7 @@ export function BillingPayments() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {payments.map(pay => (
-            <Card key={pay.id} className="overflow-hidden">
+            <Card key={pay.id} className="card-gradient overflow-hidden">
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export function BillingPayments() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="card-glow w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-400" /> Record Payment</CardTitle>
@@ -153,7 +153,7 @@ export function BillingPayments() {
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">Record Payment</Button>
+                  <Button type="submit" className="btn-gradient-primary flex-1">Record Payment</Button>
                 </div>
               </form>
             </CardContent>

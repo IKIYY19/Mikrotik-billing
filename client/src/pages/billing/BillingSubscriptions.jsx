@@ -97,10 +97,10 @@ export function BillingSubscriptions() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Subscriptions ({subs.length})</h2>
+          <h2 className="text-2xl font-bold text-white gradient-text">Subscriptions ({subs.length})</h2>
           <p className="text-slate-400 mt-1">Manage customer subscriptions and plans</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+        <Button onClick={() => setShowForm(true)} className="btn-gradient-primary flex items-center gap-2">
           <Plus className="w-5 h-5" /> New Subscription
         </Button>
       </div>
@@ -112,7 +112,7 @@ export function BillingSubscriptions() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {subs.map(sub => (
-            <Card key={sub.id} className="overflow-hidden">
+            <Card key={sub.id} className="card-gradient overflow-hidden">
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div>
@@ -155,7 +155,7 @@ export function BillingSubscriptions() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="card-glow w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle>{editingSub ? 'Edit Subscription' : 'New Subscription'}</CardTitle>
@@ -215,7 +215,7 @@ export function BillingSubscriptions() {
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
                   <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingSub(null); }} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">{editingSub ? 'Update Subscription' : 'Create Subscription'}</Button>
+                  <Button type="submit" className="btn-gradient-primary flex-1">{editingSub ? 'Update Subscription' : 'Create Subscription'}</Button>
                 </div>
               </form>
             </CardContent>
@@ -226,7 +226,7 @@ export function BillingSubscriptions() {
       {/* MikroTik Script Modal */}
       {showScript && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
+          <Card className="card-glow w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -234,8 +234,8 @@ export function BillingSubscriptions() {
                   MikroTik Provisioning Script
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => copyScript(showScript)} className="flex items-center gap-1">
-                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                  <Button size="sm" onClick={() => copyScript(showScript)} className="btn-gradient-success flex items-center gap-1">
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     {copied ? 'Copied!' : 'Copy'}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setShowScript(null)}><X className="w-5 h-5" /></Button>
