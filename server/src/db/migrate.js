@@ -2,6 +2,7 @@ const db = require('./index');
 const { runAuthMigrations } = require('./authMigrations');
 const { runBillingMigrations } = require('./billingMigrations');
 const { runIntegrationsMigration } = require('./integrationsMigration');
+const provisioningMigrations = require('./provisionMigrations');
 
 const coreMigrations = [
   // Users table (MUST be first - required for auth)
@@ -154,6 +155,12 @@ async function runMigrations() {
     if (!integrationsOk) {
       throw new Error('Integrations migration reported failure');
     }
+
+    // Run provisioning migrations (routers table)
+    for (const migration of provisioningMigrations) {
+      await db.query(migration);
+    }
+    console.log('Provisioning migrations completed successfully');
 
     console.log('All migrations completed successfully');
   } catch (error) {

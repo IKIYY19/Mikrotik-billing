@@ -279,6 +279,66 @@ module.exports = {
       return { rows: [deleted] };
     }
 
+    // SELECT routers
+    if (lowerText.includes('select') && lowerText.includes('from routers')) {
+      if (lowerText.includes('where provision_token =')) {
+        const router = store.routers.find(r => r.provision_token === params[0]);
+        return { rows: router ? [router] : [] };
+      }
+      if (lowerText.includes('where id =')) {
+        const router = store.routers.find(r => r.id === params[0]);
+        return { rows: router ? [router] : [] };
+      }
+      if (lowerText.includes('where project_id =')) {
+        const routers = store.routers.filter(r => r.project_id === params[0]);
+        return { rows: routers };
+      }
+      return { rows: store.routers };
+    }
+
+    // INSERT routers
+    if (lowerText.includes('insert into routers')) {
+      const router = {
+        id: params[0],
+        project_id: params[1],
+        name: params[2],
+        identity: params[3],
+        model: params[4],
+        mac_address: params[5],
+        ip_address: params[6],
+        wan_interface: params[7],
+        lan_interface: params[8],
+        provision_token: params[9],
+        provision_status: params[10],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.routers.push(router);
+      return { rows: [router] };
+    }
+
+    // UPDATE routers
+    if (lowerText.includes('update routers') && lowerText.includes('set')) {
+      const idx = store.routers.findIndex(r => r.id === params[params.length - 1]);
+      if (idx === -1) return { rows: [] };
+      const router = { ...store.routers[idx], updated_at: new Date().toISOString() };
+      // Handle various SET patterns
+      if (lowerText.includes('name =')) router.name = params[0];
+      if (lowerText.includes('provision_status =')) router.provision_status = params[0];
+      if (lowerText.includes('provision_token =')) router.provision_token = params[0];
+      if (lowerText.includes('last_provisioned_at =')) router.last_provisioned_at = params[0];
+      store.routers[idx] = router;
+      return { rows: [router] };
+    }
+
+    // DELETE routers
+    if (lowerText.includes('delete from routers')) {
+      const idx = store.routers.findIndex(r => r.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      const deleted = store.routers.splice(idx, 1)[0];
+      return { rows: [deleted] };
+    }
+
     // SELECT project_modules
     if (lowerText.includes('select') && lowerText.includes('from project_modules')) {
       if (lowerText.includes('where project_id =')) {
