@@ -119,37 +119,38 @@ export function PaymentPage() {
   const selected = methods.find(m => m.id === selectedMethod);
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <button onClick={() => navigate('/billing-invoices')} className="text-slate-400 hover:text-white mb-6 flex items-center gap-2">
-        <ArrowLeft className="w-4 h-4" /> Back to Invoices
-      </button>
+    <div className="min-h-screen bg-slate-900 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => navigate('/billing-invoices')} className="text-slate-400 hover:text-white mb-6 flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> Back to Invoices
+        </button>
 
-      {invoice && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-xl font-bold text-white">{invoice.invoice_number}</h2>
-              <p className="text-slate-400">{invoice.customer?.name}</p>
+        {invoice && (
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">{invoice.invoice_number}</h2>
+                <p className="text-slate-400">{invoice.customer?.name}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">KES {invoice.balance?.toFixed(2) || invoice.total.toFixed(2)}</div>
+                <span className={`px-2 py-0.5 rounded text-xs ${
+                  invoice.status === 'paid' ? 'bg-green-600/20 text-green-400' :
+                  invoice.status === 'partial' ? 'bg-blue-600/20 text-blue-400' :
+                  'bg-amber-600/20 text-amber-400'
+                }`}>{invoice.status}</span>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white">KES {invoice.balance?.toFixed(2) || invoice.total.toFixed(2)}</div>
-              <span className={`px-2 py-0.5 rounded text-xs ${
-                invoice.status === 'paid' ? 'bg-green-600/20 text-green-400' :
-                invoice.status === 'partial' ? 'bg-blue-600/20 text-blue-400' :
-                'bg-amber-600/20 text-amber-400'
-              }`}>{invoice.status}</span>
-            </div>
+            {invoice.due_date && (
+              <p className="text-sm text-slate-400 mt-2">Due: {invoice.due_date}</p>
+            )}
           </div>
-          {invoice.due_date && (
-            <p className="text-sm text-slate-400 mt-2">Due: {invoice.due_date}</p>
-          )}
-        </div>
-      )}
+        )}
 
       {/* Payment Methods */}
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
         <h3 className="text-lg font-semibold text-white mb-4">Select Payment Method</h3>
-        <div className="grid grid-cols-1 gap-3 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
           {methods.map(method => (
             <button
               key={method.id}
@@ -159,15 +160,15 @@ export function PaymentPage() {
               }`}
             >
               <span className="text-2xl">{method.icon}</span>
-              <div className="flex-1">
-                <div className="text-white font-medium">{method.name}</div>
-                <div className="text-sm text-slate-400">{method.description}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-medium truncate">{method.name}</div>
+                <div className="text-sm text-slate-400 truncate">{method.description}</div>
                 <div className="text-xs text-slate-500 mt-1">
                   Min: KES {method.min} • Max: KES {method.max.toLocaleString()}
                   {method.fee > 0 && ` • Fee: ${method.fee}%`}
                 </div>
               </div>
-              {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-green-500" />}
+              {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />}
             </button>
           ))}
         </div>
@@ -325,6 +326,7 @@ export function PaymentPage() {
             </ul>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
