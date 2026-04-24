@@ -206,7 +206,7 @@ export function TicketSystem() {
       {/* Ticket Detail Modal */}
       {ticketDetail && (
         <TicketDetailModal ticket={ticketDetail} technicians={technicians} onClose={() => { setTicketDetail(null); setSelectedTicket(null); }}
-          onRefresh={() => fetchTicketDetail(ticketDetail.id)} />
+          onRefresh={() => fetchTicketDetail(ticketDetail.id)} onListRefresh={() => fetchData()} />
       )}
 
       {/* Create Ticket Modal */}
@@ -219,7 +219,7 @@ export function TicketSystem() {
 }
 
 /* ─── Ticket Detail Modal ─── */
-function TicketDetailModal({ ticket, technicians, onClose, onRefresh }) {
+function TicketDetailModal({ ticket, technicians, onClose, onRefresh, onListRefresh }) {
   const [reply, setReply] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
@@ -253,7 +253,7 @@ function TicketDetailModal({ ticket, technicians, onClose, onRefresh }) {
     try {
       await axios.delete(`${API}/tickets/${ticket.id}`);
       onClose();
-      onRefresh();
+      onListRefresh();
     } catch (e) {
       alert('Failed to delete ticket');
     }
