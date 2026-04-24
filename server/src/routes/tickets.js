@@ -107,14 +107,14 @@ router.get('/dashboard/stats', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// TECHNICIANS (Users with technician role)
+// TECHNICIANS & STAFF (Users who can be assigned tickets)
 // ═══════════════════════════════════════
 router.get('/technicians', async (req, res) => {
   try {
     const result = await db.query(
       `SELECT id, name, email, phone, role,
               (SELECT COUNT(*) FROM tickets WHERE assignee_id = users.id AND status != 'closed') as active_tickets
-       FROM users WHERE role IN ('admin', 'technician', 'support') ORDER BY name ASC`
+       FROM users WHERE role IN ('admin', 'technician', 'support', 'staff') ORDER BY name ASC`
     );
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -202,6 +202,29 @@ router.put('/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
     res.json(result.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE TICKET
+router.delete('/:id', async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    // Delete related messages and attachments first
+    await db.query('DELETE FROM ticket_messages WHERE ticket_id = $1', [ticketId]);
+    await db.query('DELETE FROM ticket_attachments WHERE ticket_id = $1', [ticketId]);
+
+    // Delete the ticket
+    const result = await db.query('DELETE FROM tickets WHERE id = $1 RETURNING id, ticket_number', [ticketId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    res.json({ message: 'Ticket deleted successfully', ticket: result.rows[0] });
+  } catch (e) {
+    console.error('Delete ticket error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════
