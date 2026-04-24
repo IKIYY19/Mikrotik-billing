@@ -64,7 +64,6 @@ export function BillingSubscriptions() {
   };
 
   const handleDelete = async (sub) => {
-    if (!confirm(`Are you sure you want to delete subscription for ${sub.customer?.name}?`)) return;
     await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
     toast.success('Subscription deleted');
     fetchSubs();
