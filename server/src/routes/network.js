@@ -339,11 +339,14 @@ router.get('/vouchers', async (req, res) => {
 router.post('/vouchers', async (req, res) => {
   try {
     const { vouchers, connection_id } = req.body;
+    console.log('Received voucher creation request:', { voucherCount: vouchers?.length, connection_id });
+    
     const db = global.db || require('../db/memory');
     const { v4: uuidv4 } = require('uuid');
 
     for (const v of vouchers) {
       const id = uuidv4();
+      console.log('Inserting voucher:', { username: v.username, id });
       await db.query(
         `INSERT INTO hotspot_vouchers (id, username, password, profile, valid_for, rate_limit, data_limit, price, company_name, connection_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -363,8 +366,12 @@ router.post('/vouchers', async (req, res) => {
       }
     }
 
+    console.log('Vouchers created successfully');
     res.json({ success: true, count: vouchers.length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('Failed to create vouchers:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Delete voucher
