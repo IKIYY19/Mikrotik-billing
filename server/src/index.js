@@ -312,7 +312,7 @@ const startServer = async () => {
       return `/network${suffix}`;
     }, networkRoutes);
     const pppoeAliasRouter = createPrefixedAliasRouter((suffix) => `/pppoe${suffix}`, networkRoutes);
-    const hotspotAliasRouter = createPrefixedAliasRouter((suffix) => `/hotspot${suffix}`, networkRoutes);
+    const hotspotAliasRouter = createPrefixedAliasRouter((suffix) => suffix, networkRoutes);
     const captivePortalAliasRouter = createPrefixedAliasRouter((suffix) => `/captive-portals${suffix}`, resellerRoutes);
 
     app.use('/api/network', authenticate, requireNetworkPermission, networkAliasRouter);
