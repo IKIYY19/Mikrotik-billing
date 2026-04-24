@@ -381,11 +381,51 @@ class OLTService {
     const conn = await this.getRawConnection(id);
     if (!conn) throw new Error('OLT connection not found');
 
+    // Command sanitization - prevent injection attacks
+    const dangerousPatterns = [
+      /;\s*rm\s+/i,        // rm commands
+      /;\s*del\s+/i,       // del commands
+      /;\s*format\s+/i,    // format commands
+      /;\s*reboot/i,       // reboot commands
+      /;\s*shutdown/i,     // shutdown commands
+      /&&\s*rm\s+/i,       // rm with &&
+      /\|\s*rm\s+/i,       // rm with pipe
+      />\s*\//i,           // redirect to root
+      /`/i,                // backticks
+      /\$\(/i,             // command substitution
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(command)) {
+        throw new Error('Command contains dangerous patterns and was blocked');
+      }
+    }
+
+    // Allow only safe display/info commands by default
+    const allowedPrefixes = [
+      'display',
+      'show',
+      'get',
+      'list',
+      'stat',
+      'status',
+      'version',
+      'help',
+    ];
+
+    const commandLower = command.trim().toLowerCase();
+    const isAllowed = allowedPrefixes.some(prefix => commandLower.startsWith(prefix));
+
+    if (!isAllowed) {
+      logger.warn('Blocked potentially dangerous command', { id, command });
+      throw new Error('Only display/show commands are allowed for safety');
+    }
+
     try {
       if (!telnet) throw new Error('Telnet library not available');
 
       const connection = new telnet();
-      
+
       const result = await connection.connect({
         host: conn.ip_address,
         port: conn.telnet_port || 23,
@@ -400,6 +440,7 @@ class OLTService {
       const output = await connection.exec(command);
       await connection.end();
 
+      logger.info('OLT command executed successfully', { id, command });
       return { success: true, output };
     } catch (error) {
       logger.error('OLT command failed', { error: error.message, id, command });

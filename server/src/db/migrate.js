@@ -140,6 +140,27 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_hotspot_vouchers_username ON hotspot_vouchers(username)`,
   `CREATE INDEX IF NOT EXISTS idx_hotspot_vouchers_connection_id ON hotspot_vouchers(connection_id)`,
+
+  // OLT connections table
+  `CREATE TABLE IF NOT EXISTS olt_connections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    vendor VARCHAR(50) NOT NULL,
+    model VARCHAR(100),
+    ip_address VARCHAR(45) NOT NULL,
+    telnet_port INTEGER DEFAULT 23,
+    snmp_port INTEGER DEFAULT 161,
+    username VARCHAR(100) NOT NULL,
+    password_encrypted TEXT NOT NULL,
+    snmp_community_encrypted TEXT NOT NULL,
+    location VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'active',
+    custom_oids JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_olt_connections_vendor ON olt_connections(vendor)`,
+  `CREATE INDEX IF NOT EXISTS idx_olt_connections_status ON olt_connections(status)`,
 ];
 
 async function runMigrations() {

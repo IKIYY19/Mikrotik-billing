@@ -8,6 +8,25 @@ const router = express.Router();
 const OLTService = require('../services/oltService');
 const { validate, validations } = require('../middleware/validation');
 const logger = require('../utils/logger');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiting for OLT operations (prevent abuse)
+const oltRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Too many OLT requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiting for command execution
+const commandRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 20, // Limit each IP to 20 commands per 5 minutes
+  message: { error: 'Too many command executions, please wait' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ═══════════════════════════════════════
 // OLT CONNECTIONS
@@ -171,7 +190,7 @@ router.get('/:id/optical-power', async (req, res) => {
 });
 
 // Execute command on OLT (Telnet)
-router.post('/:id/command', async (req, res) => {
+router.post('/:id/command', commandRateLimit, async (req, res) => {
   try {
     const { command } = req.body;
     if (!command) return res.status(400).json({ error: 'Command required' });
