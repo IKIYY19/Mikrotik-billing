@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Plus, Power, PowerOff, Copy, Terminal, Check } from 'lucide-react';
+import { Plus, Power, PowerOff, Copy, Terminal, Check, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -14,6 +14,7 @@ export function BillingSubscriptions() {
   const [showForm, setShowForm] = useState(false);
   const [showScript, setShowScript] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [editingSub, setEditingSub] = useState(null);
   const [form, setForm] = useState({ customer_id: '', plan_id: '', router_id: '', pppoe_username: '', pppoe_password: '', start_date: '', billing_cycle: 'monthly', auto_provision: true });
 
   useEffect(() => {
@@ -29,16 +30,44 @@ export function BillingSubscriptions() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { data } = await axios.post(`${API}/billing/subscriptions`, {
-      ...form,
-      start_date: form.start_date || new Date().toISOString().split('T')[0],
-    });
+    if (editingSub) {
+      await axios.put(`${API}/billing/subscriptions/${editingSub.id}`, form);
+      toast.success('Subscription updated');
+    } else {
+      const { data } = await axios.post(`${API}/billing/subscriptions`, {
+        ...form,
+        start_date: form.start_date || new Date().toISOString().split('T')[0],
+      });
+      if (data.provision_script) {
+        setShowScript(data.provision_script);
+      }
+    }
     setShowForm(false);
+    setEditingSub(null);
     setForm({ customer_id: '', plan_id: '', router_id: '', pppoe_username: '', pppoe_password: '', start_date: '', billing_cycle: 'monthly', auto_provision: true });
     fetchSubs();
-    if (data.provision_script) {
-      setShowScript(data.provision_script);
-    }
+  };
+
+  const handleEdit = (sub) => {
+    setEditingSub(sub);
+    setForm({
+      customer_id: sub.customer_id,
+      plan_id: sub.plan_id,
+      router_id: sub.router_id || '',
+      pppoe_username: sub.pppoe_username || '',
+      pppoe_password: sub.pppoe_password || '',
+      start_date: sub.start_date,
+      billing_cycle: sub.billing_cycle,
+      auto_provision: sub.auto_provision,
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (sub) => {
+    if (!confirm(`Are you sure you want to delete subscription for ${sub.customer?.name}?`)) return;
+    await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
+    toast.success('Subscription deleted');
+    fetchSubs();
   };
 
   const toggleStatus = async (sub) => {
@@ -101,15 +130,25 @@ export function BillingSubscriptions() {
                   }`}>{sub.status}</span>
                 </td>
                 <td className="p-3 text-right">
-                  <button onClick={() => toggleStatus(sub)}
-                    className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ml-auto ${
-                      sub.status === 'active'
-                        ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
-                        : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                    }`}>
-                    {sub.status === 'active' ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                    {sub.status === 'active' ? 'Suspend' : 'Activate'}
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => handleEdit(sub)}
+                      className="px-2 py-1.5 rounded text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 flex items-center gap-1">
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                    <button onClick={() => handleDelete(sub)}
+                      className="px-2 py-1.5 rounded text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => toggleStatus(sub)}
+                      className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ${
+                        sub.status === 'active'
+                          ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
+                          : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                      }`}>
+                      {sub.status === 'active' ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                      {sub.status === 'active' ? 'Suspend' : 'Activate'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -122,8 +161,8 @@ export function BillingSubscriptions() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-800 rounded-lg w-full max-w-lg">
             <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-white font-semibold">New Subscription</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">✕</button>
+              <h3 className="text-white font-semibold">{editingSub ? 'Edit Subscription' : 'New Subscription'}</h3>
+              <button onClick={() => { setShowForm(false); setEditingSub(null); }} className="text-slate-400 hover:text-white">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
@@ -183,8 +222,8 @@ export function BillingSubscriptions() {
                 Auto-provision MikroTik PPPoE on activate
               </label>
               <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">Create Subscription</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingSub(null); }} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">{editingSub ? 'Update Subscription' : 'Create Subscription'}</button>
               </div>
             </form>
           </div>
