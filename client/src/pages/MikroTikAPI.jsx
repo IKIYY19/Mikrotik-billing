@@ -8,12 +8,19 @@ const API = import.meta.env.VITE_API_URL || '/api';
 export function MikroTikAPI() {
   const { info } = useToast();
   const [connections, setConnections] = useState([]);
+  const [connectionType, setConnectionType] = useState('api'); // 'api' or 'ssh'
   const [formData, setFormData] = useState({
     name: '',
     ip_address: '',
     api_port: 8728,
+    ssh_port: 22,
     username: '',
     password: '',
+    use_tunnel: false,
+    tunnel_host: '',
+    tunnel_port: 22,
+    tunnel_username: '',
+    tunnel_password: '',
   });
   const [testResult, setTestResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -80,6 +87,28 @@ export function MikroTikAPI() {
             <Server className="w-5 h-5" />
             Add Connection
           </h3>
+          
+          {/* Connection Type Toggle */}
+          <div className="mb-4">
+            <label className="block text-sm text-slate-300 mb-2">Connection Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConnectionType('api')}
+                className={`flex-1 px-4 py-2 rounded ${connectionType === 'api' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+              >
+                API
+              </button>
+              <button
+                type="button"
+                onClick={() => setConnectionType('ssh')}
+                className={`flex-1 px-4 py-2 rounded ${connectionType === 'ssh' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+              >
+                SSH
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleSave}>
             <div className="space-y-4">
               <div>
@@ -103,12 +132,18 @@ export function MikroTikAPI() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-300 mb-2">API Port</label>
+                <label className="block text-sm text-slate-300 mb-2">
+                  {connectionType === 'api' ? 'API Port' : 'SSH Port'}
+                </label>
                 <input
                   type="number"
-                  value={formData.api_port}
-                  onChange={(e) => setFormData({ ...formData, api_port: e.target.value })}
+                  value={connectionType === 'api' ? formData.api_port : formData.ssh_port}
+                  onChange={(e) => setFormData(connectionType === 'api' 
+                    ? { ...formData, api_port: e.target.value }
+                    : { ...formData, ssh_port: e.target.value }
+                  )}
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                  placeholder={connectionType === 'api' ? '8728' : '22'}
                 />
               </div>
               <div>
@@ -129,6 +164,67 @@ export function MikroTikAPI() {
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
                 />
               </div>
+
+              {/* SSH Tunnel Section */}
+              {connectionType === 'ssh' && (
+                <div className="border-t border-slate-600 pt-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="use_tunnel"
+                      checked={formData.use_tunnel}
+                      onChange={(e) => setFormData({ ...formData, use_tunnel: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="use_tunnel" className="text-sm text-slate-300">
+                      Use SSH Tunnel (for remote access)
+                    </label>
+                  </div>
+
+                  {formData.use_tunnel && (
+                    <div className="space-y-3 bg-slate-700/50 p-3 rounded">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Tunnel Host (Jump Server)</label>
+                        <input
+                          type="text"
+                          value={formData.tunnel_host}
+                          onChange={(e) => setFormData({ ...formData, tunnel_host: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                          placeholder="e.g., your-server.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Tunnel Port</label>
+                        <input
+                          type="number"
+                          value={formData.tunnel_port}
+                          onChange={(e) => setFormData({ ...formData, tunnel_port: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                          placeholder="22"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Tunnel Username</label>
+                        <input
+                          type="text"
+                          value={formData.tunnel_username}
+                          onChange={(e) => setFormData({ ...formData, tunnel_username: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Tunnel Password</label>
+                        <input
+                          type="password"
+                          value={formData.tunnel_password}
+                          onChange={(e) => setFormData({ ...formData, tunnel_password: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -142,10 +238,10 @@ export function MikroTikAPI() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={saving}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
               >
-                Save
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </form>
