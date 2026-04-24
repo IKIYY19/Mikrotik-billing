@@ -31,7 +31,7 @@ function decrypt(encryptedText) {
 // Get all connections
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, name, ip_address, api_port, username, created_at, updated_at FROM mikrotik_connections');
+    const result = await db.query('SELECT id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, created_at, updated_at FROM mikrotik_connections');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -41,14 +41,15 @@ router.get('/', async (req, res) => {
 // Create connection
 router.post('/', async (req, res) => {
   try {
-    const { name, ip_address, api_port, username, password } = req.body;
+    const { name, ip_address, api_port, ssh_port, username, password, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password } = req.body;
     const id = uuidv4();
     const encryptedPassword = encrypt(password);
+    const encryptedTunnelPassword = use_tunnel && tunnel_password ? encrypt(tunnel_password) : null;
 
     const result = await db.query(
-      `INSERT INTO mikrotik_connections (id, name, ip_address, api_port, username, password_encrypted)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, ip_address, api_port, username, created_at`,
-      [id, name, ip_address, api_port || 8728, username, encryptedPassword]
+      `INSERT INTO mikrotik_connections (id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password_encrypted)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, created_at`,
+      [id, name, ip_address, api_port || 8728, ssh_port || 22, username, encryptedPassword, connection_type || 'api', use_tunnel || false, tunnel_host, tunnel_port || 22, tunnel_username, encryptedTunnelPassword]
     );
 
     res.status(201).json(result.rows[0]);
@@ -60,19 +61,51 @@ router.post('/', async (req, res) => {
 // Test connection
 router.post('/test', async (req, res) => {
   try {
-    const { ip_address, api_port, username, password } = req.body;
+    const { ip_address, api_port, ssh_port, username, password, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password } = req.body;
 
-    // Try to connect using mikronode
-    const MikroNode = require('mikronode');
-    const device = new MikroNode(ip_address, { port: api_port || 8728 });
+    if (connection_type === 'ssh') {
+      // Test SSH connection
+      const MikroTikSSHService = require('../services/mikrotikSSH');
+      const sshService = MikroTikSSHService;
 
-    try {
-      const conn = await device.connect(username, password);
-      const close = conn.closeOnDone(true);
-      res.json({ success: true, message: 'Connection successful' });
-      close();
-    } catch (error) {
-      res.json({ success: false, message: error.message });
+      try {
+        if (use_tunnel) {
+          // For SSH tunnel, we would need to establish the tunnel first
+          // This is a simplified version - in production you'd use a proper SSH tunnel library
+          return res.json({ success: false, message: 'SSH tunneling requires additional setup. Please use VPN or direct SSH access.' });
+        }
+
+        const connection = await sshService.createConnection({
+          host: ip_address,
+          port: ssh_port || 22,
+          username,
+          password,
+        });
+
+        const testResult = await sshService.testConnection(connection.id);
+        await sshService.removeConnection(connection.id);
+
+        if (testResult.success) {
+          res.json({ success: true, message: 'SSH connection successful', data: testResult.data });
+        } else {
+          res.json({ success: false, message: testResult.error });
+        }
+      } catch (error) {
+        res.json({ success: false, message: error.message });
+      }
+    } else {
+      // Test API connection
+      const MikroNode = require('mikronode');
+      const device = new MikroNode(ip_address, { port: api_port || 8728 });
+
+      try {
+        const conn = await device.connect(username, password);
+        const close = conn.closeOnDone(true);
+        res.json({ success: true, message: 'API connection successful' });
+        close();
+      } catch (error) {
+        res.json({ success: false, message: error.message });
+      }
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
