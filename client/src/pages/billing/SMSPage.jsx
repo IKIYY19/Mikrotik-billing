@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Send, Settings, FileText, MessageSquare, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { Send, Settings, FileText, MessageSquare, CheckCircle, XCircle, Clock, Eye, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -86,16 +88,16 @@ export function SMSPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-white">SMS Notifications</h2>
+          <h2 className="text-2xl font-bold text-white gradient-text">SMS Notifications</h2>
           <p className="text-sm text-slate-400">Africa's Talking Integration</p>
         </div>
         <div className="flex items-center gap-4">
           {balance && (
-            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+            <Card className="card-gradient px-4 py-2">
               <span className="text-sm text-slate-400">Balance: </span>
               <span className="text-white font-semibold">{balance.balance} {balance.unit}</span>
               {balance.isSandbox && <span className="text-xs text-amber-400 ml-2">(Sandbox)</span>}
-            </div>
+            </Card>
           )}
           {!settings.is_configured && (
             <div className="bg-amber-600/20 border border-amber-600/50 rounded px-3 py-1.5 text-amber-400 text-sm">
@@ -113,21 +115,20 @@ export function SMSPage() {
           { id: 'logs', label: 'SMS Logs', icon: MessageSquare },
           { id: 'settings', label: 'Settings', icon: Settings },
         ].map(tab => (
-          <button
+          <Button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
-              activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            variant={activeTab === tab.id ? 'default' : 'outline'}
+            className={activeTab === tab.id ? 'btn-gradient-primary' : ''}
           >
             <tab.icon className="w-4 h-4" /> {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Send SMS Tab */}
       {activeTab === 'send' && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
+        <Card className="card-gradient p-6 space-y-4">
           <div>
             <label className="block text-sm text-slate-400 mb-1">Phone Number</label>
             <input
@@ -163,13 +164,13 @@ export function SMSPage() {
               <div className="text-xs text-slate-500 mt-1">{customMessage.length}/160 characters</div>
             </div>
           )}
-          <button
+          <Button
             onClick={handleSend}
             disabled={sending || (!sendTo) || (!sendTemplate && !customMessage)}
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+            className="btn-gradient-success flex items-center gap-2"
           >
             <Send className="w-4 h-4" /> {sending ? 'Sending...' : 'Send SMS'}
-          </button>
+          </Button>
 
           {sendResult && (
             <div className={`mt-4 p-4 rounded ${sendResult.success ? 'bg-green-600/20 border border-green-600/50' : 'bg-red-600/20 border border-red-600/50'}`}>
@@ -189,14 +190,14 @@ export function SMSPage() {
               )}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Templates Tab */}
       {activeTab === 'templates' && (
         <div className="space-y-4">
           {templates.map(tmpl => (
-            <div key={tmpl.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <Card key={tmpl.id} className="card-gradient p-4">
               {editingTemplate === tmpl.id ? (
                 <div className="space-y-3">
                   <textarea
@@ -206,8 +207,8 @@ export function SMSPage() {
                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm font-mono"
                   />
                   <div className="flex gap-2">
-                    <button onClick={() => handleSaveTemplate(editingTemplate)} className="bg-green-600 text-white px-3 py-1 rounded text-sm">Save</button>
-                    <button onClick={() => setEditingTemplate(null)} className="bg-slate-600 text-white px-3 py-1 rounded text-sm">Cancel</button>
+                    <Button onClick={() => handleSaveTemplate(editingTemplate)} className="btn-gradient-success text-sm">Save</Button>
+                    <Button onClick={() => setEditingTemplate(null)} variant="outline" className="text-sm">Cancel</Button>
                   </div>
                 </div>
               ) : (
@@ -219,24 +220,24 @@ export function SMSPage() {
                         {tmpl.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    <button onClick={() => setEditingTemplate(tmpl)} className="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
+                    <Button onClick={() => setEditingTemplate(tmpl)} variant="ghost" className="text-blue-400 text-sm">Edit</Button>
                   </div>
                   <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap bg-slate-900 p-3 rounded">{tmpl.body}</pre>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
       {/* Logs Tab */}
       {activeTab === 'logs' && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        <Card className="card-gradient overflow-hidden">
           {logs.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No SMS sent yet</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-900 text-slate-400">
+              <thead className="bg-slate-900/50 text-slate-400">
                 <tr>
                   <th className="text-left p-3">Time</th>
                   <th className="text-left p-3">To</th>
@@ -247,7 +248,7 @@ export function SMSPage() {
               </thead>
               <tbody>
                 {logs.map(log => (
-                  <tr key={log.id} className="border-t border-slate-700 hover:bg-slate-700/50">
+                  <tr key={log.id} className="border-t border-zinc-800 hover:bg-zinc-800/50 transition-colors">
                     <td className="p-3 text-slate-400 text-xs">{new Date(log.created_at).toLocaleString()}</td>
                     <td className="p-3 text-white text-xs">{log.to?.[0]}</td>
                     <td className="p-3 text-slate-300 text-xs max-w-xs truncate">{log.message}</td>
@@ -263,13 +264,15 @@ export function SMSPage() {
               </tbody>
             </table>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
-          <h3 className="text-white font-semibold">Africa's Talking Configuration</h3>
+        <Card className="card-gradient p-6 space-y-4">
+          <CardHeader className="p-0 mb-4">
+            <CardTitle>Africa's Talking Configuration</CardTitle>
+          </CardHeader>
           <div className="bg-slate-900 rounded p-4 space-y-2 text-sm">
             <p className="text-slate-300">To enable real SMS (not sandbox), set these environment variables:</p>
             <div className="font-mono text-xs space-y-1">
@@ -293,7 +296,7 @@ export function SMSPage() {
               <div className="flex justify-between"><span className="text-slate-400">Company</span><span className="text-white">{settings.company?.company_name || 'Your ISP'}</span></div>
             </div>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Clock, Shield, AlertTriangle, Settings, Play, CheckCircle, Save } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -33,15 +35,18 @@ export function AutoSuspendPage() {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+      <h2 className="text-2xl font-bold text-white gradient-text mb-6 flex items-center gap-2">
         <Shield className="w-6 h-6 text-blue-400" /> Auto-Suspend with Grace Period
       </h2>
 
       {/* Configuration */}
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
-        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-          <Settings className="w-4 h-4" /> Grace Period Configuration
-        </h3>
+      <Card className="card-gradient p-6 mb-6">
+        <CardHeader className="p-0 mb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-4 h-4" /> Grace Period Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -103,21 +108,25 @@ export function AutoSuspendPage() {
           </div>
         </div>
 
-        <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">
+        <Button onClick={handleSave} className="btn-gradient-primary flex items-center gap-2">
           <Save className="w-4 h-4" /> Save Configuration
-        </button>
-      </div>
+        </Button>
+        </CardContent>
+      </Card>
 
       {/* Run Auto-Suspend */}
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6">
-        <h3 className="text-white font-semibold mb-4">Manual Run</h3>
-        <p className="text-sm text-slate-400 mb-4">
-          Run the auto-suspend check now. This will process all overdue invoices and apply warnings, throttling, or suspension based on the configuration above.
-        </p>
-        <button onClick={handleRun} disabled={running}
-          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg flex items-center gap-2">
-          <Play className="w-4 h-4" /> {running ? 'Running...' : 'Run Auto-Suspend Now'}
-        </button>
+      <Card className="card-gradient p-6 mb-6">
+        <CardHeader className="p-0 mb-4">
+          <CardTitle>Manual Run</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <p className="text-sm text-slate-400 mb-4">
+            Run the auto-suspend check now. This will process all overdue invoices and apply warnings, throttling, or suspension based on the configuration above.
+          </p>
+          <Button onClick={handleRun} disabled={running}
+            className="btn-gradient-success flex items-center gap-2">
+            <Play className="w-4 h-4" /> {running ? 'Running...' : 'Run Auto-Suspend Now'}
+          </Button>
 
         {result && (
           <div className="mt-6 space-y-4">
@@ -159,8 +168,8 @@ export function AutoSuspendPage() {
               <p className="text-slate-400 text-sm">No overdue accounts found. All customers are in good standing.</p>
             )}
           </div>
-        )}
-      </div>
+          </CardContent>
+      </Card>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { MessageCircle, Send, Settings, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -55,13 +57,13 @@ export function WhatsAppPage() {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+      <h2 className="text-2xl font-bold text-white gradient-text mb-2 flex items-center gap-2">
         <MessageCircle className="w-6 h-6 text-green-400" /> WhatsApp Notifications
       </h2>
       <p className="text-sm text-slate-400 mb-6">Send notifications via WhatsApp Business API</p>
 
       {/* Settings */}
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6 flex items-center justify-between">
+      <Card className="card-glow p-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Settings className="w-5 h-5 text-slate-400" />
           <div>
@@ -78,15 +80,17 @@ export function WhatsAppPage() {
         <div className="text-xs text-slate-500">
           Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID in .env
         </div>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Send Message */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-            <Send className="w-4 h-4" /> Send WhatsApp
-          </h3>
-          <div className="space-y-4">
+        <Card className="card-gradient p-6">
+          <CardHeader className="p-0 mb-4">
+            <CardTitle className="flex items-center gap-2">
+              <Send className="w-4 h-4" /> Send WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 space-y-4">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Phone Number</label>
               <input value={sendTo} onChange={e => setSendTo(e.target.value)} placeholder="254712345678"
@@ -111,10 +115,10 @@ export function WhatsAppPage() {
                 <div className="text-xs text-slate-500 mt-1">{customMessage.length}/160 characters</div>
               </div>
             )}
-            <button onClick={handleSend} disabled={sending || !sendTo || (!sendTemplate && !customMessage)}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-2 rounded-lg flex items-center justify-center gap-2">
+            <Button onClick={handleSend} disabled={sending || !sendTo || (!sendTemplate && !customMessage)}
+              className="w-full btn-gradient-success flex items-center justify-center gap-2">
               <MessageCircle className="w-4 h-4" /> {sending ? 'Sending...' : 'Send WhatsApp'}
-            </button>
+            </Button>
             {result && (
               <div className={`p-3 rounded ${result.success ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
                 <div className="flex items-center gap-2">
@@ -124,20 +128,20 @@ export function WhatsAppPage() {
                 {result.isSandbox && <p className="text-xs text-amber-300 mt-1">Sandbox mode</p>}
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Message Logs */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4" /> WhatsApp Logs
-          </h3>
-          {logs.length === 0 ? (
-            <p className="text-slate-500 text-sm">No WhatsApp messages yet</p>
-          ) : (
+        <Card className="card-gradient p-6">
+          <CardHeader className="p-0 mb-4">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" /> WhatsApp Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {logs.map(log => (
-                <div key={log.id} className="bg-slate-700 rounded p-3">
+                <div key={log.id} className="bg-slate-700/50 rounded p-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white text-sm">{log.to?.[0] || log.from}</span>
                     <span className={`text-xs px-2 py-0.5 rounded ${
@@ -149,8 +153,8 @@ export function WhatsAppPage() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
