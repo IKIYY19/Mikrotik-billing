@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Search, ExternalLink, UserPlus, Trash2, Pencil, ChevronRight, Wifi, Zap, ArrowUpRight, ArrowDownRight, Clock, RefreshCw } from 'lucide-react';
+import { Plus, Search, ExternalLink, UserPlus, Trash2, Pencil, ChevronRight, Wifi, Zap, ArrowUpRight, ArrowDownRight, Clock, RefreshCw, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -139,15 +143,11 @@ export function BillingCustomers() {
   );
 
   return (
-    <div className="relative min-h-full p-8 animate-fade-in">
-      <div className="absolute inset-0 bg-mesh" />
-      <div className="absolute inset-0 bg-noise" />
-
-      {/* Header */}
-      <div className="relative flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Customers</h1>
-          <p className="text-zinc-400 mt-1">{customers.length} total • {filtered.length} shown</p>
+          <h2 className="text-2xl font-bold text-white">Customers ({customers.length})</h2>
+          <p className="text-slate-400 mt-1">Manage customer accounts and subscriptions</p>
           {selectedConnection && onlineData && (
             <div className="flex items-center gap-2 mt-2">
               <div className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -160,184 +160,169 @@ export function BillingCustomers() {
         </div>
         <div className="flex items-center gap-3">
           {connections.length > 0 && (
-            <select value={selectedConnection} onChange={e => { setSelectedConnection(e.target.value); }} className="modern-input text-sm py-2">
+            <select value={selectedConnection} onChange={e => { setSelectedConnection(e.target.value); }} className="flex h-10 w-48 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
               <option value="">No Router (Offline)</option>
               {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          <button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' }); setShowForm(true); }}
-            className="btn-primary">
-            <UserPlus className="w-4 h-4" /> Add Customer
-          </button>
+          <Button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' }); setShowForm(true); }} className="flex items-center gap-2">
+            <UserPlus className="w-5 h-5" /> Add Customer
+          </Button>
         </div>
       </div>
 
       {/* Search */}
       <div className="relative mb-6">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, or phone..."
-          className="modern-input pl-10 max-w-md" />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, or phone..." className="pl-10 max-w-md" />
       </div>
 
-      {/* Table */}
-      <div className="relative glass rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-3">
-            {[1,2,3,4].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}
-          </div>
-        ) : (
-          <table className="modern-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Contact</th>
-                <th>Location</th>
-                <th>Subs</th>
-                <th>Balance</th>
-                {selectedConnection && <th>Online</th>}
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(c => (
-                <tr key={c.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
-                        onlineData[c.id] ? 'bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 ring-1 ring-emerald-500/20 text-emerald-400' : 'bg-gradient-to-br from-blue-500/20 to-violet-500/20 ring-1 ring-blue-500/10 text-blue-400'
-                      }`}>
-                        {c.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <button onClick={() => navigate(`/portal/${c.id}`)} className="text-white font-medium hover:text-blue-400 transition-colors truncate block">{c.name}</button>
-                        {c.account_number && <div className="text-[11px] text-zinc-500 font-mono">{c.account_number}</div>}
-                        {c.id_number && <div className="text-[11px] text-zinc-500">ID: {c.id_number}</div>}
-                        {onlineData[c.id] && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            <span className="text-[10px] text-emerald-400">{onlineData[c.id].uptime || 'Online'}</span>
-                          </div>
-                        )}
-                      </div>
+      {/* Cards Grid */}
+      {loading ? (
+        <div className="p-6 space-y-3">
+          {[1,2,3,4].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg">{search ? 'No results found' : 'No customers yet. Add your first customer.'}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filtered.map(c => (
+            <Card key={c.id} className="overflow-hidden">
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold ${
+                      onlineData[c.id] ? 'bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 ring-1 ring-emerald-500/20 text-emerald-400' : 'bg-gradient-to-br from-blue-500/20 to-violet-500/20 ring-1 ring-blue-500/10 text-blue-400'
+                    }`}>
+                      {c.name.charAt(0)}
                     </div>
-                  </td>
-                  <td>
-                    {c.email && <div className="text-sm text-zinc-300 truncate max-w-[160px]">{c.email}</div>}
-                    {c.phone && <div className="text-xs text-zinc-500">{c.phone}</div>}
-                  </td>
-                  <td className="text-sm text-zinc-400">{[c.city, c.country].filter(Boolean).join(', ') || <span className="text-zinc-600">—</span>}</td>
-                  <td><span className="badge badge-blue">{c.subscription_count}</span></td>
-                  <td className={`font-semibold tabular-nums ${c.outstanding_balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${c.outstanding_balance.toFixed(2)}</td>
-                  {selectedConnection && (
-                    <td>
-                      {onlineData[c.id] ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full bg-emerald-400 status-dot" />
-                          <span className="text-xs text-emerald-400 font-medium">Online</span>
-                          {onlineData[c.id].type === 'pppoe' ? <Wifi className="w-3 h-3 text-blue-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-zinc-600">Offline</span>
-                      )}
-                    </td>
-                  )}
-                  <td><span className={`badge ${c.status === 'active' ? 'badge-green' : 'badge-red'}`}>{c.status}</span></td>
-                  <td>
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => navigate(`/portal/${c.id}`)} className="btn-ghost p-2" title="Portal"><ExternalLink className="w-4 h-4" /></button>
-                      <button onClick={() => editCustomer(c)} className="btn-ghost p-2" title="Edit"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(c.id)} className="btn-ghost p-2 text-zinc-500 hover:text-rose-400" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                    <div>
+                      <CardTitle className="text-lg">{c.name}</CardTitle>
+                      {c.account_number && <p className="text-[11px] text-zinc-500 font-mono">{c.account_number}</p>}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {!loading && filtered.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon"><UserPlus className="w-6 h-6 text-zinc-600" /></div>
-            <div className="empty-state-title">{search ? 'No results found' : 'No customers yet'}</div>
-            <div className="empty-state-desc">{search ? 'Try a different search term' : 'Add your first customer to get started'}</div>
-          </div>
-        )}
-      </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    c.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                  }`}>
+                    {c.status}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
+                <div className="text-zinc-400">Email: <span className="text-white truncate block">{c.email || '—'}</span></div>
+                <div className="text-zinc-400">Phone: <span className="text-white">{c.phone || '—'}</span></div>
+                <div className="text-zinc-400">Location: <span className="text-white">{[c.city, c.country].filter(Boolean).join(', ') || '—'}</span></div>
+                <div className="text-zinc-400">Subs: <span className="text-white">{c.subscription_count}</span></div>
+                <div className="text-zinc-400">Balance: <span className={`font-semibold ${c.outstanding_balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${c.outstanding_balance.toFixed(2)}</span></div>
+                {selectedConnection && (
+                  <div className="text-zinc-400">
+                    {onlineData[c.id] ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 status-dot" />
+                        <span className="text-emerald-400 font-medium">Online</span>
+                        {onlineData[c.id].type === 'pppoe' ? <Wifi className="w-3 h-3 text-blue-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
+                      </div>
+                    ) : (
+                      <span className="text-zinc-600">Offline</span>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+              <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate(`/portal/${c.id}`)} className="flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Portal
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => editCustomer(c)} className="flex items-center gap-1">
+                  <Pencil className="w-3 h-3" /> Edit
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(c.id)} className="flex items-center gap-1 text-red-400 ml-auto">
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
-        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
-          <div className="glass-strong rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-scale" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-zinc-800/50 flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-semibold text-white">{editing ? 'Edit Customer' : 'New Customer'}</h3>
-                <p className="text-sm text-zinc-400 mt-0.5">{editing ? 'Update customer details' : 'Add a new subscriber to your network'}</p>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{editing ? 'Edit Customer' : 'New Customer'}</CardTitle>
+                  <p className="text-sm text-zinc-400 mt-0.5">{editing ? 'Update customer details' : 'Add a new subscriber to your network'}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="w-5 h-5" /></Button>
               </div>
-              <button onClick={() => setShowForm(false)} className="btn-ghost p-2 flex-shrink-0">✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Name *</label>
-                  <input required value={form.name} onChange={e => {
-                    const newName = e.target.value;
-                    // Auto-generate account number when name changes (for new customers)
-                    if (!editing && !form.account_number) {
-                      const newAccountNum = generateAccountNumber(newName, customers);
-                      setForm({...form, name: newName, account_number: newAccountNum});
-                    } else {
-                      setForm({...form, name: newName});
-                    }
-                  }} className="modern-input" placeholder="John Kamau" />
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="customer-name">Name *</Label>
+                    <Input id="customer-name" required value={form.name} onChange={e => {
+                      const newName = e.target.value;
+                      if (!editing && !form.account_number) {
+                        const newAccountNum = generateAccountNumber(newName, customers);
+                        setForm({...form, name: newName, account_number: newAccountNum});
+                      } else {
+                        setForm({...form, name: newName});
+                      }
+                    }} placeholder="John Kamau" />
+                  </div>
+                  <div>
+                    <Label htmlFor="account-number">Account Number</Label>
+                    <Input id="account-number" value={form.account_number || generateAccountNumber(form.name, customers)} onChange={e => setForm({...form, account_number: e.target.value})} className="font-mono" placeholder="Auto-generated" />
+                    <p className="text-xs text-zinc-500 mt-1">Auto-generated from name</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="john@example.com" />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+254712345678" />
+                  </div>
+                  <div>
+                    <Label htmlFor="id-number">ID Number</Label>
+                    <Input id="id-number" value={form.id_number} onChange={e => setForm({...form, id_number: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label htmlFor="city">City</Label>
+                    <Input id="city" value={form.city} onChange={e => setForm({...form, city: e.target.value})} placeholder="Nairobi" />
+                  </div>
+                  <div>
+                    <Label htmlFor="country">Country</Label>
+                    <Input id="country" value={form.country} onChange={e => setForm({...form, country: e.target.value})} placeholder="Kenya" />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input id="address" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="Street address" />
+                  </div>
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <select id="status" value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <textarea id="notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows="2" className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background resize-none" placeholder="Internal notes about this customer..." />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Account Number</label>
-                  <input value={form.account_number || generateAccountNumber(form.name, customers)} onChange={e => setForm({...form, account_number: e.target.value})} className="modern-input bg-zinc-800/50 font-mono" placeholder="Auto-generated" />
-                  <p className="text-xs text-zinc-500 mt-1">Auto-generated from name</p>
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">{editing ? 'Update Customer' : 'Create Customer'}</Button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Email</label>
-                  <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="modern-input" placeholder="john@example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Phone</label>
-                  <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="modern-input" placeholder="+254712345678" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">ID Number</label>
-                  <input value={form.id_number} onChange={e => setForm({...form, id_number: e.target.value})} className="modern-input" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">City</label>
-                  <input value={form.city} onChange={e => setForm({...form, city: e.target.value})} className="modern-input" placeholder="Nairobi" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Country</label>
-                  <input value={form.country} onChange={e => setForm({...form, country: e.target.value})} className="modern-input" placeholder="Kenya" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Address</label>
-                  <input value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="modern-input" placeholder="Street address" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Status</label>
-                  <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="modern-input">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Notes</label>
-                  <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows="2" className="modern-input resize-none" placeholder="Internal notes about this customer..." />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2 border-t border-zinc-800/50">
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" className="btn-primary flex-1">{editing ? 'Update Customer' : 'Create Customer'}</button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

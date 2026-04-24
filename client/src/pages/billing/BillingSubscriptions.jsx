@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Plus, Power, PowerOff, Copy, Terminal, Check, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Power, PowerOff, Copy, Terminal, Check, Pencil, Trash2, X } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -91,175 +95,160 @@ export function BillingSubscriptions() {
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Subscriptions ({subs.length})</h2>
-        <button onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Subscription
-        </button>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Subscriptions ({subs.length})</h2>
+          <p className="text-slate-400 mt-1">Manage customer subscriptions and plans</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Plus className="w-5 h-5" /> New Subscription
+        </Button>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-900 text-slate-400">
-            <tr>
-              <th className="text-left p-3">Customer</th>
-              <th className="text-left p-3">Plan</th>
-              <th className="text-left p-3">PPPoE</th>
-              <th className="text-left p-3">Router</th>
-              <th className="text-left p-3">Started</th>
-              <th className="text-left p-3">Cycle</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-right p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subs.map(sub => (
-              <tr key={sub.id} className="border-t border-slate-700 hover:bg-slate-700/50">
-                <td className="p-3 text-white">{sub.customer?.name || 'Unknown'}</td>
-                <td className="p-3">
-                  <div className="text-white">{sub.plan?.name || 'No plan'}</div>
-                  {sub.plan && <div className="text-slate-500 text-xs">{sub.plan.speed_up}/{sub.plan.speed_down} — ${sub.plan.price}/mo</div>}
-                </td>
-                <td className="p-3">
-                  {sub.pppoe_username ? (
-                    <div className="text-blue-400 font-mono text-xs">{sub.pppoe_username}</div>
-                  ) : <span className="text-slate-500 text-xs">—</span>}
-                </td>
-                <td className="p-3 text-slate-400 text-xs">{sub.router?.name || '—'}</td>
-                <td className="p-3 text-slate-400 text-xs">{sub.start_date}</td>
-                <td className="p-3 text-slate-400 text-xs capitalize">{sub.billing_cycle}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-xs ${
-                    sub.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                  }`}>{sub.status}</span>
-                </td>
-                <td className="p-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => handleEdit(sub)}
-                      className="px-2 py-1.5 rounded text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 flex items-center gap-1">
-                      <Pencil className="w-3 h-3" /> Edit
-                    </button>
-                    <button onClick={() => handleDelete(sub)}
-                      className="px-2 py-1.5 rounded text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 flex items-center gap-1">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => toggleStatus(sub)}
-                      className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ${
-                        sub.status === 'active'
-                          ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
-                          : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                      }`}>
-                      {sub.status === 'active' ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                      {sub.status === 'active' ? 'Suspend' : 'Activate'}
-                    </button>
+      {subs.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg">No subscriptions yet. Create your first subscription.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {subs.map(sub => (
+            <Card key={sub.id} className="overflow-hidden">
+              <CardHeader className="border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{sub.customer?.name || 'Unknown'}</CardTitle>
+                    <p className="text-slate-400 text-sm">{sub.plan?.name || 'No plan'}</p>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {subs.length === 0 && <div className="text-center py-8 text-slate-500">No subscriptions yet</div>}
-      </div>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    sub.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                  }`}>
+                    {sub.status}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
+                <div className="text-zinc-400">Plan: <span className="text-white">{sub.plan?.speed_up}/{sub.plan?.speed_down}</span></div>
+                <div className="text-zinc-400">Price: <span className="text-white">${sub.plan?.price}/mo</span></div>
+                <div className="text-zinc-400">PPPoE: <span className="text-white font-mono">{sub.pppoe_username || '—'}</span></div>
+                <div className="text-zinc-400">Router: <span className="text-white">{sub.router?.name || '—'}</span></div>
+                <div className="text-zinc-400">Started: <span className="text-white">{sub.start_date}</span></div>
+                <div className="text-zinc-400">Cycle: <span className="text-white capitalize">{sub.billing_cycle}</span></div>
+              </CardContent>
+              <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleEdit(sub)} className="flex items-center gap-1">
+                  <Pencil className="w-3 h-3" /> Edit
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(sub)} className="flex items-center gap-1 text-red-400">
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => toggleStatus(sub)} className={`flex items-center gap-1 ml-auto ${
+                  sub.status === 'active' ? 'text-red-400' : 'text-green-400'
+                }`}>
+                  {sub.status === 'active' ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                  {sub.status === 'active' ? 'Suspend' : 'Activate'}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-lg">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-white font-semibold">{editingSub ? 'Edit Subscription' : 'New Subscription'}</h3>
-              <button onClick={() => { setShowForm(false); setEditingSub(null); }} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Customer *</label>
-                <select required value={form.customer_id} onChange={e => setForm({...form, customer_id: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="">Select customer</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle>{editingSub ? 'Edit Subscription' : 'New Subscription'}</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditingSub(null); }}><X className="w-5 h-5" /></Button>
               </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Service Plan *</label>
-                <select required value={form.plan_id} onChange={e => setForm({...form, plan_id: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="">Select plan</option>
-                  {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.price}/mo</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Router/Device (optional)</label>
-                <select value={form.router_id} onChange={e => setForm({...form, router_id: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="">No device linked</option>
-                  {devices.map(d => <option key={d.id} value={d.id}>{d.name} ({d.provision_status})</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-6">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">PPPoE Username</label>
-                  <input value={form.pppoe_username} onChange={e => setForm({...form, pppoe_username: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="customer01" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">PPPoE Password</label>
-                  <input value={form.pppoe_password} onChange={e => setForm({...form, pppoe_password: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" placeholder="••••••••" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Start Date</label>
-                  <input type="date" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Billing Cycle</label>
-                  <select value={form.billing_cycle} onChange={e => setForm({...form, billing_cycle: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
+                  <Label htmlFor="customer">Customer *</Label>
+                  <select id="customer" required value={form.customer_id} onChange={e => setForm({...form, customer_id: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select customer</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
-              </div>
-              <label className="flex items-center gap-2 text-slate-300">
-                <input type="checkbox" checked={form.auto_provision} onChange={e => setForm({...form, auto_provision: e.target.checked})} />
-                Auto-provision MikroTik PPPoE on activate
-              </label>
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button type="button" onClick={() => { setShowForm(false); setEditingSub(null); }} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">{editingSub ? 'Update Subscription' : 'Create Subscription'}</button>
-              </div>
-            </form>
-          </div>
+                <div>
+                  <Label htmlFor="plan">Service Plan *</Label>
+                  <select id="plan" required value={form.plan_id} onChange={e => setForm({...form, plan_id: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select plan</option>
+                    {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.price}/mo</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="router">Router/Device (optional)</Label>
+                  <select id="router" value={form.router_id} onChange={e => setForm({...form, router_id: e.target.value})}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">No device linked</option>
+                    {devices.map(d => <option key={d.id} value={d.id}>{d.name} ({d.provision_status})</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="pppoe-username">PPPoE Username</Label>
+                    <Input id="pppoe-username" value={form.pppoe_username} onChange={e => setForm({...form, pppoe_username: e.target.value})} placeholder="customer01" />
+                  </div>
+                  <div>
+                    <Label htmlFor="pppoe-password">PPPoE Password</Label>
+                    <Input id="pppoe-password" type="password" value={form.pppoe_password} onChange={e => setForm({...form, pppoe_password: e.target.value})} placeholder="••••••••" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <Input id="start-date" type="date" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label htmlFor="billing-cycle">Billing Cycle</Label>
+                    <select id="billing-cycle" value={form.billing_cycle} onChange={e => setForm({...form, billing_cycle: e.target.value})}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingSub(null); }} className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">{editingSub ? 'Update Subscription' : 'Create Subscription'}</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* MikroTik Script Modal */}
       {showScript && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-green-500" />
-                MikroTik Provisioning Script
-              </h3>
-              <div className="flex gap-2">
-                <button onClick={() => copyScript(showScript)}
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1">
-                  {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button onClick={() => setShowScript(null)} className="text-slate-400 hover:text-white">✕</button>
+          <Card className="w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-green-500" />
+                  MikroTik Provisioning Script
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => copyScript(showScript)} className="flex items-center gap-1">
+                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowScript(null)}><X className="w-5 h-5" /></Button>
+                </div>
               </div>
-            </div>
-            <div className="flex-1 overflow-auto p-6">
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto p-6">
               <div className="bg-yellow-600/20 border border-yellow-600/50 rounded p-3 mb-4">
                 <p className="text-yellow-400 text-sm">⚠️ Paste this into your MikroTik terminal to apply the provisioning changes.</p>
               </div>
               <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">{showScript}</pre>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
