@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useStore } from '../store';
+import axios from 'axios';
+import { Server, TestTube, Send, Trash2, Plus } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
-import { Server, TestTube, Send } from 'lucide-react';
+
+const API = import.meta.env.VITE_API_URL || '/api';
 
 export function MikroTikAPI() {
-  const { connections, fetchConnections, testConnection, pushScript } = useStore();
   const { info } = useToast();
+  const [connections, setConnections] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     ip_address: '',
@@ -14,8 +16,17 @@ export function MikroTikAPI() {
     password: '',
   });
   const [testResult, setTestResult] = useState(null);
-  const [pushResult, setPushResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const fetchConnections = async () => {
+    try {
+      const { data } = await axios.get(`${API}/mikrotik`);
+      setConnections(data);
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+    }
+  };
 
   useEffect(() => {
     fetchConnections();
@@ -23,19 +34,39 @@ export function MikroTikAPI() {
 
   const handleTest = async () => {
     setLoading(true);
+    setTestResult(null);
     try {
-      const result = await testConnection(formData);
-      setTestResult(result);
+      const { data } = await axios.post(`${API}/mikrotik/test`, formData);
+      setTestResult(data);
     } catch (error) {
-      setTestResult({ success: false, message: error.message });
+      setTestResult({ success: false, message: error.response?.data?.error || error.message });
     }
     setLoading(false);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    // Save connection - would need a POST endpoint
-    info('Save Connection', 'Save connection endpoint - integrate with your backend');
+    setSaving(true);
+    try {
+      const { data } = await axios.post(`${API}/mikrotik`, formData);
+      setConnections([...connections, data]);
+      setFormData({ name: '', ip_address: '', api_port: 8728, username: '', password: '' });
+      setTestResult({ success: true, message: 'Connection saved successfully' });
+    } catch (error) {
+      setTestResult({ success: false, message: error.response?.data?.error || error.message });
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this connection?')) return;
+    try {
+      await axios.delete(`${API}/mikrotik/${id}`);
+      setConnections(connections.filter(c => c.id !== id));
+      info('Success', 'Connection deleted successfully');
+    } catch (error) {
+      alert('Failed to delete connection');
+    }
   };
 
   return (
@@ -139,10 +170,14 @@ export function MikroTikAPI() {
                     <div>
                       <h4 className="font-semibold text-white">{conn.name}</h4>
                       <p className="text-sm text-slate-400">{conn.ip_address}:{conn.api_port}</p>
+                      <p className="text-xs text-slate-500">User: {conn.username}</p>
                     </div>
-                    <button className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1">
-                      <Send className="w-3 h-3" />
-                      Push
+                    <button
+                      onClick={() => handleDelete(conn.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
                     </button>
                   </div>
                 </div>
