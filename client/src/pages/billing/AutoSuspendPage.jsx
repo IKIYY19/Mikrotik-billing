@@ -168,7 +168,8 @@ export function AutoSuspendPage() {
               <p className="text-slate-400 text-sm">No overdue accounts found. All customers are in good standing.</p>
             )}
           </div>
-          </CardContent>
+        )}
+        </CardContent>
       </Card>
     </div>
   );
