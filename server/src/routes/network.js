@@ -350,7 +350,7 @@ router.post('/vouchers', async (req, res) => {
       await db.query(
         `INSERT INTO hotspot_vouchers (id, username, password, profile, valid_for, rate_limit, data_limit, price, company_name, connection_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [id, v.username, v.password, v.profile, v.valid_for, v.rate_limit, v.data_limit, v.price, v.company_name, v.connection_id || connection_id, new Date().toISOString()]
+        [id, v.username, v.password, v.profile, v.valid_for, v.rate_limit, v.data_limit, v.price, v.company_name, v.connection_id || connection_id || null, new Date().toISOString()]
       );
     }
 
