@@ -64,9 +64,15 @@ export function BillingSubscriptions() {
   };
 
   const handleDelete = async (sub) => {
-    await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
-    toast.success('Subscription deleted');
-    fetchSubs();
+    console.log('Deleting subscription:', sub.id);
+    try {
+      await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
+      toast.success('Subscription deleted');
+      fetchSubs();
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error('Failed to delete subscription');
+    }
   };
 
   const toggleStatus = async (sub) => {
