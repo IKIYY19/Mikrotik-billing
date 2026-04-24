@@ -297,6 +297,15 @@ async function toggleSubscriptionStatus(id) {
   return normalizeSubscription(await backend.toggleSubscriptionStatus(id));
 }
 
+async function deleteSubscription(id) {
+  const backend = getBackend();
+  if (usesRepositoryBackend()) {
+    const deleted = await backend.subscriptions.delete(id);
+    return deleted;
+  }
+  return await backend.deleteSubscription(id);
+}
+
 async function listInvoices() {
   if (usesRepositoryBackend()) {
     const backend = getBackend();
@@ -477,6 +486,7 @@ module.exports = {
   createSubscription,
   updateSubscription,
   toggleSubscriptionStatus,
+  deleteSubscription,
   listInvoices,
   getInvoiceById,
   createInvoice,
