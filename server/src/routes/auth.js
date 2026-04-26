@@ -133,24 +133,33 @@ router.post('/heartbeat', async (req, res) => {
     const db = getDb();
     const authHeader = req.headers.authorization;
     
+    console.log('Heartbeat request received');
+    console.log('Auth header:', authHeader ? 'Present' : 'Missing');
+    
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('Heartbeat failed: No valid auth header');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    console.log('Heartbeat for user ID:', decoded.id, 'Email:', decoded.email);
     
     const now = new Date();
 
-    await db.query(
+    const result = await db.query(
       `UPDATE users 
        SET last_seen = $1, is_online = true 
-       WHERE id = $2`,
+       WHERE id = $2
+       RETURNING id, email, is_online, last_seen`,
       [now.toISOString(), decoded.id]
     );
+
+    console.log('Heartbeat update result:', result.rows[0]);
 
     res.json({ success: true, last_seen: now.toISOString() });
   } catch (e) {
     console.error('Heartbeat error:', e.message);
+    console.error('Heartbeat error stack:', e.stack);
     res.status(500).json({ error: 'Failed to update activity' });
   }
 });
