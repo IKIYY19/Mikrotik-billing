@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Star, TrendingUp, Award, Users, MessageSquare, Clock, Filter } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { getToken } from '../../lib/auth';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -21,32 +22,43 @@ export function ReviewsManagement() {
 
   const fetchReviews = async () => {
     try {
-      const { data } = await axios.get(`${API}/portal/admin/reviews`);
+      const token = getToken();
+      const { data } = await axios.get(`${API}/portal/admin/reviews`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setReviews(data);
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
-      toast.error('Failed to load reviews');
+      toast.error('Failed to load reviews', error.response?.data?.error || error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchStaffPoints = async () => {
     try {
-      const { data } = await axios.get(`${API}/portal/admin/staff-points`);
+      const token = getToken();
+      const { data } = await axios.get(`${API}/portal/admin/staff-points`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setStaffPoints(data);
     } catch (error) {
       console.error('Failed to fetch staff points:', error);
-      toast.error('Failed to load staff points');
+      toast.error('Failed to load staff points', error.response?.data?.error || error.message);
     }
   };
 
   const fetchStaffHistory = async (userId) => {
     try {
-      const { data } = await axios.get(`${API}/portal/admin/staff-points/${userId}`);
+      const token = getToken();
+      const { data } = await axios.get(`${API}/portal/admin/staff-points/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setStaffHistory(data);
       setSelectedStaff(userId);
     } catch (error) {
       console.error('Failed to fetch staff history:', error);
-      toast.error('Failed to load staff history');
+      toast.error('Failed to load staff history', error.response?.data?.error || error.message);
     }
   };
 
