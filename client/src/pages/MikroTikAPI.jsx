@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Server, TestTube, Send, Trash2, Plus, Wifi, WifiOff, Clock } from 'lucide-react';
+import { Server, TestTube, Send, Trash2, Plus, Wifi, WifiOff, Clock, RefreshCw } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -48,6 +48,19 @@ export function MikroTikAPI() {
       setConnections(data);
     } catch (error) {
       console.error('Failed to fetch connections:', error);
+    }
+  };
+
+  const checkConnection = async (connectionId) => {
+    try {
+      const token = getToken();
+      await axios.post(`${API}/mikrotik/${connectionId}/check`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Refresh connections to get updated status
+      await fetchConnections();
+    } catch (error) {
+      console.error('Failed to check connection:', error);
     }
   };
 
@@ -346,13 +359,22 @@ export function MikroTikAPI() {
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDelete(conn.id)}
-                      className="ml-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 p-2 rounded-lg transition-colors"
-                      title="Delete connection"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => checkConnection(conn.id)}
+                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 p-2 rounded-lg transition-colors"
+                        title="Check connectivity"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(conn.id)}
+                        className="bg-red-600/20 hover:bg-red-600/30 text-red-400 p-2 rounded-lg transition-colors"
+                        title="Delete connection"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
