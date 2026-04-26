@@ -150,6 +150,30 @@ class RouterConnectivityService {
   async createAlert(connectionId, alertType, severity, title, message) {
     try {
       const db = this.getDb();
+      
+      // Create alerts table if it doesn't exist (on-demand creation)
+      try {
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS alerts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            connection_id UUID,
+            alert_type VARCHAR(50) NOT NULL,
+            severity VARCHAR(20) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            status VARCHAR(20) DEFAULT 'open',
+            acknowledged_by UUID,
+            acknowledged_at TIMESTAMP,
+            resolved_at TIMESTAMP,
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      } catch (tableError) {
+        // Table might already exist or creation failed, continue anyway
+        logger.warn('Alerts table creation check failed (continuing)', { error: tableError.message });
+      }
+      
       await db.query(
         `INSERT INTO alerts (id, connection_id, alert_type, severity, title, message, status, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'open', $7)`,
