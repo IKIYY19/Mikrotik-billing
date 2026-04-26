@@ -15,6 +15,8 @@ export function BillingCustomerDetail() {
   const [portalModal, setPortalModal] = useState(false);
   const [portalInfo, setPortalInfo] = useState(null);
   const [generatingUrl, setGeneratingUrl] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState(null);
 
   useEffect(() => { fetchCustomer(); }, [id]);
 
@@ -51,6 +53,19 @@ export function BillingCustomerDetail() {
   const openPortalModal = async () => {
     await fetchPortalInfo();
     setPortalModal(true);
+  };
+
+  const resetPassword = async () => {
+    setResettingPassword(true);
+    try {
+      const { data } = await axios.post(`${API}/billing/customers/${id}/reset-password`);
+      setNewPassword(data.password);
+      toast.success('Password reset successfully');
+    } catch (e) {
+      toast.error('Failed to reset password', e.response?.data?.error || e.message);
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   if (loading) return <div className="p-8 text-white">Loading...</div>;
@@ -287,6 +302,40 @@ export function BillingCustomerDetail() {
                         <Copy className="w-4 h-4" />
                       </button>
                     </div>
+                  </div>
+                  
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-slate-400">Password</div>
+                      <button
+                        onClick={resetPassword}
+                        disabled={resettingPassword}
+                        className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                      >
+                        {resettingPassword ? 'Resetting...' : 'Reset Password'}
+                      </button>
+                    </div>
+                    {newPassword ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={newPassword}
+                          className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white font-mono"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(newPassword);
+                            toast.success('Password copied to clipboard');
+                          }}
+                          className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-white"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-slate-500 text-sm italic">Click "Reset Password" to generate a new password</div>
+                    )}
                   </div>
                   
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
