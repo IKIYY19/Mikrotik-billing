@@ -3,6 +3,7 @@ const router = express.Router();
 const billing = require('../services/billingData');
 const PPPoEProvisioner = require('../utils/pppoeProvisioner');
 const { triggerSMS } = require('./sms');
+const db = global.dbAvailable ? global.db : require('../db/memory');
 
 // ═══════════════════════════════════════
 // DASHBOARD
@@ -537,5 +538,62 @@ function aggregateByTimeRange(records, startTime, endTime, groupBy) {
 
   return buckets;
 }
+
+// ═══════════════════════════════════════
+// REVIEWS (Admin)
+// ═══════════════════════════════════════
+
+// Get all reviews (admin only)
+router.get('/reviews', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT r.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
+       FROM reviews r
+       LEFT JOIN customers c ON c.id = r.customer_id
+       ORDER BY r.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get all reviews error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff points leaderboard
+router.get('/staff-points', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, COALESCE(SUM(sp.points), 0) as total_points
+       FROM users u
+       LEFT JOIN staff_points sp ON sp.user_id = u.id
+       WHERE u.role IN ('customer_care', 'sales_team', 'admin', 'technician')
+       GROUP BY u.id, u.name, u.email, u.role
+       ORDER BY total_points DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff points error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff point history
+router.get('/staff-points/:userId', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT sp.*, r.rating, r.service_quality, c.name as customer_name
+       FROM staff_points sp
+       LEFT JOIN reviews r ON r.id = sp.review_id
+       LEFT JOIN customers c ON c.id = r.customer_id
+       WHERE sp.user_id = $1
+       ORDER BY sp.created_at DESC`,
+      [req.params.userId]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff point history error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 module.exports = router;
