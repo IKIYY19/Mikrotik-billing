@@ -501,22 +501,6 @@ export function UserManagement() {
     return formatDate(dateStr);
   };
 
-  const formatLoginTime = (dateStr) => {
-    if (!dateStr) return 'Never';
-    const now = new Date();
-    const loginTime = new Date(dateStr);
-    const diffMs = now - loginTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDate(dateStr);
-  };
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -658,7 +642,7 @@ export function UserManagement() {
                     <td className="px-4 py-3 text-sm text-zinc-400">
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3 h-3 text-zinc-500" />
-                        {formatLoginTime(user.last_login_at)}
+                        {formatLastSeen(user.last_seen)}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-500">
