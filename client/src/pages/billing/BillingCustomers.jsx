@@ -53,12 +53,13 @@ export function BillingCustomers() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '', fup_profile_id: '' });
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState('');
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
+  const [fupProfiles, setFupProfiles] = useState([]);
 
   // Auto-generate account number from company name
   const generateAccountNumber = (companyName, existingCustomers) => {
@@ -70,7 +71,7 @@ export function BillingCustomers() {
     return `${prefix}-${String(nextNum).padStart(4, '0')}`;
   };
 
-  useEffect(() => { fetchCustomers(); fetchConnections(); }, []);
+  useEffect(() => { fetchCustomers(); fetchConnections(); fetchFUPProfiles(); }, []);
   useEffect(() => { if (selectedConnection) fetchOnlineStatus(); }, [selectedConnection]);
 
   const fetchCustomers = async () => {
@@ -81,6 +82,10 @@ export function BillingCustomers() {
 
   const fetchConnections = async () => {
     try { const { data } = await axios.get(`${API}/mikrotik`); setConnections(data); } catch (error) { console.error('Failed to fetch connections:', error); toast.error('Failed to load connections', error.response?.data?.error || error.message); }
+  };
+
+  const fetchFUPProfiles = async () => {
+    try { const { data } = await axios.get(`${API}/fup`).catch(() => ({ data: [] })); setFupProfiles(data); } catch (error) { console.error('Failed to fetch FUP profiles:', error); }
   };
 
   const fetchOnlineStatus = async () => {
@@ -110,7 +115,7 @@ export function BillingCustomers() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '' });
+      setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '', fup_profile_id: '' });
       fetchCustomers();
     } catch (error) {
       console.error('Failed to save customer:', error);
@@ -132,7 +137,7 @@ export function BillingCustomers() {
 
   const editCustomer = (c) => {
     setEditing(c);
-    setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', country: c.country || '', id_number: c.id_number || '', status: c.status, notes: c.notes || '', account_number: c.account_number || '' });
+    setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', country: c.country || '', id_number: c.id_number || '', status: c.status, notes: c.notes || '', account_number: c.account_number || '', fup_profile_id: c.fup_profile_id || '' });
     setShowForm(true);
   };
 
@@ -156,7 +161,7 @@ export function BillingCustomers() {
               {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          <Button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '' }); setShowForm(true); }} className="btn-gradient-primary flex items-center gap-2">
+          <Button onClick={() => { setEditing(null); setForm({ name: '', email: '', phone: '', address: '', city: '', country: '', id_number: '', status: 'active', notes: '', account_number: '', fup_profile_id: '' }); setShowForm(true); }} className="btn-gradient-primary flex items-center gap-2">
             <UserPlus className="w-5 h-5" /> Add Customer
           </Button>
         </div>
@@ -300,6 +305,15 @@ export function BillingCustomers() {
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                       <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="fup-profile">FUP Profile</Label>
+                    <select id="fup-profile" value={form.fup_profile_id} onChange={e => setForm({...form, fup_profile_id: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      <option value="">No FUP Profile</option>
+                      {fupProfiles.filter(f => f.is_active).map(f => (
+                        <option key={f.id} value={f.id}>{f.name} ({f.data_limit} {f.data_limit_unit})</option>
+                      ))}
                     </select>
                   </div>
                   <div className="col-span-2">
