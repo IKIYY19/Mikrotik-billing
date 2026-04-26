@@ -60,6 +60,7 @@ export function BillingCustomers() {
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [fupProfiles, setFupProfiles] = useState([]);
+  const [portalUrl, setPortalUrl] = useState(null);
 
   // Auto-generate account number from company name
   const generateAccountNumber = (companyName, existingCustomers) => {
@@ -112,6 +113,10 @@ export function BillingCustomers() {
       } else {
         const { data } = await axios.post(`${API}/billing/customers`, submitData);
         toast.success(`Customer created: ${data.account_number || data.name}`);
+        // Show portal URL if returned
+        if (data.portal_url) {
+          setPortalUrl(data.portal_url);
+        }
       }
       setShowForm(false);
       setEditing(null);
@@ -326,6 +331,65 @@ export function BillingCustomers() {
                   <Button type="submit" className="btn-gradient-primary flex-1">{editing ? 'Update Customer' : 'Create Customer'}</Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Portal URL Modal */}
+      {portalUrl && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="card-glow w-full max-w-md">
+            <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Customer Portal URL</CardTitle>
+                  <p className="text-sm text-zinc-400 mt-0.5">Share this link with your customer</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setPortalUrl(null)}><X className="w-5 h-5" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="bg-zinc-800 rounded-lg p-4 mb-4">
+                <div className="text-sm text-zinc-400 mb-2">Portal Link</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={portalUrl}
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(portalUrl);
+                      toast.success('URL copied to clipboard');
+                    }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-sm text-blue-300">
+                  <strong>Note:</strong> This link expires in 30 days. You can regenerate it anytime from the customer details page.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(portalUrl, '_blank')}
+                  className="flex-1"
+                >
+                  Open Portal
+                </Button>
+                <Button
+                  onClick={() => setPortalUrl(null)}
+                  className="btn-gradient-primary flex-1"
+                >
+                  Close
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
