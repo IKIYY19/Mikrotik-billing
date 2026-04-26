@@ -81,7 +81,7 @@ export function SettingsPage() {
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
     'network-map', 'monitoring', 'agents', 'auto-suspend', 'reports', 'analytics', 'pppoe', 'hotspot',
-    'vouchers', 'network-services', 'olt', 'fup', 'tr069', 'speedtest', 'monitoring', 'radius', 'tickets', 'captive-portal', 'bandwidth', 'resellers',
+    'vouchers', 'network-services', 'olt', 'fup', 'tr069', 'speedtest', 'alerts', 'radius', 'tickets', 'captive-portal', 'bandwidth', 'resellers',
     'backups', 'inventory', 'users',
   ];
 
