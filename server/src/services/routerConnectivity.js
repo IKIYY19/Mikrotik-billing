@@ -1,12 +1,27 @@
 /**
  * Router Connectivity Service (Phase 1 - Basic Online/Offline)
  * Simple service to check if MikroTik routers are online
+ * Phase 2: Creates alerts when routers go offline
  */
 
 const logger = require('../utils/logger');
+const { v4: uuidv4 } = require('uuid');
 
 // Check interval in milliseconds (2 minutes)
 const CHECK_INTERVAL = 2 * 60 * 1000;
+
+// Alert types
+const ALERT_TYPES = {
+  ROUTER_OFFLINE: 'router_offline',
+  ROUTER_ONLINE: 'router_online',
+};
+
+// Severity levels
+const SEVERITY = {
+  CRITICAL: 'critical',
+  WARNING: 'warning',
+  INFO: 'info',
+};
 
 class RouterConnectivityService {
   constructor() {
@@ -86,7 +101,7 @@ class RouterConnectivityService {
       
       // Get connection details
       const connectionResult = await db.query(
-        'SELECT id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type FROM mikrotik_connections WHERE id = $1',
+        'SELECT id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type, is_online FROM mikrotik_connections WHERE id = $1',
         [connectionId]
       );
 
@@ -96,6 +111,7 @@ class RouterConnectivityService {
       }
 
       const connection = connectionResult.rows[0];
+      const wasOnline = connection.is_online;
       let isOnline = false;
 
       // Use real MikroTik connection test based on connection type
@@ -113,9 +129,51 @@ class RouterConnectivityService {
         [isOnline, now.toISOString(), connectionId]
       );
 
+      // Create alert if status changed
+      if (wasOnline && !isOnline) {
+        await this.createAlert(connectionId, ALERT_TYPES.ROUTER_OFFLINE, SEVERITY.CRITICAL,
+          'Router Offline', `Router ${connection.name} (${connection.ip_address}) is not responding`);
+      } else if (!wasOnline && isOnline) {
+        await this.createAlert(connectionId, ALERT_TYPES.ROUTER_ONLINE, SEVERITY.INFO,
+          'Router Online', `Router ${connection.name} (${connection.ip_address}) is back online`);
+        // Resolve any open offline alerts
+        await this.resolveAlerts(connectionId, ALERT_TYPES.ROUTER_OFFLINE);
+      }
+
       logger.debug('Connectivity check completed', { connectionId, isOnline });
     } catch (error) {
       logger.error('Connectivity check failed', { connectionId, error: error.message });
+    }
+  }
+
+  // Create an alert
+  async createAlert(connectionId, alertType, severity, title, message) {
+    try {
+      const db = this.getDb();
+      await db.query(
+        `INSERT INTO alerts (id, connection_id, alert_type, severity, title, message, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'open', $7)`,
+        [uuidv4(), connectionId, alertType, severity, title, message, new Date().toISOString()]
+      );
+      logger.info('Alert created', { connectionId, alertType, severity, title });
+    } catch (error) {
+      logger.error('Failed to create alert', { connectionId, error: error.message });
+    }
+  }
+
+  // Resolve alerts for a specific connection and type
+  async resolveAlerts(connectionId, alertType) {
+    try {
+      const db = this.getDb();
+      await db.query(
+        `UPDATE alerts 
+         SET status = 'resolved', resolved_at = $1 
+         WHERE connection_id = $2 AND alert_type = $3 AND status = 'open'`,
+        [new Date().toISOString(), connectionId, alertType]
+      );
+      logger.info('Alerts resolved', { connectionId, alertType });
+    } catch (error) {
+      logger.error('Failed to resolve alerts', { connectionId, alertType, error: error.message });
     }
   }
 

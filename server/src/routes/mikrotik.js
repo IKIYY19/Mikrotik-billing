@@ -200,4 +200,92 @@ router.post('/:id/check', async (req, res) => {
   }
 });
 
+// Get alerts for a specific connection
+router.get('/:id/alerts', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, limit = 50 } = req.query;
+    
+    let query = 'SELECT * FROM alerts WHERE connection_id = $1';
+    const params = [id];
+    
+    if (status) {
+      query += ' AND status = $2';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
+    params.push(parseInt(limit));
+    
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all alerts (admin view)
+router.get('/alerts/all', async (req, res) => {
+  try {
+    const { status, limit = 100 } = req.query;
+    
+    let query = 'SELECT a.*, mc.name as connection_name, mc.ip_address FROM alerts a LEFT JOIN mikrotik_connections mc ON a.connection_id = mc.id WHERE 1=1';
+    const params = [];
+    
+    if (status) {
+      query += ' AND a.status = $1';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY a.created_at DESC LIMIT $' + (params.length + 1);
+    params.push(parseInt(limit));
+    
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Acknowledge an alert
+router.post('/alerts/:id/acknowledge', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    
+    const result = await db.query(
+      'UPDATE alerts SET status = $1, acknowledged_by = $2, acknowledged_at = $3 WHERE id = $4 RETURNING *',
+      ['acknowledged', userId, new Date().toISOString(), id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Resolve an alert
+router.post('/alerts/:id/resolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(
+      'UPDATE alerts SET status = $1, resolved_at = $2 WHERE id = $3 RETURNING *',
+      ['resolved', new Date().toISOString(), id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
