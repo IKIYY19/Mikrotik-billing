@@ -86,7 +86,7 @@ class RouterConnectivityService {
       
       // Get connection details
       const connectionResult = await db.query(
-        'SELECT id, name, ip_address FROM mikrotik_connections WHERE id = $1',
+        'SELECT id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type FROM mikrotik_connections WHERE id = $1',
         [connectionId]
       );
 
@@ -96,10 +96,14 @@ class RouterConnectivityService {
       }
 
       const connection = connectionResult.rows[0];
-      
-      // Simple ping check (replace with actual MikroTik API call later)
-      // For now, we'll simulate with a random success rate
-      const isOnline = Math.random() > 0.1; // 90% success rate for testing
+      let isOnline = false;
+
+      // Use real MikroTik connection test based on connection type
+      if (connection.connection_type === 'ssh') {
+        isOnline = await this.testSSHConnection(connection);
+      } else {
+        isOnline = await this.testAPIConnection(connection);
+      }
       
       // Update connection status
       await db.query(
@@ -112,6 +116,65 @@ class RouterConnectivityService {
       logger.debug('Connectivity check completed', { connectionId, isOnline });
     } catch (error) {
       logger.error('Connectivity check failed', { connectionId, error: error.message });
+    }
+  }
+
+  // Test MikroTik API connection
+  async testAPIConnection(connection) {
+    try {
+      const MikroNode = require('mikronode');
+      const crypto = require('crypto');
+      
+      // Decrypt password
+      const algorithm = 'aes-256-cbc';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 32);
+      const iv = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 16);
+      const decipher = crypto.createDecipheriv(algorithm, key, iv);
+      let password = decipher.update(connection.password_encrypted, 'hex', 'utf8');
+      password += decipher.final('utf8');
+
+      const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
+      const conn = await device.connect(connection.username, password);
+      conn.close();
+      
+      return true;
+    } catch (error) {
+      logger.warn('API connection test failed', { connectionId: connection.id, error: error.message });
+      return false;
+    }
+  }
+
+  // Test MikroTik SSH connection
+  async testSSHConnection(connection) {
+    try {
+      const { NodeSSH } = require('node-ssh');
+      const crypto = require('crypto');
+      
+      // Decrypt password
+      const algorithm = 'aes-256-cbc';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 32);
+      const iv = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 16);
+      const decipher = crypto.createDecipheriv(algorithm, key, iv);
+      let password = decipher.update(connection.password_encrypted, 'hex', 'utf8');
+      password += decipher.final('utf8');
+
+      const ssh = new NodeSSH();
+      await ssh.connect({
+        host: connection.ip_address,
+        port: connection.ssh_port || 22,
+        username: connection.username,
+        password: password,
+        readyTimeout: 10000,
+      });
+      
+      // Execute a simple command to verify connection
+      await ssh.execCommand('/system resource print');
+      ssh.dispose();
+      
+      return true;
+    } catch (error) {
+      logger.warn('SSH connection test failed', { connectionId: connection.id, error: error.message });
+      return false;
     }
   }
 }
