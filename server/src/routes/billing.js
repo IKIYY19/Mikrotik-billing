@@ -57,6 +57,73 @@ router.delete('/customers/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Generate/regenerate portal URL for customer
+router.post('/customers/:id/portal-url', async (req, res) => {
+  try {
+    const db = global.dbAvailable ? global.db : require('../db/memory');
+    const { v4: uuidv4 } = require('uuid');
+    
+    const newToken = uuidv4();
+    const tokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    const result = await db.query(
+      `UPDATE customers 
+       SET portal_token = $1, portal_token_expires = $2, updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, name, email, phone, portal_username, portal_token, portal_token_expires`,
+      [newToken, tokenExpires, req.params.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    const customer = result.rows[0];
+    const portalUrl = `${req.protocol}://${req.get('host')}/portal/${customer.portal_token}`;
+    
+    res.json({
+      portal_url: portalUrl,
+      portal_token: customer.portal_token,
+      portal_token_expires: customer.portal_token_expires,
+      portal_username: customer.portal_username || customer.email || customer.phone
+    });
+  } catch (e) {
+    console.error('Generate portal URL error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get customer portal info
+router.get('/customers/:id/portal-info', async (req, res) => {
+  try {
+    const db = global.dbAvailable ? global.db : require('../db/memory');
+    
+    const result = await db.query(
+      `SELECT id, name, email, phone, portal_username, portal_token, portal_token_expires 
+       FROM customers 
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    const customer = result.rows[0];
+    const portalUrl = customer.portal_token ? `${req.protocol}://${req.get('host')}/portal/${customer.portal_token}` : null;
+    
+    res.json({
+      portal_url: portalUrl,
+      portal_token: customer.portal_token,
+      portal_token_expires: customer.portal_token_expires,
+      portal_username: customer.portal_username || customer.email || customer.phone
+    });
+  } catch (e) {
+    console.error('Get portal info error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════
 // SERVICE PLANS
 // ═══════════════════════════════════════
