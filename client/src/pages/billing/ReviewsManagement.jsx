@@ -23,7 +23,7 @@ export function ReviewsManagement() {
   const fetchReviews = async () => {
     try {
       const token = getToken();
-      const { data } = await axios.get(`${API}/portal/admin/reviews`, {
+      const { data } = await axios.get(`${API}/billing/reviews`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReviews(data);
@@ -38,7 +38,7 @@ export function ReviewsManagement() {
   const fetchStaffPoints = async () => {
     try {
       const token = getToken();
-      const { data } = await axios.get(`${API}/portal/admin/staff-points`, {
+      const { data } = await axios.get(`${API}/billing/staff-points`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setStaffPoints(data);
@@ -51,7 +51,7 @@ export function ReviewsManagement() {
   const fetchStaffHistory = async (userId) => {
     try {
       const token = getToken();
-      const { data } = await axios.get(`${API}/portal/admin/staff-points/${userId}`, {
+      const { data } = await axios.get(`${API}/billing/staff-points/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setStaffHistory(data);
