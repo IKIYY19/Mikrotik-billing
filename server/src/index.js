@@ -415,7 +415,9 @@ const startServer = async () => {
         // Start TR-069 ACS service
         try {
           const tr069Service = require('./services/tr069Service');
-          await tr069Service.start();
+          tr069Service.start().catch(err => {
+            logger.error('Failed to initialize TR-069 ACS service', { error: err.message });
+          });
         } catch (error) {
           logger.error('Failed to initialize TR-069 ACS service', { error: error.message });
         }
