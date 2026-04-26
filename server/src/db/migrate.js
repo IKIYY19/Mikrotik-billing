@@ -223,9 +223,7 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
 
-  // Disable alerts migration temporarily - causing black screen
-  /*
-  // Add alerts table (Phase 2 - basic alerts)
+  // Add alerts table (Phase 2 - basic alerts) - with error handling in migration runner
   `CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
@@ -245,7 +243,6 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(created_at)`,
-  */
 
   // Disable monitoring migrations - causing black screen
   /*
@@ -322,9 +319,14 @@ async function runMigrations() {
   console.log('Running database migrations...');
   try {
     for (const migration of coreMigrations) {
-      await db.query(migration);
+      try {
+        await db.query(migration);
+      } catch (error) {
+        console.error('Migration failed (continuing anyway):', error.message);
+        // Continue with other migrations even if one fails
+      }
     }
-    console.log('Core migrations completed successfully');
+    console.log('Core migrations completed');
 
     const authOk = await runAuthMigrations();
     if (!authOk) {
