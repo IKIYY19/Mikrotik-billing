@@ -444,9 +444,9 @@ export function CustomerPortal() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <div className="text-white font-semibold">KES {inv.amount.toFixed(2)}</div>
+                          <div className="text-white font-semibold">KES {parseFloat(inv.amount || 0).toFixed(2)}</div>
                           <div className={`text-xs ${inv.balance > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                            {inv.balance > 0 ? `Balance: KES ${inv.balance.toFixed(2)}` : 'Paid'}
+                            {inv.balance > 0 ? `Balance: KES ${parseFloat(inv.balance || 0).toFixed(2)}` : 'Paid'}
                           </div>
                         </div>
                         <button onClick={() => downloadInvoice(inv)} className="p-2 hover:bg-zinc-700/50 rounded-lg transition-colors" title="Download PDF">
@@ -649,7 +649,7 @@ export function CustomerPortal() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="text-white font-semibold">KES {inv.amount.toFixed(2)}</div>
+                        <div className="text-white font-semibold">KES {parseFloat(inv.amount || 0).toFixed(2)}</div>
                         <span className={`inline-block px-2 py-0.5 rounded text-xs ${
                           inv.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' :
                           inv.status === 'partial' ? 'bg-blue-500/20 text-blue-400' :
@@ -693,7 +693,7 @@ export function CustomerPortal() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="text-emerald-400 font-semibold">KES {payment.amount.toFixed(2)}</div>
+                        <div className="text-emerald-400 font-semibold">KES {parseFloat(payment.amount || 0).toFixed(2)}</div>
                         <div className="text-zinc-500 text-xs">Ref: {payment.reference || 'N/A'}</div>
                       </div>
                       <button onClick={() => downloadReceipt(payment)} className="p-2 hover:bg-zinc-700/50 rounded-lg transition-colors" title="Download Receipt">
@@ -849,7 +849,7 @@ export function CustomerPortal() {
                       {data.recent_payments.map(payment => (
                         <div key={payment.id} className="bg-zinc-900/50 rounded p-3">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-white font-medium">KES {payment.amount?.toFixed(2)}</span>
+                            <span className="text-sm text-white font-medium">KES {parseFloat(payment.amount || 0).toFixed(2)}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${
                               payment.status === 'completed' ? 'bg-green-500/20 text-green-400' :
                               payment.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :

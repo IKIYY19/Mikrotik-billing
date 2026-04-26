@@ -185,9 +185,9 @@ export function CustomerPortal() {
               {data.recent_invoices?.map(inv => (
                 <tr key={inv.id} className="border-t border-slate-700 hover:bg-slate-700/50">
                   <td className="p-3 text-blue-400 font-mono text-xs">{inv.invoice_number}</td>
-                  <td className="p-3 text-white">KES {inv.amount.toFixed(2)}</td>
-                  <td className="p-3 text-green-400">KES {(inv.paid_amount || 0).toFixed(2)}</td>
-                  <td className={`p-3 font-semibold ${inv.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>KES {inv.balance.toFixed(2)}</td>
+                  <td className="p-3 text-white">KES {parseFloat(inv.amount || 0).toFixed(2)}</td>
+                  <td className="p-3 text-green-400">KES {parseFloat(inv.paid_amount || 0).toFixed(2)}</td>
+                  <td className={`p-3 font-semibold ${inv.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>KES {parseFloat(inv.balance || 0).toFixed(2)}</td>
                   <td className="p-3 text-slate-400">{inv.due_date}</td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded text-xs ${
@@ -224,7 +224,7 @@ export function CustomerPortal() {
               {data.recent_payments?.map(pay => (
                 <tr key={pay.id} className="border-t border-slate-700">
                   <td className="p-3 text-blue-400 font-mono text-xs">{pay.receipt_number}</td>
-                  <td className="p-3 text-green-400 font-semibold">KES {pay.amount.toFixed(2)}</td>
+                  <td className="p-3 text-green-400 font-semibold">KES {parseFloat(pay.amount || 0).toFixed(2)}</td>
                   <td className="p-3 text-slate-300 capitalize">{pay.method.replace('_', ' ')}</td>
                   <td className="p-3 text-slate-400 text-xs">{new Date(pay.received_at).toLocaleDateString()}</td>
                 </tr>

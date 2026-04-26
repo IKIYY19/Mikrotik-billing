@@ -73,27 +73,27 @@ export function generateInvoicePDF(invoice, customer) {
         <tbody>
           <tr>
             <td>${invoice.description || 'Monthly subscription fee'}</td>
-            <td style="text-align: right;">KES ${invoice.amount.toFixed(2)}</td>
+            <td style="text-align: right;">KES ${parseFloat(invoice.amount || 0).toFixed(2)}</td>
           </tr>
           ${invoice.late_fee ? `
           <tr>
             <td>Late payment fee</td>
-            <td style="text-align: right;">KES ${invoice.late_fee.toFixed(2)}</td>
+            <td style="text-align: right;">KES ${parseFloat(invoice.late_fee || 0).toFixed(2)}</td>
           </tr>
           ` : ''}
         </tbody>
         <tfoot>
           <tr class="total-row">
             <td>Total Amount</td>
-            <td style="text-align: right;">KES ${(invoice.amount + (invoice.late_fee || 0)).toFixed(2)}</td>
+            <td style="text-align: right;">KES ${(parseFloat(invoice.amount || 0) + parseFloat(invoice.late_fee || 0)).toFixed(2)}</td>
           </tr>
           <tr>
             <td>Amount Paid</td>
-            <td style="text-align: right; color: #16a34a;">KES ${(invoice.paid_amount || 0).toFixed(2)}</td>
+            <td style="text-align: right; color: #16a34a;">KES ${parseFloat(invoice.paid_amount || 0).toFixed(2)}</td>
           </tr>
           <tr class="total-row">
             <td>Balance Due</td>
-            <td style="text-align: right; color: #dc2626;">KES ${(invoice.balance || invoice.amount - (invoice.paid_amount || 0)).toFixed(2)}</td>
+            <td style="text-align: right; color: #dc2626;">KES ${parseFloat(invoice.balance || parseFloat(invoice.amount || 0) - parseFloat(invoice.paid_amount || 0)).toFixed(2)}</td>
           </tr>
         </tfoot>
       </table>
@@ -150,7 +150,7 @@ export function generateReceiptPDF(payment, invoice, customer) {
 
       <div class="amount-box">
         <div class="amount-label">Amount Paid</div>
-        <div class="amount-value">KES ${payment.amount.toFixed(2)}</div>
+        <div class="amount-value">KES ${parseFloat(payment.amount || 0).toFixed(2)}</div>
       </div>
 
       <div class="info-grid">
@@ -184,9 +184,9 @@ export function generateReceiptPDF(payment, invoice, customer) {
         <tbody>
           <tr>
             <td>${invoice?.invoice_number || 'N/A'}</td>
-            <td>KES ${invoice?.amount.toFixed(2) || '0.00'}</td>
-            <td>KES ${payment.amount.toFixed(2)}</td>
-            <td>KES ${((invoice?.balance || 0) - payment.amount).toFixed(2)}</td>
+            <td>KES ${parseFloat(invoice?.amount || 0).toFixed(2) || '0.00'}</td>
+            <td>KES ${parseFloat(payment.amount || 0).toFixed(2)}</td>
+            <td>KES ${(parseFloat(invoice?.balance || 0) - parseFloat(payment.amount || 0)).toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
