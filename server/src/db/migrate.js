@@ -223,19 +223,16 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
 
-  // Disable alerts migration - foreign key constraints causing black screen
-  // Will try alternative approach without foreign keys
-  /*
-  // Add alerts table (Phase 2 - basic alerts) - with error handling in migration runner
+  // Add alerts table (Phase 2 - basic alerts) - WITHOUT foreign keys first
   `CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
+    connection_id UUID,
     alert_type VARCHAR(50) NOT NULL,
     severity VARCHAR(20) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     status VARCHAR(20) DEFAULT 'open',
-    acknowledged_by UUID REFERENCES users(id),
+    acknowledged_by UUID,
     acknowledged_at TIMESTAMP,
     resolved_at TIMESTAMP,
     metadata JSONB,
@@ -246,7 +243,10 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(created_at)`,
-  */
+
+  // Add foreign keys separately with error handling
+  `ALTER TABLE alerts ADD CONSTRAINT IF NOT EXISTS fk_alerts_connection FOREIGN KEY (connection_id) REFERENCES mikrotik_connections(id) ON DELETE CASCADE`,
+  `ALTER TABLE alerts ADD CONSTRAINT IF NOT EXISTS fk_alerts_user FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL`,
 
   // Disable monitoring migrations - causing black screen
   /*
