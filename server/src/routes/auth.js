@@ -66,7 +66,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    await db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.rows[0].id]);
+    await db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP, is_online = true WHERE id = $1', [user.rows[0].id]);
 
     const token = jwt.sign({ id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
