@@ -79,7 +79,7 @@ router.post('/customers/:id/portal-url', async (req, res) => {
     }
     
     const customer = result.rows[0];
-    const portalUrl = `${req.protocol}://${req.get('host')}/portal/${customer.portal_token}`;
+    const portalUrl = `${req.protocol}://${req.get('host')}/portal/token/${customer.portal_token}`;
     
     res.json({
       portal_url: portalUrl,
@@ -110,7 +110,7 @@ router.get('/customers/:id/portal-info', async (req, res) => {
     }
     
     const customer = result.rows[0];
-    const portalUrl = customer.portal_token ? `${req.protocol}://${req.get('host')}/portal/${customer.portal_token}` : null;
+    const portalUrl = customer.portal_token ? `${req.protocol}://${req.get('host')}/portal/token/${customer.portal_token}` : null;
     
     res.json({
       portal_url: portalUrl,
@@ -120,6 +120,42 @@ router.get('/customers/:id/portal-info', async (req, res) => {
     });
   } catch (e) {
     console.error('Get portal info error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Generate new password for customer
+router.post('/customers/:id/reset-password', async (req, res) => {
+  try {
+    const db = global.dbAvailable ? global.db : require('../db/memory');
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+    
+    // Generate random 8-character password
+    const newPassword = crypto.randomBytes(4).toString('hex');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    
+    const result = await db.query(
+      `UPDATE customers 
+       SET portal_password_hash = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, email, phone, portal_username`,
+      [passwordHash, req.params.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    const customer = result.rows[0];
+    
+    res.json({
+      success: true,
+      password: newPassword,
+      portal_username: customer.portal_username || customer.email || customer.phone
+    });
+  } catch (e) {
+    console.error('Reset password error:', e);
     res.status(500).json({ error: e.message });
   }
 });
