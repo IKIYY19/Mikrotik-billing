@@ -3,7 +3,8 @@ import axios from 'axios';
 import {
   BarChart3, Activity, Gauge, FileText, Receipt, Ticket, Lock, Smartphone,
   MessageSquare, Plus, Clock, CheckCircle, AlertCircle, X, Key, History, User, CreditCard, Settings,
-  Wifi, Download, Upload, AlertTriangle, DollarSign, TrendingUp, Calendar, Bell, Zap, Printer, ExternalLink
+  Wifi, Download, Upload, AlertTriangle, DollarSign, TrendingUp, Calendar, Bell, Zap, Printer, ExternalLink,
+  Star, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 import { generateInvoicePDF, generateReceiptPDF } from '../../utils/pdfGenerator';
@@ -52,12 +53,17 @@ export function CustomerPortal() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, service_quality: 'good', comment: '' });
+  const [customerReview, setCustomerReview] = useState(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     fetchData();
     fetchPaymentHistory();
     fetchSupportTickets();
     fetchBandwidthHistory();
+    fetchCustomerReview();
   }, [customerId]);
 
   useEffect(() => {
@@ -217,6 +223,32 @@ export function CustomerPortal() {
     setChangingPassword(false);
   };
 
+  const fetchCustomerReview = async () => {
+    try {
+      const { data } = await axios.get(`${API}/portal/${customerId}/reviews`);
+      if (data.has_review) {
+        setCustomerReview(data.review);
+      }
+    } catch (e) {
+      console.error('Failed to fetch review:', e);
+    }
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    setSubmittingReview(true);
+    try {
+      await axios.post(`${API}/portal/${customerId}/reviews`, reviewForm);
+      setShowReviewModal(false);
+      setReviewForm({ rating: 5, service_quality: 'good', comment: '' });
+      toast.success('Thank you for your feedback!');
+      fetchCustomerReview();
+    } catch (e) {
+      toast.error('Failed to submit review', e.response?.data?.error || e.message);
+    }
+    setSubmittingReview(false);
+  };
+
   const downloadInvoice = (invoice) => {
     generateInvoicePDF(invoice, data?.customer || {});
   };
@@ -240,6 +272,7 @@ export function CustomerPortal() {
     { id: 'payments', label: 'Payments', icon: Receipt },
     { id: 'support', label: 'Support', icon: Ticket },
     { id: 'history', label: 'History', icon: History },
+    { id: 'review', label: 'Review', icon: Star },
     { id: 'settings', label: 'Settings', icon: Lock },
   ];
 
@@ -846,7 +879,149 @@ export function CustomerPortal() {
           </div>
         )}
 
+        {/* Review Tab */}
+        {activeTab === 'review' && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-400" />
+                Rate Our Service
+              </h3>
+              
+              {customerReview ? (
+                <div className="bg-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-white font-medium text-lg">Your Review</div>
+                      <div className="text-sm text-zinc-500">
+                        Submitted on {new Date(customerReview.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowReviewModal(true)}
+                      className="text-blue-400 hover:text-blue-300 text-sm"
+                    >
+                      Update Review
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-6 h-6 ${
+                          star <= customerReview.rating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-600'
+                        }`}
+                      />
+                    ))}
+                    <span className="text-white font-semibold ml-2">{customerReview.rating}/5</span>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      customerReview.service_quality === 'bad' ? 'bg-red-500/20 text-red-400' :
+                      customerReview.service_quality === 'satisfactory' ? 'bg-yellow-500/20 text-yellow-400' :
+                      customerReview.service_quality === 'good' ? 'bg-blue-500/20 text-blue-400' :
+                      customerReview.service_quality === 'excellent' ? 'bg-green-500/20 text-green-400' :
+                      'bg-purple-500/20 text-purple-400'
+                    }`}>
+                      {customerReview.service_quality.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                  
+                  {customerReview.comment && (
+                    <div className="bg-zinc-900/50 rounded-lg p-4">
+                      <p className="text-zinc-300">{customerReview.comment}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Star className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                  <p className="text-zinc-400 mb-6">You haven't rated our service yet</p>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+                  >
+                    <Star className="w-5 h-5" />
+                    Leave a Review
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-zinc-800/50 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Rate Our Service</h3>
+              <button onClick={() => setShowReviewModal(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitReview} className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-3">Overall Rating</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`w-8 h-8 ${
+                          star <= reviewForm.rating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-600'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-white font-semibold ml-2">{reviewForm.rating}/5</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Service Quality</label>
+                <select
+                  value={reviewForm.service_quality}
+                  onChange={e => setReviewForm({ ...reviewForm, service_quality: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                >
+                  <option value="bad">Bad - Below expectations</option>
+                  <option value="satisfactory">Satisfactory - Met expectations</option>
+                  <option value="good">Good - Above expectations</option>
+                  <option value="excellent">Excellent - Far exceeded expectations</option>
+                  <option value="over_expectation">Over Expectation - Outstanding service</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Comments (Optional)</label>
+                <textarea
+                  value={reviewForm.comment}
+                  onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  rows="4"
+                  placeholder="Tell us more about your experience..."
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowReviewModal(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={submittingReview} className={`btn-primary flex-1 ${submittingReview ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Password Change Modal */}
       {showPasswordModal && (
