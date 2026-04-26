@@ -47,6 +47,8 @@ import SetupWizard from './pages/SetupWizard';
 import { UserManagement } from './pages/UserManagement';
 import IntegrationsSettings from './pages/IntegrationsSettings';
 import { SettingsPage } from './pages/SettingsPage';
+import { FUPProfiles } from './pages/network/FUPProfiles';
+import { TR069Devices } from './pages/network/TR069Devices';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -116,6 +118,8 @@ function App() {
                     <Route path="/hotspot-vouchers" element={<HotspotVouchers />} />
                     <Route path="/network-services" element={<NetworkServices />} />
                     <Route path="/olt" element={<OLTManagement />} />
+                    <Route path="/fup" element={<FUPProfiles />} />
+                    <Route path="/tr069" element={<TR069Devices />} />
                     <Route path="/radius" element={<RadiusManagement />} />
                     <Route path="/tickets" element={<TicketSystem />} />
                     <Route path="/captive-portal" element={<CaptivePortalBuilder />} />

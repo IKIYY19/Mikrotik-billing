@@ -33,6 +33,8 @@ import {
   User,
   Key,
   Radio,
+  Gauge,
+  Router,
 } from 'lucide-react';
 import { clearAuth } from '../lib/auth';
 import { SearchButton } from './GlobalSearch';
@@ -70,6 +72,8 @@ const billingItems = [
   { to: '/hotspot-vouchers', icon: Ticket, label: 'Vouchers', feature: 'vouchers' },
   { to: '/network-services', icon: Server, label: 'Network', feature: 'network-services' },
   { to: '/olt', icon: Radio, label: 'OLT/Fiber', feature: 'olt' },
+  { to: '/fup', icon: Gauge, label: 'FUP Profiles', feature: 'fup' },
+  { to: '/tr069', icon: Router, label: 'TR-069 CPE', feature: 'tr069' },
   { to: '/radius', icon: Shield, label: 'RADIUS', feature: 'radius' },
   { to: '/tickets', icon: LifeBuoy, label: 'Support', feature: 'tickets' },
   { to: '/captive-portal', icon: Palette, label: 'Portal Builder', feature: 'captive-portal' },
