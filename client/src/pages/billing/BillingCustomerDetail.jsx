@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, User, Package, FileText, CreditCard, Activity, MapPin, Mail, Phone, Hash, Link, Copy, ExternalLink, RefreshCw } from 'lucide-react';
-import { useToast } from '../ui/use-toast';
+import { useToast } from '../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
