@@ -34,7 +34,9 @@ router.get('/customers/:id', async (req, res) => {
 router.post('/customers', async (req, res) => {
   try {
     const customer = await billing.createCustomer(req.body);
-    res.status(201).json(customer);
+    // Generate portal URL
+    const portalUrl = `${req.protocol}://${req.get('host')}/portal/${customer.portal_token}`;
+    res.status(201).json({ ...customer, portal_url: portalUrl });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

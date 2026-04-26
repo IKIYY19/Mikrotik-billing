@@ -79,6 +79,8 @@ module.exports = {
       status: data.status || 'active',
       notes: data.notes || '',
       fup_profile_id: data.fup_profile_id || null,
+      portal_token: uuidv4(),
+      portal_token_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

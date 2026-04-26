@@ -124,6 +124,17 @@ router.get('/:customerId/dashboard', async (req, res) => {
     );
     const payments = payResult.rows;
 
+    // Get tickets
+    const ticketResult = await db.query(
+      `SELECT t.*, tc.name as category_name, tc.color as category_color
+       FROM tickets t
+       LEFT JOIN ticket_categories tc ON tc.id = t.category_id
+       WHERE t.customer_id = $1
+       ORDER BY t.created_at DESC LIMIT 10`,
+      [customer.id]
+    );
+    const tickets = ticketResult.rows;
+
     const outstanding = invoices.filter(i => i.status !== 'paid').reduce((sum, i) => sum + i.total - (i.paid_amount || 0), 0);
 
     // Get usage from RADIUS store (simplified)
@@ -137,6 +148,7 @@ router.get('/:customerId/dashboard', async (req, res) => {
       outstanding_balance: outstanding,
       recent_invoices: invoices.slice(0, 5),
       recent_payments: payments,
+      recent_tickets: tickets,
     });
   } catch (e) {
     console.error('Dashboard error:', e);
