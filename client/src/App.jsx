@@ -28,6 +28,7 @@ import { MonitoringDashboard } from './pages/billing/MonitoringDashboard';
 import { AgentResellerPage } from './pages/billing/AgentResellerPage';
 import { AutoSuspendPage } from './pages/billing/AutoSuspendPage';
 import { CustomerPortal } from './pages/billing/EnhancedCustomerPortal';
+import { ReviewsManagement } from './pages/billing/ReviewsManagement';
 import { FinancialReports } from './pages/billing/FinancialReports';
 import { WhatsAppPage } from './pages/billing/WhatsAppPage';
 import { MapView } from './pages/billing/MapView';
@@ -139,6 +140,7 @@ function App() {
                     <Route path="/billing-monitoring" element={<MonitoringDashboard />} />
                     <Route path="/billing-agents" element={<AgentResellerPage />} />
                     <Route path="/billing-auto-suspend" element={<AutoSuspendPage />} />
+                    <Route path="/billing-reviews" element={<ReviewsManagement />} />
                     <Route path="/billing-reports" element={<FinancialReports />} />
                     <Route path="/billing-backup" element={<BackupPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />

@@ -27,6 +27,8 @@ const ROLES = {
   TECHNICIAN: 'technician',
   RESELLER: 'reseller',
   CUSTOMER: 'customer',
+  CUSTOMER_CARE: 'customer_care',
+  SALES_TEAM: 'sales_team',
 };
 
 const ROLE_COLORS = {
@@ -35,6 +37,8 @@ const ROLE_COLORS = {
   technician: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
   reseller: 'bg-green-500/20 text-green-400 border-green-500/30',
   customer: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+  customer_care: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
+  sales_team: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
 };
 
 const STATUS_COLORS = {
