@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Users, Tag, Plus, DollarSign, Package, RefreshCw, Copy, Check, UserPlus } from 'lucide-react';
+import { Users, Tag, Plus, DollarSign, Package, RefreshCw, Copy, Check, UserPlus, Trash2, Edit } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -15,6 +15,7 @@ export function AgentResellerPage() {
 
   // Agent form
   const [showAgentForm, setShowAgentForm] = useState(false);
+  const [editingAgent, setEditingAgent] = useState(null);
   const [agentForm, setAgentForm] = useState({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 });
 
   // Voucher generation
@@ -40,10 +41,44 @@ export function AgentResellerPage() {
 
   const handleCreateAgent = async (e) => {
     e.preventDefault();
-    await axios.post(`${API}/features/agents`, agentForm);
-    setShowAgentForm(false);
-    setAgentForm({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 });
-    fetchAgents();
+    try {
+      if (editingAgent) {
+        await axios.put(`${API}/features/agents/${editingAgent.id}`, agentForm);
+        toast.success('Agent updated successfully');
+      } else {
+        await axios.post(`${API}/features/agents`, agentForm);
+        toast.success('Agent created successfully');
+      }
+      setShowAgentForm(false);
+      setEditingAgent(null);
+      setAgentForm({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 });
+      fetchAgents();
+    } catch (error) {
+      toast.error('Failed to save agent', error.response?.data?.error || error.message);
+    }
+  };
+
+  const handleEditAgent = (agent) => {
+    setEditingAgent(agent);
+    setAgentForm({
+      name: agent.name,
+      phone: agent.phone,
+      email: agent.email,
+      branch_id: agent.branch_id,
+      commission_rate: agent.commission_rate
+    });
+    setShowAgentForm(true);
+  };
+
+  const handleDeleteAgent = async (agentId) => {
+    if (!confirm('Are you sure you want to delete this agent?')) return;
+    try {
+      await axios.delete(`${API}/features/agents/${agentId}`);
+      toast.success('Agent deleted successfully');
+      fetchAgents();
+    } catch (error) {
+      toast.error('Failed to delete agent', error.response?.data?.error || error.message);
+    }
   };
 
   const handleGenerateVouchers = async (e) => {
@@ -123,6 +158,7 @@ export function AgentResellerPage() {
                   <th className="text-left p-3">Revenue</th>
                   <th className="text-left p-3">Balance</th>
                   <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,6 +175,16 @@ export function AgentResellerPage() {
                     <td className={`p-3 font-semibold ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleEditAgent(a)} className="text-blue-400 hover:text-blue-300" title="Edit">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteAgent(a.id)} className="text-red-400 hover:text-red-300" title="Delete">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -244,24 +290,39 @@ export function AgentResellerPage() {
       {showAgentForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-800 rounded-lg w-full max-w-lg p-6">
-            <h3 className="text-white font-semibold mb-4">Add Agent</h3>
+            <h3 className="text-white font-semibold mb-4">{editingAgent ? 'Edit Agent' : 'Add Agent'}</h3>
             <form onSubmit={handleCreateAgent} className="space-y-4">
-              <input required value={agentForm.name} onChange={e => setAgentForm({...agentForm, name: e.target.value})}
-                placeholder="Agent name" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              <input value={agentForm.phone} onChange={e => setAgentForm({...agentForm, phone: e.target.value})}
-                placeholder="Phone" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              <input value={agentForm.email} onChange={e => setAgentForm({...agentForm, email: e.target.value})}
-                placeholder="Email" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              <select value={agentForm.branch_id} onChange={e => setAgentForm({...agentForm, branch_id: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                <option value="">Select branch</option>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-              <input type="number" value={agentForm.commission_rate} onChange={e => setAgentForm({...agentForm, commission_rate: parseInt(e.target.value)})}
-                placeholder="Commission %" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Agent Name *</label>
+                <input required value={agentForm.name} onChange={e => setAgentForm({...agentForm, name: e.target.value})}
+                  placeholder="Agent name" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Phone</label>
+                <input value={agentForm.phone} onChange={e => setAgentForm({...agentForm, phone: e.target.value})}
+                  placeholder="Phone" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Email</label>
+                <input type="email" value={agentForm.email} onChange={e => setAgentForm({...agentForm, email: e.target.value})}
+                  placeholder="Email" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Branch</label>
+                <select value={agentForm.branch_id} onChange={e => setAgentForm({...agentForm, branch_id: e.target.value})}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
+                  <option value="">Select branch</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Commission Rate (%)</label>
+                <input type="number" min="0" max="100" value={agentForm.commission_rate} onChange={e => setAgentForm({...agentForm, commission_rate: parseInt(e.target.value)})}
+                  placeholder="Commission %" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
+              </div>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setShowAgentForm(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">Create</button>
+                <button type="button" onClick={() => { setShowAgentForm(false); setEditingAgent(null); setAgentForm({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 }); }} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">{editingAgent ? 'Update' : 'Create'}</button>
               </div>
             </form>
           </div>
