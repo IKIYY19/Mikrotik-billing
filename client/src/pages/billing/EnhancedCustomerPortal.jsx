@@ -6,7 +6,7 @@ import { generateInvoicePDF, generateReceiptPDF } from '../../utils/pdfGenerator
 import {
   Smartphone, Wifi, Download, Upload, FileText, CreditCard, Clock, AlertTriangle,
   CheckCircle, DollarSign, MessageSquare, BarChart3, Gauge, Ticket, Receipt,
-  TrendingUp, Calendar, Bell, Zap, Activity, Printer, ExternalLink, X
+  TrendingUp, Calendar, Bell, Zap, Activity, Printer, ExternalLink, X, Lock, Key
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -50,6 +50,9 @@ export function CustomerPortal() {
   const [payAmount, setPayAmount] = useState('');
   const [paying, setPaying] = useState(false);
   const [usageAlerts, setUsageAlerts] = useState([]);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -189,6 +192,32 @@ export function CustomerPortal() {
     setPaying(false);
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (passwordForm.new_password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    
+    setChangingPassword(true);
+    try {
+      await axios.post(`${API}/portal/${customerId}/change-password`, {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      setShowPasswordModal(false);
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+      toast.success('Password changed successfully');
+    } catch (e) {
+      toast.error('Failed to change password', e.response?.data?.error || e.message);
+    }
+    setChangingPassword(false);
+  };
+
   const downloadInvoice = (invoice) => {
     generateInvoicePDF(invoice, data?.customer || {});
   };
@@ -211,6 +240,7 @@ export function CustomerPortal() {
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'payments', label: 'Payments', icon: Receipt },
     { id: 'support', label: 'Support', icon: Ticket },
+    { id: 'settings', label: 'Settings', icon: Lock },
   ];
 
   return (
@@ -684,7 +714,138 @@ export function CustomerPortal() {
             )}
           </div>
         )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="text-white font-semibold flex items-center gap-2 mb-6">
+                <Key className="w-5 h-5" />
+                WiFi Password
+              </h3>
+              
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-zinc-400 text-sm">Current password status</div>
+                  <div className="text-white font-medium mt-1">
+                    {data.customer?.wifi_password ? 'Password set' : 'No password set'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Lock className="w-4 h-4" />
+                  Change Password
+                </button>
+              </div>
+
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Bell className="w-5 h-5 text-amber-400 mt-0.5" />
+                  <div className="text-sm text-zinc-400">
+                    <span className="text-amber-300 font-medium">Note:</span> Changing your WiFi password will update it on your connected devices. Make sure to update the password on all your devices after changing.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="text-white font-semibold flex items-center gap-2 mb-4">
+                <Wifi className="w-5 h-5" />
+                Connection Details
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
+                  <span className="text-zinc-400">Username</span>
+                  <span className="text-white font-medium">{data.customer?.username || data.customer?.phone}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
+                  <span className="text-zinc-400">Plan</span>
+                  <span className="text-white font-medium">{data.subscription?.plan_name || 'No plan'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
+                  <span className="text-zinc-400">Speed</span>
+                  <span className="text-white font-medium">{data.subscription?.speed || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-zinc-400">Status</span>
+                  <span className={`font-medium ${data.customer?.status === 'active' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {data.customer?.status || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPasswordModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-zinc-800/50 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Change WiFi Password</h3>
+              <button onClick={() => setShowPasswordModal(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.current_password}
+                  onChange={e => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.new_password}
+                  onChange={e => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Enter new password (min 6 characters)"
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Confirm New Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.confirm_password}
+                  onChange={e => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Confirm new password"
+                  minLength={6}
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Ticket Form Modal */}
       {showTicketForm && (
