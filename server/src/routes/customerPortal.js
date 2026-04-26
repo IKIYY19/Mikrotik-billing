@@ -11,6 +11,7 @@ const billing = require('../db/billingStore');
 const radiusStore = require('../db/radiusStore');
 const MpesaService = require('../services/mpesa');
 const { triggerSMS } = require('./sms');
+const db = global.dbAvailable ? global.db : require('../db/memory');
 
 // ─══════════════════════════════════════
 // CUSTOMER PORTAL
@@ -138,34 +139,53 @@ router.post('/:customerId/pay', async (req, res) => {
 });
 
 // Customer open ticket
-router.post('/:customerId/tickets', (req, res) => {
-  const { subject, description, category } = req.body;
-  const customer = billing.store.customers.find(c => c.id === req.params.customerId);
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
+router.post('/:customerId/tickets', async (req, res) => {
+  try {
+    const { subject, description, category } = req.body;
+    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
 
-  const ticket = {
-    id: uuidv4(),
-    customer_id: customer.id,
-    subject,
-    description,
-    category: category || 'general',
-    status: 'open',
-    priority: 'medium',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+    // Create ticket in database (same as admin system)
+    const id = uuidv4();
+    const ticketNumber = `TKT-${Date.now().toString().slice(-8)}`;
 
-  // Store in multiFeatureStore
-  const multiStore = require('../db/multiFeatureStore');
-  multiStore.tickets = multiStore.tickets || [];
-  multiStore.tickets.push(ticket);
+    // Get category ID if category name provided
+    let categoryId = null;
+    if (category) {
+      const catResult = await db.query(
+        'SELECT id FROM ticket_categories WHERE name ILIKE $1',
+        [category]
+      );
+      if (catResult.rows.length > 0) {
+        categoryId = catResult.rows[0].id;
+      }
+    }
 
-  // Send SMS confirmation
-  if (customer.phone) {
-    triggerSMS('payment_received', { customer, payment: { reference: ticket.id } }).catch(() => {});
+    const result = await db.query(
+      `INSERT INTO tickets (id, ticket_number, customer_id, category_id, subject, description, priority, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'medium', 'open') RETURNING *`,
+      [id, ticketNumber, customer.id, categoryId, subject, description]
+    );
+
+    // Add initial message from customer
+    await db.query(
+      `INSERT INTO ticket_messages (ticket_id, user_id, message, is_internal) VALUES ($1, NULL, $2, false)`,
+      [id, description]
+    );
+
+    // Send SMS confirmation
+    if (customer.phone) {
+      triggerSMS('payment_received', { customer, payment: { reference: ticketNumber } }).catch(() => {});
+    }
+
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('Ticket creation error:', e);
+    res.status(500).json({ error: e.message });
   }
-
-  res.status(201).json(ticket);
 });
 
 // ─══════════════════════════════════════
@@ -530,34 +550,21 @@ router.get('/:customerId/payments', (req, res) => {
 });
 
 // Get customer support tickets
-router.get('/:customerId/tickets', (req, res) => {
+router.get('/:customerId/tickets', async (req, res) => {
   try {
-    const tickets = billing.store.tickets
-      .filter(t => t.customer_id === req.params.customerId)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    res.json(tickets);
+    const result = await db.query(
+      `SELECT t.*, tc.name as category_name, tc.color as category_color,
+              (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) as reply_count,
+              (SELECT MAX(created_at) FROM ticket_messages WHERE ticket_id = t.id) as last_reply_at
+       FROM tickets t
+       LEFT JOIN ticket_categories tc ON tc.id = t.category_id
+       WHERE t.customer_id = $1
+       ORDER BY t.created_at DESC`,
+      [req.params.customerId]
+    );
+    res.json(result.rows);
   } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Create support ticket
-router.post('/:customerId/tickets', (req, res) => {
-  try {
-    const { subject, description, category } = req.body;
-    const ticket = {
-      id: uuidv4(),
-      customer_id: req.params.customerId,
-      subject,
-      description,
-      category: category || 'general',
-      status: 'open',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    billing.store.tickets.push(ticket);
-    res.status(201).json(ticket);
-  } catch (e) {
+    console.error('Failed to fetch tickets:', e);
     res.status(500).json({ error: e.message });
   }
 });
