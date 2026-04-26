@@ -12,6 +12,9 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  Clock,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { getToken } from '../lib/auth';
@@ -482,6 +485,22 @@ export function UserManagement() {
     });
   };
 
+  const formatLastSeen = (dateStr) => {
+    if (!dateStr) return 'Never';
+    const now = new Date();
+    const lastSeen = new Date(dateStr);
+    const diffMs = now - lastSeen;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return formatDate(dateStr);
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -567,7 +586,8 @@ export function UserManagement() {
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">User</th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Role</th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Status</th>
-                <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Last Login</th>
+                <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Online</th>
+                <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Last Seen</th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Created</th>
                 <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3">Actions</th>
               </tr>
@@ -575,14 +595,14 @@ export function UserManagement() {
             <tbody className="divide-y divide-zinc-800/30">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-zinc-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading users...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-zinc-500">
                     No users found
                   </td>
                 </tr>
@@ -606,8 +626,24 @@ export function UserManagement() {
                     <td className="px-4 py-3">
                       <StatusBadge isActive={user.is_active} />
                     </td>
+                    <td className="px-4 py-3">
+                      {user.is_online ? (
+                        <div className="flex items-center gap-1.5 text-emerald-400">
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 status-dot" />
+                          <span className="text-xs font-medium">Online</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-zinc-500">
+                          <WifiOff className="w-3 h-3" />
+                          <span className="text-xs">Offline</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-zinc-400">
-                      {formatDate(user.last_login_at)}
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-zinc-500" />
+                        {formatLastSeen(user.last_seen)}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-500">
                       {formatDate(user.created_at)}
