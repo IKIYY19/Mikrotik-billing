@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const tr069Service = require('../services/tr069Service');
 
 // Get all TR-069 devices
 router.get('/', async (req, res) => {
@@ -142,9 +143,13 @@ router.post('/:id/reboot', async (req, res) => {
     const result = await db.query('SELECT * FROM tr069_devices WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
 
-    // In a real implementation, this would send a Reboot RPC to the CPE
-    logger.info('TR-069 device reboot requested', { id: req.params.id });
-    res.json({ success: true, message: 'Reboot command sent to device' });
+    const device = result.rows[0];
+    
+    // Send reboot command via TR-069 service
+    const rebootResult = await tr069Service.rebootDevice(device.serial_number);
+    
+    logger.info('TR-069 device reboot requested', { id: req.params.id, serial: device.serial_number });
+    res.json({ success: true, message: 'Reboot command sent to device', ...rebootResult });
   } catch (e) {
     logger.error('Failed to reboot TR-069 device', { error: e.message, id: req.params.id });
     res.status(500).json({ error: e.message });
@@ -158,9 +163,13 @@ router.post('/:id/factory-reset', async (req, res) => {
     const result = await db.query('SELECT * FROM tr069_devices WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
 
-    // In a real implementation, this would send a FactoryReset RPC to the CPE
-    logger.info('TR-069 device factory reset requested', { id: req.params.id });
-    res.json({ success: true, message: 'Factory reset command sent to device' });
+    const device = result.rows[0];
+    
+    // Send factory reset command via TR-069 service
+    const resetResult = await tr069Service.factoryResetDevice(device.serial_number);
+    
+    logger.info('TR-069 device factory reset requested', { id: req.params.id, serial: device.serial_number });
+    res.json({ success: true, message: 'Factory reset command sent to device', ...resetResult });
   } catch (e) {
     logger.error('Failed to factory reset TR-069 device', { error: e.message, id: req.params.id });
     res.status(500).json({ error: e.message });

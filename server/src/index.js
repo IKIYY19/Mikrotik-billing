@@ -412,6 +412,14 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
+        // Start TR-069 ACS service
+        try {
+          const tr069Service = require('./services/tr069Service');
+          await tr069Service.start();
+        } catch (error) {
+          logger.error('Failed to initialize TR-069 ACS service', { error: error.message });
+        }
+        
         // Disable router connectivity service - causing black screen
         // Will debug separately
         /*
