@@ -49,6 +49,7 @@ import IntegrationsSettings from './pages/IntegrationsSettings';
 import { SettingsPage } from './pages/SettingsPage';
 import { FUPProfiles } from './pages/network/FUPProfiles';
 import { TR069Devices } from './pages/network/TR069Devices';
+import { SpeedTest } from './pages/network/SpeedTest';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -120,6 +121,7 @@ function App() {
                     <Route path="/olt" element={<OLTManagement />} />
                     <Route path="/fup" element={<FUPProfiles />} />
                     <Route path="/tr069" element={<TR069Devices />} />
+                    <Route path="/speedtest" element={<SpeedTest />} />
                     <Route path="/radius" element={<RadiusManagement />} />
                     <Route path="/tickets" element={<TicketSystem />} />
                     <Route path="/captive-portal" element={<CaptivePortalBuilder />} />

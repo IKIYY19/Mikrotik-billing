@@ -74,6 +74,7 @@ const billingItems = [
   { to: '/olt', icon: Radio, label: 'OLT/Fiber', feature: 'olt' },
   { to: '/fup', icon: Gauge, label: 'FUP Profiles', feature: 'fup' },
   { to: '/tr069', icon: Router, label: 'TR-069 CPE', feature: 'tr069' },
+  { to: '/speedtest', icon: Activity, label: 'Speed Test', feature: 'speedtest' },
   { to: '/radius', icon: Shield, label: 'RADIUS', feature: 'radius' },
   { to: '/tickets', icon: LifeBuoy, label: 'Support', feature: 'tickets' },
   { to: '/captive-portal', icon: Palette, label: 'Portal Builder', feature: 'captive-portal' },
