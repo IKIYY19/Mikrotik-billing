@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import {
+  BarChart3, Activity, Gauge, FileText, Receipt, Ticket, Lock, Smartphone,
+  MessageSquare, Plus, Clock, CheckCircle, AlertCircle, X, Key, History, User, CreditCard, Settings,
+  Wifi, Download, Upload, AlertTriangle, DollarSign, TrendingUp, Calendar, Bell, Zap, Printer, ExternalLink
+} from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 import { generateInvoicePDF, generateReceiptPDF } from '../../utils/pdfGenerator';
-import {
-  Smartphone, Wifi, Download, Upload, FileText, CreditCard, Clock, AlertTriangle,
-  CheckCircle, DollarSign, MessageSquare, BarChart3, Gauge, Ticket, Receipt,
-  TrendingUp, Calendar, Bell, Zap, Activity, Printer, ExternalLink, X, Lock, Key
-} from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -240,6 +239,7 @@ export function CustomerPortal() {
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'payments', label: 'Payments', icon: Receipt },
     { id: 'support', label: 'Support', icon: Ticket },
+    { id: 'history', label: 'History', icon: History },
     { id: 'settings', label: 'Settings', icon: Lock },
   ];
 
@@ -749,42 +749,109 @@ export function CustomerPortal() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800/50 rounded-2xl p-6">
-              <h3 className="text-white font-semibold flex items-center gap-2 mb-4">
-                <Wifi className="w-5 h-5" />
-                Connection Details
+        {/* History Tab */}
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <History className="w-5 h-5 text-purple-400" />
+                Activity History
               </h3>
-              
               <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
-                  <span className="text-zinc-400">Username</span>
-                  <span className="text-white font-medium">{data.customer?.username || data.customer?.phone}</span>
+                {/* Tickets History */}
+                <div className="bg-zinc-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Ticket className="w-4 h-4 text-blue-400" />
+                    <span className="text-white font-medium">Support Tickets</span>
+                  </div>
+                  {data.recent_tickets && data.recent_tickets.length > 0 ? (
+                    <div className="space-y-2">
+                      {data.recent_tickets.map(ticket => (
+                        <div key={ticket.id} className="bg-zinc-900/50 rounded p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-white font-medium">{ticket.subject}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              ticket.status === 'open' ? 'bg-blue-500/20 text-blue-400' :
+                              ticket.status === 'in_progress' ? 'bg-amber-500/20 text-amber-400' :
+                              ticket.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                              'bg-zinc-500/20 text-zinc-400'
+                            }`}>
+                              {ticket.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            {ticket.ticket_number} • {new Date(ticket.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-500">No tickets created yet</div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
-                  <span className="text-zinc-400">Plan</span>
-                  <span className="text-white font-medium">{data.subscription?.plan_name || 'No plan'}</span>
+
+                {/* Payments History */}
+                <div className="bg-zinc-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CreditCard className="w-4 h-4 text-green-400" />
+                    <span className="text-white font-medium">Payments</span>
+                  </div>
+                  {data.recent_payments && data.recent_payments.length > 0 ? (
+                    <div className="space-y-2">
+                      {data.recent_payments.map(payment => (
+                        <div key={payment.id} className="bg-zinc-900/50 rounded p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-white font-medium">KES {payment.amount?.toFixed(2)}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              payment.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                              payment.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {payment.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            {payment.method} • {new Date(payment.received_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-500">No payments made yet</div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
-                  <span className="text-zinc-400">Speed</span>
-                  <span className="text-white font-medium">{data.subscription?.speed || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-zinc-400">Status</span>
-                  <span className={`font-medium ${data.customer?.status === 'active' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {data.customer?.status || 'Unknown'}
-                  </span>
+
+                {/* Password Changes */}
+                <div className="bg-zinc-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Key className="w-4 h-4 text-amber-400" />
+                    <span className="text-white font-medium">Password Changes</span>
+                  </div>
+                  {passwordInfo.password_changed_at ? (
+                    <div className="bg-zinc-900/50 rounded p-3">
+                      <div className="text-sm text-white">WiFi password was changed</div>
+                      <div className="text-xs text-zinc-500">
+                        {new Date(passwordInfo.password_changed_at).toLocaleString()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-500">No password changes recorded</div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
+
       </div>
 
       {/* Password Change Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPasswordModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-zinc-800/50 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Change WiFi Password</h3>
               <button onClick={() => setShowPasswordModal(false)} className="text-zinc-400 hover:text-white">
@@ -796,51 +863,37 @@ export function CustomerPortal() {
                 <label className="block text-sm font-medium text-zinc-300 mb-1.5">Current Password</label>
                 <input
                   type="password"
-                  value={passwordForm.current_password}
-                  onChange={e => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                  value={passwordForm.current}
+                  onChange={e => setPasswordForm({ ...passwordForm, current: e.target.value })}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
                   placeholder="Enter current password"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Password *</label>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Password</label>
                 <input
                   type="password"
                   required
-                  value={passwordForm.new_password}
-                  onChange={e => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                  value={passwordForm.new}
+                  onChange={e => setPasswordForm({ ...passwordForm, new: e.target.value })}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
-                  placeholder="Enter new password (min 6 characters)"
-                  minLength={6}
+                  placeholder="Enter new password"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Confirm New Password *</label>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Confirm New Password</label>
                 <input
                   type="password"
                   required
-                  value={passwordForm.confirm_password}
-                  onChange={e => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                  value={passwordForm.confirm}
+                  onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
                   placeholder="Confirm new password"
-                  minLength={6}
                 />
               </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={changingPassword}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
-                >
-                  {changingPassword ? 'Changing...' : 'Change Password'}
-                </button>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" className="btn-primary flex-1">Change Password</button>
               </div>
             </form>
           </div>
