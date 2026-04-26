@@ -207,6 +207,27 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ─── PERMANENTLY DELETE USER ───
+router.delete('/:id/permanent', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const result = await db.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, email, name',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully', user: result.rows[0] });
+  } catch (e) {
+    console.error('Delete user error:', e.message);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 // ─── ENABLE USER ───
 router.post('/:id/enable', async (req, res) => {
   try {
