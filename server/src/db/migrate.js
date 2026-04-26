@@ -223,27 +223,8 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
 
-  // Add alerts table (Phase 2 - basic alerts) - NO foreign key constraints
-  // Using application-level data integrity instead of database FKs
-  `CREATE TABLE IF NOT EXISTS alerts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID,
-    alert_type VARCHAR(50) NOT NULL,
-    severity VARCHAR(20) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    message TEXT NOT NULL,
-    status VARCHAR(20) DEFAULT 'open',
-    acknowledged_by UUID,
-    acknowledged_at TIMESTAMP,
-    resolved_at TIMESTAMP,
-    metadata JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_alerts_connection ON alerts(connection_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type)`,
-  `CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
-  `CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
-  `CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(created_at)`,
+  // Alerts table removed from migrations - created on-demand in service
+  // This prevents black screen if table creation fails during startup
 
   // Disable monitoring migrations - causing black screen
   /*
