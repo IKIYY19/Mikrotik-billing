@@ -104,8 +104,8 @@ export function Sidebar({ onSearchOpen }) {
     }
   }, []);
 
-  const handleLogout = () => {
-    clearAuth();
+  const handleLogout = async () => {
+    await clearAuth();
     navigate('/login');
   };
 

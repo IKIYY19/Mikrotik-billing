@@ -69,8 +69,26 @@ export function isAuthenticated() {
 /**
  * Clear auth data (logout)
  */
-export function clearAuth() {
+export async function clearAuth() {
   console.log('🗑️ clearAuth() called');
+  
+  // Call logout endpoint to update server-side status
+  try {
+    const token = getToken();
+    if (token) {
+      await fetch(`${import.meta.env.VITE_API_URL || '/api'}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Logout API call failed:', err);
+    // Continue with local cleanup even if API call fails
+  }
+  
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
