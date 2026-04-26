@@ -58,6 +58,7 @@ export function CustomerPortal() {
   const [reviewForm, setReviewForm] = useState({ rating: 5, service_quality: 'good', comment: '' });
   const [customerReview, setCustomerReview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [passwordInfo, setPasswordInfo] = useState({ password_changed_at: null });
 
   useEffect(() => {
     fetchData();
@@ -65,6 +66,7 @@ export function CustomerPortal() {
     fetchSupportTickets();
     fetchBandwidthHistory();
     fetchCustomerReview();
+    fetchPasswordInfo();
   }, [customerId]);
 
   useEffect(() => {
@@ -232,6 +234,15 @@ export function CustomerPortal() {
       }
     } catch (e) {
       console.error('Failed to fetch review:', e);
+    }
+  };
+
+  const fetchPasswordInfo = async () => {
+    try {
+      const { data } = await axios.get(`${API}/portal/${customerId}/password-info`);
+      setPasswordInfo(data);
+    } catch (e) {
+      console.error('Failed to fetch password info:', e);
     }
   };
 
