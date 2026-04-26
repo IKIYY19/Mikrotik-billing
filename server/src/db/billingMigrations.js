@@ -449,6 +449,36 @@ const billingMigrations = [
       ALTER TABLE customers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
     END IF;
   END $$`,
+
+  // Create branches table for network map
+  `CREATE TABLE IF NOT EXISTS branches (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    city VARCHAR(100),
+    address TEXT,
+    contact VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'active',
+    lat DECIMAL(10,8),
+    lng DECIMAL(11,8),
+    active_pppoe INTEGER DEFAULT 0,
+    online_routers INTEGER DEFAULT 0,
+    total_routers INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // Seed initial branches
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+   SELECT 'branch-nairobi-main', 'Nairobi Main POP', 'Nairobi', 'Moi Avenue', '+254700000001', 'active', -1.2921, 36.8219
+   WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-nairobi-main')`,
+  
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+   SELECT 'branch-mombasa', 'Mombasa POP', 'Mombasa', 'Moi Road', '+254700000002', 'active', -4.0435, 39.6682
+   WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-mombasa')`,
+  
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+   SELECT 'branch-kisumu', 'Kisumu POP', 'Kisumu', 'Oginga Odinga St', '+254700000003', 'active', -0.0917, 34.7679
+   WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-kisumu')`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id)`,

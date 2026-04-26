@@ -79,42 +79,101 @@ router.post('/wallet/daily-run', async (req, res) => {
 // MAP / GIS
 // ═══════════════════════════════════════
 
-router.get('/map/data', (req, res) => {
-  const multiStore = require('../db/multiFeatureStore');
+router.get('/map/data', async (req, res) => {
+  try {
+    const db = global.dbAvailable ? global.db : require('../db/memory');
+    const billing = require('../db/billingStore');
+    const walletStore = require('../db/walletStore');
 
-  const branches = multiStore.branches.map(b => ({
-    id: b.id,
-    name: b.name,
-    type: 'branch',
-    lat: b.lat || (-1.2921 + Math.random() * 0.5), // Default Kenya coords
-    lng: b.lng || (36.8219 + Math.random() * 0.5),
-    city: b.city,
-    status: b.status,
-    active_pppoe: Math.floor(Math.random() * 50) + 10,
-    online_routers: Math.floor(Math.random() * 3) + 1,
-    total_routers: 3,
-  }));
+    // Get branches from database or fallback to in-memory
+    let branches = [];
+    if (global.dbAvailable) {
+      const branchResult = await db.query('SELECT * FROM branches ORDER BY name');
+      branches = branchResult.rows.map(b => ({
+        id: b.id,
+        name: b.name,
+        type: 'branch',
+        lat: parseFloat(b.lat),
+        lng: parseFloat(b.lng),
+        city: b.city,
+        status: b.status,
+        active_pppoe: b.active_pppoe || 0,
+        online_routers: b.online_routers || 0,
+        total_routers: b.total_routers || 0,
+      }));
+    } else {
+      const multiStore = require('../db/multiFeatureStore');
+      branches = multiStore.branches.map(b => ({
+        id: b.id,
+        name: b.name,
+        type: 'branch',
+        lat: b.lat || (-1.2921 + Math.random() * 0.5),
+        lng: b.lng || (36.8219 + Math.random() * 0.5),
+        city: b.city,
+        status: b.status,
+        active_pppoe: Math.floor(Math.random() * 50) + 10,
+        online_routers: Math.floor(Math.random() * 3) + 1,
+        total_routers: 3,
+      }));
+    }
 
-  const customers = billing.store.customers.map(c => {
-    const sub = billing.store.subscriptions.find(s => s.customer_id === c.id && s.status === 'active');
-    const wallet = walletStore.getWallet(c.id);
-    const isSuspended = sub?.status === 'suspended' || wallet?.status === 'suspended';
-    const isThrottled = sub?.throttled;
+    // Get customers with coordinates
+    let customers = [];
+    if (global.dbAvailable) {
+      const customerResult = await db.query(
+        `SELECT c.id, c.name, c.lat, c.lng, c.phone, c.status, c.branch_id,
+         s.plan_id, s.status as sub_status, s.throttled
+         FROM customers c
+         LEFT JOIN subscriptions s ON s.customer_id = c.id AND s.status = 'active'
+         WHERE c.lat IS NOT NULL AND c.lng IS NOT NULL`
+      );
+      
+      const plans = await db.query('SELECT id, name FROM service_plans');
+      const planMap = new Map(plans.rows.map(p => [p.id, p.name]));
 
-    return {
-      id: c.id,
-      name: c.name,
-      type: 'customer',
-      lat: c.lat || (-1.2 + Math.random() * 0.8),
-      lng: c.lng || (36.7 + Math.random() * 0.6),
-      status: isSuspended ? 'suspended' : isThrottled ? 'throttled' : 'active',
-      phone: c.phone,
-      plan: sub?.plan ? billing.store.service_plans.find(p => p.id === sub.plan_id)?.name : null,
-      branch_id: c.branch_id,
-    };
-  });
+      customers = customerResult.rows.map(c => ({
+        id: c.id,
+        name: c.name,
+        type: 'customer',
+        lat: parseFloat(c.lat),
+        lng: parseFloat(c.lng),
+        status: c.status === 'suspended' ? 'suspended' : c.throttled ? 'throttled' : 'active',
+        phone: c.phone,
+        plan: c.plan_id ? planMap.get(c.plan_id) : null,
+        branch_id: c.branch_id,
+      }));
+    } else {
+      customers = billing.store.customers.map(c => {
+        const sub = billing.store.subscriptions.find(s => s.customer_id === c.id && s.status === 'active');
+        const wallet = walletStore.getWallet(c.id);
+        const isSuspended = sub?.status === 'suspended' || wallet?.status === 'suspended';
+        const isThrottled = sub?.throttled;
 
-  res.json({ branches, customers, center: [-1.2921, 36.8219], zoom: 10 });
+        return {
+          id: c.id,
+          name: c.name,
+          type: 'customer',
+          lat: c.lat || (-1.2 + Math.random() * 0.8),
+          lng: c.lng || (36.7 + Math.random() * 0.6),
+          status: isSuspended ? 'suspended' : isThrottled ? 'throttled' : 'active',
+          phone: c.phone,
+          plan: sub?.plan ? billing.store.service_plans.find(p => p.id === sub.plan_id)?.name : null,
+          branch_id: c.branch_id,
+        };
+      });
+    }
+
+    // Calculate center point from all locations
+    const allLats = [...branches.map(b => b.lat), ...customers.map(c => c.lat)];
+    const allLngs = [...branches.map(b => b.lng), ...customers.map(c => c.lng)];
+    const centerLat = allLats.length > 0 ? allLats.reduce((a, b) => a + b, 0) / allLats.length : -1.2921;
+    const centerLng = allLngs.length > 0 ? allLngs.reduce((a, b) => a + b, 0) / allLngs.length : 36.8219;
+
+    res.json({ branches, customers, center: [centerLat, centerLng], zoom: 10 });
+  } catch (e) {
+    console.error('Map data error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put('/map/customer/:id', (req, res) => {

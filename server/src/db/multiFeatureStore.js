@@ -7,9 +7,9 @@ const { v4: uuidv4 } = require('uuid');
 
 // ─── Branches ───
 const branches = [
-  { id: 'branch-nairobi-main', name: 'Nairobi Main POP', city: 'Nairobi', address: 'Moi Avenue', contact: '+254700000001', status: 'active', created_at: new Date().toISOString() },
-  { id: 'branch-mombasa', name: 'Mombasa POP', city: 'Mombasa', address: 'Moi Road', contact: '+254700000002', status: 'active', created_at: new Date().toISOString() },
-  { id: 'branch-kisumu', name: 'Kisumu POP', city: 'Kisumu', address: 'Oginga Odinga St', contact: '+254700000003', status: 'active', created_at: new Date().toISOString() },
+  { id: 'branch-nairobi-main', name: 'Nairobi Main POP', city: 'Nairobi', address: 'Moi Avenue', contact: '+254700000001', status: 'active', lat: -1.2921, lng: 36.8219, created_at: new Date().toISOString() },
+  { id: 'branch-mombasa', name: 'Mombasa POP', city: 'Mombasa', address: 'Moi Road', contact: '+254700000002', status: 'active', lat: -4.0435, lng: 39.6682, created_at: new Date().toISOString() },
+  { id: 'branch-kisumu', name: 'Kisumu POP', city: 'Kisumu', address: 'Oginga Odinga St', contact: '+254700000003', status: 'active', lat: -0.0917, lng: 34.7679, created_at: new Date().toISOString() },
 ];
 
 // ─── Agents/Resellers ───
