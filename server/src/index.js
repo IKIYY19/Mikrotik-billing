@@ -122,8 +122,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Apply general rate limiting to all API routes
+const { trackUserActivity, startOnlineStatusUpdater } = require('./middleware/userActivity');
 const { apiLimiter } = require('./middleware/rateLimiter');
 app.use('/api', apiLimiter);
+
+// Track user activity on authenticated requests
+app.use('/api', trackUserActivity);
 
 // Start server
 const startServer = async () => {
@@ -402,6 +406,9 @@ const startServer = async () => {
         // Initialize WebSocket service for real-time monitoring
         const websocketService = require('./services/websocketService');
         websocketService.initialize(server);
+        
+        // Start user online status updater
+        startOnlineStatusUpdater();
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });

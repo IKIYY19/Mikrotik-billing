@@ -210,6 +210,12 @@ const coreMigrations = [
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_port INTEGER DEFAULT 22`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_username VARCHAR(100)`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_password_encrypted TEXT`,
+
+  // Add user activity tracking
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false`,
+  `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_online ON users(is_online)`,
 ];
 
 async function runMigrations() {

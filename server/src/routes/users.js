@@ -18,7 +18,7 @@ const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
 router.get('/', async (req, res) => {
   try {
     const { role, status, search } = req.query;
-    let query = 'SELECT id, email, name, role, is_active, last_login_at, created_at FROM users WHERE 1=1';
+    let query = 'SELECT id, email, name, role, is_active, last_login_at, last_seen, is_online, created_at FROM users WHERE 1=1';
     const params = [];
     let paramIndex = 1;
 
@@ -79,7 +79,7 @@ router.get('/stats', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, email, name, role, is_active, last_login_at, created_at FROM users WHERE id = $1',
+      'SELECT id, email, name, role, is_active, last_login_at, last_seen, is_online, created_at FROM users WHERE id = $1',
       [req.params.id]
     );
 
