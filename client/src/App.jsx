@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
 import { Sidebar } from './components/Sidebar';
 import { Toast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { GlobalSearch } from './components/GlobalSearch';
-import LoginPage from './pages/LoginPage';
+import { getToken } from './lib/auth';
 import { Dashboard } from './pages/Dashboard';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Templates } from './pages/Templates';
@@ -53,6 +54,31 @@ import { SpeedTest } from './pages/network/SpeedTest';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Heartbeat to keep user online status updated
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const API = import.meta.env.VITE_API_URL || '/api';
+        await axios.post(`${API}/users/heartbeat`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        // Silently fail - don't spam errors
+      }
+    };
+
+    // Send heartbeat every 30 seconds
+    const interval = setInterval(sendHeartbeat, 30000);
+    
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
