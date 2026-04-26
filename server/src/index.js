@@ -126,8 +126,8 @@ const { trackUserActivity, startOnlineStatusUpdater } = require('./middleware/us
 const { apiLimiter } = require('./middleware/rateLimiter');
 app.use('/api', apiLimiter);
 
-// Track user activity on authenticated requests
-app.use('/api', trackUserActivity);
+// Temporarily disable user activity tracking
+// app.use('/api', trackUserActivity);
 
 // Start server
 const startServer = async () => {
@@ -409,8 +409,8 @@ const startServer = async () => {
         const websocketService = require('./services/websocketService');
         websocketService.initialize(server);
         
-        // Start user online status updater
-        startOnlineStatusUpdater();
+        // Temporarily disable user online status updater
+        // startOnlineStatusUpdater();
         
         // Temporarily disable health check service
         // const healthCheckService = require('./services/healthCheckService');
