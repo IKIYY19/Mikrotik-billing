@@ -217,9 +217,7 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)`,
   `CREATE INDEX IF NOT EXISTS idx_users_online ON users(is_online)`,
 
-  // Temporarily disable monitoring migrations
-  /*
-  // Monitoring and alerting tables
+  // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
   `CREATE TABLE IF NOT EXISTS health_checks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
@@ -285,7 +283,6 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_connection ON monitoring_rules(connection_id)`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_type ON monitoring_rules(rule_type)`,
-  */
 ];
 
 async function runMigrations() {

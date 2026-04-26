@@ -349,8 +349,7 @@ const startServer = async () => {
     app.use('/api/fup', authenticate, require('./routes/fup'));
     app.use('/api/tr069', authenticate, require('./routes/tr069'));
     app.use('/api/speedtest', authenticate, require('./routes/speedtest'));
-    // Temporarily disable monitoring route
-    // app.use('/api/monitoring', authenticate, require('./routes/monitoring'));
+    app.use('/api/monitoring', authenticate, require('./routes/monitoring'));
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());
@@ -412,9 +411,13 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
-        // Keep health check service disabled
-        // const healthCheckService = require('./services/healthCheckService');
-        // healthCheckService.start();
+        // Start health check service (opt-in, won't auto-start monitoring)
+        try {
+          const healthCheckService = require('./services/healthCheckService');
+          healthCheckService.start();
+        } catch (error) {
+          logger.error('Failed to initialize health check service', { error: error.message });
+        }
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });

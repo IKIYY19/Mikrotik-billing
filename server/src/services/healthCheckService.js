@@ -41,37 +41,15 @@ class HealthCheckService {
     return global.dbAvailable ? global.db : require('../db/memory');
   }
 
-  // Start health checks for all connections
+  // Start health checks for all connections (opt-in - disabled by default)
   async start() {
     if (this.isRunning) {
       logger.warn('Health check service already running');
       return;
     }
 
-    logger.info('Starting health check service');
+    logger.info('Health check service is ready - use startConnectionChecks() to enable monitoring for specific connections');
     this.isRunning = true;
-
-    try {
-      const db = this.getDb();
-      // Try to get connections, handle case where is_active column doesn't exist
-      let result;
-      try {
-        result = await db.query('SELECT id FROM mikrotik_connections WHERE is_active = true');
-      } catch (e) {
-        // Fallback if is_active column doesn't exist
-        logger.warn('is_active column not found, fetching all connections');
-        result = await db.query('SELECT id FROM mikrotik_connections');
-      }
-      
-      for (const row of result.rows) {
-        this.startConnectionChecks(row.id);
-      }
-
-      logger.info(`Started health checks for ${result.rows.length} connections`);
-    } catch (error) {
-      logger.error('Failed to start health checks', { error: error.message });
-      // Don't throw - allow server to start even if health checks fail
-    }
   }
 
   // Stop all health checks
