@@ -83,6 +83,36 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
+// ─── LOGOUT ───
+router.post('/logout', async (req, res) => {
+  try {
+    const db = getDb();
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        
+        // Set user as offline
+        await db.query(
+          'UPDATE users SET is_online = false WHERE id = $1',
+          [decoded.id]
+        );
+        
+        logger.info('User logged out', { userId: decoded.id, email: decoded.email });
+      } catch (e) {
+        // Token might be expired, but still try to proceed
+        logger.warn('Logout with invalid token', { error: e.message });
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (e) {
+    logger.error('Logout error', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── GET ME ───
 router.get('/me', async (req, res) => {
   try {
