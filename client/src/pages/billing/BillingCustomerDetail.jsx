@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, User, Package, FileText, CreditCard, Activity, MapPin, Mail, Phone, Hash } from 'lucide-react';
+import { ArrowLeft, User, Package, FileText, CreditCard, Activity, MapPin, Mail, Phone, Hash, Link, Copy, ExternalLink, RefreshCw } from 'lucide-react';
+import { useToast } from '../ui/use-toast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function BillingCustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [portalModal, setPortalModal] = useState(false);
+  const [portalInfo, setPortalInfo] = useState(null);
+  const [generatingUrl, setGeneratingUrl] = useState(false);
 
   useEffect(() => { fetchCustomer(); }, [id]);
 
@@ -19,6 +24,33 @@ export function BillingCustomerDetail() {
       setCustomer(data);
     } catch (e) { console.error(e); }
     setLoading(false);
+  };
+
+  const fetchPortalInfo = async () => {
+    try {
+      const { data } = await axios.get(`${API}/billing/customers/${id}/portal-info`);
+      setPortalInfo(data);
+    } catch (e) {
+      console.error('Failed to fetch portal info:', e);
+    }
+  };
+
+  const generatePortalUrl = async () => {
+    setGeneratingUrl(true);
+    try {
+      const { data } = await axios.post(`${API}/billing/customers/${id}/portal-url`);
+      setPortalInfo(data);
+      toast.success('Portal URL generated successfully');
+    } catch (e) {
+      toast.error('Failed to generate portal URL', e.response?.data?.error || e.message);
+    } finally {
+      setGeneratingUrl(false);
+    }
+  };
+
+  const openPortalModal = async () => {
+    await fetchPortalInfo();
+    setPortalModal(true);
   };
 
   if (loading) return <div className="p-8 text-white">Loading...</div>;
@@ -47,9 +79,18 @@ export function BillingCustomerDetail() {
             <p className="text-sm text-slate-400">Customer since {new Date(customer.created_at).toLocaleDateString()}</p>
           </div>
         </div>
-        <span className={`ml-auto px-3 py-1 rounded text-sm ${customer.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
-          {customer.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded text-sm ${customer.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
+            {customer.status}
+          </span>
+          <button
+            onClick={openPortalModal}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Link className="w-4 h-4" />
+            <span className="hidden sm:inline">Portal Access</span>
+          </button>
+        </div>
       </div>
 
       {/* Info Cards */}
@@ -177,7 +218,104 @@ export function BillingCustomerDetail() {
       {customer.notes && (
         <div className="bg-slate-800 border border-slate-700 rounded-lg mt-6 p-4">
           <h3 className="text-white font-semibold mb-2">Notes</h3>
-          <p className="text-slate-400 text-sm">{customer.notes}</p>
+          <p className="text-slate-300 text-sm">{customer.notes}</p>
+        </div>
+      )}
+
+      {/* Portal Access Modal */}
+      {portalModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-md">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Customer Portal Access</h3>
+              <button onClick={() => setPortalModal(false)} className="text-slate-400 hover:text-white">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {!portalInfo?.portal_url ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-400 mb-4">No portal URL generated yet</p>
+                  <button
+                    onClick={generatePortalUrl}
+                    disabled={generatingUrl}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg flex items-center gap-2 mx-auto transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${generatingUrl ? 'animate-spin' : ''}`} />
+                    {generatingUrl ? 'Generating...' : 'Generate Portal URL'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-sm text-slate-400 mb-2">Portal Link</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={portalInfo.portal_url}
+                        className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(portalInfo.portal_url);
+                          toast.success('URL copied to clipboard');
+                        }}
+                        className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-white"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-sm text-slate-400 mb-2">Username</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={portalInfo.portal_username}
+                        className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(portalInfo.portal_username);
+                          toast.success('Username copied to clipboard');
+                        }}
+                        className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-white"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                    <p className="text-sm text-blue-300">
+                      <strong>Note:</strong> This link expires in 30 days. You can regenerate it anytime.
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={generatePortalUrl}
+                      disabled={generatingUrl}
+                      className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${generatingUrl ? 'animate-spin' : ''}`} />
+                      {generatingUrl ? 'Regenerating...' : 'Regenerate URL'}
+                    </button>
+                    <button
+                      onClick={() => window.open(portalInfo.portal_url, '_blank')}
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open Portal
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
