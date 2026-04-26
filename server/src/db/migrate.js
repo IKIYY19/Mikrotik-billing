@@ -219,6 +219,18 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating)`,
   `CREATE INDEX IF NOT EXISTS idx_reviews_service_quality ON reviews(service_quality)`,
 
+  // Staff points table for gamification
+  `CREATE TABLE IF NOT EXISTS staff_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    points INTEGER NOT NULL DEFAULT 0,
+    review_id UUID REFERENCES reviews(id) ON DELETE SET NULL,
+    reason VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_staff_points_user_id ON staff_points(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_staff_points_review_id ON staff_points(review_id)`,
+
   // Add missing columns to mikrotik_connections
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS ssh_port INTEGER DEFAULT 22`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS connection_type VARCHAR(10) DEFAULT 'api'`,

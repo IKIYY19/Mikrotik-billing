@@ -12,7 +12,7 @@ const { v4: uuidv4 } = require('uuid');
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
 
 // Valid roles
-const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
+const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer', 'customer_care', 'sales_team'];
 
 // ─── LIST ALL USERS ───
 router.get('/', async (req, res) => {

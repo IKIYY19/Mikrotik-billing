@@ -854,6 +854,24 @@ router.post('/:customerId/reviews', async (req, res) => {
          RETURNING *`,
         [id, customer.id, rating, service_quality, comment]
       );
+
+      // Award points to staff based on review
+      const review = reviewResult.rows[0];
+      const points = calculatePoints(rating, service_quality);
+      
+      // Get all staff members (customer care and sales team)
+      const staffResult = await db.query(
+        `SELECT id FROM users WHERE role IN ('customer_care', 'sales_team', 'admin', 'technician') AND is_active = true`
+      );
+
+      // Distribute points among staff
+      for (const staff of staffResult.rows) {
+        await db.query(
+          `INSERT INTO staff_points (user_id, points, review_id, reason)
+           VALUES ($1, $2, $3, $4)`,
+          [staff.id, points, review.id, `Customer review: ${rating} stars - ${service_quality}`]
+        );
+      }
     }
 
     res.status(201).json(reviewResult.rows[0]);
@@ -862,6 +880,22 @@ router.post('/:customerId/reviews', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Calculate points based on review
+function calculatePoints(rating, serviceQuality) {
+  let basePoints = rating * 10; // 10 points per star
+  
+  // Bonus for service quality
+  const qualityBonus = {
+    'bad': 0,
+    'satisfactory': 5,
+    'good': 15,
+    'excellent': 25,
+    'over_expectation': 50
+  };
+  
+  return basePoints + (qualityBonus[serviceQuality] || 0);
+}
 
 // Get customer review
 router.get('/:customerId/reviews', async (req, res) => {
@@ -887,6 +921,59 @@ router.get('/:customerId/reviews', async (req, res) => {
     res.json({ has_review: true, review: reviewResult.rows[0] });
   } catch (e) {
     console.error('Get review error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get all reviews (admin only)
+router.get('/admin/reviews', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT r.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
+       FROM reviews r
+       LEFT JOIN customers c ON c.id = r.customer_id
+       ORDER BY r.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get all reviews error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff points leaderboard
+router.get('/admin/staff-points', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, COALESCE(SUM(sp.points), 0) as total_points
+       FROM users u
+       LEFT JOIN staff_points sp ON sp.user_id = u.id
+       WHERE u.role IN ('customer_care', 'sales_team', 'admin', 'technician')
+       GROUP BY u.id, u.name, u.email, u.role
+       ORDER BY total_points DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff points error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff point history
+router.get('/admin/staff-points/:userId', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT sp.*, r.rating, r.service_quality, c.name as customer_name
+       FROM staff_points sp
+       LEFT JOIN reviews r ON r.id = sp.review_id
+       LEFT JOIN customers c ON c.id = r.customer_id
+       WHERE sp.user_id = $1
+       ORDER BY sp.created_at DESC`,
+      [req.params.userId]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff point history error:', e);
     res.status(500).json({ error: e.message });
   }
 });

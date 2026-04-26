@@ -10,7 +10,7 @@ const { authLimiter } = require('../middleware/rateLimiter');
 const { audit } = require('../utils/audit');
 
 // Valid RBAC roles
-const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer'];
+const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer', 'customer_care', 'sales_team'];
 
 // Lazy db getter - avoids requiring pg at module load time
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
