@@ -5,8 +5,8 @@
 
 const logger = require('../utils/logger');
 
-// Online timeout in milliseconds (5 minutes)
-const ONLINE_TIMEOUT = 5 * 60 * 1000;
+// Online timeout in milliseconds (2 minutes)
+const ONLINE_TIMEOUT = 2 * 60 * 1000;
 
 // Update user activity on each authenticated request
 async function trackUserActivity(req, res, next) {

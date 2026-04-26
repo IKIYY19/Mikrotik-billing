@@ -255,4 +255,28 @@ router.post('/:id/reset-password', async (req, res) => {
   }
 });
 
+// ─── HEARTBEAT (update user activity) ───
+router.post('/heartbeat', async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const db = getDb();
+    const now = new Date();
+
+    await db.query(
+      `UPDATE users 
+       SET last_seen = $1, is_online = true 
+       WHERE id = $2`,
+      [now.toISOString(), req.user.id]
+    );
+
+    res.json({ success: true, last_seen: now.toISOString() });
+  } catch (e) {
+    console.error('Heartbeat error:', e.message);
+    res.status(500).json({ error: 'Failed to update activity' });
+  }
+});
+
 module.exports = router;
