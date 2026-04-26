@@ -94,11 +94,30 @@ export function MikroTikAPI() {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold text-white mb-8">MikroTik API Connection</h2>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">MikroTik Connections</h2>
+          <p className="text-slate-400">Manage and monitor your MikroTik router connections</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+            <div className="text-xs text-slate-400">Total Connections</div>
+            <div className="text-xl font-bold text-white">{connections.length}</div>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+            <div className="text-xs text-slate-400">Online</div>
+            <div className="text-xl font-bold text-emerald-400">{connections.filter(c => c.is_online).length}</div>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+            <div className="text-xs text-slate-400">Offline</div>
+            <div className="text-xl font-bold text-red-400">{connections.filter(c => !c.is_online).length}</div>
+          </div>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Connection Form */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div className="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Server className="w-5 h-5" />
             Add Connection
@@ -270,43 +289,69 @@ export function MikroTikAPI() {
         </div>
 
         {/* Saved Connections */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Saved Connections</h3>
+        <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Saved Connections</h3>
+            <button
+              onClick={fetchConnections}
+              className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            >
+              <TestTube className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
           {connections.length === 0 ? (
-            <p className="text-slate-400">No saved connections.</p>
+            <div className="text-center py-12">
+              <Server className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400">No connections configured yet</p>
+              <p className="text-sm text-slate-500 mt-1">Add your first MikroTik connection to get started</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {connections.map((conn) => (
-                <div key={conn.id} className="bg-slate-700 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
+                <div key={conn.id} className={`bg-slate-700 rounded-lg p-4 border-l-4 ${conn.is_online ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-white">{conn.name}</h4>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="font-semibold text-white text-lg">{conn.name}</h4>
                         {conn.is_online ? (
-                          <span className="flex items-center gap-1 text-xs text-emerald-400">
+                          <span className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
                             <Wifi className="w-3 h-3" />
                             Online
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-xs text-red-400">
+                          <span className="flex items-center gap-1.5 px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium">
                             <WifiOff className="w-3 h-3" />
                             Offline
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-400">{conn.ip_address}:{conn.api_port}</p>
-                      <p className="text-xs text-slate-500">User: {conn.username}</p>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                        <Clock className="w-3 h-3" />
-                        Last seen: {formatLastSeen(conn.last_seen)}
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-slate-400">IP: </span>
+                          <span className="text-white">{conn.ip_address}:{conn.api_port}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">User: </span>
+                          <span className="text-white">{conn.username}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Type: </span>
+                          <span className="text-white capitalize">{conn.connection_type || 'API'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span className="text-slate-400">Last seen: </span>
+                          <span className="text-white">{formatLastSeen(conn.last_seen)}</span>
+                        </div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleDelete(conn.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+                      className="ml-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 p-2 rounded-lg transition-colors"
+                      title="Delete connection"
                     >
-                      <Trash2 className="w-3 h-3" />
-                      Delete
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
