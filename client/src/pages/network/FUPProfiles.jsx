@@ -155,16 +155,34 @@ export function FUPProfiles() {
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1.5">Data Limit</label>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={form.data_limit}
-                  onChange={e => setForm({ ...form, data_limit: e.target.value })}
-                  className="modern-input flex-1"
-                  placeholder="100"
-                  min="0"
-                  step="1"
-                  required
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    value={form.data_limit}
+                    onChange={e => setForm({ ...form, data_limit: e.target.value })}
+                    className="modern-input pr-10"
+                    placeholder="100"
+                    min="0"
+                    step="1"
+                    required
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, data_limit: parseInt(form.data_limit || 0) + 1 })}
+                      className="text-zinc-400 hover:text-white text-xs leading-none"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, data_limit: Math.max(0, parseInt(form.data_limit || 0) - 1) })}
+                      className="text-zinc-400 hover:text-white text-xs leading-none"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
                 <select
                   value={form.data_limit_unit}
                   onChange={e => setForm({ ...form, data_limit_unit: e.target.value })}
