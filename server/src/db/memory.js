@@ -572,6 +572,7 @@ module.exports = {
         status: params[5] || 'active',
         service_plan_id: params[6],
         reseller_id: params[7],
+        fup_profile_id: params[8] || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -583,7 +584,12 @@ module.exports = {
     if (lowerText.includes('update customers') && lowerText.includes('where id =')) {
       const idx = store.customers.findIndex(c => c.id === params[params.length - 1]);
       if (idx === -1) return { rows: [] };
-      store.customers[idx] = { ...store.customers[idx], ...params[0], updated_at: new Date().toISOString() };
+      store.customers[idx] = { 
+        ...store.customers[idx], 
+        ...params[0], 
+        fup_profile_id: params[0].fup_profile_id !== undefined ? params[0].fup_profile_id : store.customers[idx].fup_profile_id,
+        updated_at: new Date().toISOString() 
+      };
       return { rows: [store.customers[idx]] };
     }
 

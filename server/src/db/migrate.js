@@ -197,6 +197,10 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_serial ON tr069_devices(serial_number)`,
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_status ON tr069_devices(status)`,
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_connection ON tr069_devices(connection_id)`,
+
+  // Add FUP profile to customers table
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS fup_profile_id UUID REFERENCES fup_profiles(id) ON DELETE SET NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_fup_profile ON customers(fup_profile_id)`,
 ];
 
 async function runMigrations() {

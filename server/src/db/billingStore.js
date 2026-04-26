@@ -78,6 +78,7 @@ module.exports = {
       id_number: data.id_number || '',
       status: data.status || 'active',
       notes: data.notes || '',
+      fup_profile_id: data.fup_profile_id || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -88,7 +89,12 @@ module.exports = {
   async updateCustomer(id, data) {
     const idx = billingStore.customers.findIndex(c => c.id === id);
     if (idx === -1) return null;
-    billingStore.customers[idx] = { ...billingStore.customers[idx], ...data, updated_at: new Date().toISOString() };
+    billingStore.customers[idx] = { 
+      ...billingStore.customers[idx], 
+      ...data, 
+      fup_profile_id: data.fup_profile_id !== undefined ? data.fup_profile_id : billingStore.customers[idx].fup_profile_id,
+      updated_at: new Date().toISOString() 
+    };
     return billingStore.customers[idx];
   },
 
