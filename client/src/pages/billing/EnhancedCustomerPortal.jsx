@@ -910,7 +910,14 @@ export function CustomerPortal() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setShowReviewModal(true)}
+                      onClick={() => {
+                        setReviewForm({
+                          rating: customerReview.rating,
+                          service_quality: customerReview.service_quality,
+                          comment: customerReview.comment || ''
+                        });
+                        setShowReviewModal(true);
+                      }}
                       className="text-blue-400 hover:text-blue-300 text-sm"
                     >
                       Update Review
