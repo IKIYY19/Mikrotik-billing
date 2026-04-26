@@ -205,6 +205,20 @@ const coreMigrations = [
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_token_expires TIMESTAMP`,
   `CREATE INDEX IF NOT EXISTS idx_customers_portal_token ON customers(portal_token)`,
 
+  // Reviews table for customer feedback
+  `CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    service_quality VARCHAR(50) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_reviews_customer_id ON reviews(customer_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviews_service_quality ON reviews(service_quality)`,
+
   // Add missing columns to mikrotik_connections
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS ssh_port INTEGER DEFAULT 22`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS connection_type VARCHAR(10) DEFAULT 'api'`,

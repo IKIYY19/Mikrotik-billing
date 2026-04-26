@@ -802,4 +802,93 @@ router.get('/token/:token', async (req, res) => {
   }
 });
 
+// Submit review
+router.post('/:customerId/reviews', async (req, res) => {
+  try {
+    const { rating, service_quality, comment } = req.body;
+    
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+    
+    // Validate service quality
+    const validQualities = ['bad', 'satisfactory', 'good', 'excellent', 'over_expectation'];
+    if (!service_quality || !validQualities.includes(service_quality)) {
+      return res.status(400).json({ error: 'Invalid service quality' });
+    }
+
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const customer = result.rows[0];
+
+    // Check if customer already has a review
+    const existingReview = await db.query(
+      'SELECT * FROM reviews WHERE customer_id = $1',
+      [customer.id]
+    );
+
+    let reviewResult;
+    if (existingReview.rows.length > 0) {
+      // Update existing review
+      reviewResult = await db.query(
+        `UPDATE reviews 
+         SET rating = $1, service_quality = $2, comment = $3, updated_at = NOW()
+         WHERE customer_id = $4
+         RETURNING *`,
+        [rating, service_quality, comment, customer.id]
+      );
+    } else {
+      // Create new review
+      const id = uuidv4();
+      reviewResult = await db.query(
+        `INSERT INTO reviews (id, customer_id, rating, service_quality, comment)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [id, customer.id, rating, service_quality, comment]
+      );
+    }
+
+    res.status(201).json(reviewResult.rows[0]);
+  } catch (e) {
+    console.error('Review submission error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get customer review
+router.get('/:customerId/reviews', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const reviewResult = await db.query(
+      'SELECT * FROM reviews WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [req.params.customerId]
+    );
+
+    if (reviewResult.rows.length === 0) {
+      return res.json({ has_review: false });
+    }
+
+    res.json({ has_review: true, review: reviewResult.rows[0] });
+  } catch (e) {
+    console.error('Get review error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
