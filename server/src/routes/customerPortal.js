@@ -86,55 +86,98 @@ router.post('/login', (req, res) => {
 });
 
 // Get customer dashboard
-router.get('/:customerId/dashboard', (req, res) => {
-  const customer = billing.store.customers.find(c => c.id === req.params.customerId);
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
+router.get('/:customerId/dashboard', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
 
-  const subscription = billing.store.subscriptions.find(s => s.customer_id === customer.id && s.status === 'active');
-  const plan = subscription ? billing.store.service_plans.find(p => p.id === subscription.plan_id) : null;
-  const usage = radiusStore.getUsageReport(customer.id, 'month');
-  const invoices = billing.store.invoices.filter(i => i.customer_id === customer.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const payments = billing.store.payments.filter(p => p.customer_id === customer.id).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)).slice(0, 10);
-  const outstanding = invoices.filter(i => i.status !== 'paid').reduce((sum, i) => sum + i.total - (i.paid_amount || 0), 0);
-  const quotaUsed = plan?.quota_gb ? (usage.total_bytes / (plan.quota_gb * 1024 * 1024 * 1024) * 100).toFixed(0) : null;
+    const customer = result.rows[0];
 
-  res.json({
-    customer,
-    subscription: { ...subscription, plan },
-    usage: { ...usage, quota_gb: plan?.quota_gb, quota_used_percent: quotaUsed },
-    outstanding_balance: outstanding,
-    recent_invoices: invoices.slice(0, 5),
-    recent_payments: payments,
-  });
+    // Get subscription
+    const subResult = await db.query(
+      `SELECT s.*, p.name as plan_name, p.speed_down, p.speed_up, p.price, p.quota_gb
+       FROM subscriptions s
+       LEFT JOIN service_plans p ON p.id = s.plan_id
+       WHERE s.customer_id = $1 AND s.status = 'active'
+       ORDER BY s.created_at DESC LIMIT 1`,
+      [customer.id]
+    );
+    const subscription = subResult.rows[0];
+
+    // Get invoices
+    const invResult = await db.query(
+      'SELECT * FROM invoices WHERE customer_id = $1 ORDER BY created_at DESC',
+      [customer.id]
+    );
+    const invoices = invResult.rows;
+
+    // Get payments
+    const payResult = await db.query(
+      'SELECT * FROM payments WHERE customer_id = $1 ORDER BY received_at DESC LIMIT 10',
+      [customer.id]
+    );
+    const payments = payResult.rows;
+
+    const outstanding = invoices.filter(i => i.status !== 'paid').reduce((sum, i) => sum + i.total - (i.paid_amount || 0), 0);
+
+    // Get usage from RADIUS store (simplified)
+    const usage = radiusStore.getUsageReport(customer.id, 'month');
+    const quotaUsed = subscription?.quota_gb ? (usage.total_bytes / (subscription.quota_gb * 1024 * 1024 * 1024) * 100).toFixed(0) : null;
+
+    res.json({
+      customer,
+      subscription: { ...subscription, plan: subscription },
+      usage: { ...usage, quota_gb: subscription?.quota_gb, quota_used_percent: quotaUsed },
+      outstanding_balance: outstanding,
+      recent_invoices: invoices.slice(0, 5),
+      recent_payments: payments,
+    });
+  } catch (e) {
+    console.error('Dashboard error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Customer M-Pesa payment
 router.post('/:customerId/pay', async (req, res) => {
-  const { phone, amount, invoice_id } = req.body;
-  const customer = billing.store.customers.find(c => c.id === req.params.customerId);
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
+  try {
+    const { phone, amount, invoice_id } = req.body;
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
 
-  const mpesa = new MpesaService();
-  const result = await mpesa.stkPush(phone, amount, `INV-${Date.now()}`, `Payment from ${customer.name}`);
+    const customer = result.rows[0];
 
-  if (result.success) {
-    // Store pending payment
-    const pendingId = uuidv4();
-    radiusStore.radiusStore.pending_payments = radiusStore.radiusStore.pending_payments || [];
-    radiusStore.radiusStore.pending_payments.push({
-      id: pendingId,
-      customer_id: customer.id,
-      invoice_id,
-      phone,
-      amount: parseFloat(amount),
-      checkoutRequestId: result.checkoutRequestId,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    });
+    const mpesa = new MpesaService();
+    const mpesaResult = await mpesa.stkPush(phone, amount, `INV-${Date.now()}`, `Payment from ${customer.name}`);
 
-    res.json({ success: true, checkoutRequestId: result.checkoutRequestId, pending_id: pendingId });
-  } else {
-    res.status(500).json(result);
+    if (mpesaResult.success) {
+      // Store pending payment
+      const pendingId = uuidv4();
+      await db.query(
+        `INSERT INTO payments (id, customer_id, invoice_id, phone, amount, method, status, reference, received_at)
+         VALUES ($1, $2, $3, $4, $5, 'mpesa', 'pending', $6, NOW())`,
+        [pendingId, customer.id, invoice_id, phone, parseFloat(amount), mpesaResult.checkoutRequestId]
+      );
+
+      res.json({ success: true, checkoutRequestId: mpesaResult.checkoutRequestId, pending_id: pendingId });
+    } else {
+      res.status(500).json(mpesaResult);
+    }
+  } catch (e) {
+    console.error('Payment error:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -142,11 +185,16 @@ router.post('/:customerId/pay', async (req, res) => {
 router.post('/:customerId/tickets', async (req, res) => {
   try {
     const { subject, description, category } = req.body;
-    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
     
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    const customer = result.rows[0];
 
     // Create ticket in database (same as admin system)
     const id = uuidv4();
@@ -164,7 +212,7 @@ router.post('/:customerId/tickets', async (req, res) => {
       }
     }
 
-    const result = await db.query(
+    const ticketResult = await db.query(
       `INSERT INTO tickets (id, ticket_number, customer_id, category_id, subject, description, priority, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'medium', 'open') RETURNING *`,
       [id, ticketNumber, customer.id, categoryId, subject, description]
@@ -181,7 +229,7 @@ router.post('/:customerId/tickets', async (req, res) => {
       triggerSMS('payment_received', { customer, payment: { reference: ticketNumber } }).catch(() => {});
     }
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(ticketResult.rows[0]);
   } catch (e) {
     console.error('Ticket creation error:', e);
     res.status(500).json({ error: e.message });
@@ -618,11 +666,16 @@ router.post('/:customerId/speedtest', (req, res) => {
 router.post('/:customerId/change-password', async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
-    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
     
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    const customer = result.rows[0];
 
     // Verify current password (if set)
     if (customer.wifi_password && customer.wifi_password !== current_password) {
@@ -630,8 +683,10 @@ router.post('/:customerId/change-password', async (req, res) => {
     }
 
     // Update customer password
-    customer.wifi_password = new_password;
-    customer.password_changed_at = new Date().toISOString();
+    await db.query(
+      'UPDATE customers SET wifi_password = $1, password_changed_at = NOW() WHERE id = $2',
+      [new_password, customer.id]
+    );
 
     // TODO: Push to MikroTik router if customer has PPP/Hotspot account
     // This would require integrating with the MikroTik API to update the secret
@@ -644,13 +699,18 @@ router.post('/:customerId/change-password', async (req, res) => {
 });
 
 // Get current WiFi password info (masked)
-router.get('/:customerId/password-info', (req, res) => {
+router.get('/:customerId/password-info', async (req, res) => {
   try {
-    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    const result = await db.query(
+      'SELECT wifi_password, password_changed_at FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
     
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    const customer = result.rows[0];
 
     res.json({
       has_password: !!customer.wifi_password,
@@ -663,21 +723,28 @@ router.get('/:customerId/password-info', (req, res) => {
 });
 
 // Generate unique portal access token for customer
-router.post('/:customerId/generate-portal-token', (req, res) => {
+router.post('/:customerId/generate-portal-token', async (req, res) => {
   try {
-    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
     
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    const customer = result.rows[0];
 
     // Generate a unique token
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-    // Store token (in production, save to database)
-    customer.portal_token = token;
-    customer.portal_token_expires = expiresAt.toISOString();
+    // Store token in database
+    await db.query(
+      'UPDATE customers SET portal_token = $1, portal_token_expires = $2 WHERE id = $3',
+      [token, expiresAt.toISOString(), customer.id]
+    );
 
     const portalUrl = `${req.protocol}://${req.get('host')}/portal/${token}`;
 
@@ -694,16 +761,21 @@ router.post('/:customerId/generate-portal-token', (req, res) => {
 });
 
 // Access portal via token
-router.get('/token/:token', (req, res) => {
+router.get('/token/:token', async (req, res) => {
   try {
     const { token } = req.params;
     
     // Find customer by token
-    const customer = billing.store.customers.find(c => c.portal_token === token);
+    const result = await db.query(
+      'SELECT * FROM customers WHERE portal_token = $1',
+      [token]
+    );
     
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Invalid or expired token' });
     }
+
+    const customer = result.rows[0];
 
     // Check if token is expired
     if (customer.portal_token_expires && new Date(customer.portal_token_expires) < new Date()) {

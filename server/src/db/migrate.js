@@ -118,11 +118,16 @@ const coreMigrations = [
     pin_reset_code VARCHAR(10),
     pin_reset_expires TIMESTAMP,
     last_portal_login TIMESTAMP,
+    wifi_password VARCHAR(255),
+    password_changed_at TIMESTAMP,
+    portal_token VARCHAR(255),
+    portal_token_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_portal_token ON customers(portal_token)`,
 
   // Hotspot vouchers table
   `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
