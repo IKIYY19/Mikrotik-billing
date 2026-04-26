@@ -217,6 +217,8 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)`,
   `CREATE INDEX IF NOT EXISTS idx_users_online ON users(is_online)`,
 
+  // Disable monitoring migrations - causing black screen
+  /*
   // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
   `CREATE TABLE IF NOT EXISTS health_checks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -283,6 +285,7 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_connection ON monitoring_rules(connection_id)`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_type ON monitoring_rules(rule_type)`,
+  */
 ];
 
 async function runMigrations() {
