@@ -412,13 +412,16 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
-        // Start router connectivity service (Phase 1 - basic online/offline)
+        // Disable router connectivity service - causing black screen
+        // Will debug separately
+        /*
         try {
           const routerConnectivityService = require('./services/routerConnectivity');
           routerConnectivityService.start();
         } catch (error) {
           logger.error('Failed to initialize router connectivity service', { error: error.message });
         }
+        */
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });
