@@ -157,7 +157,8 @@ class RouterConnectivityService {
       );
       logger.info('Alert created', { connectionId, alertType, severity, title });
     } catch (error) {
-      logger.error('Failed to create alert', { connectionId, error: error.message });
+      // Don't crash if alert creation fails - log and continue
+      logger.error('Failed to create alert (non-critical)', { connectionId, alertType, error: error.message });
     }
   }
 
@@ -173,7 +174,8 @@ class RouterConnectivityService {
       );
       logger.info('Alerts resolved', { connectionId, alertType });
     } catch (error) {
-      logger.error('Failed to resolve alerts', { connectionId, alertType, error: error.message });
+      // Don't crash if alert resolution fails - log and continue
+      logger.error('Failed to resolve alerts (non-critical)', { connectionId, alertType, error: error.message });
     }
   }
 

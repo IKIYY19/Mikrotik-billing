@@ -200,6 +200,8 @@ router.post('/:id/check', async (req, res) => {
   }
 });
 
+// Disable alert routes temporarily - causing black screen
+/*
 // Get alerts for a specific connection
 router.get('/:id/alerts', async (req, res) => {
   try {
@@ -287,5 +289,6 @@ router.post('/alerts/:id/resolve', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+*/
 
 module.exports = router;

@@ -223,6 +223,8 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
 
+  // Disable alerts migration temporarily - causing black screen
+  /*
   // Add alerts table (Phase 2 - basic alerts)
   `CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -243,6 +245,7 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(created_at)`,
+  */
 
   // Disable monitoring migrations - causing black screen
   /*
