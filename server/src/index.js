@@ -412,13 +412,13 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
-        // Disable health check service - causing black screen
-        // try {
-        //   const healthCheckService = require('./services/healthCheckService');
-        //   healthCheckService.start();
-        // } catch (error) {
-        //   logger.error('Failed to initialize health check service', { error: error.message });
-        // }
+        // Start router connectivity service (Phase 1 - basic online/offline)
+        try {
+          const routerConnectivityService = require('./services/routerConnectivity');
+          routerConnectivityService.start();
+        } catch (error) {
+          logger.error('Failed to initialize router connectivity service', { error: error.message });
+        }
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });

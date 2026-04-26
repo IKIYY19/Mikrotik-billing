@@ -217,6 +217,12 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)`,
   `CREATE INDEX IF NOT EXISTS idx_users_online ON users(is_online)`,
 
+  // Add router connectivity tracking (Phase 1 - basic online/offline)
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`,
+  `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
+  `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
+
   // Disable monitoring migrations - causing black screen
   /*
   // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
