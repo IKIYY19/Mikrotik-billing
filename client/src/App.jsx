@@ -57,8 +57,6 @@ import { SpeedTest } from './pages/network/SpeedTest';
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Temporarily disable heartbeat
-  /*
   // Heartbeat to keep user online status updated
   useEffect(() => {
     const token = getToken();
@@ -83,7 +81,6 @@ function App() {
 
     return () => clearInterval(interval);
   }, []);
-  */
 
   useEffect(() => {
     const handleKeyDown = (e) => {
