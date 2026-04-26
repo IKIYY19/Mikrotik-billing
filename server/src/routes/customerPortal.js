@@ -655,4 +655,60 @@ router.get('/:customerId/password-info', (req, res) => {
   }
 });
 
+// Generate unique portal access token for customer
+router.post('/:customerId/generate-portal-token', (req, res) => {
+  try {
+    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Generate a unique token
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    // Store token (in production, save to database)
+    customer.portal_token = token;
+    customer.portal_token_expires = expiresAt.toISOString();
+
+    const portalUrl = `${req.protocol}://${req.get('host')}/portal/${token}`;
+
+    res.json({
+      success: true,
+      token,
+      portal_url: portalUrl,
+      expires_at: expiresAt.toISOString(),
+    });
+  } catch (e) {
+    console.error('Token generation error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Access portal via token
+router.get('/token/:token', (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    // Find customer by token
+    const customer = billing.store.customers.find(c => c.portal_token === token);
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Invalid or expired token' });
+    }
+
+    // Check if token is expired
+    if (customer.portal_token_expires && new Date(customer.portal_token_expires) < new Date()) {
+      return res.status(401).json({ error: 'Token has expired' });
+    }
+
+    // Redirect to customer portal with customer ID
+    res.redirect(`/portal/${customer.id}`);
+  } catch (e) {
+    console.error('Token access error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
