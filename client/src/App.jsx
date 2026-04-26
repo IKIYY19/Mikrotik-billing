@@ -52,6 +52,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { FUPProfiles } from './pages/network/FUPProfiles';
 import { TR069Devices } from './pages/network/TR069Devices';
 import { SpeedTest } from './pages/network/SpeedTest';
+import { Monitoring } from './pages/network/Monitoring';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -149,6 +150,7 @@ function App() {
                     <Route path="/fup" element={<FUPProfiles />} />
                     <Route path="/tr069" element={<TR069Devices />} />
                     <Route path="/speedtest" element={<SpeedTest />} />
+                    <Route path="/monitoring" element={<Monitoring />} />
                     <Route path="/radius" element={<RadiusManagement />} />
                     <Route path="/tickets" element={<TicketSystem />} />
                     <Route path="/captive-portal" element={<CaptivePortalBuilder />} />
