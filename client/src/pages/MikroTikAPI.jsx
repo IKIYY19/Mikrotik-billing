@@ -1,9 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Server, TestTube, Send, Trash2, Plus } from 'lucide-react';
+import { Server, TestTube, Send, Trash2, Plus, Wifi, WifiOff, Clock } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
+
+// Helper function to format relative time
+const formatLastSeen = (date) => {
+  if (!date) return 'Never';
+  const now = new Date();
+  const then = new Date(date);
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+};
 
 export function MikroTikAPI() {
   const { info } = useToast();
@@ -263,10 +279,27 @@ export function MikroTikAPI() {
               {connections.map((conn) => (
                 <div key={conn.id} className="bg-slate-700 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-white">{conn.name}</h4>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-white">{conn.name}</h4>
+                        {conn.is_online ? (
+                          <span className="flex items-center gap-1 text-xs text-emerald-400">
+                            <Wifi className="w-3 h-3" />
+                            Online
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-red-400">
+                            <WifiOff className="w-3 h-3" />
+                            Offline
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-slate-400">{conn.ip_address}:{conn.api_port}</p>
                       <p className="text-xs text-slate-500">User: {conn.username}</p>
+                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                        <Clock className="w-3 h-3" />
+                        Last seen: {formatLastSeen(conn.last_seen)}
+                      </div>
                     </div>
                     <button
                       onClick={() => handleDelete(conn.id)}
