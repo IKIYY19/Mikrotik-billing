@@ -201,6 +201,9 @@ const coreMigrations = [
   // Add FUP profile to customers table
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS fup_profile_id UUID REFERENCES fup_profiles(id) ON DELETE SET NULL`,
   `CREATE INDEX IF NOT EXISTS idx_customers_fup_profile ON customers(fup_profile_id)`,
+
+  // Add ssh_port to mikrotik_connections if missing
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS ssh_port INTEGER DEFAULT 22`,
 ];
 
 async function runMigrations() {
