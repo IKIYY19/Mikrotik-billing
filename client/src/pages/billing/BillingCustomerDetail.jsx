@@ -42,6 +42,9 @@ export function BillingCustomerDetail() {
     try {
       const { data } = await axios.post(`${API}/billing/customers/${id}/portal-url`);
       setPortalInfo(data);
+      if (data.password) {
+        setNewPassword(data.password);
+      }
       toast.success('Portal URL generated successfully');
     } catch (e) {
       toast.error('Failed to generate portal URL', e.response?.data?.error || e.message);
