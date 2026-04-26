@@ -127,6 +127,34 @@ router.get('/me', async (req, res) => {
   } catch (e) { res.status(401).json({ error: 'Invalid token' }); }
 });
 
+// ─── HEARTBEAT (update user activity) ───
+router.post('/heartbeat', async (req, res) => {
+  try {
+    const db = getDb();
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    
+    const now = new Date();
+
+    await db.query(
+      `UPDATE users 
+       SET last_seen = $1, is_online = true 
+       WHERE id = $2`,
+      [now.toISOString(), decoded.id]
+    );
+
+    res.json({ success: true, last_seen: now.toISOString() });
+  } catch (e) {
+    console.error('Heartbeat error:', e.message);
+    res.status(500).json({ error: 'Failed to update activity' });
+  }
+});
+
 module.exports = router;
 module.exports.JWT_SECRET = JWT_SECRET;
 module.exports.authenticate = async (req, res, next) => {
