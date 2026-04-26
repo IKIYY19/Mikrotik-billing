@@ -161,6 +161,8 @@ export function FUPProfiles() {
                   onChange={e => setForm({ ...form, data_limit: e.target.value })}
                   className="modern-input flex-1"
                   placeholder="100"
+                  min="0"
+                  step="1"
                   required
                 />
                 <select
