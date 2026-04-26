@@ -344,6 +344,7 @@ const startServer = async () => {
     app.use('/api/settings', authenticate, require('./routes/settings'));
     app.use('/api/fup', authenticate, require('./routes/fup'));
     app.use('/api/tr069', authenticate, require('./routes/tr069'));
+    app.use('/api/speedtest', authenticate, require('./routes/speedtest'));
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());
