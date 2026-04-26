@@ -202,8 +202,14 @@ const coreMigrations = [
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS fup_profile_id UUID REFERENCES fup_profiles(id) ON DELETE SET NULL`,
   `CREATE INDEX IF NOT EXISTS idx_customers_fup_profile ON customers(fup_profile_id)`,
 
-  // Add ssh_port to mikrotik_connections if missing
+  // Add missing columns to mikrotik_connections
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS ssh_port INTEGER DEFAULT 22`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS connection_type VARCHAR(10) DEFAULT 'api'`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS use_tunnel BOOLEAN DEFAULT false`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_host VARCHAR(255)`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_port INTEGER DEFAULT 22`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_username VARCHAR(100)`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS tunnel_password_encrypted TEXT`,
 ];
 
 async function runMigrations() {
