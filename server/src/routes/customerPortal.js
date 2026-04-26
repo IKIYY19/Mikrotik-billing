@@ -14,6 +14,63 @@ const { triggerSMS } = require('./sms');
 const db = global.dbAvailable ? global.db : require('../db/memory');
 
 // ─══════════════════════════════════════
+// ADMIN ROUTES (must come before :customerId routes)
+// ═══════════════════════════════════════
+
+// Get all reviews (admin only)
+router.get('/admin/reviews', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT r.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
+       FROM reviews r
+       LEFT JOIN customers c ON c.id = r.customer_id
+       ORDER BY r.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get all reviews error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff points leaderboard
+router.get('/admin/staff-points', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, COALESCE(SUM(sp.points), 0) as total_points
+       FROM users u
+       LEFT JOIN staff_points sp ON sp.user_id = u.id
+       WHERE u.role IN ('customer_care', 'sales_team', 'admin', 'technician')
+       GROUP BY u.id, u.name, u.email, u.role
+       ORDER BY total_points DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff points error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get staff point history
+router.get('/admin/staff-points/:userId', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT sp.*, r.rating, r.service_quality, c.name as customer_name
+       FROM staff_points sp
+       LEFT JOIN reviews r ON r.id = sp.review_id
+       LEFT JOIN customers c ON c.id = r.customer_id
+       WHERE sp.user_id = $1
+       ORDER BY sp.created_at DESC`,
+      [req.params.userId]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get staff point history error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─══════════════════════════════════════
 // CUSTOMER PORTAL
 // ═══════════════════════════════════════
 
@@ -943,59 +1000,6 @@ router.get('/:customerId/reviews', async (req, res) => {
     res.json({ has_review: true, review: reviewResult.rows[0] });
   } catch (e) {
     console.error('Get review error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Get all reviews (admin only)
-router.get('/admin/reviews', async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT r.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
-       FROM reviews r
-       LEFT JOIN customers c ON c.id = r.customer_id
-       ORDER BY r.created_at DESC`
-    );
-    res.json(result.rows);
-  } catch (e) {
-    console.error('Get all reviews error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Get staff points leaderboard
-router.get('/admin/staff-points', async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT u.id, u.name, u.email, u.role, COALESCE(SUM(sp.points), 0) as total_points
-       FROM users u
-       LEFT JOIN staff_points sp ON sp.user_id = u.id
-       WHERE u.role IN ('customer_care', 'sales_team', 'admin', 'technician')
-       GROUP BY u.id, u.name, u.email, u.role
-       ORDER BY total_points DESC`
-    );
-    res.json(result.rows);
-  } catch (e) {
-    console.error('Get staff points error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Get staff point history
-router.get('/admin/staff-points/:userId', async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT sp.*, r.rating, r.service_quality, c.name as customer_name
-       FROM staff_points sp
-       LEFT JOIN reviews r ON r.id = sp.review_id
-       LEFT JOIN customers c ON c.id = r.customer_id
-       WHERE sp.user_id = $1
-       ORDER BY sp.created_at DESC`,
-      [req.params.userId]
-    );
-    res.json(result.rows);
-  } catch (e) {
-    console.error('Get staff point history error:', e);
     res.status(500).json({ error: e.message });
   }
 });
