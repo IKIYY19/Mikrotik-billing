@@ -66,7 +66,7 @@ function App() {
     const sendHeartbeat = async () => {
       try {
         const API = import.meta.env.VITE_API_URL || '/api';
-        await axios.post(`${API}/users/heartbeat`, {}, {
+        await axios.post(`${API}/auth/heartbeat`, {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } catch (e) {
