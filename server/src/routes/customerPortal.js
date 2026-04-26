@@ -954,6 +954,68 @@ function calculatePoints(rating, serviceQuality) {
   return basePoints + (qualityBonus[serviceQuality] || 0);
 }
 
+// Update customer credentials
+router.put('/:customerId/credentials', async (req, res) => {
+  try {
+    const { current_password, new_username, new_password } = req.body;
+    const bcrypt = require('bcryptjs');
+    
+    const result = await db.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const customer = result.rows[0];
+
+    // Verify current password
+    if (customer.portal_password_hash) {
+      const validPassword = await bcrypt.compare(current_password, customer.portal_password_hash);
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Invalid current password' });
+      }
+    }
+
+    // Update credentials
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (new_username) {
+      updates.push(`portal_username = $${paramIndex}`);
+      values.push(new_username);
+      paramIndex++;
+    }
+
+    if (new_password) {
+      const newPasswordHash = await bcrypt.hash(new_password, 10);
+      updates.push(`portal_password_hash = $${paramIndex}`);
+      values.push(newPasswordHash);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No changes provided' });
+    }
+
+    values.push(req.params.customerId);
+    updates.push(`updated_at = NOW()`);
+
+    await db.query(
+      `UPDATE customers SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
+      values
+    );
+
+    res.json({ success: true, message: 'Credentials updated successfully' });
+  } catch (e) {
+    console.error('Update credentials error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get password info
 router.get('/:customerId/password-info', async (req, res) => {
   try {

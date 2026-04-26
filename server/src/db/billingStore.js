@@ -65,6 +65,10 @@ module.exports = {
 
   // ─── CUSTOMERS ───
   async createCustomer(data) {
+    const bcrypt = require('bcryptjs');
+    const defaultPassword = data.phone?.slice(-6) || '123456'; // Default to last 6 digits of phone or 123456
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+    
     const customer = {
       id: uuidv4(),
       name: data.name,
@@ -79,13 +83,15 @@ module.exports = {
       status: data.status || 'active',
       notes: data.notes || '',
       fup_profile_id: data.fup_profile_id || null,
+      portal_username: data.email || data.phone || `user_${Date.now()}`,
+      portal_password_hash: passwordHash,
       portal_token: uuidv4(),
       portal_token_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     billingStore.customers.push(customer);
-    return customer;
+    return { ...customer, portal_password: defaultPassword }; // Return plain password for display
   },
 
   async updateCustomer(id, data) {

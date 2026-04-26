@@ -105,7 +105,7 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_version_history_project_id ON version_history(project_id)`,
   `CREATE INDEX IF NOT EXISTS idx_script_history_project_id ON script_history(project_id)`,
 
-  // Customers table (for billing)
+  // Customers table
   `CREATE TABLE IF NOT EXISTS customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -114,6 +114,8 @@ const coreMigrations = [
     address TEXT,
     status VARCHAR(50) DEFAULT 'active',
     balance NUMERIC(10, 2) DEFAULT 0,
+    portal_username VARCHAR(100),
+    portal_password_hash VARCHAR(255),
     portal_pin_hash VARCHAR(255),
     pin_reset_code VARCHAR(10),
     pin_reset_expires TIMESTAMP,
@@ -123,6 +125,7 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_portal_username ON customers(portal_username)`,
 
   // Hotspot vouchers table
   `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
@@ -198,7 +201,10 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_status ON tr069_devices(status)`,
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_connection ON tr069_devices(connection_id)`,
 
-  // Add missing columns to customers table for portal features
+  // Add missing columns to customers table for portal credentials
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_username VARCHAR(100)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_password_hash VARCHAR(255)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_portal_username ON customers(portal_username)`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS wifi_password VARCHAR(255)`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_token VARCHAR(255)`,
