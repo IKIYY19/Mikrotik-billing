@@ -32,15 +32,16 @@ const graceConfig = {
 };
 
 // ─── Seed sample agents ───
-const seedAgents = () => {
-  if (agents.length > 0) return;
-  agents.push(
-    { id: 'agent-001', name: 'James Ochieng', phone: '+254711111111', email: 'james@agent.co.ke', branch_id: 'branch-nairobi-main', commission_rate: 10, balance: 5000, status: 'active', created_at: new Date().toISOString() },
-    { id: 'agent-002', name: 'Amina Hassan', phone: '+254722222222', email: 'amina@agent.co.ke', branch_id: 'branch-mombasa', commission_rate: 12, balance: 3500, status: 'active', created_at: new Date().toISOString() },
-    { id: 'agent-003', name: 'Peter Kamau', phone: '+254733333333', email: 'peter@agent.co.ke', branch_id: 'branch-kisumu', commission_rate: 10, balance: 2000, status: 'active', created_at: new Date().toISOString() },
-  );
-};
-seedAgents();
+// Commented out to prevent auto-reseeding after deletion
+// const seedAgents = () => {
+//   if (agents.length > 0) return;
+//   agents.push(
+//     { id: 'agent-001', name: 'James Ochieng', phone: '+254711111111', email: 'james@agent.co.ke', branch_id: 'branch-nairobi-main', commission_rate: 10, balance: 5000, status: 'active', created_at: new Date().toISOString() },
+//     { id: 'agent-002', name: 'Amina Hassan', phone: '+254722222222', email: 'amina@agent.co.ke', branch_id: 'branch-mombasa', commission_rate: 12, balance: 3500, status: 'active', created_at: new Date().toISOString() },
+//     { id: 'agent-003', name: 'Peter Kamau', phone: '+254733333333', email: 'peter@agent.co.ke', branch_id: 'branch-kisumu', commission_rate: 10, balance: 2000, status: 'active', created_at: new Date().toISOString() },
+//   );
+// };
+// seedAgents();
 
 // ─── Seed sample vouchers ───
 const seedVouchers = () => {
