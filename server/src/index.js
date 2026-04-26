@@ -411,9 +411,13 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
-        // Start health check service
-        const healthCheckService = require('./services/healthCheckService');
-        healthCheckService.start();
+        // Start health check service (don't block server startup if it fails)
+        try {
+          const healthCheckService = require('./services/healthCheckService');
+          healthCheckService.start();
+        } catch (error) {
+          logger.error('Failed to start health check service', { error: error.message });
+        }
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });

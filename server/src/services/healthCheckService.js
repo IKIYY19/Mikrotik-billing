@@ -53,7 +53,15 @@ class HealthCheckService {
 
     try {
       const db = this.getDb();
-      const result = await db.query('SELECT id FROM mikrotik_connections WHERE is_active = true');
+      // Try to get connections, handle case where is_active column doesn't exist
+      let result;
+      try {
+        result = await db.query('SELECT id FROM mikrotik_connections WHERE is_active = true');
+      } catch (e) {
+        // Fallback if is_active column doesn't exist
+        logger.warn('is_active column not found, fetching all connections');
+        result = await db.query('SELECT id FROM mikrotik_connections');
+      }
       
       for (const row of result.rows) {
         this.startConnectionChecks(row.id);
@@ -62,6 +70,7 @@ class HealthCheckService {
       logger.info(`Started health checks for ${result.rows.length} connections`);
     } catch (error) {
       logger.error('Failed to start health checks', { error: error.message });
+      // Don't throw - allow server to start even if health checks fail
     }
   }
 
