@@ -897,6 +897,28 @@ function calculatePoints(rating, serviceQuality) {
   return basePoints + (qualityBonus[serviceQuality] || 0);
 }
 
+// Get password info
+router.get('/:customerId/password-info', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT wifi_password, password_changed_at FROM customers WHERE id = $1',
+      [req.params.customerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const customer = result.rows[0];
+    res.json({
+      password_changed_at: customer.password_changed_at,
+    });
+  } catch (e) {
+    console.error('Get password info error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get customer review
 router.get('/:customerId/reviews', async (req, res) => {
   try {
