@@ -118,16 +118,11 @@ const coreMigrations = [
     pin_reset_code VARCHAR(10),
     pin_reset_expires TIMESTAMP,
     last_portal_login TIMESTAMP,
-    wifi_password VARCHAR(255),
-    password_changed_at TIMESTAMP,
-    portal_token VARCHAR(255),
-    portal_token_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
-  `CREATE INDEX IF NOT EXISTS idx_customers_portal_token ON customers(portal_token)`,
 
   // Hotspot vouchers table
   `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
@@ -203,9 +198,12 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_status ON tr069_devices(status)`,
   `CREATE INDEX IF NOT EXISTS idx_tr069_devices_connection ON tr069_devices(connection_id)`,
 
-  // Add FUP profile to customers table
-  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS fup_profile_id UUID REFERENCES fup_profiles(id) ON DELETE SET NULL`,
-  `CREATE INDEX IF NOT EXISTS idx_customers_fup_profile ON customers(fup_profile_id)`,
+  // Add missing columns to customers table for portal features
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS wifi_password VARCHAR(255)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_token VARCHAR(255)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_token_expires TIMESTAMP`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_portal_token ON customers(portal_token)`,
 
   // Add missing columns to mikrotik_connections
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS ssh_port INTEGER DEFAULT 22`,
