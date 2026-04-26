@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Users, Tag, Plus, DollarSign, Package, RefreshCw, Copy, Check, UserPlus, Trash2, Edit } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -106,22 +110,30 @@ export function AgentResellerPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Users className="w-4 h-4" /> Agents</div>
-          <div className="text-2xl font-bold text-white">{agents.length}</div>
-        </div>
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Tag className="w-4 h-4" /> Available</div>
-          <div className="text-2xl font-bold text-green-400">{voucherStats.available}</div>
-        </div>
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><DollarSign className="w-4 h-4" /> Sold</div>
-          <div className="text-2xl font-bold text-blue-400">{voucherStats.sold}</div>
-        </div>
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Check className="w-4 h-4" /> Redeemed</div>
-          <div className="text-2xl font-bold text-purple-400">{voucherStats.redeemed}</div>
-        </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Users className="w-4 h-4" /> Agents</div>
+            <div className="text-2xl font-bold text-white">{agents.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Tag className="w-4 h-4" /> Available</div>
+            <div className="text-2xl font-bold text-green-400">{voucherStats.available}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><DollarSign className="w-4 h-4" /> Sold</div>
+            <div className="text-2xl font-bold text-blue-400">{voucherStats.sold}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Check className="w-4 h-4" /> Redeemed</div>
+            <div className="text-2xl font-bold text-purple-400">{voucherStats.redeemed}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs */}
@@ -131,203 +143,213 @@ export function AgentResellerPage() {
           { id: 'vouchers', label: 'Vouchers', icon: Tag },
           { id: 'generate', label: 'Generate', icon: Package },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
-              activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}>
+          <Button key={tab.id} onClick={() => setActiveTab(tab.id)} variant={activeTab === tab.id ? 'default' : 'outline'} className="flex items-center gap-2">
             <tab.icon className="w-4 h-4" /> {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Agents Tab */}
       {activeTab === 'agents' && (
         <div>
-          <button onClick={() => setShowAgentForm(true)}
-            className="mb-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-            <UserPlus className="w-4 h-4" /> Add Agent
-          </button>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+          <Button onClick={() => setShowAgentForm(true)} className="mb-4">
+            <UserPlus className="w-4 h-4 mr-2" /> Add Agent
+          </Button>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[800px]">
+                  <thead className="bg-slate-900 text-slate-400">
+                    <tr>
+                      <th className="text-left p-3 whitespace-nowrap">Agent</th>
+                      <th className="text-left p-3 whitespace-nowrap">Branch</th>
+                      <th className="text-left p-3 whitespace-nowrap">Commission</th>
+                      <th className="text-left p-3 whitespace-nowrap">Vouchers Sold</th>
+                      <th className="text-left p-3 whitespace-nowrap">Revenue</th>
+                      <th className="text-left p-3 whitespace-nowrap">Balance</th>
+                      <th className="text-left p-3 whitespace-nowrap">Status</th>
+                      <th className="text-left p-3 whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agents.map(a => (
+                      <tr key={a.id} className="border-t border-slate-700 hover:bg-slate-700/50">
+                        <td className="p-3 whitespace-nowrap">
+                          <div className="text-white font-medium">{a.name}</div>
+                          <div className="text-slate-500 text-xs">{a.phone || '—'}</div>
+                        </td>
+                        <td className="p-3 text-slate-300 whitespace-nowrap">{branches.find(b => b.id === a.branch_id)?.name || '—'}</td>
+                        <td className="p-3 text-amber-400 whitespace-nowrap">{a.commission_rate}%</td>
+                        <td className="p-3 text-white whitespace-nowrap">{a.vouchers_sold || 0}</td>
+                        <td className="p-3 text-green-400 whitespace-nowrap">KES {(parseFloat(a.voucher_revenue) || 0).toFixed(2)}</td>
+                        <td className={`p-3 font-semibold whitespace-nowrap ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Button onClick={() => handleEditAgent(a)} variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300 p-1">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button onClick={() => handleDeleteAgent(a.id)} variant="ghost" size="sm" className="text-red-400 hover:text-red-300 p-1">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {agents.length === 0 && <div className="p-8 text-center text-slate-500">No agents yet</div>}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Vouchers Tab */}
+      {activeTab === 'vouchers' && (
+        <Card>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px]">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead className="bg-slate-900 text-slate-400">
                   <tr>
-                    <th className="text-left p-3 whitespace-nowrap">Agent</th>
-                    <th className="text-left p-3 whitespace-nowrap">Branch</th>
-                    <th className="text-left p-3 whitespace-nowrap">Commission</th>
-                    <th className="text-left p-3 whitespace-nowrap">Vouchers Sold</th>
-                    <th className="text-left p-3 whitespace-nowrap">Revenue</th>
-                    <th className="text-left p-3 whitespace-nowrap">Balance</th>
+                    <th className="text-left p-3 whitespace-nowrap">Code</th>
+                    <th className="text-left p-3 whitespace-nowrap">Plan</th>
+                    <th className="text-left p-3 whitespace-nowrap">Price</th>
+                    <th className="text-left p-3 whitespace-nowrap">Sold By</th>
                     <th className="text-left p-3 whitespace-nowrap">Status</th>
-                    <th className="text-left p-3 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {agents.map(a => (
-                    <tr key={a.id} className="border-t border-slate-700 hover:bg-slate-700/50">
-                      <td className="p-3 whitespace-nowrap">
-                        <div className="text-white font-medium">{a.name}</div>
-                        <div className="text-slate-500 text-xs">{a.phone || '—'}</div>
-                      </td>
-                      <td className="p-3 text-slate-300 whitespace-nowrap">{branches.find(b => b.id === a.branch_id)?.name || '—'}</td>
-                      <td className="p-3 text-amber-400 whitespace-nowrap">{a.commission_rate}%</td>
-                      <td className="p-3 text-white whitespace-nowrap">{a.vouchers_sold || 0}</td>
-                      <td className="p-3 text-green-400 whitespace-nowrap">KES {(parseFloat(a.voucher_revenue) || 0).toFixed(2)}</td>
-                      <td className={`p-3 font-semibold whitespace-nowrap ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
-                      </td>
+                  {vouchers.map(v => (
+                    <tr key={v.id} className="border-t border-slate-700 hover:bg-slate-700/50">
                       <td className="p-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleEditAgent(a)} className="text-blue-400 hover:text-blue-300 p-1" title="Edit">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteAgent(a.id)} className="text-red-400 hover:text-red-300 p-1" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <span className="text-blue-400 font-mono">{v.code}</span>
+                          <Button onClick={() => copyCode(v.code)} variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
+                            {copied === v.code ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                          </Button>
                         </div>
+                      </td>
+                      <td className="p-3 text-white whitespace-nowrap">{v.plan_name}</td>
+                      <td className="p-3 text-green-400 whitespace-nowrap">KES {v.price}</td>
+                      <td className="p-3 text-slate-300 whitespace-nowrap">{agents.find(a => a.id === v.sold_by)?.name || '—'}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          v.status === 'available' ? 'bg-green-600/20 text-green-400' :
+                          v.status === 'sold' ? 'bg-blue-600/20 text-blue-400' :
+                          'bg-purple-600/20 text-purple-400'
+                        }`}>{v.status}</span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {agents.length === 0 && <div className="p-8 text-center text-slate-500">No agents yet</div>}
-          </div>
-        </div>
-      )}
-
-      {/* Vouchers Tab */}
-      {activeTab === 'vouchers' && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900 text-slate-400">
-              <tr>
-                <th className="text-left p-3">Code</th>
-                <th className="text-left p-3">Plan</th>
-                <th className="text-left p-3">Price</th>
-                <th className="text-left p-3">Sold By</th>
-                <th className="text-left p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vouchers.map(v => (
-                <tr key={v.id} className="border-t border-slate-700 hover:bg-slate-700/50">
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-blue-400 font-mono">{v.code}</span>
-                      <button onClick={() => copyCode(v.code)} className="text-slate-400 hover:text-white">
-                        {copied === v.code ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-3 text-white">{v.plan_name}</td>
-                  <td className="p-3 text-green-400">KES {v.price}</td>
-                  <td className="p-3 text-slate-300">{agents.find(a => a.id === v.sold_by)?.name || '—'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      v.status === 'available' ? 'bg-green-600/20 text-green-400' :
-                      v.status === 'sold' ? 'bg-blue-600/20 text-blue-400' :
-                      'bg-purple-600/20 text-purple-400'
-                    }`}>{v.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {vouchers.length === 0 && <div className="p-8 text-center text-slate-500">No vouchers generated</div>}
-        </div>
+            {vouchers.length === 0 && <div className="p-8 text-center text-slate-500">No vouchers generated</div>}
+          </CardContent>
+        </Card>
       )}
 
       {/* Generate Tab */}
       {activeTab === 'generate' && (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <h3 className="text-white font-semibold mb-4">Generate Vouchers</h3>
-          <form onSubmit={handleGenerateVouchers} className="space-y-4 max-w-lg">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Plan *</label>
-              <select required value={voucherForm.plan_id} onChange={e => setVoucherForm({...voucherForm, plan_id: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                <option value="">Select plan</option>
-                {plans.map(p => <option key={p.id} value={p.id}>{p.name} — KES {p.price}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Agent (optional)</label>
-              <select value={voucherForm.agent_id} onChange={e => setVoucherForm({...voucherForm, agent_id: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                <option value="">None (available)</option>
-                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Quantity</label>
-              <input type="number" min="1" max="100" value={voucherForm.count} onChange={e => setVoucherForm({...voucherForm, count: parseInt(e.target.value)})}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-            </div>
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">
-              <Package className="w-4 h-4" /> Generate Vouchers
-            </button>
-          </form>
-
-          {generatedVouchers && (
-            <div className="mt-6">
-              <h4 className="text-white font-semibold mb-2">Generated {generatedVouchers.length} Vouchers</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {generatedVouchers.map(v => (
-                  <div key={v.id} className="bg-slate-700 rounded p-3 flex items-center justify-between">
-                    <span className="text-blue-400 font-mono text-sm">{v.code}</span>
-                    <button onClick={() => copyCode(v.code)} className="text-slate-400 hover:text-white">
-                      {copied === v.code ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  </div>
-                ))}
+        <Card>
+          <CardHeader>
+            <CardTitle>Generate Vouchers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleGenerateVouchers} className="space-y-4 max-w-lg">
+              <div>
+                <Label htmlFor="plan">Plan *</Label>
+                <select required id="plan" value={voucherForm.plan_id} onChange={e => setVoucherForm({...voucherForm, plan_id: e.target.value})}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white mt-1">
+                  <option value="">Select plan</option>
+                  {plans.map(p => <option key={p.id} value={p.id}>{p.name} — KES {p.price}</option>)}
+                </select>
               </div>
-            </div>
-          )}
-        </div>
+              <div>
+                <Label htmlFor="agent">Agent (optional)</Label>
+                <select id="agent" value={voucherForm.agent_id} onChange={e => setVoucherForm({...voucherForm, agent_id: e.target.value})}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white mt-1">
+                  <option value="">None (available)</option>
+                  {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input id="quantity" type="number" min="1" max="100" value={voucherForm.count} onChange={e => setVoucherForm({...voucherForm, count: parseInt(e.target.value)})}
+                  className="mt-1" />
+              </div>
+              <Button type="submit">
+                <Package className="w-4 h-4 mr-2" /> Generate Vouchers
+              </Button>
+            </form>
+
+            {generatedVouchers && (
+              <div className="mt-6">
+                <h4 className="text-white font-semibold mb-2">Generated {generatedVouchers.length} Vouchers</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {generatedVouchers.map(v => (
+                    <div key={v.id} className="bg-slate-700 rounded p-3 flex items-center justify-between">
+                      <span className="text-blue-400 font-mono text-sm">{v.code}</span>
+                      <Button onClick={() => copyCode(v.code)} variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
+                        {copied === v.code ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Agent Form Modal */}
       {showAgentForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-lg p-6">
-            <h3 className="text-white font-semibold mb-4">{editingAgent ? 'Edit Agent' : 'Add Agent'}</h3>
-            <form onSubmit={handleCreateAgent} className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Agent Name *</label>
-                <input required value={agentForm.name} onChange={e => setAgentForm({...agentForm, name: e.target.value})}
-                  placeholder="Agent name" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Phone</label>
-                <input value={agentForm.phone} onChange={e => setAgentForm({...agentForm, phone: e.target.value})}
-                  placeholder="Phone" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Email</label>
-                <input type="email" value={agentForm.email} onChange={e => setAgentForm({...agentForm, email: e.target.value})}
-                  placeholder="Email" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Branch</label>
-                <select value={agentForm.branch_id} onChange={e => setAgentForm({...agentForm, branch_id: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white">
-                  <option value="">Select branch</option>
-                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Commission Rate (%)</label>
-                <input type="number" min="0" max="100" value={agentForm.commission_rate} onChange={e => setAgentForm({...agentForm, commission_rate: parseInt(e.target.value)})}
-                  placeholder="Commission %" className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white" />
-              </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => { setShowAgentForm(false); setEditingAgent(null); setAgentForm({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 }); }} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded">{editingAgent ? 'Update' : 'Create'}</button>
-              </div>
-            </form>
-          </div>
+          <Card className="w-full max-w-lg">
+            <CardHeader>
+              <CardTitle>{editingAgent ? 'Edit Agent' : 'Add Agent'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateAgent} className="space-y-4">
+                <div>
+                  <Label htmlFor="agentName">Agent Name *</Label>
+                  <Input id="agentName" required value={agentForm.name} onChange={e => setAgentForm({...agentForm, name: e.target.value})}
+                    placeholder="Agent name" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="agentPhone">Phone</Label>
+                  <Input id="agentPhone" value={agentForm.phone} onChange={e => setAgentForm({...agentForm, phone: e.target.value})}
+                    placeholder="Phone" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="agentEmail">Email</Label>
+                  <Input id="agentEmail" type="email" value={agentForm.email} onChange={e => setAgentForm({...agentForm, email: e.target.value})}
+                    placeholder="Email" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="agentBranch">Branch</Label>
+                  <select id="agentBranch" value={agentForm.branch_id} onChange={e => setAgentForm({...agentForm, branch_id: e.target.value})}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white mt-1">
+                    <option value="">Select branch</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="commission">Commission Rate (%)</Label>
+                  <Input id="commission" type="number" min="0" max="100" value={agentForm.commission_rate} onChange={e => setAgentForm({...agentForm, commission_rate: parseInt(e.target.value)})}
+                    placeholder="Commission %" className="mt-1" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button type="button" onClick={() => { setShowAgentForm(false); setEditingAgent(null); setAgentForm({ name: '', phone: '', email: '', branch_id: '', commission_rate: 10 }); }} variant="outline" className="flex-1">Cancel</Button>
+                  <Button type="submit" className="flex-1">{editingAgent ? 'Update' : 'Create'}</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
