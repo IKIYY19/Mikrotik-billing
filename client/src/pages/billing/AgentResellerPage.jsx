@@ -148,48 +148,50 @@ export function AgentResellerPage() {
             <UserPlus className="w-4 h-4" /> Add Agent
           </button>
           <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-900 text-slate-400">
-                <tr>
-                  <th className="text-left p-3">Agent</th>
-                  <th className="text-left p-3">Branch</th>
-                  <th className="text-left p-3">Commission</th>
-                  <th className="text-left p-3">Vouchers Sold</th>
-                  <th className="text-left p-3">Revenue</th>
-                  <th className="text-left p-3">Balance</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map(a => (
-                  <tr key={a.id} className="border-t border-slate-700 hover:bg-slate-700/50">
-                    <td className="p-3">
-                      <div className="text-white">{a.name}</div>
-                      <div className="text-slate-500 text-xs">{a.phone}</div>
-                    </td>
-                    <td className="p-3 text-slate-300">{branches.find(b => b.id === a.branch_id)?.name || '—'}</td>
-                    <td className="p-3 text-amber-400">{a.commission_rate}%</td>
-                    <td className="p-3 text-white">{a.vouchers_sold}</td>
-                    <td className="p-3 text-green-400">KES {(parseFloat(a.voucher_revenue) || 0).toFixed(2)}</td>
-                    <td className={`p-3 font-semibold ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleEditAgent(a)} className="text-blue-400 hover:text-blue-300" title="Edit">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDeleteAgent(a.id)} className="text-red-400 hover:text-red-300" title="Delete">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[800px]">
+                <thead className="bg-slate-900 text-slate-400">
+                  <tr>
+                    <th className="text-left p-3 whitespace-nowrap">Agent</th>
+                    <th className="text-left p-3 whitespace-nowrap">Branch</th>
+                    <th className="text-left p-3 whitespace-nowrap">Commission</th>
+                    <th className="text-left p-3 whitespace-nowrap">Vouchers Sold</th>
+                    <th className="text-left p-3 whitespace-nowrap">Revenue</th>
+                    <th className="text-left p-3 whitespace-nowrap">Balance</th>
+                    <th className="text-left p-3 whitespace-nowrap">Status</th>
+                    <th className="text-left p-3 whitespace-nowrap">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {agents.map(a => (
+                    <tr key={a.id} className="border-t border-slate-700 hover:bg-slate-700/50">
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="text-white font-medium">{a.name}</div>
+                        <div className="text-slate-500 text-xs">{a.phone || '—'}</div>
+                      </td>
+                      <td className="p-3 text-slate-300 whitespace-nowrap">{branches.find(b => b.id === a.branch_id)?.name || '—'}</td>
+                      <td className="p-3 text-amber-400 whitespace-nowrap">{a.commission_rate}%</td>
+                      <td className="p-3 text-white whitespace-nowrap">{a.vouchers_sold || 0}</td>
+                      <td className="p-3 text-green-400 whitespace-nowrap">KES {(parseFloat(a.voucher_revenue) || 0).toFixed(2)}</td>
+                      <td className={`p-3 font-semibold whitespace-nowrap ${(parseFloat(a.balance) || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>KES {(parseFloat(a.balance) || 0).toFixed(2)}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-xs ${a.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>{a.status}</span>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleEditAgent(a)} className="text-blue-400 hover:text-blue-300 p-1" title="Edit">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteAgent(a.id)} className="text-red-400 hover:text-red-300 p-1" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {agents.length === 0 && <div className="p-8 text-center text-slate-500">No agents yet</div>}
           </div>
         </div>
