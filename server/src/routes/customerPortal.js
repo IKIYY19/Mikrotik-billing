@@ -607,4 +607,52 @@ router.post('/:customerId/speedtest', (req, res) => {
   res.json({ success: true, received: Date.now() });
 });
 
+// Change WiFi password
+router.post('/:customerId/change-password', async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Verify current password (if set)
+    if (customer.wifi_password && customer.wifi_password !== current_password) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Update customer password
+    customer.wifi_password = new_password;
+    customer.password_changed_at = new Date().toISOString();
+
+    // TODO: Push to MikroTik router if customer has PPP/Hotspot account
+    // This would require integrating with the MikroTik API to update the secret
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (e) {
+    console.error('Password change error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get current WiFi password info (masked)
+router.get('/:customerId/password-info', (req, res) => {
+  try {
+    const customer = billing.store.customers.find(c => c.id === req.params.customerId);
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    res.json({
+      has_password: !!customer.wifi_password,
+      password_changed_at: customer.password_changed_at,
+      // Never return actual password
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
