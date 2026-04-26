@@ -61,6 +61,7 @@ export function BillingCustomers() {
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [fupProfiles, setFupProfiles] = useState([]);
   const [portalUrl, setPortalUrl] = useState(null);
+  const [portalCredentials, setPortalCredentials] = useState(null);
 
   // Auto-generate account number from company name
   const generateAccountNumber = (companyName, existingCustomers) => {
@@ -113,9 +114,13 @@ export function BillingCustomers() {
       } else {
         const { data } = await axios.post(`${API}/billing/customers`, submitData);
         toast.success(`Customer created: ${data.account_number || data.name}`);
-        // Show portal URL if returned
+        // Show portal URL and credentials if returned
         if (data.portal_url) {
           setPortalUrl(data.portal_url);
+          setPortalCredentials({
+            username: data.portal_username,
+            password: data.portal_password
+          });
         }
       }
       setShowForm(false);
@@ -370,6 +375,55 @@ export function BillingCustomers() {
                   </Button>
                 </div>
               </div>
+              
+              {portalCredentials && (
+                <div className="bg-zinc-800 rounded-lg p-4 mb-4">
+                  <div className="text-sm text-zinc-400 mb-3">Portal Credentials</div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-zinc-500 mb-1">Username</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={portalCredentials.username}
+                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(portalCredentials.username);
+                            toast.success('Username copied to clipboard');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-zinc-500 mb-1">Password</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={portalCredentials.password}
+                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(portalCredentials.password);
+                            toast.success('Password copied to clipboard');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                 <p className="text-sm text-blue-300">
                   <strong>Note:</strong> This link expires in 30 days. You can regenerate it anytime from the customer details page.
@@ -384,7 +438,10 @@ export function BillingCustomers() {
                   Open Portal
                 </Button>
                 <Button
-                  onClick={() => setPortalUrl(null)}
+                  onClick={() => {
+                    setPortalUrl(null);
+                    setPortalCredentials(null);
+                  }}
                   className="btn-gradient-primary flex-1"
                 >
                   Close

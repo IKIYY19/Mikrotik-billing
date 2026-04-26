@@ -59,6 +59,9 @@ export function CustomerPortal() {
   const [customerReview, setCustomerReview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [passwordInfo, setPasswordInfo] = useState({ password_changed_at: null });
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [credentialsForm, setCredentialsForm] = useState({ current_password: '', new_username: '', new_password: '', confirm_password: '' });
+  const [updatingCredentials, setUpdatingCredentials] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -243,6 +246,30 @@ export function CustomerPortal() {
       setPasswordInfo(data);
     } catch (e) {
       console.error('Failed to fetch password info:', e);
+    }
+  };
+
+  const handleUpdateCredentials = async (e) => {
+    e.preventDefault();
+    if (credentialsForm.new_password && credentialsForm.new_password !== credentialsForm.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setUpdatingCredentials(true);
+    try {
+      await axios.put(`${API}/portal/${customerId}/credentials`, {
+        current_password: credentialsForm.current_password,
+        new_username: credentialsForm.new_username || undefined,
+        new_password: credentialsForm.new_password || undefined,
+      });
+      toast.success('Credentials updated successfully');
+      setShowSettingsModal(false);
+      setCredentialsForm({ current_password: '', new_username: '', new_password: '', confirm_password: '' });
+      fetchData(); // Refresh to get updated username
+    } catch (e) {
+      toast.error('Failed to update credentials', e.response?.data?.error || e.message);
+    } finally {
+      setUpdatingCredentials(false);
     }
   };
 
@@ -971,6 +998,33 @@ export function CustomerPortal() {
           </div>
         )}
 
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-blue-400" />
+                Account Settings
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="bg-zinc-800 rounded-lg p-4">
+                  <div className="text-sm text-zinc-400 mb-1">Current Username</div>
+                  <div className="text-white font-medium">{data.customer.portal_username || data.customer.email || data.customer.phone}</div>
+                </div>
+                
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Lock className="w-4 h-4" />
+                  Change Username or Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Review Modal */}
@@ -1067,7 +1121,6 @@ export function CustomerPortal() {
                 <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Password</label>
                 <input
                   type="password"
-                  required
                   value={passwordForm.new}
                   onChange={e => setPasswordForm({ ...passwordForm, new: e.target.value })}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
@@ -1078,7 +1131,6 @@ export function CustomerPortal() {
                 <label className="block text-sm font-medium text-zinc-300 mb-1.5">Confirm New Password</label>
                 <input
                   type="password"
-                  required
                   value={passwordForm.confirm}
                   onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
@@ -1087,7 +1139,75 @@ export function CustomerPortal() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowPasswordModal(false)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" className="btn-primary flex-1">Change Password</button>
+                <button type="submit" disabled={changingPassword} className={`btn-primary flex-1 ${changingPassword ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSettingsModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-zinc-800/50 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Change Credentials</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateCredentials} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Current Password</label>
+                <input
+                  type="password"
+                  value={credentialsForm.current_password}
+                  onChange={e => setCredentialsForm({ ...credentialsForm, current_password: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Enter current password"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Username (Optional)</label>
+                <input
+                  type="text"
+                  value={credentialsForm.new_username}
+                  onChange={e => setCredentialsForm({ ...credentialsForm, new_username: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Enter new username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">New Password (Optional)</label>
+                <input
+                  type="password"
+                  value={credentialsForm.new_password}
+                  onChange={e => setCredentialsForm({ ...credentialsForm, new_password: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Enter new password"
+                />
+              </div>
+              {credentialsForm.new_password && (
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={credentialsForm.confirm_password}
+                    onChange={e => setCredentialsForm({ ...credentialsForm, confirm_password: e.target.value })}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowSettingsModal(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={updatingCredentials} className={`btn-primary flex-1 ${updatingCredentials ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {updatingCredentials ? 'Updating...' : 'Update Credentials'}
+                </button>
               </div>
             </form>
           </div>
