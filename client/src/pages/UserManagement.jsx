@@ -660,10 +660,10 @@ export function UserManagement() {
                         {user.is_active ? (
                           <button
                             onClick={() => setDisablingUser(user)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
                             title="Disable user"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <XCircle className="w-4 h-4" />
                           </button>
                         ) : (
                           <button
@@ -686,6 +686,28 @@ export function UserManagement() {
                             <CheckCircle className="w-4 h-4" />
                           </button>
                         )}
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Are you sure you want to permanently delete ${user.name}? This action cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              const token = getToken();
+                              await axios.delete(`${API}/users/${user.id}/permanent`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                              });
+                              toast.success('User deleted permanently');
+                              fetchUsers();
+                              fetchStats();
+                            } catch (err) {
+                              toast.error('Failed to delete user', err.response?.data?.error || err.message);
+                            }
+                          }}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Delete user permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
