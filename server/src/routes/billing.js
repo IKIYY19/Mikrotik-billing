@@ -62,16 +62,22 @@ router.post('/customers/:id/portal-url', async (req, res) => {
   try {
     const db = global.dbAvailable ? global.db : require('../db/memory');
     const { v4: uuidv4 } = require('uuid');
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
     
     const newToken = uuidv4();
     const tokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     
+    // Generate random 8-character password
+    const newPassword = crypto.randomBytes(4).toString('hex');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    
     const result = await db.query(
       `UPDATE customers 
-       SET portal_token = $1, portal_token_expires = $2, updated_at = NOW()
-       WHERE id = $3
+       SET portal_token = $1, portal_token_expires = $2, portal_password_hash = $3, updated_at = NOW()
+       WHERE id = $4
        RETURNING id, name, email, phone, portal_username, portal_token, portal_token_expires`,
-      [newToken, tokenExpires, req.params.id]
+      [newToken, tokenExpires, passwordHash, req.params.id]
     );
     
     if (result.rows.length === 0) {
@@ -85,7 +91,8 @@ router.post('/customers/:id/portal-url', async (req, res) => {
       portal_url: portalUrl,
       portal_token: customer.portal_token,
       portal_token_expires: customer.portal_token_expires,
-      portal_username: customer.portal_username || customer.email || customer.phone
+      portal_username: customer.portal_username || customer.email || customer.phone,
+      password: newPassword
     });
   } catch (e) {
     console.error('Generate portal URL error:', e);
