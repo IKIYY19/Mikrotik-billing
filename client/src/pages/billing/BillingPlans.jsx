@@ -86,7 +86,7 @@ export function BillingPlans() {
                   </div>
                   <div className="bg-zinc-800 rounded p-3 text-center">
                     <div className="text-xs text-zinc-400">Price</div>
-                    <div className="text-green-400 font-bold">${plan.price}/mo</div>
+                    <div className="text-green-400 font-bold">KSH {plan.price}/mo</div>
                   </div>
                   <div className="bg-zinc-800 rounded p-3 text-center">
                     <div className="text-xs text-zinc-400">Quota</div>
@@ -135,7 +135,7 @@ export function BillingPlans() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Monthly Price ($)</Label>
+                    <Label htmlFor="price">Monthly Price (KSH)</Label>
                     <Input id="price" type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} />
                   </div>
                   <div>
