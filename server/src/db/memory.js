@@ -22,6 +22,8 @@ const store = {
   olt_connections: [],
   integrations: [],
   hotspot_vouchers: [],
+  fup_profiles: [],
+  tr069_devices: [],
 };
 
 // Seed example templates
@@ -736,6 +738,123 @@ module.exports = {
       const idx = store.hotspot_vouchers.findIndex(v => v.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.hotspot_vouchers.splice(idx, 1) };
+    }
+
+    // SELECT fup_profiles
+    if (lowerText.includes('select') && lowerText.includes('from fup_profiles')) {
+      if (params[0] && params.length === 1) {
+        const fup = store.fup_profiles.find(f => f.id === params[0]);
+        return fup ? { rows: [fup] } : { rows: [] };
+      }
+      return { rows: store.fup_profiles.sort((a, b) => (a.priority || 100) - (b.priority || 100)) };
+    }
+
+    // INSERT fup_profiles
+    if (lowerText.includes('insert into fup_profiles')) {
+      const fup = {
+        id: params[0],
+        name: params[1],
+        description: params[2],
+        data_limit: params[3],
+        data_limit_unit: params[4],
+        reset_period: params[5],
+        throttle_speed: params[6],
+        priority: params[7],
+        is_active: params[8],
+        created_at: params[9] || new Date().toISOString(),
+        updated_at: params[10] || new Date().toISOString(),
+      };
+      store.fup_profiles.push(fup);
+      return { rows: [fup] };
+    }
+
+    // UPDATE fup_profiles
+    if (lowerText.includes('update fup_profiles') && lowerText.includes('where id =')) {
+      const idx = store.fup_profiles.findIndex(f => f.id === params[8]);
+      if (idx === -1) return { rows: [] };
+      store.fup_profiles[idx] = {
+        ...store.fup_profiles[idx],
+        name: params[0],
+        description: params[1],
+        data_limit: params[2],
+        data_limit_unit: params[3],
+        reset_period: params[4],
+        throttle_speed: params[5],
+        priority: params[6],
+        is_active: params[7],
+        updated_at: new Date().toISOString(),
+      };
+      return { rows: [store.fup_profiles[idx]] };
+    }
+
+    // DELETE fup_profiles
+    if (lowerText.includes('delete from fup_profiles')) {
+      const idx = store.fup_profiles.findIndex(f => f.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.fup_profiles.splice(idx, 1) };
+    }
+
+    // SELECT tr069_devices
+    if (lowerText.includes('select') && lowerText.includes('from tr069_devices')) {
+      if (params[0] && params.length === 1) {
+        const device = store.tr069_devices.find(d => d.id === params[0]);
+        return device ? { rows: [device] } : { rows: [] };
+      }
+      if (lowerText.includes('serial_number =')) {
+        const device = store.tr069_devices.find(d => d.serial_number === params[0]);
+        return device ? { rows: [device] } : { rows: [] };
+      }
+      return { rows: store.tr069_devices.sort((a, b) => new Date(b.last_inform || 0) - new Date(a.last_inform || 0)) };
+    }
+
+    // INSERT tr069_devices
+    if (lowerText.includes('insert into tr069_devices')) {
+      const device = {
+        id: params[0],
+        serial_number: params[1],
+        manufacturer: params[2],
+        model: params[3],
+        firmware_version: params[4],
+        connection_id: params[5],
+        ip_address: params[6],
+        status: params[7],
+        last_inform: params[8] || new Date().toISOString(),
+        parameters: params[9],
+        created_at: params[10] || new Date().toISOString(),
+        updated_at: params[11] || new Date().toISOString(),
+      };
+      const existingIdx = store.tr069_devices.findIndex(d => d.serial_number === device.serial_number);
+      if (existingIdx !== -1) {
+        store.tr069_devices[existingIdx] = { ...store.tr069_devices[existingIdx], ...device, updated_at: new Date().toISOString() };
+        return { rows: [store.tr069_devices[existingIdx]] };
+      }
+      store.tr069_devices.push(device);
+      return { rows: [device] };
+    }
+
+    // UPDATE tr069_devices
+    if (lowerText.includes('update tr069_devices') && lowerText.includes('where id =')) {
+      const idx = store.tr069_devices.findIndex(d => d.id === params[7]);
+      if (idx === -1) return { rows: [] };
+      store.tr069_devices[idx] = {
+        ...store.tr069_devices[idx],
+        manufacturer: params[0],
+        model: params[1],
+        firmware_version: params[2],
+        connection_id: params[3],
+        ip_address: params[4],
+        status: params[5],
+        parameters: params[6],
+        updated_at: new Date().toISOString(),
+      };
+      return { rows: [store.tr069_devices[idx]] };
+    }
+
+    // DELETE tr069_devices
+    if (lowerText.includes('delete from tr069_devices')) {
+      const idx = store.tr069_devices.findIndex(d => d.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      return { rows: store.tr069_devices.splice(idx, 1) };
     }
 
     // INSERT/UPDATE anything else (generic fallback)

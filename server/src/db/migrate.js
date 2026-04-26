@@ -161,6 +161,42 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_olt_connections_vendor ON olt_connections(vendor)`,
   `CREATE INDEX IF NOT EXISTS idx_olt_connections_status ON olt_connections(status)`,
+
+  // FUP (Fair Usage Policy) profiles table
+  `CREATE TABLE IF NOT EXISTS fup_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    data_limit VARCHAR(50) NOT NULL,
+    data_limit_unit VARCHAR(10) DEFAULT 'GB',
+    reset_period VARCHAR(20) DEFAULT 'monthly',
+    throttle_speed VARCHAR(50),
+    priority INTEGER DEFAULT 100,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_fup_profiles_name ON fup_profiles(name)`,
+  `CREATE INDEX IF NOT EXISTS idx_fup_profiles_active ON fup_profiles(is_active)`,
+
+  // TR-069 CPE devices table
+  `CREATE TABLE IF NOT EXISTS tr069_devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    serial_number VARCHAR(255) UNIQUE NOT NULL,
+    manufacturer VARCHAR(100),
+    model VARCHAR(100),
+    firmware_version VARCHAR(50),
+    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL,
+    ip_address VARCHAR(45),
+    status VARCHAR(50) DEFAULT 'unknown',
+    last_inform TIMESTAMP,
+    parameters JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_tr069_devices_serial ON tr069_devices(serial_number)`,
+  `CREATE INDEX IF NOT EXISTS idx_tr069_devices_status ON tr069_devices(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_tr069_devices_connection ON tr069_devices(connection_id)`,
 ];
 
 async function runMigrations() {
