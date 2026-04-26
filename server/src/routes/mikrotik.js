@@ -288,4 +288,175 @@ router.post('/alerts/:id/resolve', async (req, res) => {
   }
 });
 
+// Fetch PPP secrets from MikroTik
+router.get('/:id/ppp-secrets', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const connectionResult = await db.query(
+      'SELECT id, name, ip_address, api_port, username, password_encrypted FROM mikrotik_connections WHERE id = $1',
+      [id]
+    );
+    
+    if (connectionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    const connection = connectionResult.rows[0];
+    
+    // Decrypt password
+    const [ivHex, authTagHex, encrypted] = connection.password_encrypted.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+    decipher.setAuthTag(authTag);
+    let password = decipher.update(encrypted, 'hex', 'utf8');
+    password += decipher.final('utf8');
+    
+    const MikroNode = require('mikronode');
+    const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
+    const conn = await device.connect(connection.username, password);
+    
+    // Fetch PPP secrets
+    const secrets = await conn.write('/ppp/secret/print');
+    
+    conn.close();
+    
+    // Format the response
+    const users = secrets.map(secret => ({
+      name: secret.name,
+      service: secret.service,
+      profile: secret.profile,
+      caller_id: secret['caller-id'],
+      comment: secret.comment,
+      disabled: secret.disabled === 'true',
+      last_logged_in: secret['last-logged-out'],
+      limit_bytes_in: secret['limit-bytes-in'],
+      limit_bytes_out: secret['limit-bytes-out']
+    }));
+    
+    res.json({ success: true, users });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fetch Hotspot users from MikroTik
+router.get('/:id/hotspot-users', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const connectionResult = await db.query(
+      'SELECT id, name, ip_address, api_port, username, password_encrypted FROM mikrotik_connections WHERE id = $1',
+      [id]
+    );
+    
+    if (connectionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    const connection = connectionResult.rows[0];
+    
+    // Decrypt password
+    const [ivHex, authTagHex, encrypted] = connection.password_encrypted.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+    decipher.setAuthTag(authTag);
+    let password = decipher.update(encrypted, 'hex', 'utf8');
+    password += decipher.final('utf8');
+    
+    const MikroNode = require('mikronode');
+    const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
+    const conn = await device.connect(connection.username, password);
+    
+    // Fetch Hotspot users
+    const users = await conn.write('/ip/hotspot/user/print');
+    
+    conn.close();
+    
+    // Format the response
+    const hotspotUsers = users.map(user => ({
+      name: user.name,
+      profile: user.profile,
+      mac_address: user['mac-address'],
+      comment: user.comment,
+      disabled: user.disabled === 'true',
+      uptime: user.uptime,
+      bytes_in: user['bytes-in'],
+      bytes_out: user['bytes-out'],
+      packets_in: user['packets-in'],
+      packets_out: user['packets-out']
+    }));
+    
+    res.json({ success: true, users: hotspotUsers });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Import MikroTik users as customers
+router.post('/:id/import-users', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { users, userType } = req.body; // userType: 'ppp' or 'hotspot'
+    
+    if (!users || !Array.isArray(users)) {
+      return res.status(400).json({ error: 'users array is required' });
+    }
+    
+    const connectionResult = await db.query(
+      'SELECT id, name FROM mikrotik_connections WHERE id = $1',
+      [id]
+    );
+    
+    if (connectionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    const imported = [];
+    const errors = [];
+    
+    for (const user of users) {
+      try {
+        // Check if user already exists by email (using username as email)
+        const existingUser = await db.query(
+          'SELECT id FROM users WHERE email = $1',
+          [user.name]
+        );
+        
+        if (existingUser.rows.length > 0) {
+          errors.push({ user: user.name, error: 'User already exists' });
+          continue;
+        }
+        
+        // Create new customer
+        const userId = uuidv4();
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(user.name + '123', 10); // Default password
+        
+        await db.query(
+          `INSERT INTO users (id, email, name, password, role, is_active, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+          [userId, user.name, user.comment || user.name, hashedPassword, 'customer', true]
+        );
+        
+        imported.push({ id: userId, name: user.name, email: user.name });
+      } catch (error) {
+        errors.push({ user: user.name, error: error.message });
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      imported: imported.length, 
+      importedUsers: imported,
+      errors: errors.length,
+      errorDetails: errors
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
