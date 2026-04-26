@@ -216,6 +216,73 @@ const coreMigrations = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)`,
   `CREATE INDEX IF NOT EXISTS idx_users_online ON users(is_online)`,
+
+  // Monitoring and alerting tables
+  `CREATE TABLE IF NOT EXISTS health_checks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
+    check_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    cpu_usage NUMERIC(5,2),
+    memory_usage NUMERIC(5,2),
+    uptime_seconds INTEGER,
+    temperature NUMERIC(5,2),
+    bandwidth_usage JSONB,
+    latency_ms NUMERIC(10,2),
+    error_message TEXT,
+    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_health_checks_connection ON health_checks(connection_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_health_checks_type ON health_checks(check_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_health_checks_status ON health_checks(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_health_checks_time ON health_checks(checked_at)`,
+
+  `CREATE TABLE IF NOT EXISTS alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
+    alert_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'open',
+    acknowledged_by UUID REFERENCES users(id),
+    acknowledged_at TIMESTAMP,
+    resolved_at TIMESTAMP,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_connection ON alerts(connection_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(created_at)`,
+
+  `CREATE TABLE IF NOT EXISTS notification_channels (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    channel_type VARCHAR(20) NOT NULL,
+    is_enabled BOOLEAN DEFAULT true,
+    config JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_channels_user ON notification_channels(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_channels_type ON notification_channels(channel_type)`,
+
+  `CREATE TABLE IF NOT EXISTS monitoring_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE CASCADE,
+    rule_type VARCHAR(50) NOT NULL,
+    threshold_value NUMERIC(10,2) NOT NULL,
+    comparison_operator VARCHAR(10) DEFAULT '>',
+    is_enabled BOOLEAN DEFAULT true,
+    alert_severity VARCHAR(20) DEFAULT 'warning',
+    notification_channels TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_connection ON monitoring_rules(connection_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_type ON monitoring_rules(rule_type)`,
 ];
 
 async function runMigrations() {
