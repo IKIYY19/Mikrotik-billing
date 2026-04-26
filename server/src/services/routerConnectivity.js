@@ -125,6 +125,8 @@ class RouterConnectivityService {
       const MikroNode = require('mikronode');
       const crypto = require('crypto');
       
+      logger.info('Testing API connection', { connectionId: connection.id, ip: connection.ip_address });
+      
       // Decrypt password
       const algorithm = 'aes-256-cbc';
       const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 32);
@@ -133,13 +135,21 @@ class RouterConnectivityService {
       let password = decipher.update(connection.password_encrypted, 'hex', 'utf8');
       password += decipher.final('utf8');
 
+      logger.info('Attempting MikroTik API connection', { 
+        connectionId: connection.id, 
+        ip: connection.ip_address, 
+        port: connection.api_port || 8728,
+        username: connection.username 
+      });
+
       const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
       const conn = await device.connect(connection.username, password);
       conn.close();
       
+      logger.info('API connection successful', { connectionId: connection.id });
       return true;
     } catch (error) {
-      logger.warn('API connection test failed', { connectionId: connection.id, error: error.message });
+      logger.error('API connection test failed', { connectionId: connection.id, error: error.message, stack: error.stack });
       return false;
     }
   }
@@ -150,6 +160,8 @@ class RouterConnectivityService {
       const { NodeSSH } = require('node-ssh');
       const crypto = require('crypto');
       
+      logger.info('Testing SSH connection', { connectionId: connection.id, ip: connection.ip_address });
+      
       // Decrypt password
       const algorithm = 'aes-256-cbc';
       const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-bytes-long!!', 'utf8').slice(0, 32);
@@ -157,6 +169,13 @@ class RouterConnectivityService {
       const decipher = crypto.createDecipheriv(algorithm, key, iv);
       let password = decipher.update(connection.password_encrypted, 'hex', 'utf8');
       password += decipher.final('utf8');
+
+      logger.info('Attempting SSH connection', { 
+        connectionId: connection.id, 
+        ip: connection.ip_address, 
+        port: connection.ssh_port || 22,
+        username: connection.username 
+      });
 
       const ssh = new NodeSSH();
       await ssh.connect({
@@ -171,11 +190,17 @@ class RouterConnectivityService {
       await ssh.execCommand('/system resource print');
       ssh.dispose();
       
+      logger.info('SSH connection successful', { connectionId: connection.id });
       return true;
     } catch (error) {
-      logger.warn('SSH connection test failed', { connectionId: connection.id, error: error.message });
+      logger.error('SSH connection test failed', { connectionId: connection.id, error: error.message, stack: error.stack });
       return false;
     }
+  }
+
+  // Manual check for a specific connection (returns result immediately)
+  async checkConnectionNow(connectionId) {
+    return await this.checkConnection(connectionId);
   }
 }
 

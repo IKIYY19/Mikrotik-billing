@@ -31,7 +31,7 @@ function decrypt(encryptedText) {
 // Get all connections
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, created_at, updated_at FROM mikrotik_connections');
+    const result = await db.query('SELECT id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, is_online, last_seen, created_at, updated_at FROM mikrotik_connections');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -172,6 +172,29 @@ router.delete('/:id', async (req, res) => {
     }
 
     res.json({ message: 'Connection deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check connectivity for a specific connection
+router.post('/:id/check', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const routerConnectivityService = require('../services/routerConnectivity');
+    await routerConnectivityService.checkConnectionNow(id);
+    
+    // Get updated connection status
+    const result = await db.query(
+      'SELECT id, name, ip_address, is_online, last_seen FROM mikrotik_connections WHERE id = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    res.json({ success: true, connection: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
