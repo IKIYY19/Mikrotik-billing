@@ -6,6 +6,7 @@ import { Toast } from './components/Toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { GlobalSearch } from './components/GlobalSearch';
 import { getToken } from './lib/auth';
+import LoginPage from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Templates } from './pages/Templates';
