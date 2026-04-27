@@ -149,13 +149,18 @@ module.exports = {
       customer_id: data.customer_id,
       plan_id: data.plan_id,
       router_id: data.router_id || null,
+      mikrotik_connection_id: data.mikrotik_connection_id || null,
       pppoe_username: data.pppoe_username || '',
       pppoe_password: data.pppoe_password || '',
+      pppoe_profile: data.pppoe_profile || null,
       status: data.status || 'active',
       start_date: formatDate(data.start_date) || formatDate(new Date()),
       end_date: formatDate(data.end_date) || null,
       billing_cycle: data.billing_cycle || 'monthly',
       auto_provision: data.auto_provision !== false,
+      last_synced_at: data.last_synced_at || null,
+      last_sync_status: data.last_sync_status || null,
+      last_sync_error: data.last_sync_error || null,
       created_at: new Date().toISOString(),
     };
     billingStore.subscriptions.push(sub);
@@ -176,6 +181,12 @@ module.exports = {
     sub.status = sub.status === 'active' ? 'suspended' : 'active';
     sub.updated_at = new Date().toISOString();
     return sub;
+  },
+
+  async deleteSubscription(id) {
+    const idx = billingStore.subscriptions.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+    return billingStore.subscriptions.splice(idx, 1)[0];
   },
 
   // ─── INVOICES ───

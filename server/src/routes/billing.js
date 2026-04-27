@@ -6,6 +6,86 @@ const { triggerSMS } = require('./sms');
 const db = global.dbAvailable ? global.db : require('../db/memory');
 const MpesaService = require('../services/mpesa');
 const alertSystem = require('../services/alertSystem');
+const mikrotikProvisioning = require('../services/mikrotikProvisioning');
+
+async function getExpandedSubscription(subscriptionId) {
+  const sub = await billing.getSubscriptionById(subscriptionId);
+  if (!sub) return null;
+
+  const customer = sub.customer || await billing.getCustomerById(sub.customer_id);
+  const plan = sub.plan || await billing.getPlanById(sub.plan_id);
+  return { ...sub, customer, plan };
+}
+
+async function persistSyncState(subscriptionId, syncResult) {
+  if (!subscriptionId || !syncResult) return null;
+
+  const payload = {
+    last_synced_at: new Date().toISOString(),
+    last_sync_status: syncResult.status || (syncResult.success ? 'synced' : 'failed'),
+    last_sync_error: syncResult.success ? null : (syncResult.error || syncResult.message || 'Unknown sync error'),
+  };
+
+  await billing.updateSubscription(subscriptionId, payload);
+  return billing.getSubscriptionById(subscriptionId);
+}
+
+function buildProvisionScriptFallback(action, subscription) {
+  if (!subscription?.pppoe_username) {
+    return null;
+  }
+
+  return PPPoEProvisioner.generateProvisioningScript(action, subscription);
+}
+
+async function syncSubscription(action, subscription) {
+  if (!subscription?.auto_provision || !subscription?.pppoe_username) {
+    return {
+      syncResult: { success: false, status: 'skipped', error: 'Auto provisioning is disabled or PPPoE username is missing' },
+      provisionScript: null,
+    };
+  }
+
+  const fallbackScript = buildProvisionScriptFallback(
+    action === 'delete' ? 'remove' : action === 'suspend' ? 'suspend' : subscription.status === 'active' ? 'activate' : 'suspend',
+    subscription
+  );
+
+  if (!subscription.mikrotik_connection_id) {
+    return {
+      syncResult: { success: false, status: 'skipped', error: 'No MikroTik connection linked to this subscription' },
+      provisionScript: fallbackScript,
+    };
+  }
+
+  try {
+    let syncResult;
+    if (action === 'delete') {
+      syncResult = await mikrotikProvisioning.deleteSubscriptionSecret(subscription);
+    } else if (action === 'suspend') {
+      syncResult = await mikrotikProvisioning.suspendSubscriptionSecret(subscription);
+    } else {
+      syncResult = await mikrotikProvisioning.reconcileSubscription(subscription);
+    }
+
+    await persistSyncState(subscription.id, syncResult);
+    return {
+      syncResult,
+      provisionScript: syncResult.success ? null : fallbackScript,
+    };
+  } catch (error) {
+    const failedSync = {
+      success: false,
+      status: 'failed',
+      error: error.message,
+    };
+    await persistSyncState(subscription.id, failedSync);
+    return {
+      syncResult: failedSync,
+      provisionScript: fallbackScript,
+    };
+  }
+}
 
 // ═══════════════════════════════════════
 // DASHBOARD
@@ -281,14 +361,10 @@ router.post('/subscriptions', async (req, res) => {
       });
     }
 
-    // Generate MikroTik provision script if PPPoE credentials provided
-    let provisionScript = null;
-    if (sub.auto_provision && sub.pppoe_username) {
-      const customer = sub.customer || await billing.getCustomerById(sub.customer_id);
-      provisionScript = PPPoEProvisioner.generateProvisioningScript('activate', { ...sub, customer, plan });
-    }
+    const expandedSub = await getExpandedSubscription(sub.id);
+    const { syncResult, provisionScript } = await syncSubscription('reconcile', { ...expandedSub, plan });
 
-    res.status(201).json({ ...sub, provision_script: provisionScript });
+    res.status(201).json({ ...expandedSub, provision_script: provisionScript, mikrotik_sync: syncResult });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -296,7 +372,12 @@ router.put('/subscriptions/:id', async (req, res) => {
   try {
     const sub = await billing.updateSubscription(req.params.id, req.body);
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
-    res.json(sub);
+    const expandedSub = await getExpandedSubscription(sub.id);
+    const shouldSync = req.body.auto_provision !== false && (req.body.pppoe_username || expandedSub.pppoe_username);
+    const { syncResult, provisionScript } = shouldSync
+      ? await syncSubscription('reconcile', expandedSub)
+      : { syncResult: null, provisionScript: null };
+    res.json({ ...expandedSub, provision_script: provisionScript, mikrotik_sync: syncResult });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -305,38 +386,53 @@ router.post('/subscriptions/:id/toggle', async (req, res) => {
     const sub = await billing.toggleSubscriptionStatus(req.params.id);
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
 
-    // Generate MikroTik provisioning script
-    const customer = sub.customer || await billing.getCustomerById(sub.customer_id);
-    const plan = sub.plan || await billing.getPlanById(sub.plan_id);
-    const action = sub.status === 'active' ? 'activate_existing' : 'suspend';
-    const provisionScript = sub.pppoe_username
-      ? PPPoEProvisioner.generateProvisioningScript(action, { ...sub, customer, plan })
-      : null;
+    const expandedSub = await getExpandedSubscription(sub.id);
+    const action = expandedSub.status === 'active' ? 'reconcile' : 'suspend';
+    const { syncResult, provisionScript } = await syncSubscription(action, expandedSub);
 
     // Send SMS notification
-    if (customer?.phone) {
+    if (expandedSub.customer?.phone) {
       triggerSMS(sub.status === 'active' ? 'service_restored' : 'service_suspended', {
-        customer, sub, plan, invoice: null, payment: null,
+        customer: expandedSub.customer, sub: expandedSub, plan: expandedSub.plan, invoice: null, payment: null,
       }).catch(e => console.error('SMS error:', e.message));
     }
     
     // Send Telegram alert for suspension
-    if (sub.status !== 'active' && plan?.name) {
+    if (sub.status !== 'active' && expandedSub.plan?.name) {
       alertSystem.sendServiceSuspension(
-        customer.id,
-        plan.name
+        expandedSub.customer.id,
+        expandedSub.plan.name
       ).catch(e => console.error('Telegram alert error:', e.message));
     }
 
-    res.json({ ...sub, provision_script: provisionScript });
+    res.json({ ...expandedSub, provision_script: provisionScript, mikrotik_sync: syncResult });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/subscriptions/:id/sync', async (req, res) => {
+  try {
+    const sub = await getExpandedSubscription(req.params.id);
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+    const { syncResult, provisionScript } = await syncSubscription('reconcile', sub);
+    const refreshed = await getExpandedSubscription(req.params.id);
+    res.json({ ...refreshed, provision_script: provisionScript, mikrotik_sync: syncResult });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.delete('/subscriptions/:id', async (req, res) => {
   try {
+    const existing = await getExpandedSubscription(req.params.id);
+    let syncResult = null;
+    let provisionScript = null;
+    if (existing) {
+      const syncOutcome = await syncSubscription('delete', existing);
+      syncResult = syncOutcome.syncResult;
+      provisionScript = syncOutcome.provisionScript;
+    }
     const deleted = await billing.deleteSubscription(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Subscription not found' });
-    res.json({ success: true });
+    res.json({ success: true, mikrotik_sync: syncResult, provision_script: provisionScript });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

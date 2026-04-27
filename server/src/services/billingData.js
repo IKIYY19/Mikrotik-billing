@@ -70,11 +70,21 @@ function normalizePlanRef(row) {
 }
 
 function normalizeRouterRef(row) {
+  if (row?.mikrotik_connection) return row.mikrotik_connection;
   if (row?.router) return row.router;
+  if (row?.mikrotik_connection_id || row?.mikrotik_connection_name) {
+    return {
+      id: row.mikrotik_connection_id || null,
+      name: row.mikrotik_connection_name || '',
+      ip_address: row.mikrotik_connection_ip || '',
+      type: 'mikrotik_connection',
+    };
+  }
   if (!row?.router_id && !row?.router_name) return null;
   return {
     id: row.router_id || null,
     name: row.router_name || '',
+    type: 'router',
   };
 }
 
@@ -83,6 +93,7 @@ function normalizeSubscription(subscription) {
   return {
     ...subscription,
     auto_provision: subscription.auto_provision !== false,
+    mikrotik_connection_id: subscription.mikrotik_connection_id || subscription.router?.id || subscription.router_id || null,
     customer: normalizeCustomerRef(subscription),
     plan: normalizePlanRef(subscription),
     router: normalizeRouterRef(subscription),

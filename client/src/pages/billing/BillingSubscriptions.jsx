@@ -8,47 +8,74 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
 const API = import.meta.env.VITE_API_URL || '/api';
+const emptyForm = {
+  customer_id: '',
+  plan_id: '',
+  mikrotik_connection_id: '',
+  pppoe_username: '',
+  pppoe_password: '',
+  pppoe_profile: '',
+  start_date: '',
+  billing_cycle: 'monthly',
+  auto_provision: true,
+};
 
 export function BillingSubscriptions() {
   const toast = useToast();
   const [subs, setSubs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [devices, setDevices] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showScript, setShowScript] = useState(null);
   const [copied, setCopied] = useState(false);
   const [editingSub, setEditingSub] = useState(null);
-  const [form, setForm] = useState({ customer_id: '', plan_id: '', router_id: '', pppoe_username: '', pppoe_password: '', start_date: '', billing_cycle: 'monthly', auto_provision: true });
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     fetchSubs();
     axios.get(`${API}/billing/customers`).then(r => setCustomers(r.data));
     axios.get(`${API}/billing/plans`).then(r => setPlans(r.data));
-    axios.get(`${API}/devices`).then(r => setDevices(r.data));
+    axios.get(`${API}/mikrotik`).then(r => setConnections(r.data));
   }, []);
 
   const fetchSubs = async () => {
     try { const { data } = await axios.get(`${API}/billing/subscriptions`); setSubs(data); } catch (error) { console.error('Failed to fetch subscriptions:', error); toast.error('Failed to load subscriptions', error.response?.data?.error || error.message); }
   };
 
+  const handleSyncFeedback = (data, successMessage) => {
+    if (successMessage) {
+      toast.success(successMessage);
+    }
+    if (data?.mikrotik_sync?.success) {
+      toast.success(data.mikrotik_sync.message || 'MikroTik synced successfully');
+    } else if (data?.mikrotik_sync?.error) {
+      toast.error('MikroTik sync failed', data.mikrotik_sync.error);
+    }
+    if (data?.provision_script) {
+      setShowScript(data.provision_script);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingSub) {
-      await axios.put(`${API}/billing/subscriptions/${editingSub.id}`, form);
-      toast.success('Subscription updated');
+      const { data } = await axios.put(`${API}/billing/subscriptions/${editingSub.id}`, {
+        ...form,
+        router_id: null,
+      });
+      handleSyncFeedback(data, 'Subscription updated');
     } else {
       const { data } = await axios.post(`${API}/billing/subscriptions`, {
         ...form,
+        router_id: null,
         start_date: form.start_date || new Date().toISOString().split('T')[0],
       });
-      if (data.provision_script) {
-        setShowScript(data.provision_script);
-      }
+      handleSyncFeedback(data, 'Subscription created');
     }
     setShowForm(false);
     setEditingSub(null);
-    setForm({ customer_id: '', plan_id: '', router_id: '', pppoe_username: '', pppoe_password: '', start_date: '', billing_cycle: 'monthly', auto_provision: true });
+    setForm({ ...emptyForm });
     fetchSubs();
   };
 
@@ -57,9 +84,10 @@ export function BillingSubscriptions() {
     setForm({
       customer_id: sub.customer_id,
       plan_id: sub.plan_id,
-      router_id: sub.router_id || '',
+      mikrotik_connection_id: sub.mikrotik_connection_id || sub.router?.id || '',
       pppoe_username: sub.pppoe_username || '',
       pppoe_password: sub.pppoe_password || '',
+      pppoe_profile: sub.pppoe_profile || '',
       start_date: sub.start_date,
       billing_cycle: sub.billing_cycle,
       auto_provision: sub.auto_provision,
@@ -70,8 +98,8 @@ export function BillingSubscriptions() {
   const handleDelete = async (sub) => {
     console.log('Deleting subscription:', sub.id);
     try {
-      await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
-      toast.success('Subscription deleted');
+      const { data } = await axios.delete(`${API}/billing/subscriptions/${sub.id}`);
+      handleSyncFeedback(data, 'Subscription deleted');
       fetchSubs();
     } catch (error) {
       console.error('Delete failed:', error);
@@ -82,8 +110,16 @@ export function BillingSubscriptions() {
   const toggleStatus = async (sub) => {
     const { data } = await axios.post(`${API}/billing/subscriptions/${sub.id}/toggle`);
     fetchSubs();
-    if (data.provision_script) {
-      setShowScript(data.provision_script);
+    handleSyncFeedback(data);
+  };
+
+  const syncSubscription = async (sub) => {
+    try {
+      const { data } = await axios.post(`${API}/billing/subscriptions/${sub.id}/sync`);
+      handleSyncFeedback(data, 'Subscription sync started');
+      fetchSubs();
+    } catch (error) {
+      toast.error('Failed to sync subscription', error.response?.data?.error || error.message);
     }
   };
 
@@ -131,12 +167,22 @@ export function BillingSubscriptions() {
                 <div className="text-zinc-400">Price: <span className="text-white">${sub.plan?.price}/mo</span></div>
                 <div className="text-zinc-400">PPPoE: <span className="text-white font-mono">{sub.pppoe_username || '—'}</span></div>
                 <div className="text-zinc-400">Router: <span className="text-white">{sub.router?.name || '—'}</span></div>
+                <div className="text-zinc-400">Profile: <span className="text-white">{sub.pppoe_profile || 'default'}</span></div>
+                <div className="text-zinc-400">Sync: <span className={`${sub.last_sync_status === 'synced' ? 'text-green-400' : sub.last_sync_status ? 'text-amber-400' : 'text-slate-400'}`}>{sub.last_sync_status || 'not synced'}</span></div>
                 <div className="text-zinc-400">Started: <span className="text-white">{sub.start_date}</span></div>
                 <div className="text-zinc-400">Cycle: <span className="text-white capitalize">{sub.billing_cycle}</span></div>
               </CardContent>
+              {sub.last_sync_error && (
+                <CardContent className="pt-0 pb-4 text-xs text-amber-300">
+                  {sub.last_sync_error}
+                </CardContent>
+              )}
               <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleEdit(sub)} className="flex items-center gap-1">
                   <Pencil className="w-3 h-3" /> Edit
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => syncSubscription(sub)} className="flex items-center gap-1">
+                  Sync
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => handleDelete(sub)} className="flex items-center gap-1 text-red-400">
                   <Trash2 className="w-3 h-3" />
@@ -159,7 +205,7 @@ export function BillingSubscriptions() {
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
                 <CardTitle>{editingSub ? 'Edit Subscription' : 'New Subscription'}</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditingSub(null); }}><X className="w-5 h-5" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditingSub(null); setForm({ ...emptyForm }); }}><X className="w-5 h-5" /></Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -181,11 +227,11 @@ export function BillingSubscriptions() {
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="router">Router/Device (optional)</Label>
-                  <select id="router" value={form.router_id} onChange={e => setForm({...form, router_id: e.target.value})}
+                  <Label htmlFor="router">MikroTik Connection</Label>
+                  <select id="router" value={form.mikrotik_connection_id} onChange={e => setForm({...form, mikrotik_connection_id: e.target.value})}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
-                    <option value="">No device linked</option>
-                    {devices.map(d => <option key={d.id} value={d.id}>{d.name} ({d.provision_status})</option>)}
+                    <option value="">No MikroTik linked</option>
+                    {connections.map(c => <option key={c.id} value={c.id}>{c.name} ({c.ip_address})</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -197,6 +243,10 @@ export function BillingSubscriptions() {
                     <Label htmlFor="pppoe-password">PPPoE Password</Label>
                     <Input id="pppoe-password" type="password" value={form.pppoe_password} onChange={e => setForm({...form, pppoe_password: e.target.value})} placeholder="••••••••" />
                   </div>
+                </div>
+                <div>
+                  <Label htmlFor="pppoe-profile">PPPoE Profile</Label>
+                  <Input id="pppoe-profile" value={form.pppoe_profile} onChange={e => setForm({...form, pppoe_profile: e.target.value})} placeholder="default" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -214,7 +264,7 @@ export function BillingSubscriptions() {
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-zinc-800">
-                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingSub(null); }} className="flex-1">Cancel</Button>
+                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingSub(null); setForm({ ...emptyForm }); }} className="flex-1">Cancel</Button>
                   <Button type="submit" className="btn-gradient-primary flex-1">{editingSub ? 'Update Subscription' : 'Create Subscription'}</Button>
                 </div>
               </form>

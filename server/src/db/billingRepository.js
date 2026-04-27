@@ -159,11 +159,15 @@ const subscriptions = {
     const result = await db.query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email,
         sp.name as plan_name, sp.speed_up, sp.speed_down, sp.price as plan_price,
-        r.name as router_name
+        r.name as router_name,
+        mc.id as mikrotik_connection_id,
+        mc.name as mikrotik_connection_name,
+        mc.ip_address as mikrotik_connection_ip
        FROM subscriptions s
        LEFT JOIN customers c ON c.id = s.customer_id
        LEFT JOIN service_plans sp ON sp.id = s.plan_id
        LEFT JOIN routers r ON r.id = s.router_id
+       LEFT JOIN mikrotik_connections mc ON mc.id = s.mikrotik_connection_id
        ${whereClause}
        ORDER BY s.created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -177,11 +181,15 @@ const subscriptions = {
     const result = await db.query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
         sp.name as plan_name, sp.speed_up, sp.speed_down, sp.price as plan_price, sp.priority as plan_priority,
-        r.name as router_name
+        r.name as router_name,
+        mc.id as mikrotik_connection_id,
+        mc.name as mikrotik_connection_name,
+        mc.ip_address as mikrotik_connection_ip
        FROM subscriptions s
        LEFT JOIN customers c ON c.id = s.customer_id
        LEFT JOIN service_plans sp ON sp.id = s.plan_id
        LEFT JOIN routers r ON r.id = s.router_id
+       LEFT JOIN mikrotik_connections mc ON mc.id = s.mikrotik_connection_id
        WHERE s.id = $1`,
       [id]
     );
@@ -191,12 +199,13 @@ const subscriptions = {
   async create(data, userId = null) {
     const id = uuidv4();
     const result = await db.query(
-      `INSERT INTO subscriptions (id, customer_id, plan_id, router_id, pppoe_username, pppoe_password,
-       status, start_date, end_date, billing_cycle, auto_provision)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [id, data.customer_id, data.plan_id, data.router_id || null, data.pppoe_username || '',
-       data.pppoe_password || '', data.status || 'active', data.start_date || new Date().toISOString().split('T')[0],
-       data.end_date || null, data.billing_cycle || 'monthly', data.auto_provision !== false]
+      `INSERT INTO subscriptions (id, customer_id, plan_id, router_id, mikrotik_connection_id, pppoe_username, pppoe_password,
+       pppoe_profile, status, start_date, end_date, billing_cycle, auto_provision, last_synced_at, last_sync_status, last_sync_error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+      [id, data.customer_id, data.plan_id, data.router_id || null, data.mikrotik_connection_id || null, data.pppoe_username || '',
+       data.pppoe_password || '', data.pppoe_profile || null, data.status || 'active', data.start_date || new Date().toISOString().split('T')[0],
+       data.end_date || null, data.billing_cycle || 'monthly', data.auto_provision !== false, data.last_synced_at || null,
+       data.last_sync_status || null, data.last_sync_error || null]
     );
     if (userId) await audit.log(userId, 'create', 'subscription', id, null, result.rows[0]);
     return result.rows[0];
@@ -209,9 +218,14 @@ const subscriptions = {
       `UPDATE subscriptions SET status = COALESCE($1, status), pppoe_username = COALESCE($2, pppoe_username),
        pppoe_password = COALESCE($3, pppoe_password), billing_cycle = COALESCE($4, billing_cycle),
        auto_provision = COALESCE($5, auto_provision), end_date = COALESCE($6, end_date),
-       updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING *`,
+       mikrotik_connection_id = COALESCE($7, mikrotik_connection_id), router_id = COALESCE($8, router_id),
+       pppoe_profile = COALESCE($9, pppoe_profile), last_synced_at = COALESCE($10, last_synced_at),
+       last_sync_status = COALESCE($11, last_sync_status), last_sync_error = $12,
+       updated_at = CURRENT_TIMESTAMP WHERE id = $13 RETURNING *`,
       [data.status, data.pppoe_username, data.pppoe_password, data.billing_cycle,
-       data.auto_provision, data.end_date, id]
+       data.auto_provision, data.end_date, data.mikrotik_connection_id, data.router_id,
+       data.pppoe_profile, data.last_synced_at, data.last_sync_status,
+       data.last_sync_error !== undefined ? data.last_sync_error : existing.last_sync_error, id]
     );
     if (userId) await audit.log(userId, 'update', 'subscription', id, existing, result.rows[0]);
     return result.rows[0];
@@ -476,14 +490,18 @@ const payments = {
            reference = COALESCE($2, reference),
            notes = COALESCE($3, notes),
            gateway_transaction_id = COALESCE($4, gateway_transaction_id),
+           refund_amount = COALESCE($5, refund_amount),
+           refund_reference = COALESCE($6, refund_reference),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5
+       WHERE id = $7
        RETURNING *`,
       [
         data.status ?? null,
         data.reference ?? null,
         data.notes ?? null,
         data.gateway_transaction_id ?? null,
+        data.refund_amount ?? null,
+        data.refund_reference ?? null,
         id,
       ]
     );
