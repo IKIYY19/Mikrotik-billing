@@ -168,12 +168,40 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
   `CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`,
-  `CREATE INDEX IF NOT EXISTS idx_subscriptions_mikrotik_connection ON subscriptions(mikrotik_connection_id)`,
-  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS mikrotik_connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL`,
+  `DO $$
+  BEGIN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_name = 'subscriptions'
+    ) AND EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_name = 'mikrotik_connections'
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'subscriptions' AND column_name = 'mikrotik_connection_id'
+    ) THEN
+      ALTER TABLE subscriptions
+      ADD COLUMN mikrotik_connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL;
+    END IF;
+  END $$`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS pppoe_profile VARCHAR(100)`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS last_sync_status VARCHAR(30)`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS last_sync_error TEXT`,
+  `DO $$
+  BEGIN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'subscriptions' AND column_name = 'mikrotik_connection_id'
+    ) THEN
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_mikrotik_connection
+      ON subscriptions(mikrotik_connection_id);
+    END IF;
+  END $$`,
   `CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status)`,
   `CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date)`,
