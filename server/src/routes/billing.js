@@ -4,6 +4,7 @@ const billing = require('../services/billingData');
 const PPPoEProvisioner = require('../utils/pppoeProvisioner');
 const { triggerSMS } = require('./sms');
 const db = global.dbAvailable ? global.db : require('../db/memory');
+const MpesaService = require('../services/mpesa');
 
 // ═══════════════════════════════════════
 // DASHBOARD
@@ -163,6 +164,61 @@ router.post('/customers/:id/reset-password', async (req, res) => {
     });
   } catch (e) {
     console.error('Reset password error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// PAYMENT PROMPTS (M-Pesa STK Push)
+// ═══════════════════════════════════════
+
+// Send payment prompt to customer
+router.post('/customers/:id/payment-prompt', async (req, res) => {
+  try {
+    const { amount, invoice_id } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid amount is required' });
+    }
+
+    const customer = await billing.getCustomerDetail(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    if (!customer.phone) {
+      return res.status(400).json({ error: 'Customer phone number is required' });
+    }
+
+    // Initialize M-Pesa service
+    const mpesa = new MpesaService();
+    const accountReference = invoice_id ? `INV-${invoice_id}` : `PAY-${customer.id}`;
+    const description = invoice_id ? `Payment for invoice ${invoice_id}` : `Payment from ${customer.name}`;
+
+    const mpesaResult = await mpesa.stkPush(customer.phone, amount, accountReference, description);
+
+    if (!mpesaResult.success) {
+      return res.status(400).json({ error: mpesaResult.message || 'Failed to send M-Pesa prompt' });
+    }
+
+    // Store pending payment
+    const pendingId = `pay-${Date.now()}`;
+    if (global.dbAvailable) {
+      await db.query(
+        `INSERT INTO payments (id, customer_id, invoice_id, phone, amount, method, status, reference, received_at)
+         VALUES ($1, $2, $3, $4, $5, 'mpesa', 'pending', $6, NOW())`,
+        [pendingId, customer.id, invoice_id || null, customer.phone, parseFloat(amount), mpesaResult.checkoutRequestId]
+      );
+    }
+
+    res.json({
+      success: true,
+      checkoutRequestId: mpesaResult.checkoutRequestId,
+      pending_id: pendingId,
+      message: 'Payment prompt sent successfully'
+    });
+  } catch (e) {
+    console.error('Send payment prompt error:', e);
     res.status(500).json({ error: e.message });
   }
 });
