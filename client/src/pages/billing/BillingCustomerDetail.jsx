@@ -20,6 +20,9 @@ export function BillingCustomerDetail() {
   const [paymentPromptModal, setPaymentPromptModal] = useState(false);
   const [sendingPrompt, setSendingPrompt] = useState(false);
   const [promptAmount, setPromptAmount] = useState('');
+  const [telegramModal, setTelegramModal] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [savingTelegram, setSavingTelegram] = useState(false);
 
   useEffect(() => { fetchCustomer(); }, [id]);
 
@@ -92,6 +95,23 @@ export function BillingCustomerDetail() {
     }
   };
 
+  const saveTelegramChatId = async (e) => {
+    e.preventDefault();
+    setSavingTelegram(true);
+    try {
+      await axios.put(`${API}/billing/customers/${id}`, {
+        telegram_chat_id: telegramChatId
+      });
+      toast.success('Telegram Chat ID saved successfully');
+      setTelegramModal(false);
+      fetchCustomer();
+    } catch (e) {
+      toast.error('Failed to save Telegram Chat ID', e.response?.data?.error || e.message);
+    } finally {
+      setSavingTelegram(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-white">Loading...</div>;
   if (!customer) return <div className="p-8 text-white">Customer not found</div>;
 
@@ -140,7 +160,7 @@ export function BillingCustomerDetail() {
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Mail className="w-4 h-4" /> Email</div>
           <div className="text-white">{customer.email || '—'}</div>
@@ -156,6 +176,20 @@ export function BillingCustomerDetail() {
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Hash className="w-4 h-4" /> ID Number</div>
           <div className="text-white">{customer.id_number || '—'}</div>
+        </div>
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-slate-400 text-sm mb-1"><Send className="w-4 h-4" /> Telegram Chat ID</div>
+              <div className="text-white">{customer.telegram_chat_id || '—'}</div>
+            </div>
+            <button
+              onClick={() => { setTelegramModal(true); setTelegramChatId(customer.telegram_chat_id || ''); }}
+              className="text-blue-400 hover:text-blue-300 text-sm"
+            >
+              Edit
+            </button>
+          </div>
         </div>
       </div>
 
@@ -435,6 +469,50 @@ export function BillingCustomerDetail() {
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {sendingPrompt ? 'Sending...' : 'Send Prompt'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Telegram Chat ID Modal */}
+      {telegramModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4">Set Telegram Chat ID</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              Enter the Telegram Chat ID for {customer.name} to receive automated alerts via Telegram.
+            </p>
+            <form onSubmit={saveTelegramChatId} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Telegram Chat ID *</label>
+                <input
+                  type="text"
+                  required
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder="e.g., 123456789"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  To get your Chat ID: Start your bot in Telegram, send a message, then check the bot's updates
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setTelegramModal(false); setTelegramChatId(''); }}
+                  className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTelegram}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {savingTelegram ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>
