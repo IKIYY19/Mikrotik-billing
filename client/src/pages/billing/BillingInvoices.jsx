@@ -75,7 +75,7 @@ export function BillingInvoices() {
         <div>
           <h2 className="text-2xl font-bold text-white gradient-text">Invoices ({invoices.length})</h2>
           <p className="text-slate-400 mt-1">
-            Outstanding: <span className="text-amber-400 font-semibold">${totalOutstanding.toFixed(2)}</span>
+            Outstanding: <span className="text-amber-400 font-semibold">KES {totalOutstanding.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex gap-3">
@@ -127,9 +127,9 @@ export function BillingInvoices() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
-                <div className="text-zinc-400">Total: <span className="text-white">${inv.total.toFixed(2)}</span></div>
-                <div className="text-zinc-400">Paid: <span className="text-emerald-400">${(inv.paid_amount || 0).toFixed(2)}</span></div>
-                <div className="text-zinc-400">Balance: <span className={`font-semibold ${inv.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${inv.balance.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Total: <span className="text-white">KES {inv.total.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Paid: <span className="text-emerald-400">KES {(inv.paid_amount || 0).toFixed(2)}</span></div>
+                <div className="text-zinc-400">Balance: <span className={`font-semibold ${inv.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>KES {inv.balance.toFixed(2)}</span></div>
                 <div className="text-zinc-400">Due: <span className="text-white">{inv.due_date}</span></div>
               </CardContent>
               <CardContent className="p-4 border-t border-zinc-800">

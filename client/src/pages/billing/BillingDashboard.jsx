@@ -188,7 +188,7 @@ export function BillingDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-white font-semibold">${(inv.total ?? 0).toFixed(2)}</div>
+                      <div className="text-sm text-white font-semibold">KES {(inv.total ?? 0).toFixed(2)}</div>
                       <span className={`badge ${inv.status === 'paid' ? 'badge-green' : inv.status === 'partial' ? 'badge-blue' : 'badge-amber'}`}>{inv.status}</span>
                     </div>
                   </div>
@@ -231,7 +231,7 @@ export function BillingDashboard() {
                         <div className="text-xs text-zinc-500 capitalize">{pay.method?.replace('_', ' ')} • {pay.receipt_number}</div>
                       </div>
                     </div>
-                    <div className="text-emerald-400 font-semibold text-sm">+${(pay.amount ?? 0).toFixed(2)}</div>
+                    <div className="text-emerald-400 font-semibold text-sm">+KES {(pay.amount ?? 0).toFixed(2)}</div>
                   </div>
                 ))}
               </div>

@@ -60,7 +60,7 @@ export function BillingPayments() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-2xl font-bold text-white gradient-text">Payments ({payments.length})</h2>
-          <p className="text-slate-400 mt-1">Total received: <span className="text-green-400 font-semibold">${totalReceived.toFixed(2)}</span></p>
+          <p className="text-slate-400 mt-1">Total received: <span className="text-green-400 font-semibold">KES {totalReceived.toFixed(2)}</span></p>
         </div>
         <Button onClick={() => setShowForm(true)} className="btn-gradient-primary flex items-center gap-2">
           <Plus className="w-5 h-5" /> Record Payment
@@ -93,7 +93,7 @@ export function BillingPayments() {
               </CardHeader>
               <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
                 <div className="text-zinc-400">Invoice: <span className="text-white">{pay.invoice?.invoice_number || '-'}</span></div>
-                <div className="text-zinc-400">Amount: <span className="text-green-400 font-semibold">+${pay.amount.toFixed(2)}</span></div>
+                <div className="text-zinc-400">Amount: <span className="text-green-400 font-semibold">+KES {pay.amount.toFixed(2)}</span></div>
                 <div className="text-zinc-400">Reference: <span className="text-white">{pay.reference || '-'}</span></div>
                 <div className="text-zinc-400">Date: <span className="text-white">{new Date(pay.received_at).toLocaleDateString()}</span></div>
               </CardContent>
@@ -122,7 +122,7 @@ export function BillingPayments() {
                     <option value="">Select outstanding invoice</option>
                     {invoices.map(inv => (
                       <option key={inv.id} value={inv.id}>
-                        {inv.invoice_number} — {inv.customer?.name} — Balance: ${(inv.total - (inv.paid_amount || 0)).toFixed(2)}
+                        {inv.invoice_number} — {inv.customer?.name} — Balance: KES {(inv.total - (inv.paid_amount || 0)).toFixed(2)}
                       </option>
                     ))}
                   </select>

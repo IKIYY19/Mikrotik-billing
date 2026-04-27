@@ -163,15 +163,15 @@ export function BillingCustomerDetail() {
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 text-center">
           <div className="text-sm text-slate-400 mb-1">Total Billed</div>
-          <div className="text-2xl font-bold text-white">${totalBilled.toFixed(2)}</div>
+          <div className="text-2xl font-bold text-white">KES {totalBilled.toFixed(2)}</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 text-center">
           <div className="text-sm text-slate-400 mb-1">Total Paid</div>
-          <div className="text-2xl font-bold text-green-400">${totalPaid.toFixed(2)}</div>
+          <div className="text-2xl font-bold text-green-400">KES {totalPaid.toFixed(2)}</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 text-center">
           <div className="text-sm text-slate-400 mb-1">Outstanding</div>
-          <div className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-400' : 'text-green-400'}`}>${outstanding.toFixed(2)}</div>
+          <div className="text-2xl font-bold text-amber-400">KES {outstanding.toFixed(2)}</div>
         </div>
       </div>
 
