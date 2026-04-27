@@ -14,6 +14,7 @@
     "lint:fix": "eslint src/ --config .eslintrc.js --fix"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.0.0",
     "@sentry/node": "^7.91.0",
     "@sentry/profiling-node": "^1.2.6",
     "aws-sdk": "^2.1500.0",

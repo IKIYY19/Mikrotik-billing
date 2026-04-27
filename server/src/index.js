@@ -367,6 +367,7 @@ const startServer = async () => {
     app.use('/api/sms', authenticate, require('./routes/sms'));
     app.use('/api/email', authenticate, require('./routes/email'));
     app.use('/api/telegram', authenticate, require('./routes/telegram'));
+    app.use('/api/storage', authenticate, require('./routes/storage'));
     app.use('/api/features', authenticate, require('./routes/features'));
     app.use('/api/portal', authenticate, require('./routes/customerPortal'));
     app.use('/api/advanced', authenticate, require('./routes/advanced'));

@@ -28,7 +28,8 @@ INSERT INTO integrations (service_name, display_name, category, config_data) VAL
   ('mailgun', 'Mailgun', 'email', '{"api_key": "", "domain": "", "from_email": "", "from_name": ""}'),
   ('aws_ses', 'AWS SES', 'email', '{"access_key_id": "", "secret_access_key": "", "region": "us-east-1", "from_email": "", "from_name": ""}'),
   ('mailchimp', 'Mailchimp', 'email', '{"api_key": "", "list_id": ""}'),
-  ('telegram', 'Telegram Bot', 'communication', '{"bot_token": ""}')
+  ('telegram', 'Telegram Bot', 'communication', '{"bot_token": ""}'),
+  ('google_cloud_storage', 'Google Cloud Storage', 'storage', '{"project_id": "", "key_filename": "", "bucket_name": ""}')
 ON CONFLICT (service_name) DO NOTHING;
 `;
 
