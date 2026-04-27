@@ -166,6 +166,116 @@ function buildMessageVariables(data = {}) {
 }
 
 // ═══════════════════════════════════════
+// SEND BULK SMS (to all customers)
+// ═══════════════════════════════════════
+router.post('/send-bulk', messagingLimiter, async (req, res) => {
+  try {
+    const { message, provider, filter = 'all' } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+
+    // Fetch customers based on filter
+    let customers = [];
+    if (global.db) {
+      let query = 'SELECT id, name, phone, status FROM customers WHERE phone IS NOT NULL AND phone != \'\'';
+      let params = [];
+      
+      if (filter === 'active') {
+        query += ' AND status = $1';
+        params = ['active'];
+      } else if (filter === 'overdue') {
+        query += ' AND id IN (SELECT DISTINCT customer_id FROM invoices WHERE status != \'paid\' AND due_date < CURRENT_DATE)';
+      }
+      
+      const result = await global.db.query(query, params);
+      customers = result.rows;
+    }
+
+    if (customers.length === 0) {
+      return res.status(404).json({ error: 'No customers found with phone numbers' });
+    }
+
+    let usedProvider = provider || 'africas_talking';
+    let service;
+    
+    switch (usedProvider) {
+      case 'smsleopard':
+        service = await getSmsLeopardService();
+        break;
+      case 'bulksms_kenya':
+        service = await getBulkSmsKenyaService();
+        break;
+      case 'nexmo':
+        service = await getNexmoService();
+        break;
+      case 'twilio':
+        service = await getTwilioService();
+        break;
+      case 'africas_talking':
+      default:
+        service = await getATService();
+        break;
+    }
+
+    // Send to all customers
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const customer of customers) {
+      try {
+        let result;
+        if (usedProvider === 'africas_talking') {
+          const formattedPhone = AfricaTalkingService.formatPhone(customer.phone);
+          result = await service.sendSMS([formattedPhone], message);
+        } else {
+          result = await service.sendSMS(customer.phone, message);
+        }
+
+        await logMessage({
+          to: [customer.phone],
+          message,
+          status: result.success ? 'sent' : 'failed',
+          cost: result.cost || 0,
+          is_sandbox: false,
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+
+        results.push({
+          customer: customer.name,
+          phone: customer.phone,
+          success: result.success,
+          error: result.message,
+        });
+      } catch (error) {
+        failCount++;
+        results.push({
+          customer: customer.name,
+          phone: customer.phone,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      total: customers.length,
+      successCount,
+      failCount,
+      results,
+    });
+  } catch (e) {
+    console.error('Bulk SMS error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
 // SEND SMS (direct)
 // ═══════════════════════════════════════
 router.post('/send', messagingLimiter, async (req, res) => {
