@@ -1,12 +1,82 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Server, TestTube, Send, Trash2, Plus, Wifi, WifiOff, Clock, RefreshCw, Users, Download, X, Check } from 'lucide-react';
+import {
+  Server,
+  TestTube,
+  Trash2,
+  Wifi,
+  WifiOff,
+  Clock,
+  RefreshCw,
+  Users,
+  Download,
+  X,
+  Check,
+  Shield,
+  ArrowRightLeft,
+  Globe,
+  Cable,
+  Lock,
+} from 'lucide-react';
 import { useToast } from '../hooks/useToast';
+import { getToken } from '../lib/auth';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
-// Helper function to format relative time
-const formatLastSeen = (date) => {
+const REMOTE_PROFILES = [
+  {
+    id: 'direct-api',
+    label: 'Direct API',
+    icon: Globe,
+    summary: 'Best when the router has a reachable static IP and API access is allowed.',
+    connectionType: 'api',
+    defaults: { api_port: 8728, ssh_port: 22, use_tunnel: false },
+    checklist: ['Allow TCP 8728 from your billing server IP', 'Restrict firewall to trusted management IPs', 'Use a dedicated read/write API account'],
+  },
+  {
+    id: 'vpn-api',
+    label: 'VPN / Private API',
+    icon: Shield,
+    summary: 'Best when routers are behind NAT but reachable over WireGuard, IPsec, or another site VPN.',
+    connectionType: 'api',
+    defaults: { api_port: 8728, ssh_port: 22, use_tunnel: false },
+    checklist: ['Use the router VPN IP, not the public address', 'Confirm the billing server can ping the router VPN IP', 'Keep API closed on the public WAN'],
+  },
+  {
+    id: 'direct-ssh',
+    label: 'Direct SSH',
+    icon: Cable,
+    summary: 'Good fallback for routers where API is disabled or RouterOS API access is unreliable.',
+    connectionType: 'ssh',
+    defaults: { api_port: 8728, ssh_port: 22, use_tunnel: false },
+    checklist: ['Allow TCP 22 from your billing server IP', 'Use a restricted automation account', 'Prefer SSH only when API is not viable'],
+  },
+  {
+    id: 'jump-host',
+    label: 'Jump Host / Tunnel',
+    icon: Lock,
+    summary: 'Use when the router is only reachable through a remote Linux/Windows jump server.',
+    connectionType: 'ssh',
+    defaults: { api_port: 8728, ssh_port: 22, use_tunnel: true, tunnel_port: 22 },
+    checklist: ['Confirm the jump host can reach the router LAN IP', 'Store separate jump-host credentials', 'Use VPN if possible because jump-host support is still basic'],
+  },
+];
+
+const emptyForm = {
+  name: '',
+  ip_address: '',
+  api_port: 8728,
+  ssh_port: 22,
+  username: '',
+  password: '',
+  use_tunnel: false,
+  tunnel_host: '',
+  tunnel_port: 22,
+  tunnel_username: '',
+  tunnel_password: '',
+};
+
+function formatLastSeen(date) {
   if (!date) return 'Never';
   const now = new Date();
   const then = new Date(date);
@@ -14,50 +84,119 @@ const formatLastSeen = (date) => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${diffDays}d ago`;
-};
+}
 
 export function MikroTikAPI() {
-  const { info } = useToast();
+  const toast = useToast();
   const [connections, setConnections] = useState([]);
-  const [connectionType, setConnectionType] = useState('api'); // 'api' or 'ssh'
-  const [formData, setFormData] = useState({
-    name: '',
-    ip_address: '',
-    api_port: 8728,
-    ssh_port: 22,
-    username: '',
-    password: '',
-    use_tunnel: false,
-    tunnel_host: '',
-    tunnel_port: 22,
-    tunnel_username: '',
-    tunnel_password: '',
-  });
+  const [remoteProfile, setRemoteProfile] = useState('direct-api');
+  const [connectionType, setConnectionType] = useState('api');
+  const [formData, setFormData] = useState(emptyForm);
   const [testResult, setTestResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  // User import state
+
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState(null);
-  const [userType, setUserType] = useState('ppp'); // 'ppp' or 'hotspot'
+  const [userType, setUserType] = useState('ppp');
   const [scanningUsers, setScanningUsers] = useState(false);
   const [foundUsers, setFoundUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
+  const activeProfile = useMemo(
+    () => REMOTE_PROFILES.find((profile) => profile.id === remoteProfile) || REMOTE_PROFILES[0],
+    [remoteProfile]
+  );
+
   const fetchConnections = async () => {
     try {
       const { data } = await axios.get(`${API}/mikrotik`);
-      setConnections(data);
+      setConnections(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch connections:', error);
+      toast.error('Failed to load MikroTik connections', error.response?.data?.error || error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnections();
+  }, []);
+
+  useEffect(() => {
+    setConnectionType(activeProfile.connectionType);
+    setFormData((current) => ({
+      ...current,
+      ...activeProfile.defaults,
+    }));
+    setTestResult(null);
+  }, [activeProfile]);
+
+  const payload = {
+    ...formData,
+    connection_type: connectionType,
+    api_port: Number(formData.api_port || 8728),
+    ssh_port: Number(formData.ssh_port || 22),
+    tunnel_port: Number(formData.tunnel_port || 22),
+  };
+
+  const remoteWarnings = useMemo(() => {
+    const warnings = [];
+    if (!formData.ip_address) {
+      warnings.push('Router host/IP is missing.');
+    }
+    if (!formData.username || !formData.password) {
+      warnings.push('Router login credentials are incomplete.');
+    }
+    if (connectionType === 'ssh' && formData.use_tunnel && !formData.tunnel_host) {
+      warnings.push('Jump-host mode needs a tunnel host.');
+    }
+    if (remoteProfile === 'jump-host') {
+      warnings.push('Current backend tunnel support is limited, so VPN is still safer for production remote linking.');
+    }
+    return warnings;
+  }, [connectionType, formData, remoteProfile]);
+
+  const handleTest = async () => {
+    setLoading(true);
+    setTestResult(null);
+    try {
+      const { data } = await axios.post(`${API}/mikrotik/test`, payload);
+      setTestResult(data);
+      if (data.success) {
+        toast.success('Connection test passed', data.message || 'Router responded successfully');
+      } else {
+        toast.error('Connection test failed', data.message || 'Router did not respond');
+      }
+    } catch (error) {
+      const result = { success: false, message: error.response?.data?.error || error.message };
+      setTestResult(result);
+      toast.error('Connection test failed', result.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data } = await axios.post(`${API}/mikrotik`, payload);
+      setConnections((current) => [...current, data]);
+      setFormData({ ...emptyForm, ...activeProfile.defaults });
+      setTestResult({ success: true, message: 'Connection saved successfully' });
+      toast.success('Connection saved', 'Router connection is now available across billing and network tools');
+    } catch (error) {
+      const result = { success: false, message: error.response?.data?.error || error.message };
+      setTestResult(result);
+      toast.error('Failed to save connection', result.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -67,51 +206,21 @@ export function MikroTikAPI() {
       await axios.post(`${API}/mikrotik/${connectionId}/check`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Refresh connections to get updated status
       await fetchConnections();
+      toast.success('Connection check complete', 'Router status has been refreshed');
     } catch (error) {
-      console.error('Failed to check connection:', error);
+      toast.error('Failed to check router', error.response?.data?.error || error.message);
     }
-  };
-
-  useEffect(() => {
-    fetchConnections();
-  }, []);
-
-  const handleTest = async () => {
-    setLoading(true);
-    setTestResult(null);
-    try {
-      const { data } = await axios.post(`${API}/mikrotik/test`, formData);
-      setTestResult(data);
-    } catch (error) {
-      setTestResult({ success: false, message: error.response?.data?.error || error.message });
-    }
-    setLoading(false);
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const { data } = await axios.post(`${API}/mikrotik`, formData);
-      setConnections([...connections, data]);
-      setFormData({ name: '', ip_address: '', api_port: 8728, username: '', password: '' });
-      setTestResult({ success: true, message: 'Connection saved successfully' });
-    } catch (error) {
-      setTestResult({ success: false, message: error.response?.data?.error || error.message });
-    }
-    setSaving(false);
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this connection?')) return;
     try {
       await axios.delete(`${API}/mikrotik/${id}`);
-      setConnections(connections.filter(c => c.id !== id));
-      info('Success', 'Connection deleted successfully');
+      setConnections((current) => current.filter((connection) => connection.id !== id));
+      toast.success('Connection deleted', 'The MikroTik connection has been removed');
     } catch (error) {
-      alert('Failed to delete connection');
+      toast.error('Failed to delete connection', error.response?.data?.error || error.message);
     }
   };
 
@@ -121,226 +230,250 @@ export function MikroTikAPI() {
     setFoundUsers([]);
     setSelectedUsers(new Set());
     setImportResult(null);
-    
+
     try {
       const endpoint = userType === 'ppp' ? `/mikrotik/${connection.id}/ppp-secrets` : `/mikrotik/${connection.id}/hotspot-users`;
       const { data } = await axios.get(`${API}${endpoint}`);
       setFoundUsers(data.users || []);
       setShowImportModal(true);
     } catch (error) {
-      alert('Failed to scan users: ' + (error.response?.data?.error || error.message));
+      toast.error('Failed to scan router users', error.response?.data?.error || error.message);
+    } finally {
+      setScanningUsers(false);
     }
-    
-    setScanningUsers(false);
   };
 
   const toggleUserSelection = (userName) => {
-    const newSelected = new Set(selectedUsers);
-    if (newSelected.has(userName)) {
-      newSelected.delete(userName);
-    } else {
-      newSelected.add(userName);
-    }
-    setSelectedUsers(newSelected);
+    const next = new Set(selectedUsers);
+    if (next.has(userName)) next.delete(userName);
+    else next.add(userName);
+    setSelectedUsers(next);
   };
 
-  const selectAllUsers = () => {
-    setSelectedUsers(new Set(foundUsers.map(u => u.name)));
-  };
-
-  const deselectAllUsers = () => {
-    setSelectedUsers(new Set());
-  };
+  const selectAllUsers = () => setSelectedUsers(new Set(foundUsers.map((user) => user.name)));
+  const deselectAllUsers = () => setSelectedUsers(new Set());
 
   const handleImportUsers = async () => {
     if (selectedUsers.size === 0) {
-      alert('Please select at least one user to import');
+      toast.warning('No users selected', 'Choose at least one router user to import');
       return;
     }
-    
+
     setImporting(true);
     setImportResult(null);
-    
+
     try {
-      const usersToImport = foundUsers.filter(u => selectedUsers.has(u.name));
+      const usersToImport = foundUsers.filter((user) => selectedUsers.has(user.name));
       const { data } = await axios.post(`${API}/mikrotik/${selectedConnection.id}/import-users`, {
         users: usersToImport,
-        userType
+        userType,
       });
-      
       setImportResult(data);
       if (data.imported > 0) {
-        info('Success', `Imported ${data.imported} users successfully`);
+        toast.success('Import finished', `Imported ${data.imported} router users`);
+      } else {
+        toast.warning('Nothing imported', 'Every selected user was skipped or failed');
       }
     } catch (error) {
-      alert('Failed to import users: ' + (error.response?.data?.error || error.message));
+      toast.error('Failed to import users', error.response?.data?.error || error.message);
+    } finally {
+      setImporting(false);
     }
-    
-    setImporting(false);
   };
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">MikroTik Connections</h2>
-          <p className="text-slate-400">Manage and monitor your MikroTik router connections</p>
+          <h2 className="mb-2 text-2xl font-bold text-white">Remote MikroTik Linking Wizard</h2>
+          <p className="text-slate-400">Choose the right remote access pattern, test it, then save a router connection the billing system can actually use.</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
-            <div className="text-xs text-slate-400">Total Connections</div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2">
+            <div className="text-xs text-slate-400">Total</div>
             <div className="text-xl font-bold text-white">{connections.length}</div>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+          <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2">
             <div className="text-xs text-slate-400">Online</div>
-            <div className="text-xl font-bold text-emerald-400">{connections.filter(c => c.is_online).length}</div>
+            <div className="text-xl font-bold text-emerald-400">{connections.filter((connection) => connection.is_online).length}</div>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+          <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2">
             <div className="text-xs text-slate-400">Offline</div>
-            <div className="text-xl font-bold text-red-400">{connections.filter(c => !c.is_online).length}</div>
+            <div className="text-xl font-bold text-red-400">{connections.filter((connection) => !connection.is_online).length}</div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Connection Form */}
-        <div className="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Server className="w-5 h-5" />
-            Add Connection
-          </h3>
-          
-          {/* Connection Type Toggle */}
-          <div className="mb-4">
-            <label className="block text-sm text-slate-300 mb-2">Connection Type</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConnectionType('api')}
-                className={`flex-1 px-4 py-2 rounded ${connectionType === 'api' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-              >
-                API
-              </button>
-              <button
-                type="button"
-                onClick={() => setConnectionType('ssh')}
-                className={`flex-1 px-4 py-2 rounded ${connectionType === 'ssh' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-              >
-                SSH
-              </button>
-            </div>
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.2fr_0.8fr_1fr]">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+          <div className="mb-5">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+              <ArrowRightLeft className="h-5 w-5" />
+              1. Pick Remote Access Pattern
+            </h3>
+            <p className="mt-1 text-sm text-slate-400">This sets the safest default for how the billing platform should reach the router.</p>
           </div>
 
-          <form onSubmit={handleSave}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {REMOTE_PROFILES.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => setRemoteProfile(profile.id)}
+                className={`rounded-xl border p-4 text-left transition ${
+                  remoteProfile === profile.id
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-slate-700 bg-slate-900/40 hover:border-slate-600'
+                }`}
+              >
+                <profile.icon className={`mb-3 h-6 w-6 ${remoteProfile === profile.id ? 'text-blue-400' : 'text-slate-400'}`} />
+                <div className="font-semibold text-white">{profile.label}</div>
+                <div className="mt-1 text-sm text-slate-400">{profile.summary}</div>
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSave} className="mt-6">
+            <div className="mb-4">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <Server className="h-5 w-5" />
+                2. Router Connection Details
+              </h3>
+              <p className="mt-1 text-sm text-slate-400">These credentials are reused by billing subscriptions, PPPoE management, and the reconcile screen.</p>
+            </div>
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                  placeholder="e.g., Office Router"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">IP Address</label>
-                <input
-                  type="text"
-                  value={formData.ip_address}
-                  onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                  placeholder="192.168.1.1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">
-                  {connectionType === 'api' ? 'API Port' : 'SSH Port'}
-                </label>
-                <input
-                  type="number"
-                  value={connectionType === 'api' ? formData.api_port : formData.ssh_port}
-                  onChange={(e) => setFormData(connectionType === 'api' 
-                    ? { ...formData, api_port: e.target.value }
-                    : { ...formData, ssh_port: e.target.value }
-                  )}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                  placeholder={connectionType === 'api' ? '8728' : '22'}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Username</label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-2">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">Connection Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white"
+                    placeholder="e.g., Nairobi POP Core"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">Connection Engine</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConnectionType('api')}
+                      className={`rounded px-4 py-2 text-sm ${connectionType === 'api' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+                    >
+                      API
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConnectionType('ssh')}
+                      className={`rounded px-4 py-2 text-sm ${connectionType === 'ssh' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+                    >
+                      SSH
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* SSH Tunnel Section */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">Router Host / IP</label>
+                  <input
+                    type="text"
+                    value={formData.ip_address}
+                    onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                    className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white"
+                    placeholder={remoteProfile === 'vpn-api' ? '10.x.x.x or 172.16.x.x over VPN' : '192.168.88.1'}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">{connectionType === 'api' ? 'API Port' : 'SSH Port'}</label>
+                  <input
+                    type="number"
+                    value={connectionType === 'api' ? formData.api_port : formData.ssh_port}
+                    onChange={(e) => setFormData(connectionType === 'api'
+                      ? { ...formData, api_port: e.target.value }
+                      : { ...formData, ssh_port: e.target.value })}
+                    className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white"
+                    placeholder={connectionType === 'api' ? '8728' : '22'}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">Username</label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white"
+                    placeholder="automation-user"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-slate-300">Password</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white"
+                    placeholder="Router password"
+                  />
+                </div>
+              </div>
+
               {connectionType === 'ssh' && (
-                <div className="border-t border-slate-600 pt-4 mt-4">
-                  <div className="flex items-center gap-2 mb-3">
+                <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+                  <div className="mb-3 flex items-center gap-2">
                     <input
-                      type="checkbox"
                       id="use_tunnel"
+                      type="checkbox"
                       checked={formData.use_tunnel}
                       onChange={(e) => setFormData({ ...formData, use_tunnel: e.target.checked })}
-                      className="w-4 h-4"
                     />
-                    <label htmlFor="use_tunnel" className="text-sm text-slate-300">
-                      Use SSH Tunnel (for remote access)
-                    </label>
+                    <label htmlFor="use_tunnel" className="text-sm text-slate-300">Connect through a jump host / tunnel</label>
                   </div>
 
                   {formData.use_tunnel && (
-                    <div className="space-y-3 bg-slate-700/50 p-3 rounded">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Tunnel Host (Jump Server)</label>
+                        <label className="mb-2 block text-xs text-slate-400">Jump Host</label>
                         <input
                           type="text"
                           value={formData.tunnel_host}
                           onChange={(e) => setFormData({ ...formData, tunnel_host: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
-                          placeholder="e.g., your-server.com"
+                          className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white text-sm"
+                          placeholder="jump-host.example.com"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Tunnel Port</label>
+                        <label className="mb-2 block text-xs text-slate-400">Jump Host Port</label>
                         <input
                           type="number"
                           value={formData.tunnel_port}
                           onChange={(e) => setFormData({ ...formData, tunnel_port: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                          className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white text-sm"
                           placeholder="22"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Tunnel Username</label>
+                        <label className="mb-2 block text-xs text-slate-400">Jump Host Username</label>
                         <input
                           type="text"
                           value={formData.tunnel_username}
                           onChange={(e) => setFormData({ ...formData, tunnel_username: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                          className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white text-sm"
+                          placeholder="ubuntu"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Tunnel Password</label>
+                        <label className="mb-2 block text-xs text-slate-400">Jump Host Password</label>
                         <input
                           type="password"
                           value={formData.tunnel_password}
                           onChange={(e) => setFormData({ ...formData, tunnel_password: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white text-sm"
+                          className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-white text-sm"
                         />
                       </div>
                     </div>
@@ -348,113 +481,154 @@ export function MikroTikAPI() {
                 </div>
               )}
             </div>
-            <div className="flex gap-3 mt-6">
+
+            <div className="mt-6 flex gap-3">
               <button
                 type="button"
                 onClick={handleTest}
                 disabled={loading}
-                className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700 disabled:opacity-50"
               >
-                <TestTube className="w-4 h-4" />
-                Test Connection
+                <span className="flex items-center justify-center gap-2">
+                  <TestTube className="h-4 w-4" />
+                  {loading ? 'Testing...' : 'Test Connection'}
+                </span>
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? 'Saving...' : 'Save Connection'}
               </button>
             </div>
-          </form>
 
-          {testResult && (
-            <div className={`mt-4 p-3 rounded ${testResult.success ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
-              {testResult.message}
-            </div>
-          )}
+            {testResult && (
+              <div className={`mt-4 rounded p-3 text-sm ${testResult.success ? 'bg-green-600/20 text-green-300' : 'bg-red-600/20 text-red-300'}`}>
+                {testResult.message}
+              </div>
+            )}
+          </form>
         </div>
 
-        {/* Saved Connections */}
-        <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="space-y-6">
+          <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+            <h3 className="mb-4 text-lg font-semibold text-white">3. Remote Setup Checklist</h3>
+            <div className="space-y-3">
+              {activeProfile.checklist.map((item) => (
+                <div key={item} className="flex items-start gap-3 text-sm text-slate-300">
+                  <Check className="mt-0.5 h-4 w-4 text-emerald-400" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+            <h3 className="mb-4 text-lg font-semibold text-white">Wizard Notes</h3>
+            <div className="space-y-3 text-sm text-slate-300">
+              <div>
+                <div className="font-medium text-white">Recommended profile</div>
+                <div className="mt-1 text-slate-400">{activeProfile.summary}</div>
+              </div>
+              <div>
+                <div className="font-medium text-white">Billing impact</div>
+                <div className="mt-1 text-slate-400">Saved connections are reused by subscriptions, PPPoE management, hotspot tools, and the reconcile screen.</div>
+              </div>
+              {remoteWarnings.length > 0 && (
+                <div>
+                  <div className="font-medium text-amber-300">Warnings</div>
+                  <ul className="mt-2 space-y-2 text-amber-200">
+                    {remoteWarnings.map((warning) => (
+                      <li key={warning}>- {warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-white">Saved Connections</h3>
             <button
               onClick={fetchConnections}
-              className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
             >
-              <TestTube className="w-4 h-4" />
+              <RefreshCw className="h-4 w-4" />
               Refresh
             </button>
           </div>
+
           {connections.length === 0 ? (
-            <div className="text-center py-12">
-              <Server className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+            <div className="py-12 text-center">
+              <Server className="mx-auto mb-4 h-12 w-12 text-slate-600" />
               <p className="text-slate-400">No connections configured yet</p>
-              <p className="text-sm text-slate-500 mt-1">Add your first MikroTik connection to get started</p>
+              <p className="mt-1 text-sm text-slate-500">Save a router connection here, then link it from billing subscriptions.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {connections.map((conn) => (
-                <div key={conn.id} className={`bg-slate-700 rounded-lg p-4 border-l-4 ${conn.is_online ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
-                  <div className="flex items-start justify-between">
+              {connections.map((connection) => (
+                <div key={connection.id} className={`rounded-lg border-l-4 bg-slate-700 p-4 ${connection.is_online ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="font-semibold text-white text-lg">{conn.name}</h4>
-                        {conn.is_online ? (
-                          <span className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
-                            <Wifi className="w-3 h-3" />
+                      <div className="mb-2 flex items-center gap-2">
+                        <h4 className="font-semibold text-white">{connection.name}</h4>
+                        {connection.is_online ? (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-400">
+                            <Wifi className="h-3 w-3" />
                             Online
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1.5 px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium">
-                            <WifiOff className="w-3 h-3" />
+                          <span className="flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-1 text-xs font-medium text-red-400">
+                            <WifiOff className="h-3 w-3" />
                             Offline
                           </span>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <span className="text-slate-400">IP: </span>
-                          <span className="text-white">{conn.ip_address}:{conn.api_port}</span>
+                          <span className="text-slate-400">Host: </span>
+                          <span className="text-white">{connection.ip_address}:{connection.connection_type === 'ssh' ? connection.ssh_port : connection.api_port}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Engine: </span>
+                          <span className="text-white uppercase">{connection.connection_type || 'api'}</span>
                         </div>
                         <div>
                           <span className="text-slate-400">User: </span>
-                          <span className="text-white">{conn.username}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Type: </span>
-                          <span className="text-white capitalize">{conn.connection_type || 'API'}</span>
+                          <span className="text-white">{connection.username}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
+                          <Clock className="h-3 w-3 text-slate-500" />
                           <span className="text-slate-400">Last seen: </span>
-                          <span className="text-white">{formatLastSeen(conn.last_seen)}</span>
+                          <span className="text-white">{formatLastSeen(connection.last_seen)}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleScanUsers(conn)}
+                        onClick={() => handleScanUsers(connection)}
                         disabled={scanningUsers}
-                        className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 p-2 rounded-lg transition-colors disabled:opacity-50"
+                        className="rounded-lg bg-emerald-600/20 p-2 text-emerald-400 transition-colors hover:bg-emerald-600/30 disabled:opacity-50"
                         title="Scan for users"
                       >
-                        <Users className="w-4 h-4" />
+                        <Users className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => checkConnection(conn.id)}
-                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 p-2 rounded-lg transition-colors"
+                        onClick={() => checkConnection(connection.id)}
+                        className="rounded-lg bg-blue-600/20 p-2 text-blue-400 transition-colors hover:bg-blue-600/30"
                         title="Check connectivity"
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(conn.id)}
-                        className="bg-red-600/20 hover:bg-red-600/30 text-red-400 p-2 rounded-lg transition-colors"
+                        onClick={() => handleDelete(connection.id)}
+                        className="rounded-lg bg-red-600/20 p-2 text-red-400 transition-colors hover:bg-red-600/30"
                         title="Delete connection"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -463,42 +637,36 @@ export function MikroTikAPI() {
             </div>
           )}
 
-          <div className="mt-6 p-4 bg-yellow-600/20 border border-yellow-600/50 rounded">
-            <h4 className="text-yellow-400 font-semibold mb-2">⚠️ Warning</h4>
-            <p className="text-sm text-yellow-300">
-              Pushing scripts directly to MikroTik devices will execute commands immediately. 
-              Always test your configuration in a lab environment first. Use the dry-run option 
-              to preview changes before applying.
+          <div className="mt-6 rounded border border-yellow-600/50 bg-yellow-600/20 p-4">
+            <h4 className="mb-2 font-semibold text-yellow-400">Production Reminder</h4>
+            <p className="text-sm text-yellow-200">
+              Save only management paths you actually trust. For many remote routers, VPN + API or RADIUS-centered control is still safer than exposing SSH/API broadly on the public internet.
             </p>
           </div>
         </div>
       </div>
 
-      {/* User Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-slate-700">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                  <Users className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+            <div className="border-b border-slate-700 p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-xl font-semibold text-white">
+                  <Users className="h-5 w-5" />
                   Import Users from {selectedConnection?.name}
                 </h3>
-                <button
-                  onClick={() => setShowImportModal(false)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  <X className="w-5 h-5" />
+                <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white">
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-slate-300">User Type:</label>
                   <select
                     value={userType}
                     onChange={(e) => setUserType(e.target.value)}
-                    className="bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-white text-sm"
+                    className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-white"
                   >
                     <option value="ppp">PPP Secrets</option>
                     <option value="hotspot">Hotspot Users</option>
@@ -507,44 +675,34 @@ export function MikroTikAPI() {
                 <button
                   onClick={() => handleScanUsers(selectedConnection)}
                   disabled={scanningUsers}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm disabled:opacity-50 flex items-center gap-2"
+                  className="flex items-center gap-2 rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-4 h-4 ${scanningUsers ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${scanningUsers ? 'animate-spin' : ''}`} />
                   Scan
                 </button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-[50vh]">
+            <div className="max-h-[50vh] overflow-y-auto p-6">
               {scanningUsers ? (
-                <div className="text-center py-8">
-                  <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-2" />
+                <div className="py-8 text-center">
+                  <RefreshCw className="mx-auto mb-2 h-8 w-8 animate-spin text-blue-400" />
                   <p className="text-slate-400">Scanning for users...</p>
                 </div>
               ) : foundUsers.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-slate-600 mx-auto mb-2" />
+                <div className="py-8 text-center">
+                  <Users className="mx-auto mb-2 h-12 w-12 text-slate-600" />
                   <p className="text-slate-400">No users found</p>
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="mb-4 flex items-center justify-between">
                     <div className="text-sm text-slate-400">
                       Found {foundUsers.length} users • {selectedUsers.size} selected
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={selectAllUsers}
-                        className="text-sm text-blue-400 hover:text-blue-300"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        onClick={deselectAllUsers}
-                        className="text-sm text-slate-400 hover:text-slate-300"
-                      >
-                        Deselect All
-                      </button>
+                      <button onClick={selectAllUsers} className="text-sm text-blue-400 hover:text-blue-300">Select All</button>
+                      <button onClick={deselectAllUsers} className="text-sm text-slate-400 hover:text-slate-300">Deselect All</button>
                     </div>
                   </div>
 
@@ -553,20 +711,18 @@ export function MikroTikAPI() {
                       <div
                         key={user.name}
                         onClick={() => toggleUserSelection(user.name)}
-                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                        className={`cursor-pointer rounded-lg border p-4 transition-colors ${
                           selectedUsers.has(user.name)
-                            ? 'bg-blue-600/20 border-blue-500'
-                            : 'bg-slate-700 border-slate-600 hover:border-slate-500'
+                            ? 'border-blue-500 bg-blue-600/20'
+                            : 'border-slate-600 bg-slate-700 hover:border-slate-500'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${
-                              selectedUsers.has(user.name)
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-slate-500'
+                            <div className={`flex h-5 w-5 items-center justify-center rounded border ${
+                              selectedUsers.has(user.name) ? 'border-blue-500 bg-blue-500' : 'border-slate-500'
                             }`}>
-                              {selectedUsers.has(user.name) && <Check className="w-3 h-3 text-white" />}
+                              {selectedUsers.has(user.name) && <Check className="h-3 w-3 text-white" />}
                             </div>
                             <div>
                               <div className="font-medium text-white">{user.name}</div>
@@ -577,7 +733,7 @@ export function MikroTikAPI() {
                             </div>
                           </div>
                           {user.disabled && (
-                            <span className="text-xs text-red-400 bg-red-500/20 px-2 py-1 rounded">Disabled</span>
+                            <span className="rounded bg-red-500/20 px-2 py-1 text-xs text-red-400">Disabled</span>
                           )}
                         </div>
                       </div>
@@ -588,35 +744,26 @@ export function MikroTikAPI() {
             </div>
 
             {importResult && (
-              <div className={`p-4 border-t border-slate-700 ${
-                importResult.imported > 0 ? 'bg-green-600/10' : 'bg-red-600/10'
-              }`}>
+              <div className={`border-t border-slate-700 p-4 ${importResult.imported > 0 ? 'bg-green-600/10' : 'bg-red-600/10'}`}>
                 <div className="text-sm">
                   <span className={`font-medium ${importResult.imported > 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {importResult.imported} users imported successfully
                   </span>
-                  {importResult.errors > 0 && (
-                    <span className="text-red-400 ml-2">
-                      ({importResult.errors} failed)
-                    </span>
-                  )}
+                  {importResult.errors > 0 && <span className="ml-2 text-red-400">({importResult.errors} failed)</span>}
                 </div>
               </div>
             )}
 
-            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
-              <button
-                onClick={() => setShowImportModal(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg"
-              >
+            <div className="flex justify-end gap-3 border-t border-slate-700 p-6">
+              <button onClick={() => setShowImportModal(false)} className="rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-600">
                 Cancel
               </button>
               <button
                 onClick={handleImportUsers}
                 disabled={importing || selectedUsers.size === 0}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
+                <Download className="h-4 w-4" />
                 {importing ? 'Importing...' : `Import ${selectedUsers.size} Users`}
               </button>
             </div>

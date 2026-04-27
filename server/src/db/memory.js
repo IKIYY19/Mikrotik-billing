@@ -450,7 +450,11 @@ module.exports = {
       // Return without password
       const conns = store.mikrotik_connections.map(c => ({
         id: c.id, name: c.name, ip_address: c.ip_address,
-        api_port: c.api_port, username: c.username,
+        api_port: c.api_port, ssh_port: c.ssh_port, username: c.username,
+        connection_type: c.connection_type, use_tunnel: c.use_tunnel,
+        tunnel_host: c.tunnel_host, tunnel_port: c.tunnel_port,
+        tunnel_username: c.tunnel_username,
+        is_online: c.is_online || false, last_seen: c.last_seen || null,
         created_at: c.created_at, updated_at: c.updated_at,
       }));
       return { rows: conns };
@@ -463,13 +467,35 @@ module.exports = {
         name: params[1],
         ip_address: params[2],
         api_port: params[3],
-        username: params[4],
-        password_encrypted: params[5],
+        ssh_port: params[4],
+        username: params[5],
+        password_encrypted: params[6],
+        connection_type: params[7],
+        use_tunnel: params[8],
+        tunnel_host: params[9],
+        tunnel_port: params[10],
+        tunnel_username: params[11],
+        tunnel_password_encrypted: params[12],
+        is_online: false,
+        last_seen: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       store.mikrotik_connections.push(conn);
-      const safeConn = { id: conn.id, name: conn.name, ip_address: conn.ip_address, api_port: conn.api_port, username: conn.username, created_at: conn.created_at };
+      const safeConn = {
+        id: conn.id,
+        name: conn.name,
+        ip_address: conn.ip_address,
+        api_port: conn.api_port,
+        ssh_port: conn.ssh_port,
+        username: conn.username,
+        connection_type: conn.connection_type,
+        use_tunnel: conn.use_tunnel,
+        tunnel_host: conn.tunnel_host,
+        tunnel_port: conn.tunnel_port,
+        tunnel_username: conn.tunnel_username,
+        created_at: conn.created_at,
+      };
       return { rows: [safeConn] };
     }
 
