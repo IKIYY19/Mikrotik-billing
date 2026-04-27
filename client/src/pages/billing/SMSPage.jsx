@@ -23,6 +23,12 @@ export function SMSPage() {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
+  // Bulk SMS form
+  const [bulkMessage, setBulkMessage] = useState('');
+  const [bulkFilter, setBulkFilter] = useState('all');
+  const [sendingBulk, setSendingBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+
   // Template editing
   const [editingTemplate, setEditingTemplate] = useState(null);
 
@@ -85,6 +91,26 @@ export function SMSPage() {
     setSending(false);
   };
 
+  const handleSendBulk = async () => {
+    if (!bulkMessage) return;
+    setSendingBulk(true);
+    setBulkResult(null);
+
+    try {
+      const result = await axios.post(`${API}/sms/send-bulk`, {
+        message: bulkMessage,
+        provider: selectedProvider,
+        filter: bulkFilter,
+      });
+      setBulkResult(result.data);
+      fetchLogs();
+      toast.success(`Bulk SMS sent: ${result.data.successCount} successful, ${result.data.failCount} failed`);
+    } catch (e) {
+      setBulkResult({ success: false, message: e.response?.data?.error || e.message });
+    }
+    setSendingBulk(false);
+  };
+
   const handleSaveTemplate = async (template) => {
     try {
       await axios.put(`${API}/sms/templates/${template.id}`, template);
@@ -121,6 +147,7 @@ export function SMSPage() {
       <div className="flex gap-2 mb-6">
         {[
           { id: 'send', label: 'Send SMS', icon: Send },
+          { id: 'bulk', label: 'Bulk SMS', icon: MessageSquare },
           { id: 'templates', label: 'Templates', icon: FileText },
           { id: 'logs', label: 'SMS Logs', icon: MessageSquare },
           { id: 'settings', label: 'Settings', icon: Settings },
@@ -209,6 +236,80 @@ export function SMSPage() {
                   <div>Status: {sendResult.results[0].status}</div>
                   {sendResult.results[0].messageId && <div>Message ID: {sendResult.results[0].messageId}</div>}
                 </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Bulk SMS Tab */}
+      {activeTab === 'bulk' && (
+        <Card className="card-gradient p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">SMS Provider</label>
+            <select
+              value={selectedProvider}
+              onChange={e => setSelectedProvider(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+            >
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Send To</label>
+            <select
+              value={bulkFilter}
+              onChange={e => setBulkFilter(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+            >
+              <option value="all">All Customers</option>
+              <option value="active">Active Customers Only</option>
+              <option value="overdue">Overdue Customers Only</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Message</label>
+            <textarea
+              value={bulkMessage}
+              onChange={e => setBulkMessage(e.target.value)}
+              rows="4"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+              placeholder="Enter your message to send to all customers..."
+            />
+            <div className="text-xs text-slate-500 mt-1">{bulkMessage.length}/160 characters</div>
+          </div>
+          <Button
+            onClick={handleSendBulk}
+            disabled={sendingBulk || !bulkMessage}
+            className="btn-gradient-success flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" /> {sendingBulk ? 'Sending...' : 'Send Bulk SMS'}
+          </Button>
+
+          {bulkResult && (
+            <div className={`mt-4 p-4 rounded ${bulkResult.success ? 'bg-green-600/20 border border-green-600/50' : 'bg-red-600/20 border border-red-600/50'}`}>
+              <div className="flex items-center gap-2">
+                {bulkResult.success ? <CheckCircle className="w-5 h-5 text-green-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+                <span className={bulkResult.success ? 'text-green-400' : 'text-red-400'}>
+                  {bulkResult.success 
+                    ? `Sent to ${bulkResult.total} customers: ${bulkResult.successCount} successful, ${bulkResult.failCount} failed` 
+                    : bulkResult.message}
+                </span>
+              </div>
+              {bulkResult.results && (
+                <details className="mt-3">
+                  <summary className="text-xs text-slate-400 cursor-pointer">View Details</summary>
+                  <div className="mt-2 max-h-40 overflow-y-auto text-xs space-y-1">
+                    {bulkResult.results.map((r, i) => (
+                      <div key={i} className={`flex justify-between ${r.success ? 'text-green-300' : 'text-red-300'}`}>
+                        <span>{r.customer} ({r.phone})</span>
+                        <span>{r.success ? '✓' : `✗ ${r.error}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
             </div>
           )}
