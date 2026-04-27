@@ -25,12 +25,14 @@ class TwilioService {
         };
       }
 
+      console.log(`Twilio: Sending SMS to ${to} from ${this.phoneNumber}`);
       const result = await this.client.messages.create({
         body: message,
         from: this.phoneNumber,
         to: to,
       });
 
+      console.log(`Twilio: SMS sent successfully. SID: ${result.sid}, Status: ${result.status}`);
       return {
         success: true,
         messageId: result.sid,
@@ -39,10 +41,12 @@ class TwilioService {
         from: result.from,
       };
     } catch (error) {
-      console.error('Twilio error:', error);
+      console.error('Twilio error:', error.message, error.code, error.moreInfo);
       return {
         success: false,
         message: error.message,
+        errorCode: error.code,
+        moreInfo: error.moreInfo,
       };
     }
   }
