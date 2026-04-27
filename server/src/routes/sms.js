@@ -10,6 +10,7 @@ const WhatsAppService = require('../services/whatsapp');
 const SMSLeopardService = require('../services/smsLeopard');
 const BulkSmsKenyaService = require('../services/bulkSmsKenya');
 const NexmoService = require('../services/nexmo');
+const TwilioService = require('../services/twilio');
 const messagingStore = require('../services/messagingStore');
 const { messagingLimiter } = require('../middleware/rateLimiter');
 const { decryptObject } = require('../utils/encryption');
@@ -97,6 +98,18 @@ async function getNexmoService() {
   return new NexmoService();
 }
 
+async function getTwilioService() {
+  const integrationConfig = await getIntegrationConfig('twilio');
+  if (integrationConfig) {
+    return new TwilioService({
+      accountSid: integrationConfig.account_sid,
+      authToken: integrationConfig.auth_token,
+      phoneNumber: integrationConfig.phone_number,
+    });
+  }
+  return new TwilioService();
+}
+
 function getCompanyInfo() {
   return {
     company_name: process.env.COMPANY_NAME || 'Your ISP',
@@ -176,6 +189,10 @@ router.post('/send', messagingLimiter, async (req, res) => {
       case 'nexmo':
         const nexmo = await getNexmoService();
         result = await nexmo.sendSMS(recipients[0], message);
+        break;
+      case 'twilio':
+        const twilio = await getTwilioService();
+        result = await twilio.sendSMS(recipients[0], message);
         break;
       case 'africas_talking':
       default:
