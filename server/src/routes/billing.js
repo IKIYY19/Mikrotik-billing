@@ -87,6 +87,60 @@ async function syncSubscription(action, subscription) {
   }
 }
 
+function normalizeDisabledFlag(value) {
+  return value === true || value === 'true' || value === 'yes';
+}
+
+function buildSubscriptionDrift(subscription, secret) {
+  const issues = [];
+  const expectedRateLimit = mikrotikProvisioning.buildRateLimit(subscription.plan);
+  const expectedProfile = subscription.pppoe_profile || '';
+  const expectedDisabled = subscription.status !== 'active';
+
+  if (!secret) {
+    issues.push({
+      code: 'missing_on_router',
+      message: 'Subscription exists in billing but PPPoE secret is missing on MikroTik',
+    });
+  } else {
+    const actualProfile = secret.profile || '';
+    const actualDisabled = normalizeDisabledFlag(secret.disabled);
+    const actualRateLimit = secret['rate-limit'] || secret.rate_limit || '';
+
+    if ((expectedProfile || actualProfile) && expectedProfile !== actualProfile) {
+      issues.push({
+        code: 'profile_mismatch',
+        message: `Router profile is "${actualProfile || 'default'}" but billing expects "${expectedProfile || 'default'}"`,
+      });
+    }
+
+    if ((expectedRateLimit || actualRateLimit) && expectedRateLimit !== actualRateLimit) {
+      issues.push({
+        code: 'rate_limit_mismatch',
+        message: `Router rate limit is "${actualRateLimit || 'unset'}" but billing expects "${expectedRateLimit || 'unset'}"`,
+      });
+    }
+
+    if (expectedDisabled !== actualDisabled) {
+      issues.push({
+        code: 'status_mismatch',
+        message: actualDisabled
+          ? 'Router secret is disabled while billing says the subscription is active'
+          : 'Router secret is enabled while billing says the subscription should be suspended',
+      });
+    }
+  }
+
+  if (!subscription.mikrotik_connection_id) {
+    issues.push({
+      code: 'missing_connection_link',
+      message: 'Subscription has no linked MikroTik connection',
+    });
+  }
+
+  return issues;
+}
+
 // ═══════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════
@@ -417,6 +471,203 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
     const { syncResult, provisionScript } = await syncSubscription('reconcile', sub);
     const refreshed = await getExpandedSubscription(req.params.id);
     res.json({ ...refreshed, provision_script: provisionScript, mikrotik_sync: syncResult });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/reconcile', async (req, res) => {
+  try {
+    const { connection_id = '' } = req.query;
+    const subscriptions = await billing.listSubscriptions();
+    const mikrotikConnections = connection_id
+      ? [await mikrotikProvisioning.getConnectionById(connection_id)].filter(Boolean)
+      : (await db.query('SELECT id, name, ip_address, is_online, last_seen FROM mikrotik_connections ORDER BY name ASC')).rows;
+
+    const subscriptionsInScope = subscriptions.filter((subscription) => {
+      if (!connection_id) return true;
+      return subscription.mikrotik_connection_id === connection_id;
+    });
+
+    const secretsByConnection = new Map();
+    const connectionErrors = [];
+
+    for (const connection of mikrotikConnections) {
+      try {
+        const secrets = await mikrotikProvisioning.print(connection.id, '/ppp/secret', '.id,name,profile,comment,disabled,rate-limit');
+        secretsByConnection.set(connection.id, secrets);
+      } catch (error) {
+        connectionErrors.push({
+          connection_id: connection.id,
+          connection_name: connection.name,
+          error: error.message,
+        });
+        secretsByConnection.set(connection.id, []);
+      }
+    }
+
+    const subscriptionItems = subscriptionsInScope.map((subscription) => {
+      const secrets = subscription.mikrotik_connection_id
+        ? (secretsByConnection.get(subscription.mikrotik_connection_id) || [])
+        : [];
+      const secret = subscription.pppoe_username
+        ? secrets.find((item) => item.name === subscription.pppoe_username)
+        : null;
+      const issues = buildSubscriptionDrift(subscription, secret);
+
+      return {
+        type: 'subscription',
+        id: subscription.id,
+        subscription_id: subscription.id,
+        connection_id: subscription.mikrotik_connection_id || null,
+        connection_name: subscription.router?.name || 'Unlinked',
+        customer_name: subscription.customer?.name || 'Unknown',
+        plan_name: subscription.plan?.name || 'Unknown plan',
+        pppoe_username: subscription.pppoe_username || '',
+        billing_status: subscription.status,
+        router_secret_status: secret ? (normalizeDisabledFlag(secret.disabled) ? 'disabled' : 'active') : 'missing',
+        sync_status: issues.length === 0 ? 'healthy' : 'drift',
+        issues,
+        secret,
+        subscription,
+      };
+    });
+
+    const billingKeys = new Set(
+      subscriptionsInScope
+        .filter((item) => item.mikrotik_connection_id && item.pppoe_username)
+        .map((item) => `${item.mikrotik_connection_id}:${item.pppoe_username}`)
+    );
+
+    const orphanSecrets = [];
+    for (const connection of mikrotikConnections) {
+      const secrets = secretsByConnection.get(connection.id) || [];
+      for (const secret of secrets) {
+        const key = `${connection.id}:${secret.name}`;
+        if (!billingKeys.has(key)) {
+          orphanSecrets.push({
+            type: 'orphan_secret',
+            connection_id: connection.id,
+            connection_name: connection.name,
+            pppoe_username: secret.name,
+            router_secret_status: normalizeDisabledFlag(secret.disabled) ? 'disabled' : 'active',
+            sync_status: 'untracked',
+            issues: [{
+              code: 'missing_in_billing',
+              message: 'PPPoE secret exists on MikroTik but has no linked billing subscription',
+            }],
+            secret,
+          });
+        }
+      }
+    }
+
+    const summary = {
+      total_subscriptions: subscriptionItems.length,
+      healthy_subscriptions: subscriptionItems.filter((item) => item.sync_status === 'healthy').length,
+      drifted_subscriptions: subscriptionItems.filter((item) => item.sync_status === 'drift').length,
+      orphan_secrets: orphanSecrets.length,
+      connection_errors: connectionErrors.length,
+    };
+
+    res.json({
+      summary,
+      connection_errors: connectionErrors,
+      subscriptions: subscriptionItems,
+      orphan_secrets: orphanSecrets,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/reconcile/subscriptions/:id/apply', async (req, res) => {
+  try {
+    const sub = await getExpandedSubscription(req.params.id);
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+    const { syncResult, provisionScript } = await syncSubscription('reconcile', sub);
+    const refreshed = await getExpandedSubscription(req.params.id);
+    res.json({ subscription: refreshed, mikrotik_sync: syncResult, provision_script: provisionScript });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/reconcile/orphan-secret/import', async (req, res) => {
+  try {
+    const {
+      connection_id,
+      pppoe_username,
+      plan_id,
+      customer_id = '',
+      customer_name = '',
+      customer_email = '',
+      customer_phone = '',
+      billing_cycle = 'monthly',
+    } = req.body;
+
+    if (!connection_id || !pppoe_username || !plan_id) {
+      return res.status(400).json({ error: 'connection_id, pppoe_username, and plan_id are required' });
+    }
+
+    const connection = await mikrotikProvisioning.getConnectionById(connection_id);
+    if (!connection) {
+      return res.status(404).json({ error: 'MikroTik connection not found' });
+    }
+
+    const secret = await mikrotikProvisioning.findSecret(connection_id, pppoe_username);
+    if (!secret) {
+      return res.status(404).json({ error: 'PPPoE secret not found on MikroTik' });
+    }
+
+    const existingSubscriptions = await billing.listSubscriptions();
+    const alreadyLinked = existingSubscriptions.find((item) =>
+      item.mikrotik_connection_id === connection_id && item.pppoe_username === pppoe_username
+    );
+    if (alreadyLinked) {
+      return res.status(409).json({ error: 'This PPPoE secret is already linked to a billing subscription' });
+    }
+
+    let customer;
+    if (customer_id) {
+      customer = await billing.getCustomerById(customer_id);
+      if (!customer) {
+        return res.status(404).json({ error: 'Selected customer was not found' });
+      }
+    } else {
+      const name = customer_name.trim() || pppoe_username;
+      customer = await billing.createCustomer({
+        name,
+        email: customer_email || null,
+        phone: customer_phone || null,
+        status: 'active',
+        notes: `Imported from MikroTik connection ${connection.name}`,
+      });
+    }
+
+    const status = normalizeDisabledFlag(secret.disabled) ? 'suspended' : 'active';
+    const subscription = await billing.createSubscription({
+      customer_id: customer.id,
+      plan_id,
+      mikrotik_connection_id: connection_id,
+      router_id: null,
+      pppoe_username,
+      pppoe_password: '',
+      pppoe_profile: secret.profile || '',
+      billing_cycle,
+      status,
+      auto_provision: true,
+    });
+
+    const expanded = await getExpandedSubscription(subscription.id);
+    const syncResult = {
+      success: true,
+      status: 'imported',
+      message: 'Orphan PPPoE secret imported into billing and linked to MikroTik',
+    };
+    await persistSyncState(subscription.id, syncResult);
+    const refreshed = await getExpandedSubscription(subscription.id);
+
+    res.status(201).json({
+      customer,
+      subscription: refreshed || expanded,
+      mikrotik_sync: syncResult,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

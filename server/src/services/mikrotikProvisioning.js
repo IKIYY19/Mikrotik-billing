@@ -214,6 +214,7 @@ module.exports = {
   print,
   execute,
   findSecret,
+  buildRateLimit,
   upsertSubscriptionSecret,
   suspendSubscriptionSecret,
   deleteSubscriptionSecret,

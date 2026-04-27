@@ -57,6 +57,7 @@ const billingItems = [
   { to: '/billing-customers', icon: Users, label: 'Customers', feature: 'customers' },
   { to: '/billing-plans', icon: Package, label: 'Plans', feature: 'plans' },
   { to: '/billing-subscriptions', icon: Activity, label: 'Subscriptions', feature: 'subscriptions' },
+  { to: '/billing-reconcile', icon: Link, label: 'Reconcile', feature: 'subscriptions' },
   { to: '/billing-invoices', icon: Receipt, label: 'Invoices', feature: 'invoices' },
   { to: '/billing-payments', icon: CreditCard, label: 'Payments', feature: 'payments' },
   { to: '/billing-wallet', icon: Wallet, label: 'Wallet', feature: 'wallet' },

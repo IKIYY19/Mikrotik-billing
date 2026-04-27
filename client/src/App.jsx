@@ -19,6 +19,7 @@ import { BillingDashboard } from './pages/billing/BillingDashboard';
 import { BillingCustomers } from './pages/billing/BillingCustomers';
 import { BillingPlans } from './pages/billing/BillingPlans';
 import { BillingSubscriptions } from './pages/billing/BillingSubscriptions';
+import { BillingReconcile } from './pages/billing/BillingReconcile';
 import { BillingInvoices } from './pages/billing/BillingInvoices';
 import { BillingPayments } from './pages/billing/BillingPayments';
 import { BillingCustomerDetail } from './pages/billing/BillingCustomerDetail';
@@ -131,6 +132,7 @@ function App() {
                     <Route path="/billing-customers/:id" element={<BillingCustomerDetail />} />
                     <Route path="/billing-plans" element={<BillingPlans />} />
                     <Route path="/billing-subscriptions" element={<BillingSubscriptions />} />
+                    <Route path="/billing-reconcile" element={<BillingReconcile />} />
                     <Route path="/billing-invoices" element={<BillingInvoices />} />
                     <Route path="/billing-payments" element={<BillingPayments />} />
                     <Route path="/billing-sms" element={<SMSPage />} />
