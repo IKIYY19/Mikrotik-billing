@@ -34,7 +34,13 @@ INSERT INTO integrations (service_name, display_name, category, config_data) VAL
   ('twilio', 'Twilio SMS', 'sms', '{"account_sid": "", "auth_token": "", "phone_number": ""}'),
   ('stripe', 'Stripe', 'payment', '{"secret_key": "", "publishable_key": "", "webhook_secret": "", "currency": "usd"}'),
   ('slack', 'Slack Notifications', 'monitoring', '{"webhook_url": "", "channel": "#alerts"}'),
-  ('discord', 'Discord Webhook', 'monitoring', '{"webhook_url": ""}')
+  ('discord', 'Discord Webhook', 'monitoring', '{"webhook_url": ""}'),
+  ('smsleopard', 'SMSLeopard', 'sms', '{"api_key": "", "sender_id": ""}'),
+  ('bulksms_kenya', 'BulkSMS Kenya', 'sms', '{"username": "", "api_key": "", "sender_id": ""}'),
+  ('nexmo', 'Nexmo (Vonage)', 'sms', '{"api_key": "", "api_secret": "", "sender_id": ""}'),
+  ('mailgun', 'Mailgun', 'email', '{"api_key": "", "domain": "", "from_email": "", "from_name": ""}'),
+  ('aws_ses', 'AWS SES', 'email', '{"access_key_id": "", "secret_access_key": "", "region": "us-east-1", "from_email": "", "from_name": ""}'),
+  ('mailchimp', 'Mailchimp', 'email', '{"api_key": "", "list_id": ""}')
 ON CONFLICT (service_name) DO NOTHING;
 `;
 

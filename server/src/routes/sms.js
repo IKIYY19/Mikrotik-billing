@@ -7,6 +7,9 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const AfricaTalkingService = require('../services/africasTalking');
 const WhatsAppService = require('../services/whatsapp');
+const SMSLeopardService = require('../services/smsLeopard');
+const BulkSmsKenyaService = require('../services/bulkSmsKenya');
+const NexmoService = require('../services/nexmo');
 const messagingStore = require('../services/messagingStore');
 const { messagingLimiter } = require('../middleware/rateLimiter');
 const { decryptObject } = require('../utils/encryption');
@@ -57,6 +60,41 @@ async function getWhatsAppService() {
     });
   }
   return new WhatsAppService();
+}
+
+async function getSmsLeopardService() {
+  const integrationConfig = await getIntegrationConfig('smsleopard');
+  if (integrationConfig) {
+    return new SMSLeopardService({
+      apiKey: integrationConfig.api_key,
+      senderId: integrationConfig.sender_id,
+    });
+  }
+  return new SMSLeopardService();
+}
+
+async function getBulkSmsKenyaService() {
+  const integrationConfig = await getIntegrationConfig('bulksms_kenya');
+  if (integrationConfig) {
+    return new BulkSmsKenyaService({
+      username: integrationConfig.username,
+      apiKey: integrationConfig.api_key,
+      senderId: integrationConfig.sender_id,
+    });
+  }
+  return new BulkSmsKenyaService();
+}
+
+async function getNexmoService() {
+  const integrationConfig = await getIntegrationConfig('nexmo');
+  if (integrationConfig) {
+    return new NexmoService({
+      apiKey: integrationConfig.api_key,
+      apiSecret: integrationConfig.api_secret,
+      senderId: integrationConfig.sender_id,
+    });
+  }
+  return new NexmoService();
 }
 
 function getCompanyInfo() {
@@ -119,20 +157,42 @@ function buildMessageVariables(data = {}) {
 // ═══════════════════════════════════════
 router.post('/send', messagingLimiter, async (req, res) => {
   try {
-    const { to, message } = req.body;
+    const { to, message, provider } = req.body;
     if (!to || !message) return res.status(400).json({ error: 'to and message required' });
 
-    const recipients = (Array.isArray(to) ? to : [to]).map((item) => AfricaTalkingService.formatPhone(item));
-    const at = await getATService();
-    const result = await at.sendSMS(recipients, message);
+    const recipients = (Array.isArray(to) ? to : [to]);
+    let result;
+    let usedProvider = provider || 'africas_talking';
+
+    switch (usedProvider) {
+      case 'smsleopard':
+        const smsLeopard = await getSmsLeopardService();
+        result = await smsLeopard.sendSMS(recipients[0], message);
+        break;
+      case 'bulksms_kenya':
+        const bulkSms = await getBulkSmsKenyaService();
+        result = await bulkSms.sendSMS(recipients[0], message);
+        break;
+      case 'nexmo':
+        const nexmo = await getNexmoService();
+        result = await nexmo.sendSMS(recipients[0], message);
+        break;
+      case 'africas_talking':
+      default:
+        const at = await getATService();
+        const formattedRecipients = recipients.map((item) => AfricaTalkingService.formatPhone(item));
+        result = await at.sendSMS(formattedRecipients, message);
+        break;
+    }
 
     await logMessage({
       to: recipients,
       message,
       status: result.success ? 'sent' : 'failed',
-      message_id: result.results?.[0]?.messageId || null,
-      cost: result.results?.[0]?.cost || 0,
+      message_id: result.messageId || result.results?.[0]?.messageId || null,
+      cost: result.cost || result.results?.[0]?.cost || 0,
       is_sandbox: result.isSandbox,
+      metadata: { provider: usedProvider },
     });
 
     res.json(result);
