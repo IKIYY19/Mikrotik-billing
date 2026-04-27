@@ -3,9 +3,16 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const provisionStore = require('../db/provisionStore');
 const memoryDb = require('../db/memory');
+const zeroTouchBilling = require('../services/zeroTouchBilling');
 
 function getDb() {
   return global.db || memoryDb;
+}
+
+function toSafeDevice(device) {
+  if (!device) return null;
+  const { mgmt_password_encrypted, radius_secret, ...safe } = device;
+  return safe;
 }
 
 // GET all devices
@@ -18,7 +25,7 @@ router.get('/', async (req, res) => {
     } else {
       result = await getDb().query('SELECT * FROM routers ORDER BY created_at DESC', []);
     }
-    res.json(result.rows);
+    res.json(result.rows.map(toSafeDevice));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -29,7 +36,7 @@ router.get('/:id', async (req, res) => {
   try {
     const result = await getDb().query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
-    res.json(result.rows[0]);
+    res.json(toSafeDevice(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -66,29 +73,30 @@ router.post('/', async (req, res) => {
       wan_interface, lan_interface, dns_servers, ntp_servers,
       radius_server, radius_secret, radius_port,
       hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
-      mgmt_port, notes,
+      mgmt_port, mgmt_username, mgmt_password, connection_type, notes,
     } = req.body;
 
     const id = uuidv4();
     const token = provisionStore.generateToken();
+    const encryptedMgmtPassword = mgmt_password ? zeroTouchBilling.encryptForMikrotik(mgmt_password) : null;
 
     const result = await getDb().query(
       `INSERT INTO routers (id, project_id, name, identity, model, mac_address, ip_address,
        wan_interface, lan_interface, provision_token, provision_status,
        dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
        hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
-       mgmt_port, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
        RETURNING *`,
       [id, project_id, name, identity || name, model || '', mac_address || '', ip_address || '',
        wan_interface || 'ether1', lan_interface || 'bridge1', token, 'pending',
        dns_servers || ['8.8.8.8', '8.8.4.4'], ntp_servers || ['pool.ntp.org'],
        radius_server || '', radius_secret || '', radius_port || 1812,
        hotspot_enabled || false, pppoe_enabled || false, pppoe_interface || '', pppoe_service_name || '',
-       mgmt_port || 8728, notes || '']
+       mgmt_port || 8728, mgmt_username || '', encryptedMgmtPassword, connection_type || 'api', notes || '']
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(toSafeDevice(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -102,13 +110,14 @@ router.put('/:id', async (req, res) => {
       wan_interface, lan_interface, dns_servers, ntp_servers,
       radius_server, radius_secret, radius_port,
       hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
-      mgmt_port, notes,
+      mgmt_port, mgmt_username, mgmt_password, connection_type, notes,
     } = req.body;
 
     const existing = await getDb().query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
 
     const r = existing.rows[0];
+    const encryptedMgmtPassword = mgmt_password ? zeroTouchBilling.encryptForMikrotik(mgmt_password) : r.mgmt_password_encrypted;
     const result = await getDb().query(
       `UPDATE routers SET
         name = COALESCE($1, name), identity = COALESCE($2, identity),
@@ -119,9 +128,11 @@ router.put('/:id', async (req, res) => {
         radius_secret = COALESCE($11, radius_secret), radius_port = COALESCE($12, radius_port),
         hotspot_enabled = COALESCE($13, hotspot_enabled), pppoe_enabled = COALESCE($14, pppoe_enabled),
         pppoe_interface = COALESCE($15, pppoe_interface), pppoe_service_name = COALESCE($16, pppoe_service_name),
-        mgmt_port = COALESCE($17, mgmt_port), notes = COALESCE($18, notes),
+        mgmt_port = COALESCE($17, mgmt_port), mgmt_username = COALESCE($18, mgmt_username),
+        mgmt_password_encrypted = COALESCE($19, mgmt_password_encrypted), connection_type = COALESCE($20, connection_type),
+        notes = COALESCE($21, notes),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $19 RETURNING *`,
+       WHERE id = $22 RETURNING *`,
       [name || r.name, identity || r.identity, model || r.model, mac_address || r.mac_address,
        ip_address || r.ip_address, wan_interface || r.wan_interface, lan_interface || r.lan_interface,
        dns_servers || r.dns_servers, ntp_servers || r.ntp_servers,
@@ -131,11 +142,12 @@ router.put('/:id', async (req, res) => {
        hotspot_enabled !== undefined ? hotspot_enabled : r.hotspot_enabled,
        pppoe_enabled !== undefined ? pppoe_enabled : r.pppoe_enabled,
        pppoe_interface || r.pppoe_interface, pppoe_service_name || r.pppoe_service_name,
-       mgmt_port || r.mgmt_port, notes !== undefined ? notes : r.notes,
+       mgmt_port || r.mgmt_port, mgmt_username !== undefined ? mgmt_username : r.mgmt_username,
+       encryptedMgmtPassword, connection_type || r.connection_type || 'api', notes !== undefined ? notes : r.notes,
        req.params.id]
     );
 
-    res.json(result.rows[0]);
+    res.json(toSafeDevice(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -156,6 +168,22 @@ router.post('/:id/regenerate-token', async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
     res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ACTIVATE router as billing-linked MikroTik connection
+router.post('/:id/activate-billing', async (req, res) => {
+  try {
+    const activation = await zeroTouchBilling.activateRouterInBilling(req.params.id, req.body || {});
+    if (!activation.success) {
+      return res.status(400).json(activation);
+    }
+    res.json({
+      ...activation,
+      router: toSafeDevice(activation.router),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

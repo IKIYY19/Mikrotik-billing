@@ -322,7 +322,13 @@ module.exports = {
         pppoe_interface: params[18],
         pppoe_service_name: params[19],
         mgmt_port: params[20],
-        notes: params[21],
+        mgmt_username: params[21],
+        mgmt_password_encrypted: params[22],
+        connection_type: params[23],
+        notes: params[24],
+        linked_mikrotik_connection_id: null,
+        billing_activated_at: null,
+        billing_activation_error: null,
         provision_attempts: 0,
         last_provisioned_at: null,
         created_at: new Date().toISOString(),
@@ -355,9 +361,15 @@ module.exports = {
       if (lowerText.includes('pppoe_interface =')) router.pppoe_interface = params[14];
       if (lowerText.includes('pppoe_service_name =')) router.pppoe_service_name = params[15];
       if (lowerText.includes('mgmt_port =')) router.mgmt_port = params[16];
-      if (lowerText.includes('notes =')) router.notes = params[17];
+      if (lowerText.includes('mgmt_username =')) router.mgmt_username = params[17];
+      if (lowerText.includes('mgmt_password_encrypted =')) router.mgmt_password_encrypted = params[18];
+      if (lowerText.includes('connection_type =')) router.connection_type = params[19];
+      if (lowerText.includes('notes =')) router.notes = params[20];
       if (lowerText.includes('provision_token =')) router.provision_token = params[0];
       if (lowerText.includes('provision_status =')) router.provision_status = params[0];
+      if (lowerText.includes('linked_mikrotik_connection_id =')) router.linked_mikrotik_connection_id = params[0];
+      if (lowerText.includes('billing_activated_at = case when')) router.billing_activated_at = params[0] ? new Date().toISOString() : router.billing_activated_at;
+      if (lowerText.includes('billing_activation_error =')) router.billing_activation_error = params[1];
       if (lowerText.includes('last_provisioned_at = current_timestamp')) router.last_provisioned_at = new Date().toISOString();
       if (lowerText.includes('provision_attempts = coalesce(provision_attempts, 0) + 1')) router.provision_attempts = (router.provision_attempts || 0) + 1;
       if (lowerText.includes('last_provisioned_at =') && !lowerText.includes('current_timestamp')) router.last_provisioned_at = params[0];

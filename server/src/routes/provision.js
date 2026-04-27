@@ -3,6 +3,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const provisionStore = require('../db/provisionStore');
 const memoryDb = require('../db/memory');
+const zeroTouchBilling = require('../services/zeroTouchBilling');
 
 function getDb() {
   return global.db || memoryDb;
@@ -108,7 +109,17 @@ router.get('/provision/callback/:token', async (req, res) => {
       [uuidv4(), token, routerData.id, ip, ua, 'callback', 'success', 'Router confirmed provisioning']
     );
 
-    res.type('text/plain').send('# OK: Router marked as provisioned');
+    const activation = await zeroTouchBilling.activateRouterInBilling(routerData.id);
+    const activationStatus = activation.success
+      ? `Billing link activated${activation.subscriptions_synced ? ` (${activation.subscriptions_synced} subscriptions processed)` : ''}`
+      : `Billing link skipped: ${activation.error || 'missing credentials'}`;
+
+    await getDb().query(
+      'INSERT INTO provision_logs (id, token, router_id, ip_address, user_agent, action, status, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [uuidv4(), token, routerData.id, ip, ua, 'billing_activation', activation.success ? 'success' : 'skipped', activationStatus]
+    );
+
+    res.type('text/plain').send(`# OK: Router marked as provisioned\n# ${activationStatus}`);
   } catch (error) {
     console.error('Callback error:', error);
     res.status(500).type('text/plain').send('# ERROR: Internal server error');

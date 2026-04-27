@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Router, Plus, Trash2, Copy, Download, Eye, RefreshCw,
-  Terminal, Shield, Settings, CheckCircle, Clock, X, Code, FileText, Zap
+  Terminal, X, Code, FileText, Zap, Link2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -24,11 +23,12 @@ export function Devices() {
   const [copied, setCopied] = useState(false);
   const [provisionMethod, setProvisionMethod] = useState('import');
   const [commandLoading, setCommandLoading] = useState({});
+  const [activationLoading, setActivationLoading] = useState({});
   const [formData, setFormData] = useState({
     name: '', identity: '', model: '', dns_servers: ['8.8.8.8', '8.8.4.4'],
     ntp_servers: ['pool.ntp.org'], wan_interface: 'ether1',
     radius_server: '', radius_secret: '', hotspot_enabled: false, pppoe_enabled: false,
-    notes: '',
+    ip_address: '', mgmt_port: 8728, mgmt_username: '', mgmt_password: '', connection_type: 'api', notes: '',
   });
 
   useEffect(() => { fetchDevices(); }, []);
@@ -49,9 +49,10 @@ export function Devices() {
       setShowCreate(false);
       setFormData({ name: '', identity: '', model: '', dns_servers: ['8.8.8.8', '8.8.4.4'],
         ntp_servers: ['pool.ntp.org'], wan_interface: 'ether1',
-        radius_server: '', radius_secret: '', hotspot_enabled: false, pppoe_enabled: false, notes: '' });
+        radius_server: '', radius_secret: '', hotspot_enabled: false, pppoe_enabled: false,
+        ip_address: '', mgmt_port: 8728, mgmt_username: '', mgmt_password: '', connection_type: 'api', notes: '' });
       fetchDevices();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); window.alert(e.response?.data?.error || e.message); }
   };
 
   const handleDelete = async (id) => {
@@ -64,6 +65,21 @@ export function Devices() {
     if (!window.confirm('Regenerate token? The old one will stop working.')) return;
     await axios.post(`${API_URL}/devices/${id}/regenerate-token`);
     fetchDevices();
+  };
+
+  const activateInBilling = async (device) => {
+    setActivationLoading(prev => ({ ...prev, [device.id]: true }));
+    try {
+      const { data } = await axios.post(`${API_URL}/devices/${device.id}/activate-billing`);
+      const synced = data.subscriptions_synced || 0;
+      window.alert(`Billing link ${data.connection ? 'activated' : 'processed'} successfully.${synced ? ` ${synced} subscriptions processed.` : ''}`);
+      fetchDevices();
+    } catch (e) {
+      console.error(e);
+      window.alert(e.response?.data?.error || e.response?.data?.message || e.message);
+    } finally {
+      setActivationLoading(prev => ({ ...prev, [device.id]: false }));
+    }
   };
 
   const viewScript = async (device) => {
@@ -171,11 +187,18 @@ export function Devices() {
                       <CardDescription>{dev.identity || dev.name} • {dev.model || 'Unknown model'}</CardDescription>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    dev.provision_status === 'provisioned' ? 'bg-green-600/20 text-green-400' : 'bg-amber-600/20 text-amber-400'
-                  }`}>
-                    {dev.provision_status === 'provisioned' ? '✓ Provisioned' : '⏳ Pending'}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                      dev.provision_status === 'provisioned' ? 'bg-green-600/20 text-green-400' : 'bg-amber-600/20 text-amber-400'
+                    }`}>
+                      {dev.provision_status === 'provisioned' ? '✓ Provisioned' : '⏳ Pending'}
+                    </span>
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                      dev.linked_mikrotik_connection_id ? 'bg-blue-600/20 text-blue-400' : 'bg-zinc-700 text-zinc-300'
+                    }`}>
+                      {dev.linked_mikrotik_connection_id ? 'Linked to Billing' : 'Not Linked'}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
 
@@ -225,10 +248,25 @@ export function Devices() {
                 <div className="text-zinc-400">DNS: <span className="text-white">{dev.dns_servers?.join(', ')}</span></div>
                 <div className="text-zinc-400">RADIUS: <span className="text-white">{dev.radius_server || 'Not set'}</span></div>
                 <div className="text-zinc-400">PPPoE: <span className="text-white">{dev.pppoe_enabled ? 'Yes' : 'No'}</span></div>
+                <div className="text-zinc-400">Router IP: <span className="text-white">{dev.ip_address || 'Not set'}</span></div>
+                <div className="text-zinc-400">Billing Engine: <span className="text-white uppercase">{dev.connection_type || 'api'}</span></div>
+                <div className="text-zinc-400">Mgmt User: <span className="text-white">{dev.mgmt_username || 'Not set'}</span></div>
+                <div className="text-zinc-400">Last Billing Link: <span className="text-white">{dev.billing_activated_at ? new Date(dev.billing_activated_at).toLocaleString() : 'Never'}</span></div>
               </CardContent>
+
+              {dev.billing_activation_error && (
+                <CardContent className="px-4 pb-0">
+                  <div className="rounded border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                    Last billing activation issue: {dev.billing_activation_error}
+                  </div>
+                </CardContent>
+              )}
 
               {/* Actions */}
               <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => activateInBilling(dev)} disabled={activationLoading[dev.id]} className="flex items-center gap-1 text-blue-400">
+                  <Link2 className="w-3 h-3" /> {activationLoading[dev.id] ? 'Linking...' : 'Activate in Billing'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => viewScript(dev)} className="flex items-center gap-1">
                   <Eye className="w-3 h-3" /> Preview
                 </Button>
@@ -312,6 +350,60 @@ export function Devices() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="device-ip">Router IP / Host</Label>
+                    <Input
+                      id="device-ip"
+                      value={formData.ip_address}
+                      onChange={e => setFormData({...formData, ip_address: e.target.value})}
+                      placeholder="192.168.88.1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-engine">Billing Engine</Label>
+                    <select
+                      id="device-engine"
+                      value={formData.connection_type}
+                      onChange={e => setFormData({...formData, connection_type: e.target.value})}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    >
+                      <option value="api">API</option>
+                      <option value="ssh">SSH</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="device-mgmt-port">Management Port</Label>
+                    <Input
+                      id="device-mgmt-port"
+                      type="number"
+                      value={formData.mgmt_port}
+                      onChange={e => setFormData({...formData, mgmt_port: e.target.value})}
+                      placeholder="8728"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="device-mgmt-user">Management Username</Label>
+                    <Input
+                      id="device-mgmt-user"
+                      value={formData.mgmt_username}
+                      onChange={e => setFormData({...formData, mgmt_username: e.target.value})}
+                      placeholder="automation-user"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-mgmt-password">Management Password</Label>
+                    <Input
+                      id="device-mgmt-password"
+                      type="password"
+                      value={formData.mgmt_password}
+                      onChange={e => setFormData({...formData, mgmt_password: e.target.value})}
+                      placeholder="Stored securely for billing link"
+                    />
+                  </div>
+                </div>
                 <div>
                   <Label htmlFor="device-dns">DNS Servers (comma-separated)</Label>
                   <Input
@@ -355,7 +447,7 @@ export function Devices() {
                     <Input
                       id="device-radius-port"
                       type="number"
-                      value={1812}
+                      value={formData.radius_port || 1812}
                       onChange={e => setFormData({...formData, radius_port: e.target.value})}
                     />
                   </div>
