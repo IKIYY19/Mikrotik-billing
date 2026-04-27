@@ -232,6 +232,19 @@ module.exports = {
     return payment;
   },
 
+  async updatePayment(id, data) {
+    const idx = billingStore.payments.findIndex((payment) => payment.id === id);
+    if (idx === -1) return null;
+
+    billingStore.payments[idx] = {
+      ...billingStore.payments[idx],
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+
+    return billingStore.payments[idx];
+  },
+
   // ─── USAGE RECORDS ───
   async recordUsage(data) {
     const record = {

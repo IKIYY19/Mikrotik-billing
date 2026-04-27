@@ -59,6 +59,22 @@ function parseAllowedOrigins(rawOrigins) {
   return isProductionEnv ? [] : defaultDevCorsOrigins;
 }
 
+function ensureCriticalProductionConfig() {
+  if (!isProductionEnv) {
+    return;
+  }
+
+  const missing = [];
+  if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
+  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
+  if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
+  if (!process.env.CORS_ORIGIN) missing.push('CORS_ORIGIN');
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+}
+
 function createCorsOriginHandler() {
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
 
@@ -133,6 +149,7 @@ app.use('/api', trackUserActivity);
 const startServer = async () => {
   try {
     if (!isTestEnv) {
+      ensureCriticalProductionConfig();
       const secretsValid = validateSecrets();
       if (!secretsValid && isProductionEnv) {
         throw new Error('Security validation failed: configure non-default JWT_SECRET and ENCRYPTION_KEY');
@@ -422,16 +439,18 @@ const startServer = async () => {
           logger.error('Failed to initialize TR-069 ACS service', { error: error.message });
         }
         
-        // Disable router connectivity service - causing black screen
-        // Will debug separately
-        /*
-        try {
-          const routerConnectivityService = require('./services/routerConnectivity');
-          routerConnectivityService.start();
-        } catch (error) {
-          logger.error('Failed to initialize router connectivity service', { error: error.message });
+        const enableRouterConnectivity = process.env.ENABLE_ROUTER_CONNECTIVITY === 'true';
+        if (enableRouterConnectivity) {
+          try {
+            const routerConnectivityService = require('./services/routerConnectivity');
+            routerConnectivityService.start();
+            logger.info('Router connectivity service started');
+          } catch (error) {
+            logger.error('Failed to initialize router connectivity service', { error: error.message });
+          }
+        } else {
+          logger.warn('Router connectivity service disabled (set ENABLE_ROUTER_CONNECTIVITY=true to enable)');
         }
-        */
         
         logger.info('WebSocket service initialized for real-time bandwidth monitoring');
       });

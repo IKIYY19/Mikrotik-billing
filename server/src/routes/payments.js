@@ -112,6 +112,20 @@ async function isPaypalConfigured() {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
 
+function ensureWebhookSecretConfigured(provider) {
+  if (!isProductionEnv) return true;
+  if (provider === 'stripe') {
+    return Boolean(process.env.STRIPE_WEBHOOK_SECRET);
+  }
+  if (provider === 'paypal') {
+    return Boolean(process.env.PAYPAL_WEBHOOK_ID);
+  }
+  if (provider === 'flutterwave') {
+    return Boolean(process.env.FLUTTERWAVE_SECRET_KEY);
+  }
+  return false;
+}
+
 const flutterwaveConfigured = Boolean(process.env.FLUTTERWAVE_SECRET_KEY);
 
 router.use(paymentLimiter);
@@ -629,6 +643,10 @@ router.post('/stripe/create-intent', async (req, res) => {
 // STRIPE WEBHOOK
 // ═══════════════════════════════════════
 router.post('/stripe/webhook', async (req, res) => {
+  if (!ensureWebhookSecretConfigured('stripe')) {
+    return res.status(503).json({ error: 'Stripe webhook secret is not configured' });
+  }
+
   const signature = req.headers['stripe-signature'];
   const payload = req.body;
 
@@ -700,10 +718,14 @@ router.post('/paypal/capture', async (req, res) => {
 // PAYPAL WEBHOOK
 // ═══════════════════════════════════════
 router.post('/paypal/webhook', async (req, res) => {
+  if (!ensureWebhookSecretConfigured('paypal')) {
+    return res.status(503).json({ error: 'PayPal webhook ID is not configured' });
+  }
+
   const headers = req.headers;
   const body = req.body;
 
-  if (!paypalService.verifyWebhookSignature(headers, body)) {
+  if (!paypalService.verifyWebhook(headers, body)) {
     return res.status(400).json({ error: 'Invalid webhook signature' });
   }
 
@@ -769,6 +791,10 @@ router.post('/flutterwave/verify', async (req, res) => {
 // FLUTTERWAVE WEBHOOK
 // ═══════════════════════════════════════
 router.post('/flutterwave/webhook', async (req, res) => {
+  if (!ensureWebhookSecretConfigured('flutterwave')) {
+    return res.status(503).json({ error: 'Flutterwave webhook secret is not configured' });
+  }
+
   const headers = req.headers;
   const body = req.body;
 

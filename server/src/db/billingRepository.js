@@ -464,6 +464,36 @@ const payments = {
 
     return result.rows[0];
   },
+
+  async update(id, data, userId = null) {
+    const current = await db.query('SELECT * FROM payments WHERE id = $1 LIMIT 1', [id]);
+    if (current.rows.length === 0) return null;
+
+    const existing = current.rows[0];
+    const result = await db.query(
+      `UPDATE payments
+       SET status = COALESCE($1, status),
+           reference = COALESCE($2, reference),
+           notes = COALESCE($3, notes),
+           gateway_transaction_id = COALESCE($4, gateway_transaction_id),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+       RETURNING *`,
+      [
+        data.status ?? null,
+        data.reference ?? null,
+        data.notes ?? null,
+        data.gateway_transaction_id ?? null,
+        id,
+      ]
+    );
+
+    if (userId) {
+      await audit.log(userId, 'update', 'payment', id, existing, result.rows[0]);
+    }
+
+    return result.rows[0];
+  },
 };
 
 // ─── CREDIT NOTES ───

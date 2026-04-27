@@ -7,8 +7,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { JWT_SECRET } = require('../middleware/auth');
+const db = global.dbAvailable ? global.db : require('../db/memory');
 
 const CUSTOMER_JWT_SECRET = JWT_SECRET + '_customer';
 const CUSTOMER_JWT_EXPIRES = '24h';
@@ -16,6 +16,7 @@ const CUSTOMER_JWT_EXPIRES = '24h';
 // Generate secure PIN hash
 const hashPIN = async (pin) => await bcrypt.hash(pin, 10);
 const verifyPIN = async (pin, hash) => await bcrypt.compare(pin, hash);
+const isValidPIN = (pin) => /^\d{4,8}$/.test(String(pin || ''));
 
 // POST /api/portal/auth/login
 router.post('/login', async (req, res) => {
@@ -23,6 +24,9 @@ router.post('/login', async (req, res) => {
     const { phone, pin } = req.body;
     if (!phone || !pin) {
       return res.status(400).json({ error: 'Phone and PIN required' });
+    }
+    if (!isValidPIN(pin)) {
+      return res.status(400).json({ error: 'PIN must be 4-8 digits' });
     }
 
     const customer = await db.query(
@@ -123,8 +127,8 @@ router.post('/change-pin', async (req, res) => {
       return res.status(400).json({ error: 'Current PIN and new PIN required' });
     }
 
-    if (newPIN.length < 4) {
-      return res.status(400).json({ error: 'PIN must be at least 4 digits' });
+    if (!isValidPIN(newPIN)) {
+      return res.status(400).json({ error: 'PIN must be 4-8 digits' });
     }
 
     const customer = await db.query(
@@ -199,6 +203,9 @@ router.post('/reset-pin', async (req, res) => {
 
     if (!phone || !resetCode || !newPIN) {
       return res.status(400).json({ error: 'Phone, reset code, and new PIN required' });
+    }
+    if (!isValidPIN(newPIN)) {
+      return res.status(400).json({ error: 'PIN must be 4-8 digits' });
     }
 
     const customer = await db.query(

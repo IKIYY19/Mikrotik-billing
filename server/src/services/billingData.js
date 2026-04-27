@@ -405,6 +405,18 @@ async function createPayment(data) {
   return normalizePayment(await backend.createPayment(data));
 }
 
+async function updatePayment(id, data) {
+  const backend = getBackend();
+  if (usesRepositoryBackend()) {
+    const payment = await backend.payments.update(id, data);
+    return payment ? getPaymentById(payment.id) : null;
+  }
+  if (typeof backend.updatePayment !== 'function') {
+    throw new Error('Payment updates are not supported by current backend');
+  }
+  return normalizePayment(await backend.updatePayment(id, data));
+}
+
 async function getDashboardStats() {
   const backend = getBackend();
   if (usesRepositoryBackend()) {
@@ -495,6 +507,7 @@ module.exports = {
   listPayments,
   getPaymentById,
   createPayment,
+  updatePayment,
   getDashboardStats,
   listUsageRecords,
   recordUsage,
