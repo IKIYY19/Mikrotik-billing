@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Download, CreditCard, Receipt, FileText, X } from 'lucide-react';
+import { Plus, Download, CreditCard, Receipt, FileText, X, Send } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -18,6 +19,10 @@ export function BillingInvoices() {
   const [form, setForm] = useState({ customer_id: '', subscription_id: '', amount: '', tax: '' });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const toast = useToast();
+  const [paymentPromptModal, setPaymentPromptModal] = useState(false);
+  const [sendingPrompt, setSendingPrompt] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -42,6 +47,22 @@ export function BillingInvoices() {
     if (!confirm('Generate invoices for all active subscriptions?')) return;
     await axios.post(`${API}/billing/invoices/generate-monthly`);
     const { data } = await axios.get(`${API}/billing/invoices`); setInvoices(data);
+  };
+
+  const sendPaymentPrompt = async (invoice) => {
+    setSelectedInvoice(invoice);
+    setSendingPrompt(true);
+    try {
+      const { data } = await axios.post(`${API}/billing/customers/${invoice.customer_id}/payment-prompt`, {
+        amount: invoice.balance,
+        invoice_id: invoice.id
+      });
+      toast.success('Payment prompt sent successfully');
+    } catch (e) {
+      toast.error('Failed to send payment prompt', e.response?.data?.error || e.message);
+    } finally {
+      setSendingPrompt(false);
+    }
   };
 
   const filtered = filter === 'all' ? invoices : invoices.filter(i => i.status === filter);
@@ -113,9 +134,24 @@ export function BillingInvoices() {
               </CardContent>
               <CardContent className="p-4 border-t border-zinc-800">
                 {inv.status !== 'paid' && (
-                  <Button size="sm" onClick={() => navigate(`/pay/${inv.id}`)} className="w-full flex items-center justify-center gap-2">
-                    <CreditCard className="w-3 h-3" /> Pay Invoice
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => sendPaymentPrompt(inv)}
+                      disabled={sendingPrompt}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-3 h-3" /> {sendingPrompt ? 'Sending...' : 'Send Prompt'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate(`/pay/${inv.id}`)} 
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <CreditCard className="w-3 h-3" /> Pay
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
