@@ -135,6 +135,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 app.disable('x-powered-by');
 app.set('trust proxy', isProductionEnv ? 1 : false);
+const monitoringApiEnabled = process.env.ENABLE_MONITORING_API === 'true';
 
 // Middleware
 app.use(cors({
@@ -374,8 +375,11 @@ const startServer = async () => {
     app.use('/api/fup', authenticate, require('./routes/fup'));
     app.use('/api/tr069', authenticate, require('./routes/tr069'));
     app.use('/api/speedtest', authenticate, require('./routes/speedtest'));
-    // Disable monitoring routes - causing black screen
-    // app.use('/api/monitoring', authenticate, require('./routes/monitoring'));
+    if (monitoringApiEnabled) {
+      app.use('/api/monitoring', authenticate, require('./routes/monitoring'));
+    } else {
+      logger.warn('Monitoring API disabled (set ENABLE_MONITORING_API=true to enable)');
+    }
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());

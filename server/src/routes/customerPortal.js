@@ -13,6 +13,9 @@ const MpesaService = require('../services/mpesa');
 const { triggerSMS } = require('./sms');
 const db = global.dbAvailable ? global.db : require('../db/memory');
 
+const MIN_PASSWORD_LENGTH = 8;
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+
 // ─══════════════════════════════════════
 // ADMIN ROUTES (must come before :customerId routes)
 // ═══════════════════════════════════════
@@ -77,18 +80,19 @@ router.get('/admin/staff-points/:userId', async (req, res) => {
 // Customer login (phone + PIN)
 router.post('/login', (req, res) => {
   const { phone, pin } = req.body;
+  const normalizedPhone = String(phone || '').replace(/\s/g, '');
 
   // For demo: use phone number as PIN if no PIN set
   // In production, store hashed PIN on customer record
   const customer = billing.store.customers.find(c =>
-    c.phone === phone || c.phone?.replace(/\s/g, '') === phone?.replace(/\s/g, '')
+    c.phone === phone || c.phone?.replace(/\s/g, '') === normalizedPhone
   );
 
   if (!customer) return res.status(401).json({ error: 'Customer not found' });
 
   // Simple PIN check - in production use bcrypt
   const expectedPin = customer.pin || phone?.slice(-4) || '1234';
-  if (pin !== expectedPin && pin !== '1234') {
+  if (pin !== expectedPin) {
     return res.status(401).json({ error: 'Invalid PIN' });
   }
 
@@ -217,6 +221,14 @@ router.get('/:customerId/dashboard', async (req, res) => {
 router.post('/:customerId/pay', async (req, res) => {
   try {
     const { phone, amount, invoice_id } = req.body;
+    const parsedAmount = Number(amount);
+    if (!isNonEmptyString(phone)) {
+      return res.status(400).json({ error: 'Valid phone is required' });
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+
     const result = await db.query(
       'SELECT * FROM customers WHERE id = $1',
       [req.params.customerId]
@@ -229,7 +241,7 @@ router.post('/:customerId/pay', async (req, res) => {
     const customer = result.rows[0];
 
     const mpesa = new MpesaService();
-    const mpesaResult = await mpesa.stkPush(phone, amount, `INV-${Date.now()}`, `Payment from ${customer.name}`);
+    const mpesaResult = await mpesa.stkPush(phone, parsedAmount, `INV-${Date.now()}`, `Payment from ${customer.name}`);
 
     if (mpesaResult.success) {
       // Store pending payment
@@ -237,7 +249,7 @@ router.post('/:customerId/pay', async (req, res) => {
       await db.query(
         `INSERT INTO payments (id, customer_id, invoice_id, phone, amount, method, status, reference, received_at)
          VALUES ($1, $2, $3, $4, $5, 'mpesa', 'pending', $6, NOW())`,
-        [pendingId, customer.id, invoice_id, phone, parseFloat(amount), mpesaResult.checkoutRequestId]
+        [pendingId, customer.id, invoice_id, phone, parsedAmount, mpesaResult.checkoutRequestId]
       );
 
       res.json({ success: true, checkoutRequestId: mpesaResult.checkoutRequestId, pending_id: pendingId });
@@ -735,6 +747,13 @@ router.post('/:customerId/speedtest', (req, res) => {
 router.post('/:customerId/change-password', async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
+    if (!isNonEmptyString(new_password) || new_password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+    }
+    if (current_password && current_password === new_password) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
     const result = await db.query(
       'SELECT * FROM customers WHERE id = $1',
       [req.params.customerId]
@@ -973,6 +992,9 @@ router.put('/:customerId/credentials', async (req, res) => {
 
     // Verify current password
     if (customer.portal_password_hash) {
+      if (!isNonEmptyString(current_password)) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
       const validPassword = await bcrypt.compare(current_password, customer.portal_password_hash);
       if (!validPassword) {
         return res.status(401).json({ error: 'Invalid current password' });
@@ -985,12 +1007,18 @@ router.put('/:customerId/credentials', async (req, res) => {
     let paramIndex = 1;
 
     if (new_username) {
+      if (!isNonEmptyString(new_username) || new_username.length < 3) {
+        return res.status(400).json({ error: 'Username must be at least 3 characters' });
+      }
       updates.push(`portal_username = $${paramIndex}`);
-      values.push(new_username);
+      values.push(new_username.trim());
       paramIndex++;
     }
 
     if (new_password) {
+      if (!isNonEmptyString(new_password) || new_password.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      }
       const newPasswordHash = await bcrypt.hash(new_password, 10);
       updates.push(`portal_password_hash = $${paramIndex}`);
       values.push(newPasswordHash);
@@ -1012,28 +1040,6 @@ router.put('/:customerId/credentials', async (req, res) => {
     res.json({ success: true, message: 'Credentials updated successfully' });
   } catch (e) {
     console.error('Update credentials error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Get password info
-router.get('/:customerId/password-info', async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT wifi_password, password_changed_at FROM customers WHERE id = $1',
-      [req.params.customerId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
-
-    const customer = result.rows[0];
-    res.json({
-      password_changed_at: customer.password_changed_at,
-    });
-  } catch (e) {
-    console.error('Get password info error:', e);
     res.status(500).json({ error: e.message });
   }
 });
