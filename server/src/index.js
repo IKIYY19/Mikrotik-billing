@@ -449,6 +449,16 @@ const startServer = async () => {
         // Start user online status updater
         startOnlineStatusUpdater();
         
+        // Initialize alert system for Telegram notifications
+        try {
+          const alertSystem = require('./services/alertSystem');
+          alertSystem.init().catch(err => {
+            logger.warn('Could not initialize alert system', { error: err.message });
+          });
+        } catch (error) {
+          logger.warn('Could not initialize alert system', { error: error.message });
+        }
+        
         // Start TR-069 ACS service
         try {
           const tr069Service = require('./services/tr069Service');

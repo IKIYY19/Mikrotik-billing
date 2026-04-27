@@ -5,6 +5,7 @@ const PPPoEProvisioner = require('../utils/pppoeProvisioner');
 const { triggerSMS } = require('./sms');
 const db = global.dbAvailable ? global.db : require('../db/memory');
 const MpesaService = require('../services/mpesa');
+const alertSystem = require('../services/alertSystem');
 
 // ═══════════════════════════════════════
 // DASHBOARD
@@ -318,6 +319,14 @@ router.post('/subscriptions/:id/toggle', async (req, res) => {
         customer, sub, plan, invoice: null, payment: null,
       }).catch(e => console.error('SMS error:', e.message));
     }
+    
+    // Send Telegram alert for suspension
+    if (sub.status !== 'active' && plan?.name) {
+      alertSystem.sendServiceSuspension(
+        customer.id,
+        plan.name
+      ).catch(e => console.error('Telegram alert error:', e.message));
+    }
 
     res.json({ ...sub, provision_script: provisionScript });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -349,6 +358,16 @@ router.post('/invoices', async (req, res) => {
     const customer = invoice.customer || await billing.getCustomerById(invoice.customer_id);
     if (customer?.phone) {
       triggerSMS('invoice_due_soon', { customer, invoice }).catch(e => console.error('SMS error:', e.message));
+    }
+    
+    // Send Telegram alert
+    if (invoice.invoice_number) {
+      alertSystem.sendNewInvoice(
+        invoice.customer_id,
+        invoice.invoice_number,
+        invoice.total,
+        invoice.due_date
+      ).catch(e => console.error('Telegram alert error:', e.message));
     }
     
     res.status(201).json(invoice);

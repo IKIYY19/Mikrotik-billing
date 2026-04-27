@@ -14,6 +14,7 @@ const paymentSessions = require('../services/paymentSessions');
 const { paymentLimiter } = require('../middleware/rateLimiter');
 const { triggerSMS } = require('./sms');
 const { decryptObject } = require('../utils/encryption');
+const alertSystem = require('../services/alertSystem');
 
 const router = express.Router();
 const isProductionEnv = process.env.NODE_ENV === 'production';
@@ -166,6 +167,18 @@ async function finalizeSessionPayment(session, mpesaReceipt, phone) {
   if (customer?.phone) {
     triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
       console.error('SMS error:', error.message);
+    });
+  }
+  
+  // Send Telegram alert
+  if (invoice?.invoice_number) {
+    alertSystem.sendPaymentReceived(
+      payment.customer_id,
+      payment.amount,
+      invoice.invoice_number,
+      payment.reference
+    ).catch((error) => {
+      console.error('Telegram alert error:', error.message);
     });
   }
 

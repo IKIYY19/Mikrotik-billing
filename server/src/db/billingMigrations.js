@@ -31,6 +31,7 @@ const billingMigrations = [
     id_number VARCHAR(100),
     status VARCHAR(20) DEFAULT 'active',
     notes TEXT,
+    telegram_chat_id VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -79,6 +80,8 @@ const billingMigrations = [
     reference VARCHAR(255),
     receipt_number VARCHAR(50),
     gateway_transaction_id VARCHAR(255),
+    refund_amount DECIMAL(10,2),
+    refund_reference VARCHAR(255),
     notes TEXT,
     received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -165,6 +168,8 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_received ON payments(received_at)`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10,2)`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reference VARCHAR(255)`,
   `CREATE INDEX IF NOT EXISTS idx_usage_customer ON usage_records(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_entity ON billing_audit_logs(entity_type, entity_id)`,
 
