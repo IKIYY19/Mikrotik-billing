@@ -135,11 +135,6 @@ export function SMSPage() {
               {balance.isSandbox && <span className="text-xs text-amber-400 ml-2">(Sandbox)</span>}
             </Card>
           )}
-          {!settings.is_configured && (
-            <div className="bg-amber-600/20 border border-amber-600/50 rounded px-3 py-1.5 text-amber-400 text-sm">
-              Sandbox Mode — SMS logged but not sent
-            </div>
-          )}
         </div>
       </div>
 
