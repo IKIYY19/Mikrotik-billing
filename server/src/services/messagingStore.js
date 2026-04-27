@@ -265,6 +265,29 @@ async function listLogs({ page = 1, limit = 50 } = {}) {
   };
 }
 
+async function deleteLog(id) {
+  if (useDatabase()) {
+    await global.db.query('DELETE FROM message_logs WHERE id = $1', [id]);
+    return { success: true };
+  }
+
+  const index = fallbackState.logs.findIndex((log) => log.id === id);
+  if (index !== -1) {
+    fallbackState.logs.splice(index, 1);
+  }
+  return { success: true };
+}
+
+async function clearLogs() {
+  if (useDatabase()) {
+    await global.db.query('DELETE FROM message_logs');
+    return { success: true };
+  }
+
+  fallbackState.logs = [];
+  return { success: true };
+}
+
 module.exports = {
   DEFAULT_TEMPLATES,
   listTemplates,
@@ -272,4 +295,6 @@ module.exports = {
   updateTemplate,
   createLog,
   listLogs,
+  deleteLog,
+  clearLogs,
 };

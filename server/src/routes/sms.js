@@ -210,6 +210,9 @@ router.post('/send-bulk', messagingLimiter, async (req, res) => {
       case 'twilio':
         service = await getTwilioService();
         break;
+      case 'whatsapp':
+        service = whatsapp;
+        break;
       case 'africas_talking':
       default:
         service = await getATService();
@@ -227,6 +230,8 @@ router.post('/send-bulk', messagingLimiter, async (req, res) => {
         if (usedProvider === 'africas_talking') {
           const formattedPhone = AfricaTalkingService.formatPhone(customer.phone);
           result = await service.sendSMS([formattedPhone], message);
+        } else if (usedProvider === 'whatsapp') {
+          result = await service.sendMessage(customer.phone, message);
         } else {
           result = await service.sendSMS(customer.phone, message);
         }
@@ -304,6 +309,9 @@ router.post('/send', messagingLimiter, async (req, res) => {
         const twilio = await getTwilioService();
         result = await twilio.sendSMS(recipients[0], message);
         break;
+      case 'whatsapp':
+        result = await whatsapp.sendMessage(recipients[0], message);
+        break;
       case 'africas_talking':
       default:
         const at = await getATService();
@@ -354,6 +362,31 @@ router.post('/send-template', messagingLimiter, async (req, res) => {
     });
 
     res.json({ ...result, template_id, message });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// DELETE SMS LOG
+// ═══════════════════════════════════════
+router.delete('/logs/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await messagingStore.deleteLog(id);
+    res.json({ success: true, message: 'Log deleted' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// CLEAR ALL SMS LOGS
+// ═══════════════════════════════════════
+router.delete('/logs', async (req, res) => {
+  try {
+    await messagingStore.clearLogs();
+    res.json({ success: true, message: 'All logs cleared' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
