@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS integrations (
   last_test_message TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT valid_category CHECK (category IN ('sms', 'payment', 'messaging', 'email', 'storage', 'monitoring'))
+  CONSTRAINT valid_category CHECK (category IN ('sms', 'payment', 'messaging', 'email', 'storage', 'monitoring', 'communication'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_integrations_service ON integrations(service_name);
@@ -40,7 +40,8 @@ INSERT INTO integrations (service_name, display_name, category, config_data) VAL
   ('nexmo', 'Nexmo (Vonage)', 'sms', '{"api_key": "", "api_secret": "", "sender_id": ""}'),
   ('mailgun', 'Mailgun', 'email', '{"api_key": "", "domain": "", "from_email": "", "from_name": ""}'),
   ('aws_ses', 'AWS SES', 'email', '{"access_key_id": "", "secret_access_key": "", "region": "us-east-1", "from_email": "", "from_name": ""}'),
-  ('mailchimp', 'Mailchimp', 'email', '{"api_key": "", "list_id": ""}')
+  ('mailchimp', 'Mailchimp', 'email', '{"api_key": "", "list_id": ""}'),
+  ('telegram', 'Telegram Bot', 'communication', '{"bot_token": ""}')
 ON CONFLICT (service_name) DO NOTHING;
 `;
 
