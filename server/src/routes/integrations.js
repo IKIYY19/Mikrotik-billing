@@ -159,9 +159,6 @@ router.post('/:id/test', async (req, res) => {
       case 'google_cloud_storage':
         testResult = await testGoogleCloudStorage(config);
         break;
-      case 'twilio':
-        testResult = await testTwilio(config);
-        break;
       default:
         testResult = { success: false, message: 'Unknown service' };
     }
@@ -511,17 +508,6 @@ async function testGoogleCloudStorage(config) {
       return { success: false, message: 'Project ID and bucket name are required' };
     }
     return { success: true, message: 'Google Cloud Storage configuration saved' };
-  } catch (error) {
-    return { success: false, message: 'Connection failed: ' + error.message };
-  }
-}
-
-async function testTwilio(config) {
-  try {
-    if (!config.account_sid || !config.auth_token) {
-      return { success: false, message: 'Account SID and Auth Token are required' };
-    }
-    return { success: true, message: 'Twilio configuration saved' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }

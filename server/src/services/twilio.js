@@ -3,7 +3,24 @@
  * Global SMS provider with Kenya coverage
  */
 
-const twilio = require('twilio');
+let twilioFactory = null;
+
+function getTwilioFactory() {
+  if (twilioFactory !== null) {
+    return twilioFactory;
+  }
+
+  try {
+    // Lazy-load so missing optional dependency does not crash app startup or tests.
+    // The service will still report a clear error when someone actually tries to use it.
+    // eslint-disable-next-line global-require
+    twilioFactory = require('twilio');
+  } catch (error) {
+    twilioFactory = false;
+  }
+
+  return twilioFactory;
+}
 
 class TwilioService {
   constructor(config = {}) {
@@ -12,7 +29,10 @@ class TwilioService {
     this.phoneNumber = config.phoneNumber || process.env.TWILIO_PHONE_NUMBER || '';
     
     if (this.accountSid && this.authToken) {
-      this.client = twilio(this.accountSid, this.authToken);
+      const factory = getTwilioFactory();
+      if (factory) {
+        this.client = factory(this.accountSid, this.authToken);
+      }
     }
   }
 
@@ -21,7 +41,9 @@ class TwilioService {
       if (!this.client) {
         return {
           success: false,
-          message: 'Twilio client not initialized. Check credentials.',
+          message: getTwilioFactory()
+            ? 'Twilio client not initialized. Check credentials.'
+            : 'Twilio SDK is not installed or could not be loaded.',
         };
       }
 
@@ -56,7 +78,9 @@ class TwilioService {
       if (!this.client) {
         return {
           success: false,
-          message: 'Twilio client not initialized.',
+          message: getTwilioFactory()
+            ? 'Twilio client not initialized.'
+            : 'Twilio SDK is not installed or could not be loaded.',
         };
       }
 
@@ -81,7 +105,9 @@ class TwilioService {
       if (!this.client) {
         return {
           success: false,
-          message: 'Twilio client not initialized.',
+          message: getTwilioFactory()
+            ? 'Twilio client not initialized.'
+            : 'Twilio SDK is not installed or could not be loaded.',
         };
       }
 

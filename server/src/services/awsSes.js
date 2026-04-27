@@ -3,7 +3,20 @@
  * Amazon Simple Email Service for high-volume transactional email
  */
 
-const AWS = require('aws-sdk');
+let awsSdk = null;
+
+function getAwsSdk() {
+  if (awsSdk) {
+    return awsSdk;
+  }
+
+  try {
+    awsSdk = require('aws-sdk');
+    return awsSdk;
+  } catch (error) {
+    return null;
+  }
+}
 
 class AwsSesService {
   constructor(config = {}) {
@@ -12,6 +25,13 @@ class AwsSesService {
     this.region = config.region || process.env.AWS_REGION || 'us-east-1';
     this.fromEmail = config.fromEmail || process.env.AWS_SES_FROM_EMAIL || '';
     this.fromName = config.fromName || process.env.AWS_SES_FROM_NAME || '';
+
+    const AWS = getAwsSdk();
+
+    if (!AWS) {
+      this.ses = null;
+      return;
+    }
 
     AWS.config.update({
       accessKeyId: this.accessKeyId,
@@ -22,7 +42,18 @@ class AwsSesService {
     this.ses = new AWS.SES({ apiVersion: '2010-12-01' });
   }
 
+  isConfigured() {
+    return Boolean(this.ses);
+  }
+
   async sendEmail(to, subject, html, text = '') {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'AWS SES SDK is not installed',
+      };
+    }
+
     try {
       const params = {
         Source: `${this.fromName} <${this.fromEmail}>`,
@@ -63,6 +94,13 @@ class AwsSesService {
   }
 
   async sendTemplate(to, templateName, templateData = {}) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'AWS SES SDK is not installed',
+      };
+    }
+
     try {
       const params = {
         Source: `${this.fromName} <${this.fromEmail}>`,
@@ -89,6 +127,13 @@ class AwsSesService {
   }
 
   async getSendQuota() {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'AWS SES SDK is not installed',
+      };
+    }
+
     try {
       const result = await this.ses.getSendQuota().promise();
 
@@ -107,6 +152,13 @@ class AwsSesService {
   }
 
   async verifyEmail(email) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'AWS SES SDK is not installed',
+      };
+    }
+
     try {
       const params = {
         EmailAddress: email,

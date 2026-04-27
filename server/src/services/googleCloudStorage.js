@@ -3,7 +3,20 @@
  * Alternative backup and file storage solution
  */
 
-const { Storage } = require('@google-cloud/storage');
+let storageFactory = null;
+
+function getStorageFactory() {
+  if (storageFactory) {
+    return storageFactory;
+  }
+
+  try {
+    storageFactory = require('@google-cloud/storage').Storage;
+    return storageFactory;
+  } catch (error) {
+    return null;
+  }
+}
 
 class GoogleCloudStorageService {
   constructor(config = {}) {
@@ -19,11 +32,30 @@ class GoogleCloudStorageService {
       storageConfig.keyFilename = this.keyFilename;
     }
 
+    const Storage = getStorageFactory();
+
+    if (!Storage) {
+      this.storage = null;
+      this.bucket = null;
+      return;
+    }
+
     this.storage = new Storage(storageConfig);
     this.bucket = this.storage.bucket(this.bucketName);
   }
 
+  isConfigured() {
+    return Boolean(this.bucket);
+  }
+
   async uploadFile(filePath, destination, metadata = {}) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       await this.bucket.upload(filePath, {
         destination: destination,
@@ -50,6 +82,13 @@ class GoogleCloudStorageService {
   }
 
   async uploadBuffer(buffer, destination, metadata = {}) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const file = this.bucket.file(destination);
       const stream = file.createWriteStream({
@@ -95,6 +134,13 @@ class GoogleCloudStorageService {
   }
 
   async downloadFile(source, destination) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       await this.bucket.file(source).download({
         destination: destination,
@@ -114,6 +160,13 @@ class GoogleCloudStorageService {
   }
 
   async downloadFileAsBuffer(source) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const [file] = await this.bucket.file(source).download();
       
@@ -131,6 +184,13 @@ class GoogleCloudStorageService {
   }
 
   async deleteFile(filename) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       await this.bucket.file(filename).delete();
 
@@ -148,6 +208,13 @@ class GoogleCloudStorageService {
   }
 
   async listFiles(prefix = '', maxResults = 100) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const [files] = await this.bucket.getFiles({
         prefix: prefix,
@@ -176,6 +243,13 @@ class GoogleCloudStorageService {
   }
 
   async getFileMetadata(filename) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const [metadata] = await this.bucket.file(filename).getMetadata();
 
@@ -198,6 +272,13 @@ class GoogleCloudStorageService {
   }
 
   async generateSignedUrl(filename, expiresIn = 3600) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const [url] = await this.bucket.file(filename).getSignedUrl({
         action: 'read',
@@ -219,6 +300,13 @@ class GoogleCloudStorageService {
   }
 
   async copyFile(source, destination) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       await this.bucket.file(source).copy(this.bucket.file(destination));
 
@@ -236,6 +324,13 @@ class GoogleCloudStorageService {
   }
 
   async backupDatabase(sqlDumpPath, backupName) {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const destination = `backups/${backupName}-${Date.now()}.sql`;
       const result = await this.uploadFile(sqlDumpPath, destination, {
@@ -253,6 +348,13 @@ class GoogleCloudStorageService {
   }
 
   async listBackups() {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        message: 'Google Cloud Storage SDK is not installed',
+      };
+    }
+
     try {
       const result = await this.listFiles('backups/', 1000);
       

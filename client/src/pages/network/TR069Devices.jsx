@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Router, Plus, Edit, Trash2, RefreshCw, Power, Settings,
-  AlertCircle, CheckCircle, Clock, Wifi, Monitor, Chip
+  CheckCircle
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
