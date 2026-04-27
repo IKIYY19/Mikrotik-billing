@@ -31,6 +31,7 @@ export function SMSPage() {
     { id: 'smsleopard', name: 'SMSLeopard' },
     { id: 'bulksms_kenya', name: 'BulkSMS Kenya' },
     { id: 'nexmo', name: 'Nexmo (Vonage)' },
+    { id: 'twilio', name: 'Twilio' },
   ];
 
   useEffect(() => {
