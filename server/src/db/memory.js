@@ -312,6 +312,19 @@ module.exports = {
         lan_interface: params[8],
         provision_token: params[9],
         provision_status: params[10],
+        dns_servers: params[11],
+        ntp_servers: params[12],
+        radius_server: params[13],
+        radius_secret: params[14],
+        radius_port: params[15],
+        hotspot_enabled: params[16],
+        pppoe_enabled: params[17],
+        pppoe_interface: params[18],
+        pppoe_service_name: params[19],
+        mgmt_port: params[20],
+        notes: params[21],
+        provision_attempts: 0,
+        last_provisioned_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -326,9 +339,28 @@ module.exports = {
       const router = { ...store.routers[idx], updated_at: new Date().toISOString() };
       // Handle various SET patterns
       if (lowerText.includes('name =')) router.name = params[0];
-      if (lowerText.includes('provision_status =')) router.provision_status = params[0];
+      if (lowerText.includes('identity =')) router.identity = params[1];
+      if (lowerText.includes('model =')) router.model = params[2];
+      if (lowerText.includes('mac_address =')) router.mac_address = params[3];
+      if (lowerText.includes('ip_address =')) router.ip_address = params[4];
+      if (lowerText.includes('wan_interface =')) router.wan_interface = params[5];
+      if (lowerText.includes('lan_interface =')) router.lan_interface = params[6];
+      if (lowerText.includes('dns_servers =')) router.dns_servers = params[7];
+      if (lowerText.includes('ntp_servers =')) router.ntp_servers = params[8];
+      if (lowerText.includes('radius_server =')) router.radius_server = params[9];
+      if (lowerText.includes('radius_secret =')) router.radius_secret = params[10];
+      if (lowerText.includes('radius_port =')) router.radius_port = params[11];
+      if (lowerText.includes('hotspot_enabled =')) router.hotspot_enabled = params[12];
+      if (lowerText.includes('pppoe_enabled =')) router.pppoe_enabled = params[13];
+      if (lowerText.includes('pppoe_interface =')) router.pppoe_interface = params[14];
+      if (lowerText.includes('pppoe_service_name =')) router.pppoe_service_name = params[15];
+      if (lowerText.includes('mgmt_port =')) router.mgmt_port = params[16];
+      if (lowerText.includes('notes =')) router.notes = params[17];
       if (lowerText.includes('provision_token =')) router.provision_token = params[0];
-      if (lowerText.includes('last_provisioned_at =')) router.last_provisioned_at = params[0];
+      if (lowerText.includes('provision_status =')) router.provision_status = params[0];
+      if (lowerText.includes('last_provisioned_at = current_timestamp')) router.last_provisioned_at = new Date().toISOString();
+      if (lowerText.includes('provision_attempts = coalesce(provision_attempts, 0) + 1')) router.provision_attempts = (router.provision_attempts || 0) + 1;
+      if (lowerText.includes('last_provisioned_at =') && !lowerText.includes('current_timestamp')) router.last_provisioned_at = params[0];
       store.routers[idx] = router;
       return { rows: [router] };
     }
@@ -339,6 +371,46 @@ module.exports = {
       if (idx === -1) return { rows: [] };
       const deleted = store.routers.splice(idx, 1)[0];
       return { rows: [deleted] };
+    }
+
+    // SELECT provision logs
+    if (lowerText.includes('select') && lowerText.includes('from provision_logs')) {
+      let rows = [...store.provision_logs];
+      if (lowerText.includes('where router_id =')) {
+        rows = rows.filter((log) => log.router_id === params[0]);
+      }
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      return { rows };
+    }
+
+    // INSERT provision logs
+    if (lowerText.includes('insert into provision_logs')) {
+      const log = {
+        id: params[0],
+        token: params[1],
+        router_id: params[2],
+        ip_address: params[3],
+        user_agent: params[4],
+        action: params[5],
+        status: params[6],
+        details: params[7],
+        created_at: new Date().toISOString(),
+      };
+      store.provision_logs.push(log);
+      return { rows: [log] };
+    }
+
+    // INSERT provision events
+    if (lowerText.includes('insert into provision_events')) {
+      const event = {
+        id: params[0],
+        router_id: params[1],
+        event_type: params[2],
+        script_content: params[3],
+        created_at: new Date().toISOString(),
+      };
+      store.provision_events.push(event);
+      return { rows: [event] };
     }
 
     // SELECT project_modules

@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const provisionStore = require('../db/provisionStore');
+const memoryDb = require('../db/memory');
 
-const db = provisionStore;
+function getDb() {
+  return global.db || memoryDb;
+}
 
 // GET all devices
 router.get('/', async (req, res) => {
@@ -11,9 +14,9 @@ router.get('/', async (req, res) => {
     const { project_id } = req.query;
     let result;
     if (project_id) {
-      result = await db.query('SELECT * FROM routers WHERE project_id = $1 ORDER BY created_at DESC', [project_id]);
+      result = await getDb().query('SELECT * FROM routers WHERE project_id = $1 ORDER BY created_at DESC', [project_id]);
     } else {
-      result = await db.query('SELECT * FROM routers ORDER BY created_at DESC', []);
+      result = await getDb().query('SELECT * FROM routers ORDER BY created_at DESC', []);
     }
     res.json(result.rows);
   } catch (error) {
@@ -24,7 +27,7 @@ router.get('/', async (req, res) => {
 // GET single device
 router.get('/:id', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
+    const result = await getDb().query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
     res.json(result.rows[0]);
   } catch (error) {
@@ -35,7 +38,7 @@ router.get('/:id', async (req, res) => {
 // GET device provision logs
 router.get('/:id/logs', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM provision_logs WHERE router_id = $1 ORDER BY created_at DESC LIMIT 50', [req.params.id]);
+    const result = await getDb().query('SELECT * FROM provision_logs WHERE router_id = $1 ORDER BY created_at DESC LIMIT 50', [req.params.id]);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -45,9 +48,10 @@ router.get('/:id/logs', async (req, res) => {
 // GET provision script preview
 router.get('/:id/script', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
+    const result = await getDb().query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
-    const script = provisionStore.generateProvisionScript(result.rows[0]);
+    const baseUrl = process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`;
+    const script = provisionStore.generateProvisionScript(result.rows[0], { callbackBaseUrl: baseUrl });
     res.json({ script });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -68,7 +72,7 @@ router.post('/', async (req, res) => {
     const id = uuidv4();
     const token = provisionStore.generateToken();
 
-    const result = await db.query(
+    const result = await getDb().query(
       `INSERT INTO routers (id, project_id, name, identity, model, mac_address, ip_address,
        wan_interface, lan_interface, provision_token, provision_status,
        dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
@@ -101,11 +105,11 @@ router.put('/:id', async (req, res) => {
       mgmt_port, notes,
     } = req.body;
 
-    const existing = await db.query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
+    const existing = await getDb().query('SELECT * FROM routers WHERE id = $1', [req.params.id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
 
     const r = existing.rows[0];
-    const result = await db.query(
+    const result = await getDb().query(
       `UPDATE routers SET
         name = COALESCE($1, name), identity = COALESCE($2, identity),
         model = COALESCE($3, model), mac_address = COALESCE($4, mac_address),
@@ -140,9 +144,18 @@ router.put('/:id', async (req, res) => {
 // REGENERATE token
 router.post('/:id/regenerate-token', async (req, res) => {
   try {
-    const router = provisionStore._regenerateToken(req.params.id);
-    if (!router) return res.status(404).json({ error: 'Device not found' });
-    res.json({ id: router.id, provision_token: router.provision_token, provision_status: router.provision_status });
+    const token = provisionStore.generateToken();
+    const result = await getDb().query(
+      `UPDATE routers
+       SET provision_token = $1,
+           provision_status = $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING id, provision_token, provision_status`,
+      [token, 'pending', req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -151,7 +164,7 @@ router.post('/:id/regenerate-token', async (req, res) => {
 // DELETE device
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await db.query('DELETE FROM routers WHERE id = $1 RETURNING id', [req.params.id]);
+    const result = await getDb().query('DELETE FROM routers WHERE id = $1 RETURNING id', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
     res.json({ message: 'Device deleted' });
   } catch (error) {

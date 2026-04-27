@@ -17,6 +17,36 @@ function generateToken() {
   return `prov-${crypto.randomBytes(24).toString('hex')}`;
 }
 
+function escapeRouterValue(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"');
+}
+
+function buildFetchCommand(url, destination, keepResult = true) {
+  const safeUrl = escapeRouterValue(url);
+  const parts = ['/tool fetch'];
+
+  if (/^https:/i.test(url)) {
+    parts.push('mode=https');
+    parts.push('check-certificate=no');
+  } else {
+    parts.push('mode=http');
+  }
+
+  parts.push(`url="${safeUrl}"`);
+
+  if (destination) {
+    parts.push(`dst-path=${destination}`);
+  }
+
+  if (!keepResult) {
+    parts.push('keep-result=no');
+  }
+
+  return parts.join(' ');
+}
+
 function logProvision(store, token, routerId, action, status, details, ip, ua) {
   store.provision_logs.push({
     id: uuidv4(),
@@ -31,7 +61,7 @@ function logProvision(store, token, routerId, action, status, details, ip, ua) {
   });
 }
 
-function generateProvisionScript(router) {
+function generateProvisionScript(router, options = {}) {
   const lines = [];
   const wanIface = router.wan_interface || 'ether1';
   const lanBridge = router.lan_interface || 'bridge1';
@@ -51,14 +81,9 @@ function generateProvisionScript(router) {
   lines.push('#############################################');
   lines.push('');
 
-  // Clear existing configuration (optional - safer for fresh setup)
-  lines.push('# Reset Factory Defaults (comment out to preserve existing config)');
-  lines.push('# /system reset-configuration no-defaults=yes skip-backup=yes');
-  lines.push('');
-
   // System Identity
   lines.push('# System Identity');
-  lines.push(`/system identity set name="${router.identity || router.name}"`);
+  lines.push(`/system identity set name="${escapeRouterValue(router.identity || router.name)}"`);
   lines.push('/system clock set time-zone-name=Africa/Nairobi');
   lines.push('');
 
@@ -150,7 +175,7 @@ function generateProvisionScript(router) {
   lines.push('# Forward Chain');
   lines.push('/ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="Forward established"');
   lines.push('/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"');
-  lines.push('/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"');
+  lines.push(`/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`);
   lines.push('/ip firewall filter add chain=forward action=drop comment="Drop all other forward"');
   lines.push('');
 
@@ -167,7 +192,7 @@ function generateProvisionScript(router) {
   // RADIUS Configuration
   if (router.radius_server && router.radius_secret) {
     lines.push('# RADIUS Configuration');
-    lines.push(`/radius add address=${router.radius_server} secret="${router.radius_secret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`);
+    lines.push(`/radius add address=${router.radius_server} secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`);
     lines.push('/ppp aaa set use-radius=yes accounting=yes');
     lines.push('/ip hotspot aaa set use-radius=yes accounting=yes');
     lines.push('');
@@ -182,7 +207,7 @@ function generateProvisionScript(router) {
     const pppoeGateway = router.pppoe_gateway || '10.10.0.1';
     const rateLimit = router.pppoe_rate_limit || '10M/10M';
 
-    lines.push(`/interface pppoe-server server add service-name="${serviceName}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`);
+    lines.push(`/interface pppoe-server server add service-name="${escapeRouterValue(serviceName)}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`);
     lines.push('/ip pool add name=pppoe_pool ranges=' + pppoePool);
     lines.push(`/ppp profile add name=pppoe_default local-address=${pppoeGateway} remote-address=pppoe_pool rate-limit=${rateLimit} change-tcp-mss=yes comment="Auto PPPoE Profile"`);
     lines.push('/ppp profile set default use-compression=yes use-encryption=yes');
@@ -235,16 +260,13 @@ function generateProvisionScript(router) {
   }
 
   // Security Hardening
-  lines.push('# Security Hardening');
+  lines.push('# Management Services');
+  lines.push('# Review and apply these manually after first successful provisioning if needed.');
   lines.push('/ip service set telnet disabled=yes');
   lines.push('/ip service set ftp disabled=yes');
   lines.push('/ip service set www disabled=yes');
-  lines.push('/ip service set api disabled=yes');
-  lines.push('/ip service set api-ssl disabled=no port=8729');
-  lines.push('/ip service set ssh disabled=yes port=2222');
-  lines.push('/ip service set winbox disabled=no port=8291');
   lines.push('/ip ssh set strong-crypto=yes');
-  lines.push('/user set admin password="CHANGE_ME_NOW"');
+  lines.push(`# Recommended API port: ${router.mgmt_port || 8728}`);
   lines.push('');
 
   // SNMP (if configured)
@@ -264,8 +286,12 @@ function generateProvisionScript(router) {
 
   // Callback to provisioning server
   lines.push('# Callback to Provisioning Server');
-  const callbackUrl = router.callback_url || 'https://billing.giraffenetworks.online';
-  lines.push(`/tool fetch mode=https url="${callbackUrl}/mikrotik/provision/callback/${router.provision_token}" keep-result=no`);
+  const callbackBaseUrl = options.callbackBaseUrl || router.callback_url || process.env.PUBLIC_APP_URL || '';
+  if (callbackBaseUrl) {
+    lines.push(buildFetchCommand(`${callbackBaseUrl.replace(/\/$/, '')}/mikrotik/provision/callback/${router.provision_token}`, null, false));
+  } else {
+    lines.push('# Callback URL not configured. Set PUBLIC_APP_URL or provide a callback base URL from the server.');
+  }
   lines.push('');
 
   // Success Message
@@ -275,7 +301,7 @@ function generateProvisionScript(router) {
 
   lines.push('#############################################');
   lines.push('# End of Auto-Provisioning Script');
-  lines.push('# Please change default admin password immediately');
+  lines.push('# Review management services and firewall policy before using this on public WAN links');
   lines.push('#############################################');
 
   return lines.join('\n');
@@ -286,6 +312,7 @@ module.exports = {
   generateToken,
   logProvision,
   generateProvisionScript,
+  buildFetchCommand,
 
   _updateRouterStatus(routerId, status) {
     const router = store.routers.find(r => r.id === routerId);
