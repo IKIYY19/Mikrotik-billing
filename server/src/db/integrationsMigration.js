@@ -6,24 +6,11 @@
 const db = require('./index');
 
 const integrationsMigration = `
-CREATE TABLE IF NOT EXISTS integrations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  service_name VARCHAR(100) NOT NULL UNIQUE,
-  display_name VARCHAR(100) NOT NULL,
-  category VARCHAR(50) NOT NULL,
-  config_data JSONB DEFAULT '{}',
-  is_active BOOLEAN DEFAULT false,
-  last_tested TIMESTAMP,
-  last_test_status VARCHAR(50),
-  last_test_message TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT valid_category CHECK (category IN ('sms', 'payment', 'messaging', 'email', 'storage', 'monitoring', 'communication'))
-);
+-- Drop and recreate the constraint to include 'communication' category
+ALTER TABLE integrations DROP CONSTRAINT IF EXISTS valid_category;
 
-CREATE INDEX IF NOT EXISTS idx_integrations_service ON integrations(service_name);
-CREATE INDEX IF NOT EXISTS idx_integrations_category ON integrations(category);
-CREATE INDEX IF NOT EXISTS idx_integrations_active ON integrations(is_active);
+ALTER TABLE integrations ADD CONSTRAINT valid_category 
+  CHECK (category IN ('sms', 'payment', 'messaging', 'email', 'storage', 'monitoring', 'communication'));
 
 -- Insert default integration templates
 INSERT INTO integrations (service_name, display_name, category, config_data) VALUES
