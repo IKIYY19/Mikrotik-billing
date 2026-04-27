@@ -100,6 +100,14 @@ function applySecurityHeaders(req, res, next) {
 }
 
 async function initDB() {
+  if (isTestEnv) {
+    db = require('./db/memory');
+    billingRepo = require('./db/billingStore');
+    dbAvailable = false;
+    logger.info('Using in-memory database in test environment');
+    return false;
+  }
+
   try {
     const pgDb = require('./db');
     await pgDb.query('SELECT 1');
