@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = global.db || require('../db/memory');
 const { v4: uuidv4 } = require('uuid');
+const billing = require('../services/billingData');
 
 // Simple encryption for demo - use proper encryption in production
 const crypto = require('crypto');
@@ -26,6 +27,27 @@ function decrypt(encryptedText) {
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
+}
+
+function toSafeConnection(connection) {
+  if (!connection) return null;
+  return {
+    id: connection.id,
+    name: connection.name,
+    ip_address: connection.ip_address,
+    api_port: connection.api_port,
+    ssh_port: connection.ssh_port,
+    username: connection.username,
+    connection_type: connection.connection_type,
+    use_tunnel: connection.use_tunnel,
+    tunnel_host: connection.tunnel_host,
+    tunnel_port: connection.tunnel_port,
+    tunnel_username: connection.tunnel_username,
+    is_online: connection.is_online,
+    last_seen: connection.last_seen,
+    created_at: connection.created_at,
+    updated_at: connection.updated_at,
+  };
 }
 
 // Get all connections
@@ -53,6 +75,76 @@ router.post('/', async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update connection
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      ip_address,
+      api_port,
+      ssh_port,
+      username,
+      password,
+      connection_type,
+      use_tunnel,
+      tunnel_host,
+      tunnel_port,
+      tunnel_username,
+      tunnel_password,
+    } = req.body;
+
+    const existingResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+
+    const existing = existingResult.rows[0];
+    const passwordEncrypted = password ? encrypt(password) : existing.password_encrypted;
+    const tunnelPasswordEncrypted = tunnel_password
+      ? encrypt(tunnel_password)
+      : (use_tunnel ? existing.tunnel_password_encrypted : null);
+
+    const result = await db.query(
+      `UPDATE mikrotik_connections
+       SET name = $1,
+           ip_address = $2,
+           api_port = $3,
+           ssh_port = $4,
+           username = $5,
+           password_encrypted = $6,
+           connection_type = $7,
+           use_tunnel = $8,
+           tunnel_host = $9,
+           tunnel_port = $10,
+           tunnel_username = $11,
+           tunnel_password_encrypted = $12,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $13
+       RETURNING id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, is_online, last_seen, created_at, updated_at`,
+      [
+        name || existing.name,
+        ip_address || existing.ip_address,
+        api_port || existing.api_port,
+        ssh_port || existing.ssh_port || 22,
+        username || existing.username,
+        passwordEncrypted,
+        connection_type || existing.connection_type || 'api',
+        use_tunnel === undefined ? existing.use_tunnel : use_tunnel,
+        use_tunnel === false ? null : (tunnel_host ?? existing.tunnel_host),
+        use_tunnel === false ? 22 : (tunnel_port || existing.tunnel_port || 22),
+        use_tunnel === false ? null : (tunnel_username ?? existing.tunnel_username),
+        tunnelPasswordEncrypted,
+        id,
+      ]
+    );
+
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -399,10 +491,14 @@ router.get('/:id/hotspot-users', async (req, res) => {
 router.post('/:id/import-users', async (req, res) => {
   try {
     const { id } = req.params;
-    const { users, userType } = req.body; // userType: 'ppp' or 'hotspot'
+    const { users, userType, plan_id, billing_cycle = 'monthly' } = req.body; // userType: 'ppp' or 'hotspot'
     
     if (!users || !Array.isArray(users)) {
       return res.status(400).json({ error: 'users array is required' });
+    }
+
+    if (userType === 'ppp' && !plan_id) {
+      return res.status(400).json({ error: 'plan_id is required when importing PPP users into billing subscriptions' });
     }
     
     const connectionResult = await db.query(
@@ -416,32 +512,52 @@ router.post('/:id/import-users', async (req, res) => {
     
     const imported = [];
     const errors = [];
+    const existingSubscriptions = await billing.listSubscriptions();
+    const plan = plan_id ? await billing.getPlanById(plan_id) : null;
     
     for (const user of users) {
       try {
-        // Check if user already exists by email (using username as email)
-        const existingUser = await db.query(
-          'SELECT id FROM users WHERE email = $1',
-          [user.name]
+        const duplicateSub = existingSubscriptions.find((sub) =>
+          sub.mikrotik_connection_id === id && sub.pppoe_username === user.name
         );
-        
-        if (existingUser.rows.length > 0) {
-          errors.push({ user: user.name, error: 'User already exists' });
+
+        if (duplicateSub) {
+          errors.push({ user: user.name, error: 'Billing subscription already exists for this router user' });
           continue;
         }
-        
-        // Create new customer
-        const userId = uuidv4();
-        const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash(user.name + '123', 10); // Default password
-        
-        await db.query(
-          `INSERT INTO users (id, email, name, password, role, is_active, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
-          [userId, user.name, user.comment || user.name, hashedPassword, 'customer', true]
-        );
-        
-        imported.push({ id: userId, name: user.name, email: user.name });
+
+        const customer = await billing.createCustomer({
+          name: user.comment || user.name,
+          email: '',
+          phone: '',
+          status: normalizeDisabled(user.disabled) ? 'inactive' : 'active',
+          notes: `Imported from MikroTik ${userType} user on ${connectionResult.rows[0].name}`,
+        });
+
+        let subscription = null;
+        if (userType === 'ppp') {
+          subscription = await billing.createSubscription({
+            customer_id: customer.id,
+            plan_id,
+            router_id: null,
+            mikrotik_connection_id: id,
+            pppoe_username: user.name,
+            pppoe_password: '',
+            pppoe_profile: user.profile || '',
+            status: normalizeDisabled(user.disabled) ? 'suspended' : 'active',
+            billing_cycle,
+            auto_provision: true,
+          });
+        }
+
+        imported.push({
+          customer_id: customer.id,
+          customer_name: customer.name,
+          subscription_id: subscription?.id || null,
+          username: user.name,
+          plan_name: plan?.name || null,
+          type: userType,
+        });
       } catch (error) {
         errors.push({ user: user.name, error: error.message });
       }
@@ -458,5 +574,9 @@ router.post('/:id/import-users', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+function normalizeDisabled(value) {
+  return value === true || value === 'true' || value === 'yes';
+}
 
 module.exports = router;

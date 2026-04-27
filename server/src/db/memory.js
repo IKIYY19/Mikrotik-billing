@@ -499,6 +499,46 @@ module.exports = {
       return { rows: [safeConn] };
     }
 
+    // UPDATE mikrotik_connections
+    if (lowerText.includes('update mikrotik_connections')) {
+      const id = params[12];
+      const conn = store.mikrotik_connections.find(c => c.id === id);
+      if (!conn) return { rows: [] };
+      conn.name = params[0];
+      conn.ip_address = params[1];
+      conn.api_port = params[2];
+      conn.ssh_port = params[3];
+      conn.username = params[4];
+      conn.password_encrypted = params[5];
+      conn.connection_type = params[6];
+      conn.use_tunnel = params[7];
+      conn.tunnel_host = params[8];
+      conn.tunnel_port = params[9];
+      conn.tunnel_username = params[10];
+      conn.tunnel_password_encrypted = params[11];
+      conn.updated_at = new Date().toISOString();
+
+      return {
+        rows: [{
+          id: conn.id,
+          name: conn.name,
+          ip_address: conn.ip_address,
+          api_port: conn.api_port,
+          ssh_port: conn.ssh_port,
+          username: conn.username,
+          connection_type: conn.connection_type,
+          use_tunnel: conn.use_tunnel,
+          tunnel_host: conn.tunnel_host,
+          tunnel_port: conn.tunnel_port,
+          tunnel_username: conn.tunnel_username,
+          is_online: conn.is_online || false,
+          last_seen: conn.last_seen || null,
+          created_at: conn.created_at,
+          updated_at: conn.updated_at,
+        }]
+      };
+    }
+
     // DELETE mikrotik_connections
     if (lowerText.includes('delete from mikrotik_connections')) {
       const idx = store.mikrotik_connections.findIndex(c => c.id === params[0]);
