@@ -65,10 +65,15 @@ function ensureCriticalProductionConfig() {
   }
 
   const missing = [];
-  if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
   if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
   if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
   if (!process.env.CORS_ORIGIN) missing.push('CORS_ORIGIN');
+
+  // DATABASE_URL is optional - if not provided, app will use in-memory storage
+  // This allows deployments without a database (for testing/demo purposes)
+  if (!process.env.DATABASE_URL) {
+    logger.warn('DATABASE_URL not set - using in-memory storage (not recommended for production)');
+  }
 
   if (missing.length > 0) {
     throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
