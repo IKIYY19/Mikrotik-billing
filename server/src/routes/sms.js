@@ -332,13 +332,37 @@ router.get('/balance', async (req, res) => {
   }
 });
 
-router.get('/settings', (req, res) => {
-  res.json({
-    username: process.env.AT_USERNAME || (isProductionEnv ? null : 'sandbox'),
-    sender_id: process.env.AT_SENDER_ID || 'MyISP',
-    is_configured: !!process.env.AT_API_KEY,
-    company: getCompanyInfo(),
-  });
+router.get('/settings', async (req, res) => {
+  try {
+    // Check if any SMS integration is configured in the database
+    let isConfigured = false;
+    let configuredProvider = null;
+    
+    if (global.db) {
+      const providers = ['africas_talking', 'smsleopard', 'bulksms_kenya', 'nexmo', 'twilio'];
+      for (const provider of providers) {
+        const result = await global.db.query(
+          'SELECT is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
+          [provider]
+        );
+        if (result.rows.length > 0) {
+          isConfigured = true;
+          configuredProvider = provider;
+          break;
+        }
+      }
+    }
+    
+    res.json({
+      username: process.env.AT_USERNAME || (isProductionEnv ? null : 'sandbox'),
+      sender_id: process.env.AT_SENDER_ID || 'MyISP',
+      is_configured: isConfigured,
+      configured_provider: configuredProvider,
+      company: getCompanyInfo(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════
