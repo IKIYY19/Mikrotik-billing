@@ -14,6 +14,7 @@ export function SMSPage() {
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState({});
   const [balance, setBalance] = useState(null);
+  const [selectedProvider, setSelectedProvider] = useState('africas_talking');
 
   // Send form
   const [sendTo, setSendTo] = useState('');
@@ -24,6 +25,13 @@ export function SMSPage() {
 
   // Template editing
   const [editingTemplate, setEditingTemplate] = useState(null);
+
+  const providers = [
+    { id: 'africas_talking', name: "Africa's Talking" },
+    { id: 'smsleopard', name: 'SMSLeopard' },
+    { id: 'bulksms_kenya', name: 'BulkSMS Kenya' },
+    { id: 'nexmo', name: 'Nexmo (Vonage)' },
+  ];
 
   useEffect(() => {
     fetchTemplates();
@@ -62,9 +70,10 @@ export function SMSPage() {
           template_id: sendTemplate,
           to: sendTo,
           variables: { customer_name: 'Test', invoice_number: 'INV-TEST', amount: '100', due_date: '2026-05-01' },
+          provider: selectedProvider,
         });
       } else {
-        result = await axios.post(`${API}/sms/send`, { to: sendTo, message: customMessage });
+        result = await axios.post(`${API}/sms/send`, { to: sendTo, message: customMessage, provider: selectedProvider });
       }
       setSendResult(result.data);
       fetchLogs();
@@ -89,7 +98,7 @@ export function SMSPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-white gradient-text">SMS Notifications</h2>
-          <p className="text-sm text-slate-400">Africa's Talking Integration</p>
+          <p className="text-sm text-slate-400">Multiple SMS Providers Supported</p>
         </div>
         <div className="flex items-center gap-4">
           {balance && (
@@ -129,6 +138,18 @@ export function SMSPage() {
       {/* Send SMS Tab */}
       {activeTab === 'send' && (
         <Card className="card-gradient p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">SMS Provider</label>
+            <select
+              value={selectedProvider}
+              onChange={e => setSelectedProvider(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+            >
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm text-slate-400 mb-1">Phone Number</label>
             <input
