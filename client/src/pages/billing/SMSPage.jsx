@@ -38,6 +38,7 @@ export function SMSPage() {
     { id: 'bulksms_kenya', name: 'BulkSMS Kenya' },
     { id: 'nexmo', name: 'Nexmo (Vonage)' },
     { id: 'twilio', name: 'Twilio' },
+    { id: 'whatsapp', name: 'WhatsApp' },
   ];
 
   useEffect(() => {
@@ -109,6 +110,27 @@ export function SMSPage() {
       setBulkResult({ success: false, message: e.response?.data?.error || e.message });
     }
     setSendingBulk(false);
+  };
+
+  const handleDeleteLog = async (id) => {
+    try {
+      await axios.delete(`${API}/sms/logs/${id}`);
+      toast.success('Log deleted');
+      fetchLogs();
+    } catch (e) {
+      toast.error('Failed to delete log', e.response?.data?.error || e.message);
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    if (!confirm('Are you sure you want to delete all SMS logs? This cannot be undone.')) return;
+    try {
+      await axios.delete(`${API}/sms/logs`);
+      toast.success('All logs cleared');
+      fetchLogs();
+    } catch (e) {
+      toast.error('Failed to clear logs', e.response?.data?.error || e.message);
+    }
   };
 
   const handleSaveTemplate = async (template) => {
@@ -351,6 +373,18 @@ export function SMSPage() {
       {/* Logs Tab */}
       {activeTab === 'logs' && (
         <Card className="card-gradient overflow-hidden">
+          <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
+            <h3 className="text-white font-semibold">SMS Logs</h3>
+            {logs.length > 0 && (
+              <Button
+                onClick={handleClearAllLogs}
+                variant="outline"
+                className="text-red-400 border-red-400/30 hover:bg-red-400/10 text-sm"
+              >
+                Clear All Logs
+              </Button>
+            )}
+          </div>
           {logs.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No SMS sent yet</div>
           ) : (
@@ -362,6 +396,7 @@ export function SMSPage() {
                   <th className="text-left p-3">Message</th>
                   <th className="text-left p-3">Status</th>
                   <th className="text-left p-3">Cost</th>
+                  <th className="text-left p-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -377,6 +412,14 @@ export function SMSPage() {
                       </span>
                     </td>
                     <td className="p-3 text-slate-400 text-xs">{log.cost || '-'}</td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => handleDeleteLog(log.id)}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
