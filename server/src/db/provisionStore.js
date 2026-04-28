@@ -127,7 +127,7 @@ function generateProvisionScript(router, options = {}) {
   lines.push(":local wanIfaceExists ([:len $wanIfaceFound] > 0);");
   lines.push(":if ($wanIfaceExists) do={");
   lines.push(
-    '  :local wanRunning [/interface get [find name=\\"${wanIface}\\"] running];',
+    `  :local wanRunning [/interface get [find name="${wanIface}"] running];`,
   );
   lines.push(
     `  /log info message="[ZTP] WAN interface ${wanIface} exists (running=$wanRunning)";`,
