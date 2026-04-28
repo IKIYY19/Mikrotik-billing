@@ -148,12 +148,24 @@ function generateProvisionScript(router, options = {}) {
 
   // Logging
   lines.push("# Logging Configuration");
-  lines.push("/system logging set 0 action=memory topics=info");
-  lines.push("/system logging set 1 action=memory topics=warning");
-  lines.push("/system logging set 2 action=memory topics=error");
-  lines.push("/system logging set 3 action=memory topics=critical");
-  lines.push("/system logging set 4 action=disk topics=account");
-  lines.push("/system logging set 5 action=disk topics=firewall");
+  lines.push(
+    ":do { /system logging set 0 action=memory topics=info } on-error={}",
+  );
+  lines.push(
+    ":do { /system logging set 1 action=memory topics=warning } on-error={}",
+  );
+  lines.push(
+    ":do { /system logging set 2 action=memory topics=error } on-error={}",
+  );
+  lines.push(
+    ":do { /system logging set 3 action=memory topics=critical } on-error={}",
+  );
+  lines.push(
+    ":do { /system logging set 4 action=disk topics=account } on-error={}",
+  );
+  lines.push(
+    ":do { /system logging set 5 action=disk topics=firewall } on-error={}",
+  );
   lines.push("");
 
   // WAN Configuration
