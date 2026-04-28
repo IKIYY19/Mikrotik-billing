@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Router,
@@ -14,6 +14,14 @@ import {
   FileText,
   Zap,
   Link2,
+  CheckCircle,
+  Clock,
+  Wifi,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Radio,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import {
@@ -32,122 +40,260 @@ const API_URL = import.meta.env.VITE_API_URL || "/api";
 const getProvisionServerOrigin = () => {
   if (API_URL && API_URL !== "/api") {
     try {
-      const apiUrl = new URL(API_URL, window.location.origin);
-      return `${apiUrl.protocol}//${apiUrl.host}`;
+      const u = new URL(API_URL, window.location.origin);
+      return `${u.protocol}//${u.host}`;
     } catch (e) {
-      console.error("Invalid VITE_API_URL for provisioning:", e);
+      // fall through
     }
   }
-
-  if (window.location.port === "5173") {
-    return "http://localhost:5000";
-  }
-
+  if (window.location.port === "5173") return "http://localhost:5000";
   return window.location.origin;
 };
 
-const getProvisionCommandEndpoint = (deviceId) =>
-  `${getProvisionServerOrigin()}/mikrotik/provision/command/${deviceId}`;
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const EMPTY_FORM = {
+  name: "",
+  identity: "",
+  model: "",
+  dns_servers: ["8.8.8.8", "8.8.4.4"],
+  ntp_servers: ["pool.ntp.org"],
+  wan_interface: "ether1",
+  lan_interface: "bridge1",
+  lan_ports: ["ether2", "ether3", "ether4", "ether5"],
+  radius_server: "",
+  radius_secret: "",
+  hotspot_enabled: false,
+  pppoe_enabled: false,
+  pppoe_interface: "",
+  pppoe_service_name: "",
+  ip_address: "",
+  mgmt_port: 8728,
+  mgmt_username: "",
+  mgmt_password: "",
+  connection_type: "api",
+  notes: "",
+  radius_port: 1812,
+};
+
+const STATUS_COLORS = {
+  provisioned: "bg-green-600/20 text-green-400",
+  approved: "bg-blue-600/20 text-blue-400",
+  pending: "bg-amber-600/20 text-amber-400",
+  discovered: "bg-purple-600/20 text-purple-400",
+  default: "bg-zinc-700 text-zinc-300",
+};
+
+const statusColor = (s) => STATUS_COLORS[s] || STATUS_COLORS.default;
+
+// ─── main component ──────────────────────────────────────────────────────────
 
 export function Devices() {
+  // tabs
+  const [tab, setTab] = useState("enroll"); // enroll | discovered | managed
+
+  // provision URL
+  const [publicUrl, setPublicUrl] = useState(getProvisionServerOrigin());
+
+  // enrollment token flow
+  const [enrollToken, setEnrollToken] = useState(null);
+  const [enrollLoading, setEnrollLoading] = useState(false);
+  const [enrollCopied, setEnrollCopied] = useState(false);
+  const [enrollLabel, setEnrollLabel] = useState("");
+  const [enrollExpiry, setEnrollExpiry] = useState("24");
+
+  // discovered routers
+  const [discovered, setDiscovered] = useState([]);
+  const [discoveredLoading, setDiscoveredLoading] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null); // discovered router being approved
+  const [approveForm, setApproveForm] = useState({ ...EMPTY_FORM });
+  const [approveLoading, setApproveLoading] = useState(false);
+
+  // managed devices
   const [devices, setDevices] = useState([]);
-  const [showCreate, setShowCreate] = useState(false);
+  const [devLoading, setDevLoading] = useState(false);
+
+  // per-device provision command state
+  const [showCommand, setShowCommand] = useState(null);
+  const [commandLoading, setCommandLoading] = useState({});
+  const [provisionMethod, setProvisionMethod] = useState("script");
+  const [cmdCopied, setCmdCopied] = useState(false);
+  const [activationLoading, setActivationLoading] = useState({});
+
+  // script/logs modals
   const [showScript, setShowScript] = useState(null);
   const [showLogs, setShowLogs] = useState(null);
-  const [showCommand, setShowCommand] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [provisionMethod, setProvisionMethod] = useState("import");
-  const [commandLoading, setCommandLoading] = useState({});
-  const [activationLoading, setActivationLoading] = useState({});
+
+  // manual create modal
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ ...EMPTY_FORM });
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState(null);
-  const [publicProvisionUrl, setPublicProvisionUrl] = useState(
-    getProvisionServerOrigin(),
-  );
-  const [formData, setFormData] = useState({
-    name: "",
-    identity: "",
-    model: "",
-    dns_servers: ["8.8.8.8", "8.8.4.4"],
-    ntp_servers: ["pool.ntp.org"],
-    wan_interface: "ether1",
-    lan_interface: "bridge1",
-    lan_ports: ["ether2", "ether3", "ether4", "ether5"],
-    radius_server: "",
-    radius_secret: "",
-    hotspot_enabled: false,
-    pppoe_enabled: false,
-    ip_address: "",
-    mgmt_port: 8728,
-    mgmt_username: "",
-    mgmt_password: "",
-    connection_type: "api",
-    notes: "",
-  });
+  const [createLoading, setCreateLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDevices();
+  // ── fetchers ────────────────────────────────────────────────────────────
+
+  const fetchDiscovered = useCallback(async () => {
+    setDiscoveredLoading(true);
+    try {
+      const { data } = await axios.get(`${API_URL}/devices/discovered`);
+      setDiscovered(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    }
+    setDiscoveredLoading(false);
   }, []);
 
-  const fetchDevices = async () => {
-    setLoading(true);
+  const fetchDevices = useCallback(async () => {
+    setDevLoading(true);
     try {
       const { data } = await axios.get(`${API_URL}/devices`);
-      setDevices(data);
+      setDevices(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
-  };
+    setDevLoading(false);
+  }, []);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchDiscovered();
+    fetchDevices();
+  }, [fetchDiscovered, fetchDevices]);
+
+  // Auto-refresh discovered every 15 s so newly enrolled routers appear
+  useEffect(() => {
+    const id = setInterval(fetchDiscovered, 15000);
+    return () => clearInterval(id);
+  }, [fetchDiscovered]);
+
+  // ── enrollment token ─────────────────────────────────────────────────────
+
+  const generateEnrollmentToken = async () => {
+    setEnrollLoading(true);
     try {
-      await axios.post(`${API_URL}/devices`, formData);
-      setShowCreate(false);
-      setFormData({
-        name: "",
-        identity: "",
-        model: "",
-        dns_servers: ["8.8.8.8", "8.8.4.4"],
-        ntp_servers: ["pool.ntp.org"],
-        wan_interface: "ether1",
-        lan_interface: "bridge1",
-        lan_ports: ["ether2", "ether3", "ether4", "ether5"],
-        radius_server: "",
-        radius_secret: "",
-        hotspot_enabled: false,
-        pppoe_enabled: false,
-        ip_address: "",
-        mgmt_port: 8728,
-        mgmt_username: "",
-        mgmt_password: "",
-        connection_type: "api",
-        notes: "",
+      const { data } = await axios.post(`${API_URL}/devices/enrollment-token`, {
+        baseUrl: publicUrl.replace(/\/$/, ""),
+        expires_hours: Number(enrollExpiry) || 24,
+        label: enrollLabel,
       });
-      setScanResult(null);
-      fetchDevices();
+      setEnrollToken(data);
     } catch (e) {
-      console.error(e);
       window.alert(e.response?.data?.error || e.message);
     }
+    setEnrollLoading(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this device?")) return;
-    await axios.delete(`${API_URL}/devices/${id}`);
-    fetchDevices();
+  const copyEnroll = (text) => {
+    navigator.clipboard.writeText(text);
+    setEnrollCopied(true);
+    setTimeout(() => setEnrollCopied(false), 2500);
   };
 
-  const regenerateToken = async (id) => {
-    if (!window.confirm("Regenerate token? The old one will stop working."))
-      return;
-    await axios.post(`${API_URL}/devices/${id}/regenerate-token`);
-    setShowCommand((current) => (current?.id === id ? null : current));
-    setCopied(false);
-    fetchDevices();
+  // ── approval ─────────────────────────────────────────────────────────────
+
+  const openApproval = (router) => {
+    setApproveTarget(router);
+    setApproveForm({
+      ...EMPTY_FORM,
+      name:
+        router.identity ||
+        `${router.model || "MikroTik"} - ${router.primary_mac || router.source_ip || ""}`.trim(),
+      identity: router.identity || "",
+      model: router.model || "",
+      ip_address: router.source_ip || "",
+      wan_interface: router.suggested_wan_interface || "ether1",
+      lan_interface: router.suggested_lan_interface || "bridge1",
+      lan_ports:
+        Array.isArray(router.suggested_lan_ports) &&
+        router.suggested_lan_ports.length
+          ? router.suggested_lan_ports
+          : ["ether2", "ether3", "ether4", "ether5"],
+    });
+  };
+
+  const closeApproval = () => {
+    setApproveTarget(null);
+    setApproveForm({ ...EMPTY_FORM });
+  };
+
+  const submitApproval = async (e) => {
+    e.preventDefault();
+    setApproveLoading(true);
+    try {
+      await axios.post(
+        `${API_URL}/devices/discovered/${approveTarget.id}/approve`,
+        approveForm,
+      );
+      closeApproval();
+      fetchDiscovered();
+      fetchDevices();
+      setTab("managed");
+    } catch (e) {
+      window.alert(e.response?.data?.error || e.message);
+    }
+    setApproveLoading(false);
+  };
+
+  const toggleApproveLanPort = (portName) => {
+    setApproveForm((prev) => {
+      const current = prev.lan_ports || [];
+      return {
+        ...prev,
+        lan_ports: current.includes(portName)
+          ? current.filter((p) => p !== portName)
+          : [...current, portName],
+      };
+    });
+  };
+
+  // ── managed device actions ────────────────────────────────────────────────
+
+  const getProvisionCommand = async (
+    device,
+    method = "script",
+    regenerate = false,
+  ) => {
+    setProvisionMethod(method);
+    setCommandLoading((prev) => ({ ...prev, [device.id]: true }));
+    const serverUrl = publicUrl.replace(/\/$/, "");
+    const endpoint = `${getProvisionServerOrigin()}/mikrotik/provision/command/${device.id}`;
+
+    try {
+      const request = regenerate
+        ? axios.post(endpoint, { method, baseUrl: serverUrl })
+        : axios.get(endpoint, { params: { method, baseUrl: serverUrl } });
+
+      const { data } = await request;
+      setShowCommand({
+        ...device,
+        ...data,
+        provision_token: data.token,
+        method,
+      });
+      if (regenerate) fetchDevices();
+    } catch (e) {
+      const token = device.provision_token;
+      const scriptUrl = `${serverUrl}/mikrotik/provision/${token}`;
+      const fetchMode = scriptUrl.startsWith("https") ? "https" : "http";
+      let command = `/tool fetch mode=${fetchMode} url="${scriptUrl}" dst-path=provision.rsc; /import file-name=provision.rsc`;
+      setShowCommand({
+        ...device,
+        command,
+        copyText: command,
+        method,
+        serverUrl,
+        token,
+      });
+    } finally {
+      setCommandLoading((prev) => ({ ...prev, [device.id]: false }));
+    }
+  };
+
+  const copyCmd = (text) => {
+    navigator.clipboard.writeText(text);
+    setCmdCopied(true);
+    setTimeout(() => setCmdCopied(false), 2500);
   };
 
   const activateInBilling = async (device) => {
@@ -162,7 +308,6 @@ export function Devices() {
       );
       fetchDevices();
     } catch (e) {
-      console.error(e);
       window.alert(
         e.response?.data?.error || e.response?.data?.message || e.message,
       );
@@ -192,144 +337,33 @@ export function Devices() {
     }
   };
 
-  const scanRouter = async () => {
+  const regenerateToken = async (id) => {
     if (
-      !formData.ip_address ||
-      !formData.mgmt_username ||
-      !formData.mgmt_password
-    ) {
-      window.alert(
-        "Enter router IP/host, management username, and password before scanning.",
-      );
+      !window.confirm(
+        "Regenerate token? The existing command will stop working.",
+      )
+    )
       return;
-    }
-
-    setScanLoading(true);
-    try {
-      const { data } = await axios.post(`${API_URL}/devices/scan`, {
-        ip_address: formData.ip_address,
-        mgmt_port: formData.mgmt_port,
-        api_port: formData.mgmt_port,
-        username: formData.mgmt_username,
-        password: formData.mgmt_password,
-      });
-
-      setScanResult(data);
-      setFormData((prev) => ({
-        ...prev,
-        identity: data.identity || prev.identity,
-        model: data.model || prev.model,
-        wan_interface: data.suggested?.wan_interface || prev.wan_interface,
-        lan_interface: data.suggested?.lan_interface || prev.lan_interface,
-        lan_ports: data.suggested?.lan_ports?.length
-          ? data.suggested.lan_ports
-          : prev.lan_ports,
-        connection_type: "api",
-      }));
-    } catch (e) {
-      console.error(e);
-      window.alert(
-        e.response?.data?.message ||
-          e.response?.data?.error ||
-          "Router scan failed. If the router is remote, make sure the server can reach its public/VPN IP and API port.",
-      );
-    } finally {
-      setScanLoading(false);
-    }
+    await axios.post(`${API_URL}/devices/${id}/regenerate-token`);
+    setShowCommand((c) => (c?.id === id ? null : c));
+    fetchDevices();
   };
 
-  const toggleLanPort = (portName) => {
-    setFormData((prev) => {
-      const current = prev.lan_ports || [];
-      return {
-        ...prev,
-        lan_ports: current.includes(portName)
-          ? current.filter((port) => port !== portName)
-          : [...current, portName],
-      };
-    });
-  };
-
-  const getProvisionCommand = async (
-    device,
-    method = "import",
-    regenerate = false,
-  ) => {
-    setProvisionMethod(method);
-    setCommandLoading((prev) => ({ ...prev, [device.id]: true }));
-    const serverUrl = (
-      publicProvisionUrl || getProvisionServerOrigin()
-    ).replace(/\/$/, "");
-
-    try {
-      const request = regenerate
-        ? axios.post(getProvisionCommandEndpoint(device.id), {
-            method,
-            baseUrl: serverUrl,
-          })
-        : axios.get(getProvisionCommandEndpoint(device.id), {
-            params: { method, baseUrl: serverUrl },
-          });
-
-      const { data } = await request;
-      setShowCommand({
-        ...device,
-        ...data,
-        provision_token: data.token,
-        method,
-      });
-      if (regenerate) {
-        fetchDevices();
-      }
-    } catch (e) {
-      console.error(e);
-      // Fallback to manual command without regenerating the token
-      const token = device.provision_token;
-      const scriptUrl = `${serverUrl}/mikrotik/provision/${token}`;
-      const fetchMode = scriptUrl.startsWith("https:") ? "https" : "http";
-      let command;
-      switch (method) {
-        case "fetch":
-          command = `/tool fetch mode=${fetchMode} url="${scriptUrl}" dst-path=provision.rsc`;
-          break;
-        case "inline":
-          command = `/tool fetch mode=${fetchMode} url="${scriptUrl}" dst-path=provision.rsc; /import file-name=provision.rsc; /file remove provision.rsc`;
-          break;
-        case "import":
-        case "script":
-        default:
-          command = `/tool fetch mode=${fetchMode} url="${scriptUrl}" dst-path=provision.rsc; /import file-name=provision.rsc`;
-      }
-      setShowCommand({
-        ...device,
-        command,
-        copyText: command,
-        method,
-        serverUrl,
-        token,
-      });
-    } finally {
-      setCommandLoading((prev) => ({ ...prev, [device.id]: false }));
-    }
-  };
-
-  const copyCommand = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const deleteDevice = async (id) => {
+    if (!window.confirm("Delete this device?")) return;
+    await axios.delete(`${API_URL}/devices/${id}`);
+    fetchDevices();
   };
 
   const downloadScript = async (device) => {
     try {
       let content = device.content;
-
       if (!content) {
         const { data } = await axios.get(
           `${API_URL}/devices/${device.id}/script`,
         );
         content = data.script || "";
       }
-
       const blob = new Blob([content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -338,23 +372,92 @@ export function Devices() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error(e);
       window.alert(e.response?.data?.error || e.message);
     }
   };
 
-  const provisionMethods = [
-    {
-      id: "import",
-      name: "Import",
-      icon: Zap,
-      description: "Direct import from URL",
-    },
+  // ── manual create ────────────────────────────────────────────────────────
+
+  const scanRouter = async () => {
+    if (
+      !createForm.ip_address ||
+      !createForm.mgmt_username ||
+      !createForm.mgmt_password
+    ) {
+      window.alert("Enter router IP, username, and password before scanning.");
+      return;
+    }
+    setScanLoading(true);
+    try {
+      const { data } = await axios.post(`${API_URL}/devices/scan`, {
+        ip_address: createForm.ip_address,
+        api_port: createForm.mgmt_port,
+        username: createForm.mgmt_username,
+        password: createForm.mgmt_password,
+      });
+      setScanResult(data);
+      setCreateForm((prev) => ({
+        ...prev,
+        identity: data.identity || prev.identity,
+        model: data.model || prev.model,
+        wan_interface: data.suggested?.wan_interface || prev.wan_interface,
+        lan_interface: data.suggested?.lan_interface || prev.lan_interface,
+        lan_ports: data.suggested?.lan_ports?.length
+          ? data.suggested.lan_ports
+          : prev.lan_ports,
+      }));
+    } catch (e) {
+      window.alert(
+        e.response?.data?.message ||
+          e.response?.data?.error ||
+          "Scan failed — server could not reach the router.",
+      );
+    }
+    setScanLoading(false);
+  };
+
+  const submitCreate = async (e) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    try {
+      await axios.post(`${API_URL}/devices`, createForm);
+      setShowCreate(false);
+      setCreateForm({ ...EMPTY_FORM });
+      setScanResult(null);
+      fetchDevices();
+      setTab("managed");
+    } catch (e) {
+      window.alert(e.response?.data?.error || e.message);
+    }
+    setCreateLoading(false);
+  };
+
+  const toggleCreateLanPort = (portName) => {
+    setCreateForm((prev) => {
+      const current = prev.lan_ports || [];
+      return {
+        ...prev,
+        lan_ports: current.includes(portName)
+          ? current.filter((p) => p !== portName)
+          : [...current, portName],
+      };
+    });
+  };
+
+  // ── provision methods ────────────────────────────────────────────────────
+
+  const PROVISION_METHODS = [
     {
       id: "script",
       name: "Script",
       icon: Code,
       description: "Fetch then import",
+    },
+    {
+      id: "inline",
+      name: "Inline",
+      icon: Terminal,
+      description: "Fetch, import, cleanup",
     },
     {
       id: "fetch",
@@ -363,692 +466,773 @@ export function Devices() {
       description: "Download for manual import",
     },
     {
-      id: "inline",
-      name: "Inline",
-      icon: Terminal,
-      description: "Fetch, import, cleanup",
+      id: "import",
+      name: "Import",
+      icon: Zap,
+      description: "Direct import from URL",
     },
   ];
 
+  // ── pending count badge ──────────────────────────────────────────────────
+
+  const pendingCount = discovered.filter(
+    (d) => d.status === "discovered",
+  ).length;
+
+  // ────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ────────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-white">
-            Zero-Touch Provisioning
-          </h2>
-          <p className="text-slate-400 mt-1">
-            Add routers, generate one-line provision commands
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" /> Add Device
-        </Button>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* ── Page header ─────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Radio className="w-5 h-5 text-white" />
+          </div>
+          Zero-Touch Provisioning
+        </h1>
+        <p className="text-zinc-400 mt-1 ml-12">
+          Generate an onboarding script, paste it on any MikroTik — the router
+          registers itself. No manual device entry required.
+        </p>
       </div>
 
-      <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
-        <CardContent className="p-4 space-y-2">
-          <Label htmlFor="public-provision-url">Public Provisioning URL</Label>
-          <Input
-            id="public-provision-url"
-            value={publicProvisionUrl}
-            onChange={(e) => setPublicProvisionUrl(e.target.value)}
-            placeholder="https://your-domain.com or http://public-ip:5000"
-          />
-          <p className="text-xs text-slate-400">
-            Use a URL reachable by the MikroTik router. For remote routers, this
-            must be your public domain, public IP, VPN address, or tunnel URL —
-            not localhost.
+      {/* ── Public URL bar ───────────────────────────────────────────── */}
+      <Card className="mb-5 border-blue-500/20 bg-blue-500/5">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex-1 space-y-1">
+            <Label className="text-blue-300 text-xs uppercase tracking-wider">
+              Public Provisioning URL
+            </Label>
+            <Input
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+              placeholder="https://your-domain.com or http://public-ip:5000"
+              className="bg-zinc-900 border-blue-500/30 text-white"
+            />
+          </div>
+          <p className="text-xs text-zinc-400 sm:max-w-xs">
+            Must be reachable by the MikroTik router. For remote sites use your
+            public domain, public IP, VPN, or tunnel address — not localhost.
           </p>
         </CardContent>
       </Card>
 
-      {/* Devices Grid */}
-      {devices.length === 0 ? (
-        <div className="text-center py-16">
-          <Router className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">
-            No devices yet. Add your first MikroTik router.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {devices.map((dev) => (
-            <Card key={dev.id} className="overflow-hidden">
-              {/* Header */}
-              <CardHeader className="border-b border-zinc-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Router className="w-6 h-6 text-blue-500" />
-                    <div>
-                      <CardTitle className="text-lg">{dev.name}</CardTitle>
-                      <CardDescription>
-                        {dev.identity || dev.name} •{" "}
-                        {dev.model || "Unknown model"}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        dev.provision_status === "provisioned"
-                          ? "bg-green-600/20 text-green-400"
-                          : "bg-amber-600/20 text-amber-400"
-                      }`}
-                    >
-                      {dev.provision_status === "provisioned"
-                        ? "✓ Provisioned"
-                        : "⏳ Pending"}
-                    </span>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        dev.linked_mikrotik_connection_id
-                          ? "bg-blue-600/20 text-blue-400"
-                          : "bg-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      {dev.linked_mikrotik_connection_id
-                        ? "Linked to Billing"
-                        : "Not Linked"}
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
+      {/* ── Tabs ────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 mb-6 bg-zinc-900 rounded-xl p-1 w-fit">
+        {[
+          { id: "enroll", label: "Onboarding Script", icon: Zap },
+          {
+            id: "discovered",
+            label: "Discovered Routers",
+            icon: Radio,
+            badge: pendingCount || null,
+          },
+          { id: "managed", label: "Managed Devices", icon: Settings },
+        ].map(({ id, label, icon: Icon, badge }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === id
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+            {badge ? (
+              <span className="ml-1 bg-amber-500 text-black text-xs px-1.5 py-0.5 rounded-full font-bold">
+                {badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
 
-              {/* Provision Command */}
-              <CardContent className="p-4 bg-zinc-900/50">
-                <h4 className="text-xs text-zinc-400 uppercase mb-2 flex items-center gap-1">
-                  <Terminal className="w-3 h-3" /> One-Line Provision Command
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    {provisionMethods.map((method) => {
-                      const Icon = method.icon;
-                      return (
-                        <Button
-                          key={method.id}
-                          variant={
-                            provisionMethod === method.id
-                              ? "default"
-                              : "outline"
-                          }
-                          size="sm"
-                          onClick={() => getProvisionCommand(dev, method.id)}
-                          disabled={commandLoading[dev.id]}
-                          className="flex-1"
-                          title={method.description}
-                        >
-                          <Icon className="w-3 h-3 mr-1" /> {method.name}
-                        </Button>
-                      );
-                    })}
+      {/* ══════════════════════════════════════════════════════════════
+          TAB 1 — Onboarding / Enrollment Script
+      ══════════════════════════════════════════════════════════════ */}
+      {tab === "enroll" && (
+        <div className="space-y-6">
+          {/* How it works */}
+          <Card className="border-zinc-800">
+            <CardHeader className="p-5 pb-3">
+              <CardTitle className="text-white text-base">
+                How It Works
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              <ol className="space-y-3">
+                {[
+                  {
+                    n: "1",
+                    text: "Set your Public Provisioning URL above (must be reachable by the MikroTik).",
+                  },
+                  {
+                    n: "2",
+                    text: 'Click "Generate Onboarding Script" to create a one-time enrollment token.',
+                  },
+                  {
+                    n: "3",
+                    text: "Copy the one-line command and paste it into the MikroTik terminal or run it via SSH / WinBox.",
+                  },
+                  {
+                    n: "4",
+                    text: "The router runs the script, collects its identity, model, interfaces and IP addresses, and reports them to this platform.",
+                  },
+                  {
+                    n: "5",
+                    text: 'Go to the "Discovered Routers" tab. The router appears automatically. Review its interfaces, pick WAN / LAN ports, then approve.',
+                  },
+                  {
+                    n: "6",
+                    text: "The platform generates a tailored provisioning script. The router downloads and applies it — fully configured.",
+                  },
+                ].map(({ n, text }) => (
+                  <li key={n} className="flex gap-3 text-sm text-zinc-300">
+                    <span className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0 text-xs font-bold">
+                      {n}
+                    </span>
+                    {text}
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+
+          {/* Token generation */}
+          <Card className="border-zinc-800">
+            <CardHeader className="p-5 pb-3">
+              <CardTitle className="text-white text-base flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400" /> Generate Onboarding
+                Script
+              </CardTitle>
+              <CardDescription>
+                Creates a one-time enrollment token and a RouterOS bootstrap
+                command.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Label (optional)</Label>
+                  <Input
+                    value={enrollLabel}
+                    onChange={(e) => setEnrollLabel(e.target.value)}
+                    placeholder="e.g. Nairobi Branch 1"
+                    className="bg-zinc-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Expires in (hours)</Label>
+                  <Input
+                    type="number"
+                    value={enrollExpiry}
+                    min="1"
+                    max="720"
+                    onChange={(e) => setEnrollExpiry(e.target.value)}
+                    className="bg-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <Button
+                onClick={generateEnrollmentToken}
+                disabled={enrollLoading}
+                className="w-full sm:w-auto"
+              >
+                {enrollLoading ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 mr-2" />
+                )}
+                {enrollLoading ? "Generating…" : "Generate Onboarding Script"}
+              </Button>
+
+              {enrollToken && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2 text-green-400 text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    Token created — expires{" "}
+                    {enrollToken.enrollment?.expires_at
+                      ? new Date(
+                          enrollToken.enrollment.expires_at,
+                        ).toLocaleString()
+                      : `in ${enrollExpiry}h`}
                   </div>
-                  <pre className="text-xs text-green-400 bg-zinc-800 p-3 rounded border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[60px]">
-                    {commandLoading[dev.id]
-                      ? "Loading..."
-                      : showCommand?.id === dev.id
-                        ? showCommand.copyText
-                        : "Select a method above"}
-                  </pre>
-                  {showCommand?.id === dev.id && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyCommand(showCommand.copyText)}
-                        className="flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" />{" "}
-                        {copied ? "Copied!" : "Copy"}
-                      </Button>
+
+                  <div className="space-y-1">
+                    <Label className="text-zinc-300 text-xs uppercase tracking-wider">
+                      One-Line Bootstrap Command
+                    </Label>
+                    <p className="text-xs text-zinc-400">
+                      Paste this into MikroTik terminal, SSH, or WinBox
+                      terminal:
+                    </p>
+                    <pre className="text-xs text-green-400 bg-zinc-900 p-4 rounded-lg border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
+                      {enrollToken.bootstrap_command || enrollToken.copyText}
+                    </pre>
+                    <div className="flex gap-2 pt-1">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          getProvisionCommand(dev, showCommand.method, true)
+                          copyEnroll(
+                            enrollToken.bootstrap_command ||
+                              enrollToken.copyText,
+                          )
                         }
-                        disabled={commandLoading[dev.id]}
                         className="flex items-center gap-1"
                       >
-                        <RefreshCw className="w-3 h-3" /> Regenerate Token
+                        <Copy className="w-3 h-3" />
+                        {enrollCopied ? "Copied!" : "Copy Command"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEnrollToken(null);
+                          setTab("discovered");
+                        }}
+                        className="flex items-center gap-1 text-blue-400"
+                      >
+                        <Radio className="w-3 h-3" />
+                        Watch Discovered Routers
                       </Button>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-
-              {/* Settings */}
-              <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
-                <div className="text-zinc-400">
-                  WAN: <span className="text-white">{dev.wan_interface}</span>
-                </div>
-                <div className="text-zinc-400">
-                  LAN Ports:{" "}
-                  <span className="text-white">
-                    {dev.lan_ports?.length
-                      ? dev.lan_ports.join(", ")
-                      : "Not set"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  DNS:{" "}
-                  <span className="text-white">
-                    {dev.dns_servers?.join(", ")}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  RADIUS:{" "}
-                  <span className="text-white">
-                    {dev.radius_server || "Not set"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  PPPoE:{" "}
-                  <span className="text-white">
-                    {dev.pppoe_enabled ? "Yes" : "No"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  Router IP:{" "}
-                  <span className="text-white">
-                    {dev.ip_address || "Not set"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  Billing Engine:{" "}
-                  <span className="text-white uppercase">
-                    {dev.connection_type || "api"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  Mgmt User:{" "}
-                  <span className="text-white">
-                    {dev.mgmt_username || "Not set"}
-                  </span>
-                </div>
-                <div className="text-zinc-400">
-                  Last Billing Link:{" "}
-                  <span className="text-white">
-                    {dev.billing_activated_at
-                      ? new Date(dev.billing_activated_at).toLocaleString()
-                      : "Never"}
-                  </span>
-                </div>
-              </CardContent>
-
-              {dev.billing_activation_error && (
-                <CardContent className="px-4 pb-0">
-                  <div className="rounded border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
-                    Last billing activation issue:{" "}
-                    {dev.billing_activation_error}
                   </div>
-                </CardContent>
-              )}
 
-              {/* Actions */}
-              <CardContent className="p-4 border-t border-zinc-800 flex gap-2">
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 space-y-1">
+                    <p className="font-semibold">Security note:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-amber-300/80">
+                      <li>
+                        This token can only be used once and expires
+                        automatically.
+                      </li>
+                      <li>
+                        Any router that runs this script will appear as a
+                        Discovered Router pending your approval.
+                      </li>
+                      <li>
+                        No configuration is applied until you approve the
+                        router.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          TAB 2 — Discovered Routers
+      ══════════════════════════════════════════════════════════════ */}
+      {tab === "discovered" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-zinc-400">
+              Routers that called home using an enrollment script. Review the
+              interface list and approve to create a managed device.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchDiscovered}
+              disabled={discoveredLoading}
+              className="flex items-center gap-1"
+            >
+              <RefreshCw
+                className={`w-3 h-3 ${discoveredLoading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </div>
+
+          {discoveredLoading && discovered.length === 0 && (
+            <div className="text-center py-12 text-zinc-500">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin mb-3" />
+              Checking for discovered routers…
+            </div>
+          )}
+
+          {!discoveredLoading && discovered.length === 0 && (
+            <Card className="border-zinc-800">
+              <CardContent className="py-16 text-center">
+                <Radio className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
+                <p className="text-zinc-400">
+                  No routers have called home yet.
+                </p>
+                <p className="text-zinc-500 text-sm mt-1">
+                  Generate an onboarding script and run it on a MikroTik router.
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => activateInBilling(dev)}
-                  disabled={activationLoading[dev.id]}
-                  className="flex items-center gap-1 text-blue-400"
+                  className="mt-4"
+                  onClick={() => setTab("enroll")}
                 >
-                  <Link2 className="w-3 h-3" />{" "}
-                  {activationLoading[dev.id]
-                    ? "Linking..."
-                    : "Activate in Billing"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => viewScript(dev)}
-                  className="flex items-center gap-1"
-                >
-                  <Eye className="w-3 h-3" /> Preview
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => viewLogs(dev)}
-                  className="flex items-center gap-1"
-                >
-                  <FileText className="w-3 h-3" /> Logs
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => regenerateToken(dev.id)}
-                  className="flex items-center gap-1 text-amber-400"
-                >
-                  <RefreshCw className="w-3 h-3" /> New Token
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadScript(dev)}
-                  className="flex items-center gap-1 text-green-400"
-                >
-                  <Download className="w-3 h-3" /> .rsc
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(dev.id)}
-                  className="flex items-center gap-1 text-red-400 ml-auto"
-                >
-                  <Trash2 className="w-3 h-3" />
+                  <Zap className="w-3 h-3 mr-2" /> Generate Onboarding Script
                 </Button>
               </CardContent>
             </Card>
+          )}
+
+          {discovered.map((dr) => (
+            <DiscoveredRouterCard
+              key={dr.id}
+              router={dr}
+              onApprove={() => openApproval(dr)}
+            />
           ))}
         </div>
       )}
 
-      {/* Create Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* ══════════════════════════════════════════════════════════════
+          TAB 3 — Managed Devices
+      ══════════════════════════════════════════════════════════════ */}
+      {tab === "managed" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-zinc-400">
+              Approved and provisioned MikroTik routers.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchDevices}
+                disabled={devLoading}
+              >
+                <RefreshCw
+                  className={`w-3 h-3 mr-1 ${devLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setShowCreate(true)}
+                className="flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" /> Add Manually
+              </Button>
+            </div>
+          </div>
+
+          {devLoading && devices.length === 0 && (
+            <div className="text-center py-12 text-zinc-500">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin mb-3" />
+              Loading devices…
+            </div>
+          )}
+
+          {!devLoading && devices.length === 0 && (
+            <Card className="border-zinc-800">
+              <CardContent className="py-16 text-center">
+                <Router className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
+                <p className="text-zinc-400">No managed devices yet.</p>
+                <p className="text-zinc-500 text-sm mt-1">
+                  Approve a discovered router or add one manually.
+                </p>
+                <div className="flex justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTab("discovered")}
+                  >
+                    <Radio className="w-3 h-3 mr-2" /> Discovered Routers
+                  </Button>
+                  <Button size="sm" onClick={() => setShowCreate(true)}>
+                    <Plus className="w-3 h-3 mr-2" /> Add Manually
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {devices.map((dev) => (
+              <ManagedDeviceCard
+                key={dev.id}
+                device={dev}
+                publicUrl={publicUrl}
+                showCommand={showCommand}
+                setShowCommand={setShowCommand}
+                commandLoading={commandLoading}
+                provisionMethod={provisionMethod}
+                cmdCopied={cmdCopied}
+                onGetCommand={getProvisionCommand}
+                onCopyCmd={copyCmd}
+                onActivate={activateInBilling}
+                onViewScript={viewScript}
+                onViewLogs={viewLogs}
+                onRegenToken={regenerateToken}
+                onDownload={downloadScript}
+                onDelete={deleteDevice}
+                activationLoading={activationLoading}
+                PROVISION_METHODS={PROVISION_METHODS}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          APPROVE MODAL
+      ══════════════════════════════════════════════════════════════ */}
+      {approveTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <Card className="w-full max-w-2xl my-8">
             <CardHeader className="border-b border-zinc-800">
               <div className="flex items-center justify-between">
-                <CardTitle>Add New Device</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowCreate(false)}
-                >
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    Approve Discovered Router
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {approveTarget.identity || "Unknown"} •{" "}
+                    {approveTarget.model || "Unknown model"} •{" "}
+                    {approveTarget.source_ip}
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={closeApproval}>
                   <X className="w-5 h-5" />
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreate} className="space-y-4 pt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="device-name">Name *</Label>
-                    <Input
-                      id="device-name"
-                      required
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder="Branch-Router-01"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="device-identity">Identity</Label>
-                    <Input
-                      id="device-identity"
-                      value={formData.identity}
-                      onChange={(e) =>
-                        setFormData({ ...formData, identity: e.target.value })
-                      }
-                      placeholder="MY-BRANCH-01"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="device-model">Model</Label>
-                    <select
-                      id="device-model"
-                      value={formData.model}
-                      onChange={(e) =>
-                        setFormData({ ...formData, model: e.target.value })
-                      }
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    >
-                      <option value="">Select model</option>
-                      <option value="CCR2004">CCR2004</option>
-                      <option value="CCR2116">CCR2116</option>
-                      <option value="RB5009">RB5009</option>
-                      <option value="RB4011">RB4011</option>
-                      <option value="hEX">hEX RB750Gr3</option>
-                      <option value="hAP-ax2">hAP ax²</option>
-                      <option value="CHR">Cloud Hosted Router</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="device-wan">WAN Interface</Label>
-                    <Input
-                      id="device-wan"
-                      value={formData.wan_interface}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          wan_interface: e.target.value,
-                        })
-                      }
-                      placeholder="ether1"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="device-lan-bridge">LAN Bridge Name</Label>
-                    <Input
-                      id="device-lan-bridge"
-                      value={formData.lan_interface}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          lan_interface: e.target.value,
-                        })
-                      }
-                      placeholder="bridge1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="device-lan-ports">LAN Ports</Label>
-                    <Input
-                      id="device-lan-ports"
-                      value={(formData.lan_ports || []).join(", ")}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          lan_ports: e.target.value
-                            .split(",")
-                            .map((port) => port.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      placeholder="ether2, ether3, ether4"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="device-ip">Router IP / Host</Label>
-                    <Input
-                      id="device-ip"
-                      value={formData.ip_address}
-                      onChange={(e) =>
-                        setFormData({ ...formData, ip_address: e.target.value })
-                      }
-                      placeholder="192.168.88.1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="device-engine">Billing Engine</Label>
-                    <select
-                      id="device-engine"
-                      value={formData.connection_type}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          connection_type: e.target.value,
-                        })
-                      }
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    >
-                      <option value="api">API</option>
-                      <option value="ssh">SSH</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="device-mgmt-port">Management Port</Label>
-                    <Input
-                      id="device-mgmt-port"
-                      type="number"
-                      value={formData.mgmt_port}
-                      onChange={(e) =>
-                        setFormData({ ...formData, mgmt_port: e.target.value })
-                      }
-                      placeholder="8728"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="device-mgmt-user">
-                      Management Username
-                    </Label>
-                    <Input
-                      id="device-mgmt-user"
-                      value={formData.mgmt_username}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          mgmt_username: e.target.value,
-                        })
-                      }
-                      placeholder="automation-user"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="device-mgmt-password">
-                      Management Password
-                    </Label>
-                    <Input
-                      id="device-mgmt-password"
-                      type="password"
-                      value={formData.mgmt_password}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          mgmt_password: e.target.value,
-                        })
-                      }
-                      placeholder="Stored securely for billing link"
-                    />
+            <CardContent className="p-5">
+              <form onSubmit={submitApproval} className="space-y-5">
+                {/* Detected info panel */}
+                <div className="rounded-lg bg-zinc-900 border border-zinc-800 p-4 text-sm space-y-1">
+                  <p className="text-zinc-300 font-medium mb-2">
+                    Detected Router Info
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-zinc-500">Identity</span>
+                    <span className="text-white">
+                      {approveTarget.identity || "—"}
+                    </span>
+                    <span className="text-zinc-500">Model</span>
+                    <span className="text-white">
+                      {approveTarget.model || "—"}
+                    </span>
+                    <span className="text-zinc-500">RouterOS</span>
+                    <span className="text-white">
+                      {approveTarget.version || "—"}
+                    </span>
+                    <span className="text-zinc-500">Source IP</span>
+                    <span className="text-white">
+                      {approveTarget.source_ip || "—"}
+                    </span>
+                    <span className="text-zinc-500">MAC</span>
+                    <span className="text-white font-mono">
+                      {approveTarget.primary_mac || "—"}
+                    </span>
+                    <span className="text-zinc-500">First seen</span>
+                    <span className="text-white">
+                      {approveTarget.first_seen_at
+                        ? new Date(approveTarget.first_seen_at).toLocaleString()
+                        : "—"}
+                    </span>
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-white">
-                        Scan MikroTik Before Provisioning
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        The server will connect to the router API, read
-                        identity, model, interfaces, and suggest WAN/LAN ports.
-                        For remote routers, the server must reach the router
-                        public/VPN IP and API port.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={scanRouter}
-                      disabled={scanLoading}
-                      className="shrink-0"
-                    >
-                      <RefreshCw
-                        className={`w-4 h-4 mr-2 ${scanLoading ? "animate-spin" : ""}`}
-                      />
-                      {scanLoading ? "Scanning..." : "Scan Router"}
-                    </Button>
-                  </div>
-
-                  {scanResult?.interfaces?.length > 0 && (
+                {/* Interface port selection */}
+                {Array.isArray(approveTarget.interfaces) &&
+                  approveTarget.interfaces.length > 0 && (
                     <div className="space-y-2">
-                      <div className="text-xs text-slate-300">
-                        Found {scanResult.interfaces.length} interfaces on{" "}
-                        <span className="text-white">
-                          {scanResult.identity || scanResult.host}
-                        </span>
-                        {scanResult.model ? ` (${scanResult.model})` : ""}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                        {scanResult.interfaces.map((iface) => (
-                          <label
-                            key={iface.id || iface.name}
-                            className="flex items-center justify-between gap-3 rounded border border-zinc-800 bg-zinc-900/70 p-2 text-xs"
+                      <Label className="text-zinc-300 text-xs uppercase tracking-wider">
+                        Select WAN and LAN Ports
+                      </Label>
+                      <p className="text-xs text-zinc-500">
+                        Click <strong className="text-blue-400">WAN</strong> to
+                        mark the uplink interface. Tick{" "}
+                        <strong className="text-green-400">LAN</strong>{" "}
+                        checkboxes for bridge member ports.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                        {approveTarget.interfaces.map((iface) => (
+                          <div
+                            key={iface.name}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-900/70 p-2.5 text-xs"
                           >
-                            <div>
-                              <div className="text-white font-medium">
+                            <div className="min-w-0">
+                              <div className="text-white font-medium truncate">
                                 {iface.name}
                               </div>
-                              <div className="text-slate-500">
+                              <div className="text-zinc-500 truncate">
                                 {iface.type || "interface"} •{" "}
-                                {iface.running ? "running" : "not running"}
-                                {iface.addresses?.length
-                                  ? ` • ${iface.addresses.join(", ")}`
-                                  : ""}
+                                <span
+                                  className={
+                                    iface.running
+                                      ? "text-green-400"
+                                      : "text-zinc-500"
+                                  }
+                                >
+                                  {iface.running ? "running" : "down"}
+                                </span>
+                                {iface.mac_address && (
+                                  <span className="ml-1 font-mono">
+                                    {iface.mac_address}
+                                  </span>
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setFormData({
-                                    ...formData,
+                                  setApproveForm((p) => ({
+                                    ...p,
                                     wan_interface: iface.name,
-                                  })
+                                  }))
                                 }
-                                className={`px-2 py-1 rounded ${
-                                  formData.wan_interface === iface.name
+                                className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  approveForm.wan_interface === iface.name
                                     ? "bg-blue-600 text-white"
-                                    : "bg-zinc-800 text-zinc-300"
+                                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                                 }`}
                               >
                                 WAN
                               </button>
-                              <input
-                                type="checkbox"
-                                checked={(formData.lan_ports || []).includes(
-                                  iface.name,
-                                )}
-                                onChange={() => toggleLanPort(iface.name)}
-                              />
-                              <span className="text-slate-400">LAN</span>
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(
+                                    approveForm.lan_ports || []
+                                  ).includes(iface.name)}
+                                  onChange={() =>
+                                    toggleApproveLanPort(iface.name)
+                                  }
+                                  className="accent-green-500"
+                                />
+                                <span className="text-zinc-400">LAN</span>
+                              </label>
                             </div>
-                          </label>
+                          </div>
                         ))}
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        WAN:{" "}
+                        <span className="text-blue-400">
+                          {approveForm.wan_interface}
+                        </span>
+                        {" · "}LAN ports:{" "}
+                        <span className="text-green-400">
+                          {(approveForm.lan_ports || []).join(", ") ||
+                            "none selected"}
+                        </span>
                       </div>
                     </div>
                   )}
-                </div>
-                <div>
-                  <Label htmlFor="device-dns">
-                    DNS Servers (comma-separated)
-                  </Label>
+
+                {/* Name */}
+                <div className="space-y-1">
+                  <Label>Device Name *</Label>
                   <Input
-                    id="device-dns"
-                    value={formData.dns_servers.join(", ")}
+                    required
+                    value={approveForm.name}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        dns_servers: e.target.value
-                          .split(",")
-                          .map((s) => s.trim()),
-                      })
+                      setApproveForm((p) => ({ ...p, name: e.target.value }))
                     }
-                    placeholder="8.8.8.8, 8.8.4.4"
+                    placeholder="Branch-Router-01"
+                    className="bg-zinc-900"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="device-ntp">
-                    NTP Servers (comma-separated)
-                  </Label>
-                  <Input
-                    id="device-ntp"
-                    value={formData.ntp_servers.join(", ")}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        ntp_servers: e.target.value
-                          .split(",")
-                          .map((s) => s.trim()),
-                      })
-                    }
-                    placeholder="pool.ntp.org"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="device-radius-ip">RADIUS Server IP</Label>
+
+                {/* WAN / bridge / LAN ports as text */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>WAN Interface</Label>
                     <Input
-                      id="device-radius-ip"
-                      value={formData.radius_server}
+                      value={approveForm.wan_interface}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                        setApproveForm((p) => ({
+                          ...p,
+                          wan_interface: e.target.value,
+                        }))
+                      }
+                      placeholder="ether1"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>LAN Bridge Name</Label>
+                    <Input
+                      value={approveForm.lan_interface}
+                      onChange={(e) =>
+                        setApproveForm((p) => ({
+                          ...p,
+                          lan_interface: e.target.value,
+                        }))
+                      }
+                      placeholder="bridge1"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>LAN Ports</Label>
+                    <Input
+                      value={(approveForm.lan_ports || []).join(", ")}
+                      onChange={(e) =>
+                        setApproveForm((p) => ({
+                          ...p,
+                          lan_ports: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        }))
+                      }
+                      placeholder="ether2, ether3"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                {/* DNS / NTP */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>DNS Servers</Label>
+                    <Input
+                      value={(approveForm.dns_servers || []).join(", ")}
+                      onChange={(e) =>
+                        setApproveForm((p) => ({
+                          ...p,
+                          dns_servers: e.target.value
+                            .split(",")
+                            .map((s) => s.trim()),
+                        }))
+                      }
+                      placeholder="8.8.8.8, 8.8.4.4"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>NTP Servers</Label>
+                    <Input
+                      value={(approveForm.ntp_servers || []).join(", ")}
+                      onChange={(e) =>
+                        setApproveForm((p) => ({
+                          ...p,
+                          ntp_servers: e.target.value
+                            .split(",")
+                            .map((s) => s.trim()),
+                        }))
+                      }
+                      placeholder="pool.ntp.org"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                {/* RADIUS */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>RADIUS Server IP</Label>
+                    <Input
+                      value={approveForm.radius_server}
+                      onChange={(e) =>
+                        setApproveForm((p) => ({
+                          ...p,
                           radius_server: e.target.value,
-                        })
+                        }))
                       }
                       placeholder="10.0.0.100"
+                      className="bg-zinc-900"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="device-radius-secret">RADIUS Secret</Label>
+                  <div className="space-y-1">
+                    <Label>RADIUS Secret</Label>
                     <Input
-                      id="device-radius-secret"
                       type="password"
-                      value={formData.radius_secret}
+                      value={approveForm.radius_secret}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                        setApproveForm((p) => ({
+                          ...p,
                           radius_secret: e.target.value,
-                        })
+                        }))
                       }
                       placeholder="shared-secret"
+                      className="bg-zinc-900"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="device-radius-port">RADIUS Port</Label>
+                  <div className="space-y-1">
+                    <Label>RADIUS Port</Label>
                     <Input
-                      id="device-radius-port"
                       type="number"
-                      value={formData.radius_port || 1812}
+                      value={approveForm.radius_port}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          radius_port: e.target.value,
-                        })
+                        setApproveForm((p) => ({
+                          ...p,
+                          radius_port: Number(e.target.value),
+                        }))
                       }
+                      className="bg-zinc-900"
                     />
                   </div>
                 </div>
+
+                {/* PPPoE / Hotspot toggles */}
                 <div className="flex gap-6">
-                  <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <Switch
-                      checked={formData.hotspot_enabled}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, hotspot_enabled: checked })
+                      checked={approveForm.pppoe_enabled}
+                      onCheckedChange={(v) =>
+                        setApproveForm((p) => ({ ...p, pppoe_enabled: v }))
                       }
                     />
-                    <Label className="text-zinc-300">Enable Hotspot</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-300 text-sm">PPPoE Server</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <Switch
-                      checked={formData.pppoe_enabled}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, pppoe_enabled: checked })
+                      checked={approveForm.hotspot_enabled}
+                      onCheckedChange={(v) =>
+                        setApproveForm((p) => ({ ...p, hotspot_enabled: v }))
                       }
                     />
-                    <Label className="text-zinc-300">Enable PPPoE Server</Label>
-                  </div>
+                    <span className="text-zinc-300 text-sm">Hotspot</span>
+                  </label>
                 </div>
-                <div>
-                  <Label htmlFor="device-notes">Notes</Label>
+
+                {/* Notes */}
+                <div className="space-y-1">
+                  <Label>Notes</Label>
                   <textarea
-                    id="device-notes"
-                    value={formData.notes}
+                    value={approveForm.notes}
                     onChange={(e) =>
-                      setFormData({ ...formData, notes: e.target.value })
+                      setApproveForm((p) => ({ ...p, notes: e.target.value }))
                     }
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    rows="2"
+                    rows={2}
                     placeholder="Location, contact, etc."
+                    className="flex w-full rounded-md border border-input bg-zinc-900 px-3 py-2 text-sm text-white ring-offset-background"
                   />
                 </div>
-                <div className="flex gap-3 pt-4 border-t border-zinc-800">
+
+                <div className="flex gap-3 pt-2 border-t border-zinc-800">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowCreate(false)}
+                    onClick={closeApproval}
                     className="flex-1"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1">
-                    Create Device
+                  <Button
+                    type="submit"
+                    disabled={approveLoading}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    {approveLoading ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                    )}
+                    {approveLoading ? "Approving…" : "Approve & Create Device"}
                   </Button>
                 </div>
               </form>
@@ -1057,23 +1241,312 @@ export function Devices() {
         </div>
       )}
 
-      {/* Script Preview Modal */}
-      {showScript && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-3/4 max-w-4xl max-h-[80vh] flex flex-col">
+      {/* ── Manual Create Modal ──────────────────────────────────────── */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <Card className="w-full max-w-2xl my-8">
             <CardHeader className="border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">
+                  Add Device Manually
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowCreate(false);
+                    setCreateForm({ ...EMPTY_FORM });
+                    setScanResult(null);
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <CardDescription>
+                Alternatively you can first scan the router to auto-detect model
+                and interfaces.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={submitCreate} className="space-y-4">
+                {/* credentials for scan */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>Router IP / Host *</Label>
+                    <Input
+                      value={createForm.ip_address}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          ip_address: e.target.value,
+                        }))
+                      }
+                      placeholder="192.168.88.1"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>API Port</Label>
+                    <Input
+                      type="number"
+                      value={createForm.mgmt_port}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          mgmt_port: Number(e.target.value),
+                        }))
+                      }
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Connection</Label>
+                    <select
+                      value={createForm.connection_type}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          connection_type: e.target.value,
+                        }))
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-zinc-900 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="api">API</option>
+                      <option value="ssh">SSH</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Username</Label>
+                    <Input
+                      value={createForm.mgmt_username}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          mgmt_username: e.target.value,
+                        }))
+                      }
+                      placeholder="admin"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Password</Label>
+                    <Input
+                      type="password"
+                      value={createForm.mgmt_password}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          mgmt_password: e.target.value,
+                        }))
+                      }
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={scanRouter}
+                  disabled={scanLoading}
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-2 ${scanLoading ? "animate-spin" : ""}`}
+                  />
+                  {scanLoading ? "Scanning…" : "Scan Router (optional)"}
+                </Button>
+
+                {scanResult?.interfaces?.length > 0 && (
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2">
+                    <p className="text-sm text-blue-300 font-medium">
+                      {scanResult.interfaces.length} interfaces detected on{" "}
+                      {scanResult.identity || scanResult.host}
+                      {scanResult.model ? ` (${scanResult.model})` : ""}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                      {scanResult.interfaces.map((iface) => (
+                        <div
+                          key={iface.name}
+                          className="flex items-center justify-between gap-2 rounded border border-zinc-800 bg-zinc-900/70 p-2 text-xs"
+                        >
+                          <div>
+                            <div className="text-white font-medium">
+                              {iface.name}
+                            </div>
+                            <div className="text-zinc-500">
+                              {iface.type} •{" "}
+                              <span
+                                className={
+                                  iface.running
+                                    ? "text-green-400"
+                                    : "text-zinc-500"
+                                }
+                              >
+                                {iface.running ? "running" : "down"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCreateForm((p) => ({
+                                  ...p,
+                                  wan_interface: iface.name,
+                                }))
+                              }
+                              className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                createForm.wan_interface === iface.name
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-zinc-800 text-zinc-400"
+                              }`}
+                            >
+                              WAN
+                            </button>
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(createForm.lan_ports || []).includes(
+                                  iface.name,
+                                )}
+                                onChange={() => toggleCreateLanPort(iface.name)}
+                                className="accent-green-500"
+                              />
+                              <span className="text-zinc-400">LAN</span>
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <hr className="border-zinc-800" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Name *</Label>
+                    <Input
+                      required
+                      value={createForm.name}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({ ...p, name: e.target.value }))
+                      }
+                      placeholder="Branch-Router-01"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Identity</Label>
+                    <Input
+                      value={createForm.identity}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          identity: e.target.value,
+                        }))
+                      }
+                      placeholder="MY-ROUTER"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>WAN Interface</Label>
+                    <Input
+                      value={createForm.wan_interface}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          wan_interface: e.target.value,
+                        }))
+                      }
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>LAN Bridge</Label>
+                    <Input
+                      value={createForm.lan_interface}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          lan_interface: e.target.value,
+                        }))
+                      }
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>LAN Ports</Label>
+                    <Input
+                      value={(createForm.lan_ports || []).join(", ")}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({
+                          ...p,
+                          lan_ports: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        }))
+                      }
+                      placeholder="ether2, ether3"
+                      className="bg-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2 border-t border-zinc-800">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowCreate(false);
+                      setCreateForm({ ...EMPTY_FORM });
+                      setScanResult(null);
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createLoading}
+                    className="flex-1"
+                  >
+                    {createLoading ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4 mr-2" />
+                    )}
+                    {createLoading ? "Creating…" : "Create Device"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Script Preview Modal ──────────────────────────────────────── */}
+      {showScript && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800 shrink-0">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Code className="w-5 h-5 text-green-500" /> Provision Script:{" "}
                   {showScript.name}
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => downloadScript(showScript)}
-                    className="flex items-center gap-1"
-                  >
-                    <Download className="w-4 h-4" /> Download
+                  <Button size="sm" onClick={() => downloadScript(showScript)}>
+                    <Download className="w-4 h-4 mr-1" /> Download
                   </Button>
                   <Button
                     variant="ghost"
@@ -1085,8 +1558,8 @@ export function Devices() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-6">
-              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
+            <CardContent className="flex-1 overflow-auto p-5">
+              <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap leading-relaxed">
                 {showScript.content}
               </pre>
             </CardContent>
@@ -1094,11 +1567,11 @@ export function Devices() {
         </div>
       )}
 
-      {/* Logs Modal */}
+      {/* ── Logs Modal ───────────────────────────────────────────────── */}
       {showLogs && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <Card className="w-2/3 max-w-3xl max-h-[80vh] flex flex-col">
-            <CardHeader className="border-b border-zinc-800">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col">
+            <CardHeader className="border-b border-zinc-800 shrink-0">
               <div className="flex items-center justify-between">
                 <CardTitle>Provision Logs: {showLogs.name}</CardTitle>
                 <Button
@@ -1119,17 +1592,19 @@ export function Devices() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-zinc-400 border-b border-zinc-800">
-                      <th className="text-left p-2">Time</th>
-                      <th className="text-left p-2">Action</th>
-                      <th className="text-left p-2">Status</th>
-                      <th className="text-left p-2">IP</th>
-                      <th className="text-left p-2">Details</th>
+                      {["Time", "Action", "Status", "IP", "Details"].map(
+                        (h) => (
+                          <th key={h} className="text-left p-2">
+                            {h}
+                          </th>
+                        ),
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {logs.map((log) => (
                       <tr key={log.id} className="border-b border-zinc-800/50">
-                        <td className="p-2 text-zinc-400">
+                        <td className="p-2 text-zinc-400 text-xs">
                           {new Date(log.created_at).toLocaleString()}
                         </td>
                         <td className="p-2 text-white">{log.action}</td>
@@ -1144,8 +1619,12 @@ export function Devices() {
                             {log.status}
                           </span>
                         </td>
-                        <td className="p-2 text-zinc-300">{log.ip_address}</td>
-                        <td className="p-2 text-zinc-400">{log.details}</td>
+                        <td className="p-2 text-zinc-300 font-mono text-xs">
+                          {log.ip_address}
+                        </td>
+                        <td className="p-2 text-zinc-400 text-xs">
+                          {log.details}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1156,5 +1635,401 @@ export function Devices() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── DiscoveredRouterCard ────────────────────────────────────────────────────
+
+function DiscoveredRouterCard({ router, onApprove }) {
+  const [expanded, setExpanded] = useState(false);
+  const interfaces = Array.isArray(router.interfaces) ? router.interfaces : [];
+  const addresses = Array.isArray(router.ip_addresses)
+    ? router.ip_addresses
+    : [];
+  const isApproved = router.status === "approved";
+
+  return (
+    <Card className={`border-zinc-800 ${isApproved ? "opacity-60" : ""}`}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                isApproved ? "bg-blue-600/20" : "bg-purple-600/20"
+              }`}
+            >
+              <Router
+                className={`w-5 h-5 ${isApproved ? "text-blue-400" : "text-purple-400"}`}
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="text-white font-semibold truncate">
+                {router.identity || "Unknown Router"}
+              </div>
+              <div className="text-zinc-400 text-xs truncate">
+                {router.model || "Unknown model"} • {router.version || "—"} •{" "}
+                {router.source_ip || "—"}
+              </div>
+              {router.primary_mac && (
+                <div className="text-zinc-500 text-xs font-mono">
+                  {router.primary_mac}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className={`px-2 py-1 rounded text-xs font-medium ${statusColor(router.status)}`}
+            >
+              {router.status === "discovered"
+                ? "⏳ Awaiting approval"
+                : "✓ Approved"}
+            </span>
+            {!isApproved && (
+              <Button
+                size="sm"
+                onClick={onApprove}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className="w-3 h-3 mr-1" /> Approve
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Meta row */}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+          <span>
+            <Clock className="w-3 h-3 inline mr-0.5" />
+            First seen:{" "}
+            {router.first_seen_at
+              ? new Date(router.first_seen_at).toLocaleString()
+              : "—"}
+          </span>
+          <span>
+            <Wifi className="w-3 h-3 inline mr-0.5" />
+            Last seen:{" "}
+            {router.last_seen_at
+              ? new Date(router.last_seen_at).toLocaleString()
+              : "—"}
+          </span>
+          {router.suggested_wan_interface && (
+            <span className="text-blue-400">
+              WAN suggestion: {router.suggested_wan_interface}
+            </span>
+          )}
+          {Array.isArray(router.suggested_lan_ports) &&
+            router.suggested_lan_ports.length > 0 && (
+              <span className="text-green-400">
+                LAN suggestion: {router.suggested_lan_ports.join(", ")}
+              </span>
+            )}
+        </div>
+
+        {/* Expand / collapse interfaces */}
+        {(interfaces.length > 0 || addresses.length > 0) && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-3 text-xs text-zinc-400 hover:text-white flex items-center gap-1"
+          >
+            {expanded ? (
+              <ChevronUp className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
+            )}
+            {interfaces.length} interface{interfaces.length !== 1 ? "s" : ""}
+            {addresses.length > 0 &&
+              `, ${addresses.length} IP address${addresses.length !== 1 ? "es" : ""}`}
+          </button>
+        )}
+
+        {expanded && (
+          <div className="mt-3 space-y-3">
+            {interfaces.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {interfaces.map((iface, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 rounded border border-zinc-800 bg-zinc-900/60 p-2 text-xs"
+                  >
+                    <div
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        iface.running ? "bg-green-400" : "bg-zinc-600"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-white font-medium truncate">
+                        {iface.name}
+                      </div>
+                      <div className="text-zinc-500 truncate">
+                        {iface.type || "interface"}
+                        {iface.mac_address && ` • ${iface.mac_address}`}
+                      </div>
+                    </div>
+                    {iface.disabled && (
+                      <span className="ml-auto text-zinc-600 shrink-0">
+                        disabled
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {addresses.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider">
+                  IP Addresses
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {addresses.map((addr, idx) => (
+                    <span
+                      key={idx}
+                      className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded font-mono"
+                    >
+                      {addr.address}
+                      {addr.interface && (
+                        <span className="text-zinc-500 ml-1">
+                          on {addr.interface}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── ManagedDeviceCard ───────────────────────────────────────────────────────
+
+function ManagedDeviceCard({
+  device: dev,
+  publicUrl,
+  showCommand,
+  commandLoading,
+  provisionMethod,
+  cmdCopied,
+  onGetCommand,
+  onCopyCmd,
+  onActivate,
+  onViewScript,
+  onViewLogs,
+  onRegenToken,
+  onDownload,
+  onDelete,
+  activationLoading,
+  PROVISION_METHODS,
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isActive = showCommand?.id === dev.id;
+
+  return (
+    <Card className="overflow-hidden border-zinc-800">
+      {/* Header */}
+      <CardHeader className="border-b border-zinc-800 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Router className="w-6 h-6 text-blue-400 shrink-0" />
+            <div className="min-w-0">
+              <CardTitle className="text-base text-white truncate">
+                {dev.name}
+              </CardTitle>
+              <CardDescription className="text-xs truncate">
+                {dev.identity || dev.name} • {dev.model || "Unknown"}
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-medium ${statusColor(dev.provision_status)}`}
+            >
+              {dev.provision_status === "provisioned"
+                ? "✓ Provisioned"
+                : "⏳ Pending"}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-medium ${
+                dev.linked_mikrotik_connection_id
+                  ? "bg-blue-600/20 text-blue-400"
+                  : "bg-zinc-700 text-zinc-400"
+              }`}
+            >
+              {dev.linked_mikrotik_connection_id
+                ? "Linked to Billing"
+                : "Not Linked"}
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Provision command section */}
+      <CardContent className="p-4 bg-zinc-900/40 space-y-2">
+        <p className="text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+          <Terminal className="w-3 h-3" /> Provision Command
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {PROVISION_METHODS.map((m) => {
+            const Icon = m.icon;
+            return (
+              <Button
+                key={m.id}
+                variant={
+                  provisionMethod === m.id && isActive ? "default" : "outline"
+                }
+                size="sm"
+                onClick={() => onGetCommand(dev, m.id)}
+                disabled={commandLoading[dev.id]}
+                className="text-xs"
+                title={m.description}
+              >
+                <Icon className="w-3 h-3 mr-1" /> {m.name}
+              </Button>
+            );
+          })}
+        </div>
+
+        <pre className="text-xs text-green-400 bg-zinc-900 p-3 rounded border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[52px] leading-relaxed">
+          {commandLoading[dev.id]
+            ? "Generating…"
+            : isActive
+              ? showCommand.copyText
+              : "Select a method above to generate a provision command"}
+        </pre>
+
+        {isActive && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onCopyCmd(showCommand.copyText)}
+              className="text-xs"
+            >
+              <Copy className="w-3 h-3 mr-1" /> {cmdCopied ? "Copied!" : "Copy"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onGetCommand(dev, showCommand.method, true)}
+              disabled={commandLoading[dev.id]}
+              className="text-xs text-amber-400"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" /> Regenerate Token
+            </Button>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Settings summary (collapsible) */}
+      <CardContent className="p-4 border-t border-zinc-800">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full flex items-center justify-between text-xs text-zinc-400 hover:text-white"
+        >
+          <span>Settings</span>
+          {expanded ? (
+            <ChevronUp className="w-3 h-3" />
+          ) : (
+            <ChevronDown className="w-3 h-3" />
+          )}
+        </button>
+
+        {expanded && (
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            {[
+              ["WAN", dev.wan_interface],
+              ["LAN Bridge", dev.lan_interface || "bridge1"],
+              [
+                "LAN Ports",
+                dev.lan_ports?.length ? dev.lan_ports.join(", ") : "—",
+              ],
+              ["DNS", dev.dns_servers?.join(", ") || "—"],
+              ["PPPoE", dev.pppoe_enabled ? "Enabled" : "Disabled"],
+              ["Hotspot", dev.hotspot_enabled ? "Enabled" : "Disabled"],
+              ["RADIUS", dev.radius_server || "Not set"],
+              ["Router IP", dev.ip_address || "Not set"],
+              ["Mgmt User", dev.mgmt_username || "Not set"],
+              [
+                "Last Provisioned",
+                dev.last_provisioned_at
+                  ? new Date(dev.last_provisioned_at).toLocaleString()
+                  : "Never",
+              ],
+            ].map(([label, value]) => (
+              <React.Fragment key={label}>
+                <span className="text-zinc-500">{label}</span>
+                <span className="text-white truncate">{value}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        {dev.billing_activation_error && (
+          <div className="mt-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300 flex items-start gap-1.5">
+            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+            {dev.billing_activation_error}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Actions */}
+      <CardContent className="p-3 border-t border-zinc-800 flex flex-wrap gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onActivate(dev)}
+          disabled={activationLoading[dev.id]}
+          className="text-xs text-blue-400"
+        >
+          <Link2 className="w-3 h-3 mr-1" />
+          {activationLoading[dev.id] ? "Linking…" : "Activate Billing"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onViewScript(dev)}
+          className="text-xs"
+        >
+          <Eye className="w-3 h-3 mr-1" /> Preview
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onViewLogs(dev)}
+          className="text-xs"
+        >
+          <FileText className="w-3 h-3 mr-1" /> Logs
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onDownload(dev)}
+          className="text-xs text-green-400"
+        >
+          <Download className="w-3 h-3 mr-1" /> .rsc
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onRegenToken(dev.id)}
+          className="text-xs text-amber-400"
+        >
+          <RefreshCw className="w-3 h-3 mr-1" /> New Token
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onDelete(dev.id)}
+          className="text-xs text-red-400 ml-auto"
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

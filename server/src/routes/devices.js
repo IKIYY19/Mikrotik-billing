@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 const provisionStore = require("../db/provisionStore");
 const memoryDb = require("../db/memory");
 const zeroTouchBilling = require("../services/zeroTouchBilling");
+const enrollmentMemoryStore = require("../services/enrollmentMemoryStore");
 
 function getDb() {
   return global.db || memoryDb;
@@ -127,6 +128,158 @@ async function scanMikroTikRouter({
   }
 }
 
+function getServerBaseUrl(req, explicitBaseUrl) {
+  return (
+    explicitBaseUrl ||
+    process.env.PUBLIC_APP_URL ||
+    `${req.protocol}://${req.get("host")}`
+  );
+}
+
+function generateEnrollmentToken() {
+  return `enroll-${require("crypto").randomBytes(32).toString("hex")}`;
+}
+
+function buildEnrollmentBootstrapCommand(serverUrl, token) {
+  const cleanBaseUrl = serverUrl.replace(/\/$/, "");
+  const scriptUrl = `${cleanBaseUrl}/mikrotik/enroll/bootstrap/${token}`;
+  return `${provisionStore.buildFetchCommand(scriptUrl, "ztp-enroll.rsc", true)}; /import file-name=ztp-enroll.rsc; /file remove ztp-enroll.rsc`;
+}
+
+async function createEnrollmentToken(req, options = {}) {
+  const token = generateEnrollmentToken();
+  const expiresHours = Number(options.expires_hours || 24);
+  const expiresAt = new Date(
+    Date.now() + expiresHours * 60 * 60 * 1000,
+  ).toISOString();
+  const metadata = {
+    label: options.label || "",
+    notes: options.notes || "",
+  };
+
+  if (!global.dbAvailable) {
+    const memoryToken = {
+      id: uuidv4(),
+      token,
+      status: "pending",
+      expires_at: expiresAt,
+      used_at: null,
+      router_id: null,
+      created_by: req.user?.id || null,
+      metadata,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    enrollmentMemoryStore.tokens.push(memoryToken);
+    return memoryToken;
+  }
+
+  const result = await getDb().query(
+    `INSERT INTO enrollment_tokens (id, token, status, expires_at, created_by, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     RETURNING *`,
+    [
+      uuidv4(),
+      token,
+      "pending",
+      expiresAt,
+      req.user?.id || null,
+      JSON.stringify(metadata),
+    ],
+  );
+
+  return result.rows[0];
+}
+
+function parseJsonField(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value === "object") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function normalizeDiscoveredRouter(row) {
+  return {
+    ...row,
+    interfaces: parseJsonField(row.interfaces, []),
+    ip_addresses: parseJsonField(row.ip_addresses, []),
+    raw_payload: parseJsonField(row.raw_payload, {}),
+    suggested_lan_ports: normalizeStringList(row.suggested_lan_ports, []),
+  };
+}
+
+async function listDiscoveredRouters(status = null) {
+  if (!global.dbAvailable) {
+    return enrollmentMemoryStore.discovered
+      .filter((router) => !status || router.status === status)
+      .sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))
+      .map(normalizeDiscoveredRouter);
+  }
+
+  const params = [];
+  let query = "SELECT * FROM discovered_routers";
+
+  if (status) {
+    query += " WHERE status = $1";
+    params.push(status);
+  }
+
+  query += " ORDER BY last_seen_at DESC";
+
+  const result = await getDb().query(query, params);
+  return result.rows.map(normalizeDiscoveredRouter);
+}
+
+async function getDiscoveredRouter(discoveredId) {
+  if (!global.dbAvailable) {
+    return (
+      enrollmentMemoryStore.discovered.find(
+        (router) => router.id === discoveredId,
+      ) || null
+    );
+  }
+
+  const result = await getDb().query(
+    "SELECT * FROM discovered_routers WHERE id = $1",
+    [discoveredId],
+  );
+  return result.rows[0] ? normalizeDiscoveredRouter(result.rows[0]) : null;
+}
+
+async function markDiscoveredApproved(discoveredId, routerId) {
+  if (!global.dbAvailable) {
+    const discovered = enrollmentMemoryStore.discovered.find(
+      (router) => router.id === discoveredId,
+    );
+    if (discovered) {
+      discovered.router_id = routerId;
+      discovered.status = "approved";
+      discovered.approved_at = new Date().toISOString();
+      discovered.updated_at = new Date().toISOString();
+    }
+    return;
+  }
+
+  await getDb().query(
+    `UPDATE discovered_routers
+     SET router_id = $1,
+         status = $2,
+         approved_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $3`,
+    [routerId, "approved", discoveredId],
+  );
+}
+
 // GET all devices
 router.get("/", async (req, res) => {
   try {
@@ -161,6 +314,171 @@ router.post("/scan", async (req, res) => {
       message:
         "Scan failed. Ensure the API service is enabled, credentials are correct, and this server can reach the router.",
     });
+  }
+});
+
+// POST create a one-time enrollment token and bootstrap command
+router.post("/enrollment-token", async (req, res) => {
+  try {
+    const { baseUrl, expires_hours, label, notes } = req.body || {};
+    const enrollment = await createEnrollmentToken(req, {
+      expires_hours,
+      label,
+      notes,
+    });
+    const serverUrl = getServerBaseUrl(req, baseUrl);
+    const bootstrapCommand = buildEnrollmentBootstrapCommand(
+      serverUrl,
+      enrollment.token,
+    );
+
+    res.status(201).json({
+      success: true,
+      enrollment,
+      serverUrl,
+      bootstrap_command: bootstrapCommand,
+      copyText: bootstrapCommand,
+      message:
+        "Enrollment token created. Run the bootstrap command on the MikroTik router.",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET routers that enrolled and are waiting for approval
+router.get("/discovered", async (req, res) => {
+  try {
+    const discovered = await listDiscoveredRouters(req.query.status || null);
+    res.json(discovered);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST approve a discovered router and create a managed zero-touch device
+router.post("/discovered/:id/approve", async (req, res) => {
+  try {
+    const discovered = await getDiscoveredRouter(req.params.id);
+
+    if (!discovered) {
+      return res.status(404).json({ error: "Discovered router not found" });
+    }
+
+    if (discovered.status === "approved" && discovered.router_id) {
+      return res.status(409).json({
+        error: "Discovered router is already approved",
+        router_id: discovered.router_id,
+      });
+    }
+
+    const {
+      name,
+      wan_interface,
+      lan_interface,
+      lan_ports,
+      dns_servers,
+      ntp_servers,
+      radius_server,
+      radius_secret,
+      radius_port,
+      hotspot_enabled,
+      pppoe_enabled,
+      pppoe_interface,
+      pppoe_service_name,
+      mgmt_port,
+      mgmt_username,
+      mgmt_password,
+      connection_type,
+      notes,
+    } = req.body || {};
+
+    const routerId = uuidv4();
+    const provisionToken = provisionStore.generateToken();
+    const encryptedMgmtPassword = mgmt_password
+      ? zeroTouchBilling.encryptForMikrotik(mgmt_password)
+      : null;
+
+    const selectedLanPorts = normalizeStringList(
+      lan_ports,
+      discovered.suggested_lan_ports?.length
+        ? discovered.suggested_lan_ports
+        : ["ether2", "ether3", "ether4", "ether5"],
+    );
+
+    const result = await getDb().query(
+      `INSERT INTO routers (id, project_id, name, identity, model, mac_address, ip_address,
+       wan_interface, lan_interface, lan_ports, provision_token, provision_status,
+       dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
+       hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
+       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+       RETURNING *`,
+      [
+        routerId,
+        null,
+        name ||
+          discovered.identity ||
+          `Discovered Router ${discovered.primary_mac || discovered.source_ip || ""}`.trim(),
+        discovered.identity || name || "MikroTik Router",
+        discovered.model || "",
+        discovered.primary_mac || "",
+        discovered.source_ip || "",
+        wan_interface || discovered.suggested_wan_interface || "ether1",
+        lan_interface || discovered.suggested_lan_interface || "bridge1",
+        selectedLanPorts,
+        provisionToken,
+        "pending",
+        dns_servers || ["8.8.8.8", "8.8.4.4"],
+        ntp_servers || ["pool.ntp.org"],
+        radius_server || "",
+        radius_secret || "",
+        radius_port || 1812,
+        hotspot_enabled || false,
+        pppoe_enabled || false,
+        pppoe_interface || "",
+        pppoe_service_name || "",
+        mgmt_port || 8728,
+        mgmt_username || "",
+        encryptedMgmtPassword,
+        connection_type || "api",
+        notes ||
+          `Approved from enrollment token ${discovered.enrollment_token}`,
+      ],
+    );
+
+    await markDiscoveredApproved(discovered.id, routerId);
+
+    if (global.dbAvailable) {
+      await getDb().query(
+        `UPDATE enrollment_tokens
+         SET status = $1,
+             used_at = CURRENT_TIMESTAMP,
+             router_id = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE token = $3`,
+        ["approved", routerId, discovered.enrollment_token],
+      );
+    } else {
+      const memoryToken = enrollmentMemoryStore.tokens.find(
+        (token) => token.token === discovered.enrollment_token,
+      );
+      if (memoryToken) {
+        memoryToken.status = "approved";
+        memoryToken.used_at = new Date().toISOString();
+        memoryToken.router_id = routerId;
+        memoryToken.updated_at = new Date().toISOString();
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      router: toSafeDevice(result.rows[0]),
+      provision_token: provisionToken,
+      message: "Discovered router approved and device created",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
