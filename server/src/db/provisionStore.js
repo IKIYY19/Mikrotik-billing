@@ -89,9 +89,17 @@ function generateProvisionScript(router, options = {}) {
 
   // DNS Configuration
   lines.push('# DNS Configuration');
-  const dnsServers = router.dns_servers && router.dns_servers.length > 0
-    ? router.dns_servers.filter(s => s && s.trim()).map(s => escapeRouterValue(s)).join(',')
-    : '8.8.8.8,8.8.4.4,1.1.1.1';
+  let dnsServers = '8.8.8.8,8.8.4.4,1.1.1.1';
+  if (router.dns_servers) {
+    if (Array.isArray(router.dns_servers)) {
+      const filtered = router.dns_servers.filter(s => s && typeof s === 'string' && s.trim());
+      if (filtered.length > 0) {
+        dnsServers = filtered.map(s => escapeRouterValue(s.trim())).join(',');
+      }
+    } else if (typeof router.dns_servers === 'string' && router.dns_servers.trim()) {
+      dnsServers = escapeRouterValue(router.dns_servers.trim());
+    }
+  }
   lines.push(`/ip dns set servers=${dnsServers}`);
   lines.push('/ip dns set allow-remote-requests=yes');
   lines.push('/ip dns set cache-size=10000KiB');
