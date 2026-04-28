@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock, Palette, Sun, Moon, Wifi, Plus, Download, Trash2 } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, Clock, DollarSign, FileText, Save, Upload, X, Shield, Check, X as XIcon, CreditCard, Globe, Lock, Palette, Sun, Moon, Wifi, Plus, Download, Trash2, Bell, Webhook, MessageCircle } from 'lucide-react';
 import { ROLES, FEATURE_ACCESS as DEFAULT_FEATURE_ACCESS } from '../lib/permissions';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -77,6 +77,10 @@ export function SettingsPage() {
     peers: [],
   });
 
+  // Notification settings state
+  const [notificationSettings, setNotificationSettings] = useState([]);
+  const [notificationSaving, setNotificationSaving] = useState(false);
+
   const allFeatures = [
     'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
     'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
@@ -91,6 +95,7 @@ export function SettingsPage() {
     fetchPaymentGateways();
     fetchBankPaybills();
     fetchWireguard();
+    fetchNotificationSettings();
   }, []);
 
   const fetchPermissions = async () => {
@@ -134,6 +139,17 @@ export function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch WireGuard settings:', error);
+    }
+  };
+
+  const fetchNotificationSettings = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings/notifications`);
+      if (data) {
+        setNotificationSettings(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notification settings:', error);
     }
   };
 
@@ -334,6 +350,30 @@ export function SettingsPage() {
       console.error('Failed to generate config:', error);
       setMessage({ type: 'error', text: 'Failed to generate config' });
     }
+  };
+
+  const handleSaveNotificationSettings = async () => {
+    setNotificationSaving(true);
+    setMessage(null);
+
+    try {
+      await axios.put(`${API}/settings/notifications`, notificationSettings);
+      setMessage({ type: 'success', text: 'Notification settings saved successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to save notification settings:', error);
+      setMessage({ type: 'error', text: 'Failed to save notification settings' });
+    }
+
+    setNotificationSaving(false);
+  };
+
+  const updateNotificationSetting = (index, field, value) => {
+    setNotificationSettings(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   const timezones = [
@@ -1141,8 +1181,117 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Notifications Settings */}
+      {activeTab === 'notifications' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="w-5 h-5" /> Notification Settings
+              </CardTitle>
+              <CardDescription>
+                Configure how and when you receive notifications for various events.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {notificationSettings.map((setting, index) => (
+                <div key={setting.notification_type} className="p-4 bg-zinc-800/50 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-semibold text-white capitalize">
+                      {setting.notification_type.replace(/_/g, ' ')}
+                    </h3>
+                    <Switch
+                      checked={setting.enabled}
+                      onCheckedChange={(checked) => updateNotificationSetting(index, 'enabled', checked)}
+                    />
+                  </div>
+
+                  {setting.enabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Email */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-zinc-400" />
+                          <Label className="text-sm">Email</Label>
+                          <Switch
+                            checked={setting.email_enabled}
+                            onCheckedChange={(checked) => updateNotificationSetting(index, 'email_enabled', checked)}
+                            size="sm"
+                          />
+                        </div>
+                        {setting.email_enabled && (
+                          <Input
+                            type="text"
+                            value={setting.email_recipients}
+                            onChange={(e) => updateNotificationSetting(index, 'email_recipients', e.target.value)}
+                            placeholder="email1@example.com, email2@example.com"
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
+
+                      {/* SMS */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="w-4 h-4 text-zinc-400" />
+                          <Label className="text-sm">SMS</Label>
+                          <Switch
+                            checked={setting.sms_enabled}
+                            onCheckedChange={(checked) => updateNotificationSetting(index, 'sms_enabled', checked)}
+                            size="sm"
+                          />
+                        </div>
+                        {setting.sms_enabled && (
+                          <Input
+                            type="text"
+                            value={setting.sms_recipients}
+                            onChange={(e) => updateNotificationSetting(index, 'sms_recipients', e.target.value)}
+                            placeholder="+254700000000, +254711000000"
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
+
+                      {/* Webhook */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Webhook className="w-4 h-4 text-zinc-400" />
+                          <Label className="text-sm">Webhook</Label>
+                          <Switch
+                            checked={setting.webhook_enabled}
+                            onCheckedChange={(checked) => updateNotificationSetting(index, 'webhook_enabled', checked)}
+                            size="sm"
+                          />
+                        </div>
+                        {setting.webhook_enabled && (
+                          <Input
+                            type="text"
+                            value={setting.webhook_url}
+                            onChange={(e) => updateNotificationSetting(index, 'webhook_url', e.target.value)}
+                            placeholder="https://your-domain.com/webhook"
+                            className="text-sm"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <Button onClick={handleSaveNotificationSettings} disabled={notificationSaving} className="flex items-center gap-2">
+              <Save className="w-4 h-4" />
+              {notificationSaving ? 'Saving...' : 'Save Notification Settings'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Other tabs - placeholder */}
-      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && activeTab !== 'bank-paybills' && activeTab !== 'wireguard' && (
+      {activeTab !== 'general' && activeTab !== 'permissions' && activeTab !== 'payment-gateways' && activeTab !== 'bank-paybills' && activeTab !== 'wireguard' && activeTab !== 'notifications' && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="text-zinc-500">
             <p className="text-lg font-medium mb-2">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Settings</p>
