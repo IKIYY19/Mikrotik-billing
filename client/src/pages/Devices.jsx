@@ -128,6 +128,52 @@ export function Devices() {
   const [showLogs, setShowLogs] = useState(null);
   const [logs, setLogs] = useState([]);
 
+  // batch approve
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [batchApproving, setBatchApproving] = useState(false);
+  const [showBatchConfig, setShowBatchConfig] = useState(false);
+  const [batchConfig, setBatchConfig] = useState({
+    mgmt_username: "",
+    mgmt_password: "",
+    wan_interface: "ether1",
+    lan_interface: "bridge1",
+  });
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const submitBatchApprove = async () => {
+    setBatchApproving(true);
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/devices/discovered/batch-approve`,
+        { ids: [...selectedIds], config: batchConfig },
+      );
+      addToast(
+        "success",
+        "Batch Approve",
+        `${data.total_succeeded} approved, ${data.total_failed} failed`,
+      );
+      setSelectedIds(new Set());
+      setShowBatchConfig(false);
+      fetchDiscovered();
+      fetchDevices();
+    } catch (e) {
+      addToast(
+        "error",
+        "Batch Approve Error",
+        e.response?.data?.error || e.message,
+      );
+    }
+    setBatchApproving(false);
+  };
+
   // manual create modal
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ ...EMPTY_FORM });
@@ -815,11 +861,137 @@ export function Devices() {
             </Card>
           )}
 
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-purple-800/40 bg-purple-900/10">
+              <span className="text-sm text-zinc-300">
+                {selectedIds.size} router{selectedIds.size > 1 ? "s" : ""}{" "}
+                selected
+              </span>
+              <div className="flex-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBatchConfig(true)}
+              >
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                Batch Approve
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </Button>
+            </div>
+          )}
+
+          {showBatchConfig && (
+            <Card className="border-purple-800/40 bg-purple-900/5">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-medium text-white mb-3">
+                  Batch Approve {selectedIds.size} Router
+                  {selectedIds.size > 1 ? "s" : ""}
+                </h3>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <Label className="text-xs">Mgmt Username</Label>
+                    <Input
+                      value={batchConfig.mgmt_username}
+                      onChange={(e) =>
+                        setBatchConfig((p) => ({
+                          ...p,
+                          mgmt_username: e.target.value,
+                        }))
+                      }
+                      placeholder="admin"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mgmt Password</Label>
+                    <Input
+                      type="password"
+                      value={batchConfig.mgmt_password}
+                      onChange={(e) =>
+                        setBatchConfig((p) => ({
+                          ...p,
+                          mgmt_password: e.target.value,
+                        }))
+                      }
+                      placeholder="password"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">WAN Interface</Label>
+                    <Input
+                      value={batchConfig.wan_interface}
+                      onChange={(e) =>
+                        setBatchConfig((p) => ({
+                          ...p,
+                          wan_interface: e.target.value,
+                        }))
+                      }
+                      placeholder="ether1"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">LAN Bridge</Label>
+                    <Input
+                      value={batchConfig.lan_interface}
+                      onChange={(e) =>
+                        setBatchConfig((p) => ({
+                          ...p,
+                          lan_interface: e.target.value,
+                        }))
+                      }
+                      placeholder="bridge1"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBatchConfig(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={submitBatchApprove}
+                    disabled={batchApproving}
+                  >
+                    {batchApproving ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                        Approving…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Approve All
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {discovered.map((dr) => (
             <DiscoveredRouterCard
               key={dr.id}
               router={dr}
-              onApprove={() => openApproval(dr)}
+              selected={selectedIds.has(dr.id)}
+              onToggle={() => toggleSelected(dr.id)}
+              onApprove={() => {
+                openApproval(dr);
+                setSelectedIds(new Set());
+              }}
               onDelete={() => deleteDiscoveredRouter(dr.id)}
             />
           ))}
@@ -1674,7 +1846,13 @@ export function Devices() {
 
 // ─── DiscoveredRouterCard ────────────────────────────────────────────────────
 
-function DiscoveredRouterCard({ router, onApprove, onDelete }) {
+function DiscoveredRouterCard({
+  router,
+  onApprove,
+  onDelete,
+  selected,
+  onToggle,
+}) {
   const [expanded, setExpanded] = useState(false);
   const interfaces = Array.isArray(router.interfaces) ? router.interfaces : [];
   const addresses = Array.isArray(router.ip_addresses)
@@ -1683,10 +1861,27 @@ function DiscoveredRouterCard({ router, onApprove, onDelete }) {
   const isApproved = router.status === "approved";
 
   return (
-    <Card className={`border-zinc-800 ${isApproved ? "opacity-60" : ""}`}>
+    <Card
+      className={`border-zinc-800 ${isApproved ? "opacity-60" : ""} ${selected ? "ring-2 ring-purple-500/50" : ""}`}
+    >
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
+            {!isApproved && onToggle && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle();
+                }}
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  selected
+                    ? "bg-purple-500 border-purple-500"
+                    : "border-zinc-600 hover:border-zinc-400"
+                }`}
+              >
+                {selected && <CheckCircle2 className="w-4 h-4 text-white" />}
+              </button>
+            )}
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                 isApproved ? "bg-blue-600/20" : "bg-purple-600/20"

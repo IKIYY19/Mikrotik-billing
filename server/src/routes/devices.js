@@ -363,7 +363,7 @@ router.delete("/discovered/:id", async (req, res) => {
 
     if (!global.dbAvailable) {
       const idx = enrollmentMemoryStore.discovered.findIndex(
-        (r) => r.id === discoveredId
+        (r) => r.id === discoveredId,
       );
       if (idx === -1) {
         return res.status(404).json({ error: "Discovered router not found" });
@@ -374,7 +374,7 @@ router.delete("/discovered/:id", async (req, res) => {
 
     const result = await getDb().query(
       "DELETE FROM discovered_routers WHERE id = $1 RETURNING id",
-      [discoveredId]
+      [discoveredId],
     );
 
     if (result.rows.length === 0) {
@@ -784,6 +784,197 @@ router.delete("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Device not found" });
     res.json({ message: "Device deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET count of discovered routers still in 'discovered' status
+router.get("/discovered/count", async (req, res) => {
+  try {
+    if (!global.dbAvailable) {
+      const count = enrollmentMemoryStore.discovered.filter(
+        (r) => r.status === "discovered" || !r.status,
+      ).length;
+      return res.json({ count });
+    }
+    const result = await getDb().query(
+      "SELECT COUNT(*) as count FROM discovered_routers WHERE status = 'discovered'",
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET all provision logs across all routers, most recent first, limited to 100
+router.get("/logs", async (req, res) => {
+  try {
+    if (!global.dbAvailable) {
+      const logs = (provisionStore.store.provision_logs || [])
+        .slice()
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 100)
+        .map((log) => {
+          const router = provisionStore.store.routers.find(
+            (r) => r.id === log.router_id,
+          );
+          return {
+            ...log,
+            router_name: router ? router.name : null,
+            router_identity: router ? router.identity : null,
+          };
+        });
+      return res.json(logs);
+    }
+    const result = await getDb().query(
+      `SELECT pl.*, r.name AS router_name, r.identity AS router_identity
+       FROM provision_logs pl
+       LEFT JOIN routers r ON pl.router_id = r.id
+       ORDER BY pl.created_at DESC
+       LIMIT 100`,
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST batch-approve multiple discovered routers with a shared config
+router.post("/discovered/batch-approve", async (req, res) => {
+  try {
+    const { ids, config } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "ids must be a non-empty array" });
+    }
+    if (!config || typeof config !== "object") {
+      return res.status(400).json({ error: "config object is required" });
+    }
+
+    const succeeded = [];
+    const failed = [];
+
+    for (const discoveredId of ids) {
+      try {
+        const discovered = await getDiscoveredRouter(discoveredId);
+
+        if (!discovered) {
+          failed.push({
+            id: discoveredId,
+            error: "Discovered router not found",
+          });
+          continue;
+        }
+
+        if (discovered.status === "approved" && discovered.router_id) {
+          failed.push({
+            id: discoveredId,
+            error: "Already approved",
+            router_id: discovered.router_id,
+          });
+          continue;
+        }
+
+        const routerId = uuidv4();
+        const provisionToken = provisionStore.generateToken();
+        const encryptedMgmtPassword = config.mgmt_password
+          ? zeroTouchBilling.encryptForMikrotik(config.mgmt_password)
+          : null;
+
+        const selectedLanPorts = normalizeStringList(
+          config.lan_ports,
+          discovered.suggested_lan_ports?.length
+            ? discovered.suggested_lan_ports
+            : ["ether2", "ether3", "ether4", "ether5"],
+        );
+
+        const result = await getDb().query(
+          `INSERT INTO routers (id, project_id, name, identity, model, mac_address, ip_address,
+           wan_interface, lan_interface, lan_ports, provision_token, provision_status,
+           dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
+           hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
+           mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+           RETURNING *`,
+          [
+            routerId,
+            null,
+            config.name ||
+              discovered.identity ||
+              `Discovered Router ${discovered.primary_mac || discovered.source_ip || ""}`.trim(),
+            discovered.identity || config.name || "MikroTik Router",
+            discovered.model || "",
+            discovered.primary_mac || "",
+            discovered.source_ip || "",
+            config.wan_interface ||
+              discovered.suggested_wan_interface ||
+              "ether1",
+            config.lan_interface ||
+              discovered.suggested_lan_interface ||
+              "bridge1",
+            selectedLanPorts,
+            provisionToken,
+            "pending",
+            config.dns_servers || ["8.8.8.8", "8.8.4.4"],
+            config.ntp_servers || ["pool.ntp.org"],
+            config.radius_server || "",
+            config.radius_secret || "",
+            config.radius_port || 1812,
+            config.hotspot_enabled || false,
+            config.pppoe_enabled || false,
+            config.pppoe_interface || "",
+            config.pppoe_service_name || "",
+            config.mgmt_port || 8728,
+            config.mgmt_username || "",
+            encryptedMgmtPassword,
+            config.connection_type || "api",
+            config.notes ||
+              `Approved from enrollment token ${discovered.enrollment_token}`,
+          ],
+        );
+
+        await markDiscoveredApproved(discovered.id, routerId);
+
+        if (global.dbAvailable) {
+          await getDb().query(
+            `UPDATE enrollment_tokens
+             SET status = $1,
+                 used_at = CURRENT_TIMESTAMP,
+                 router_id = $2,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE token = $3`,
+            ["approved", routerId, discovered.enrollment_token],
+          );
+        } else {
+          const memoryToken = enrollmentMemoryStore.tokens.find(
+            (token) => token.token === discovered.enrollment_token,
+          );
+          if (memoryToken) {
+            memoryToken.status = "approved";
+            memoryToken.used_at = new Date().toISOString();
+            memoryToken.router_id = routerId;
+            memoryToken.updated_at = new Date().toISOString();
+          }
+        }
+
+        succeeded.push({
+          id: discoveredId,
+          router_id: routerId,
+          provision_token: provisionToken,
+          router: toSafeDevice(result.rows[0]),
+        });
+      } catch (err) {
+        failed.push({ id: discoveredId, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      succeeded,
+      failed,
+      total_succeeded: succeeded.length,
+      total_failed: failed.length,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
