@@ -211,7 +211,7 @@ function generateProvisionScript(router, options = {}) {
   lines.push("# DHCP Server Configuration");
   lines.push("/ip pool add name=dhcp_pool ranges=" + dhcpStart + "-" + dhcpEnd);
   lines.push(
-    `/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain=local`,
+    `/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`,
   );
   lines.push(
     `/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`,
