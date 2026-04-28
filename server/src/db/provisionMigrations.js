@@ -112,6 +112,10 @@ const provisioningMigrations = [
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
 
+  // Add management credentials columns to discovered_routers for auto billing linking
+  `ALTER TABLE discovered_routers ADD COLUMN IF NOT EXISTS mgmt_username VARCHAR(100)`,
+  `ALTER TABLE discovered_routers ADD COLUMN IF NOT EXISTS mgmt_password TEXT`,
+
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_routers_project_id ON routers(project_id)`,
   `CREATE INDEX IF NOT EXISTS idx_routers_token ON routers(provision_token)`,

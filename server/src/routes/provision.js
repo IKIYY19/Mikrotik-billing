@@ -339,6 +339,8 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
       suggested_wan_interface: data.suggested_wan_interface || null,
       suggested_lan_interface: "bridge1",
       suggested_lan_ports: data.suggested_lan_ports || [],
+      mgmt_username: data.mgmt_username || null,
+      mgmt_password: data.mgmt_password || null,
       status: "discovered",
       first_seen_at: now,
       last_seen_at: now,
@@ -370,6 +372,8 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
            raw_payload = $10,
            suggested_wan_interface = COALESCE($11, suggested_wan_interface),
            suggested_lan_ports = COALESCE($12, suggested_lan_ports),
+           mgmt_username = COALESCE($14, mgmt_username),
+           mgmt_password = COALESCE($15, mgmt_password),
            last_seen_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
          WHERE enrollment_token = $13
@@ -388,6 +392,8 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
           data.suggested_wan_interface || null,
           data.suggested_lan_ports || null,
           enrollToken,
+          data.mgmt_username || null,
+          data.mgmt_password || null,
         ],
       );
       return result.rows[0];
@@ -398,8 +404,10 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
          (id, enrollment_token, token_id, identity, model, version, serial_number, primary_mac,
           source_ip, user_agent, interfaces, ip_addresses, raw_payload,
           suggested_wan_interface, suggested_lan_interface, suggested_lan_ports, status,
+          mgmt_username, mgmt_password,
           first_seen_at, last_seen_at, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'bridge1',$15,'discovered',
+               $16,$17,
                CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
        RETURNING *`,
       [
@@ -418,6 +426,8 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
         JSON.stringify(data),
         data.suggested_wan_interface || null,
         data.suggested_lan_ports || null,
+        data.mgmt_username || null,
+        data.mgmt_password || null,
       ],
     );
     return result.rows[0];
@@ -593,6 +603,15 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       ':local enrollToken "' + token + '"',
       ':local serverUrl "' + cleanUrl + '"',
       "",
+      "# ── Optional: Management credentials for auto billing linking ──",
+      "# Set these on the router BEFORE running this script:",
+      '#   :global ztpMgmtUser "admin"',
+      '#   :global ztpMgmtPass "password"',
+      ":global ztpMgmtUser; :global ztpMgmtPass;",
+      ":local mgmtUser $ztpMgmtUser",
+      ":local mgmtPass $ztpMgmtPass",
+      ':if ([:len $mgmtUser] > 0) do={ :log info message="[ZTP] Mgmt user provided: $mgmtUser" }',
+      "",
       "# URL-encode subroutine - encodes special characters in URL parameters",
       ":global ztpUrlEncode do={",
       "  :local str $1",
@@ -649,6 +668,7 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       "",
       "# ── Step 2: Report system info via GET (v6 + v7 compatible) ──",
       ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . [$ztpUrlEncode $sysIdentity] . "&model=" . [$ztpUrlEncode $sysModel] . "&version=" . [$ztpUrlEncode $sysVersion] . "&uptime=" . [$ztpUrlEncode $sysUptime] . "&serial=" . [$ztpUrlEncode $sysSerial] . "&mac=" . [$ztpUrlEncode $sysMac])',
+      ':if ([:len $mgmtUser] > 0) do={ :set reportUrl ($reportUrl . "&mgmt_user=" . [$ztpUrlEncode $mgmtUser] . "&mgmt_pass=" . [$ztpUrlEncode $mgmtPass]) }',
       `:do { ${fetchCmd("$reportUrl")} } on-error={}`,
       "",
       ':log info message=("[ZTP] Reported system info: " . $sysIdentity)',
@@ -739,6 +759,8 @@ router.all("/enroll/report/:token", async (req, res) => {
       ip_addresses: [],
       suggested_wan_interface: null,
       suggested_lan_ports: [],
+      mgmt_username: raw.mgmt_user || null,
+      mgmt_password: raw.mgmt_pass || null,
     };
 
     await upsertDiscoveredRouter(token, tokenRecord, data, ip, ua);
@@ -1005,7 +1027,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
           identity: routerName,
           model: discovered.model || "unknown",
           mac_address: macAddr,
-          ip_address: "",
+          ip_address: discovered.source_ip || "",
           wan_interface: wanIface,
           lan_interface: lanIface,
           provision_token: provisionToken,
@@ -1022,6 +1044,10 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
           pppoe_interface: "",
           pppoe_service_name: "",
           mgmt_port: 8728,
+          mgmt_username: discovered.mgmt_username || "",
+          mgmt_password_encrypted: discovered.mgmt_password
+            ? zeroTouchBilling.encryptForMikrotik(discovered.mgmt_password)
+            : null,
           notes: "",
           lan_ports: lanPorts,
           created_at: now,
@@ -1034,18 +1060,24 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
         [provisionToken],
       );
       if (existingRouter.rows.length === 0) {
+        const mgmtPasswordEncrypted = discovered.mgmt_password
+          ? zeroTouchBilling.encryptForMikrotik(discovered.mgmt_password)
+          : null;
         await getDb().query(
-          `INSERT INTO routers (id, name, identity, model, mac_address, wan_interface, lan_interface, provision_token, provision_status, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+          `INSERT INTO routers (id, name, identity, model, mac_address, ip_address, wan_interface, lan_interface, provision_token, provision_status, mgmt_username, mgmt_password_encrypted, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
           [
             routerId,
             routerName,
             routerName,
             discovered.model || "unknown",
             macAddr,
+            discovered.source_ip || "",
             wanIface,
             lanIface,
             provisionToken,
+            discovered.mgmt_username || null,
+            mgmtPasswordEncrypted,
           ],
         );
       }
@@ -1104,6 +1136,15 @@ router.get("/ztp/one-shot/:token", async (req, res) => {
       ':local enrollToken "' + token + '"',
       ':local serverUrl "' + cleanUrl + '"',
       "",
+      "# ── Optional: Management credentials for auto billing linking ──",
+      "# Set these on the router BEFORE running this script:",
+      '#   :global ztpMgmtUser "admin"',
+      '#   :global ztpMgmtPass "password"',
+      ":global ztpMgmtUser; :global ztpMgmtPass;",
+      ":local mgmtUser $ztpMgmtUser",
+      ":local mgmtPass $ztpMgmtPass",
+      ':if ([:len $mgmtUser] > 0) do={ :log info message="[ZTP] Mgmt user provided: $mgmtUser" }',
+      "",
       "# URL-encode subroutine - encodes special characters in URL parameters",
       ":global ztpUrlEncode do={",
       "  :local str $1",
@@ -1160,6 +1201,7 @@ router.get("/ztp/one-shot/:token", async (req, res) => {
       "",
       "# ── Step 2: Report system info ──",
       ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . [$ztpUrlEncode $sysIdentity] . "&model=" . [$ztpUrlEncode $sysModel] . "&version=" . [$ztpUrlEncode $sysVersion] . "&uptime=" . [$ztpUrlEncode $sysUptime] . "&serial=" . [$ztpUrlEncode $sysSerial] . "&mac=" . [$ztpUrlEncode $sysMac])',
+      ':if ([:len $mgmtUser] > 0) do={ :set reportUrl ($reportUrl . "&mgmt_user=" . [$ztpUrlEncode $mgmtUser] . "&mgmt_pass=" . [$ztpUrlEncode $mgmtPass]) }',
       `:do { ${fetchNoKeep("$reportUrl")} } on-error={}`,
       ':log info message=("[ZTP] Reported system info: " . $sysIdentity)',
       "",
