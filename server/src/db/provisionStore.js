@@ -90,7 +90,7 @@ function generateProvisionScript(router, options = {}) {
   // DNS Configuration
   lines.push('# DNS Configuration');
   const dnsServers = router.dns_servers && router.dns_servers.length > 0
-    ? router.dns_servers.join(',')
+    ? router.dns_servers.filter(s => s && s.trim()).map(s => escapeRouterValue(s)).join(',')
     : '8.8.8.8,8.8.4.4,1.1.1.1';
   lines.push(`/ip dns set servers=${dnsServers}`);
   lines.push('/ip dns set allow-remote-requests=yes');
@@ -101,13 +101,13 @@ function generateProvisionScript(router, options = {}) {
   lines.push('# NTP Configuration');
   lines.push('/system ntp client set enabled=yes');
   const ntpServers = router.ntp_servers && router.ntp_servers.length > 0
-    ? router.ntp_servers
+    ? router.ntp_servers.filter(s => s && s.trim())
     : ['pool.ntp.org', 'time.google.com'];
   if (ntpServers[0]) {
-    lines.push(`/system ntp client set primary-ntp=${ntpServers[0]}`);
+    lines.push(`/system ntp client set primary-ntp=${escapeRouterValue(ntpServers[0])}`);
   }
   if (ntpServers[1]) {
-    lines.push(`/system ntp client set secondary-ntp=${ntpServers[1]}`);
+    lines.push(`/system ntp client set secondary-ntp=${escapeRouterValue(ntpServers[1])}`);
   }
   lines.push('/system ntp client set mode=unicast');
   lines.push('');
@@ -190,9 +190,9 @@ function generateProvisionScript(router, options = {}) {
   lines.push('');
 
   // RADIUS Configuration
-  if (router.radius_server && router.radius_secret) {
+  if (router.radius_server && router.radius_secret && router.radius_server.trim() && router.radius_secret.trim()) {
     lines.push('# RADIUS Configuration');
-    lines.push(`/radius add address=${router.radius_server} secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`);
+    lines.push(`/radius add address=${escapeRouterValue(router.radius_server)} secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`);
     lines.push('/ppp aaa set use-radius=yes accounting=yes');
     lines.push('/ip hotspot aaa set use-radius=yes accounting=yes');
     lines.push('');
