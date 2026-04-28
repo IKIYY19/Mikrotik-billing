@@ -356,6 +356,38 @@ router.get("/discovered", async (req, res) => {
   }
 });
 
+// DELETE a discovered router
+router.delete("/discovered/:id", async (req, res) => {
+  try {
+    const discoveredId = req.params.id;
+
+    if (!global.dbAvailable) {
+      const idx = enrollmentMemoryStore.discovered.findIndex(
+        (r) => r.id === discoveredId
+      );
+      if (idx === -1) {
+        return res.status(404).json({ error: "Discovered router not found" });
+      }
+      enrollmentMemoryStore.discovered.splice(idx, 1);
+      return res.json({ success: true });
+    }
+
+    const result = await getDb().query(
+      "DELETE FROM discovered_routers WHERE id = $1 RETURNING id",
+      [discoveredId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Discovered router not found" });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Delete discovered router error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST approve a discovered router and create a managed zero-touch device
 router.post("/discovered/:id/approve", async (req, res) => {
   try {
