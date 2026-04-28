@@ -6,7 +6,99 @@
 const express = require('express');
 const router = express.Router();
 
-// In-memory settings store (in production, use database)
+// Get database connection
+function getDb() {
+  return global.db;
+}
+
+// Helper to get setting value from database
+async function getSetting(key, defaultValue = '') {
+  if (!getDb()) {
+    // Fallback to in-memory if database not available
+    return defaultValue;
+  }
+  try {
+    const result = await getDb().query('SELECT value FROM settings WHERE key = $1', [key]);
+    return result.rows[0]?.value || defaultValue;
+  } catch (error) {
+    console.error(`Error getting setting ${key}:`, error);
+    return defaultValue;
+  }
+}
+
+// Helper to set setting value in database
+async function setSetting(key, value) {
+  if (!getDb()) {
+    return false;
+  }
+  try {
+    await getDb().query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+      [key, value]
+    );
+    return true;
+  } catch (error) {
+    console.error(`Error setting ${key}:`, error);
+    return false;
+  }
+}
+
+// Helper to get all settings as object
+async function getAllSettings() {
+  if (!getDb()) {
+    // Fallback to default values
+    return {
+      company_name: '',
+      company_logo: '',
+      contact_email: '',
+      contact_phone: '',
+      address: '',
+      city: '',
+      country: '',
+      timezone: 'Africa/Nairobi',
+      currency: 'KES',
+      currency_symbol: 'KES',
+      date_format: 'DD/MM/YYYY',
+      invoice_prefix: 'INV-',
+      invoice_start_number: '1001',
+      payment_terms: '14',
+      tax_rate: '16',
+    };
+  }
+
+  const defaults = {
+    company_name: '',
+    company_logo: '',
+    contact_email: '',
+    contact_phone: '',
+    address: '',
+    city: '',
+    country: '',
+    timezone: 'Africa/Nairobi',
+    currency: 'KES',
+    currency_symbol: 'KES',
+    date_format: 'DD/MM/YYYY',
+    invoice_prefix: 'INV-',
+    invoice_start_number: '1001',
+    payment_terms: '14',
+    tax_rate: '16',
+  };
+
+  try {
+    const result = await getDb().query('SELECT key, value FROM settings');
+    const settings = { ...defaults };
+    result.rows.forEach(row => {
+      settings[row.key] = row.value;
+    });
+    return settings;
+  } catch (error) {
+    console.error('Error getting all settings:', error);
+    return defaults;
+  }
+}
+
+// In-memory settings store (fallback when database not available)
 const settingsStore = {
   company_name: '',
   company_logo: '',
@@ -150,14 +242,34 @@ const bankPaybillStore = {
 };
 
 // Get settings
-router.get('/', (req, res) => {
-  res.json(settingsStore);
+router.get('/', async (req, res) => {
+  const settings = await getAllSettings();
+  res.json(settings);
 });
 
 // Update settings
-router.put('/', (req, res) => {
-  Object.assign(settingsStore, req.body);
-  res.json(settingsStore);
+router.put('/', async (req, res) => {
+  const settings = req.body;
+  
+  if (!getDb()) {
+    // Fallback to in-memory if database not available
+    Object.assign(settingsStore, settings);
+    res.json(settingsStore);
+    return;
+  }
+
+  try {
+    // Save each setting to the database
+    for (const [key, value] of Object.entries(settings)) {
+      await setSetting(key, value);
+    }
+    
+    const updatedSettings = await getAllSettings();
+    res.json(updatedSettings);
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
 });
 
 // Get permissions

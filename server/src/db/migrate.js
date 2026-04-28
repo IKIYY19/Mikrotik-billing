@@ -25,6 +25,15 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
   `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
 
+  // Settings table for application-wide settings
+  `CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(255) UNIQUE NOT NULL,
+    value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key)`,
+
   // Projects table
   `CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
