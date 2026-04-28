@@ -41,12 +41,42 @@ function buildProvisionCommand(serverUrl, token, method = "script", delay = 0) {
   }
 }
 
+// Simple in-memory cache for provision scripts (30s TTL)
+const provisionCache = new Map();
+const PROVISION_CACHE_TTL = 30_000; // 30 seconds
+
+function getCachedScript(token) {
+  const cached = provisionCache.get(token);
+  if (cached && Date.now() - cached.timestamp < PROVISION_CACHE_TTL) {
+    return cached.script;
+  }
+  provisionCache.delete(token);
+  return null;
+}
+
+function setCachedScript(token, script) {
+  provisionCache.set(token, { script, timestamp: Date.now() });
+  // Evict old entries if cache grows too large
+  if (provisionCache.size > 100) {
+    const oldest = [...provisionCache.entries()]
+      .sort(([, a], [, b]) => a.timestamp - b.timestamp)
+      .slice(0, 20);
+    oldest.forEach(([key]) => provisionCache.delete(key));
+  }
+}
+
 // GET /mikrotik/provision/:token - Router downloads its config
 router.get("/provision/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const ip = req.ip || req.connection.remoteAddress;
     const ua = req.get("User-Agent") || "unknown";
+
+    // Check cache first
+    const cached = getCachedScript(token);
+    if (cached) {
+      return res.type("text/plain").send(cached);
+    }
 
     // Find router by token
     const result = await getDb().query(
@@ -96,6 +126,9 @@ router.get("/provision/:token", async (req, res) => {
       callbackBaseUrl: getServerBaseUrl(req),
     });
 
+    // Cache the script for subsequent rapid requests (e.g., retries)
+    setCachedScript(token, script);
+
     // Log the script for debugging
     console.log(
       `[Provision] Generated script for router ${routerData.id} (${routerData.name}):`,
@@ -142,6 +175,9 @@ router.get("/provision/callback/:token", async (req, res) => {
     }
 
     const routerData = result.rows[0];
+
+    // Invalidate cached script so next fetch is fresh
+    provisionCache.delete(token);
 
     // Mark as provisioned
     await getDb().query(

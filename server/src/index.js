@@ -33,16 +33,38 @@ process.on("uncaughtException", (error) => {
   });
 });
 
-// Graceful shutdown handling
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM signal received: closing HTTP server");
-  process.exit(0);
-});
+// Graceful shutdown - these will be re-bound in startServer() once the server is created
+let serverInstance = null;
 
-process.on("SIGINT", () => {
-  logger.info("SIGINT signal received: closing HTTP server");
-  process.exit(0);
-});
+async function shutdownGracefully(signal) {
+  logger.info(`${signal} received: shutting down gracefully`);
+
+  // Stop accepting new requests
+  if (serverInstance) {
+    serverInstance.close(() => {
+      logger.info("HTTP server closed");
+    });
+  }
+
+  // Disconnect database pool
+  if (global.db && global.db.end) {
+    try {
+      await global.db.end();
+      logger.info("Database pool disconnected");
+    } catch (err) {
+      logger.warn("Error disconnecting database", { error: err.message });
+    }
+  }
+
+  // Give in-flight requests 3 seconds to finish, then exit
+  setTimeout(() => {
+    logger.info("Shutdown complete");
+    process.exit(0);
+  }, 3000);
+}
+
+process.on("SIGTERM", () => shutdownGracefully("SIGTERM"));
+process.on("SIGINT", () => shutdownGracefully("SIGINT"));
 
 // Try to use PostgreSQL, fall back to in-memory storage
 let db;
@@ -522,14 +544,12 @@ const startServer = async () => {
         path: req.path,
         method: req.method,
       });
-      res
-        .status(500)
-        .json({
-          error:
-            process.env.NODE_ENV === "production"
-              ? "Internal server error"
-              : err.message,
-        });
+      res.status(500).json({
+        error:
+          process.env.NODE_ENV === "production"
+            ? "Internal server error"
+            : err.message,
+      });
     });
 
     // SPA catch-all route MUST be last - serves index.html for all non-API routes
@@ -583,7 +603,7 @@ const startServer = async () => {
         });
       }
 
-      const server = app.listen(PORT, () => {
+      serverInstance = app.listen(PORT, () => {
         logger.info("Server started", {
           port: PORT,
           environment: process.env.NODE_ENV || "development",
