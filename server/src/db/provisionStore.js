@@ -171,7 +171,7 @@ function generateProvisionScript(router, options = {}) {
   // WAN Configuration
   lines.push("# WAN Configuration");
   lines.push(
-    `/ip dhcp-client add interface=${wanIface} add-default-route=yes use-peer-dns=no comment="WAN - Auto-configured"`,
+    `:do { /ip dhcp-client add interface=${wanIface} add-default-route=yes use-peer-dns=no comment="WAN - Auto-configured" } on-error={}`,
   );
   lines.push("");
 
