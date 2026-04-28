@@ -97,13 +97,15 @@ router.get("/provision/:token", async (req, res) => {
     });
 
     // Log the script for debugging
-    console.log(`[Provision] Generated script for router ${routerData.id} (${routerData.name}):`);
-    console.log('--- SCRIPT START ---');
-    const scriptLines = script.split('\n');
+    console.log(
+      `[Provision] Generated script for router ${routerData.id} (${routerData.name}):`,
+    );
+    console.log("--- SCRIPT START ---");
+    const scriptLines = script.split("\n");
     scriptLines.forEach((line, idx) => {
       console.log(`${String(idx + 1).padStart(3)}: ${line}`);
     });
-    console.log('--- SCRIPT END ---');
+    console.log("--- SCRIPT END ---");
 
     // Log the event
     await getDb().query(
@@ -852,6 +854,311 @@ router.get("/enroll/done/:token", async (req, res) => {
   } catch (error) {
     console.error("[Enrollment] Done error:", error.message);
     res.type("text/plain").send("# ERROR: " + error.message);
+  }
+});
+
+/**
+ * GET /mikrotik/enroll/auto-complete/:token
+ * Called by the one-shot script after reporting all data.
+ * Auto-approves the discovered router, creates a router record,
+ * and returns a RouterOS script snippet with the provision token.
+ */
+router.get("/enroll/auto-complete/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const ip = req.ip || req.connection.remoteAddress;
+
+    const tokenRecord = await findEnrollmentToken(token);
+    if (!tokenRecord) {
+      return res.type("text/plain").send("# ERROR: Invalid enrollment token");
+    }
+
+    if (
+      tokenRecord.expires_at &&
+      new Date(tokenRecord.expires_at) < new Date()
+    ) {
+      return res.type("text/plain").send("# ERROR: Token expired");
+    }
+
+    if (tokenRecord.status === "approved") {
+      // Already approved, just return the existing provision token
+      const existingRouter = await getDb().query(
+        "SELECT provision_token FROM routers WHERE provision_token IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+      );
+      if (existingRouter.rows.length > 0) {
+        return res
+          .type("text/plain")
+          .send(
+            `:global provisionToken "${existingRouter.rows[0].provision_token}"`,
+          );
+      }
+    }
+
+    // 1. Find the discovered router
+    let discovered = null;
+    if (!global.dbAvailable) {
+      discovered = enrollmentMemoryStore.discovered.find(
+        (d) => d.enrollment_token === token,
+      );
+    } else {
+      const result = await getDb().query(
+        "SELECT * FROM discovered_routers WHERE enrollment_token = $1",
+        [token],
+      );
+      discovered = result.rows[0] || null;
+    }
+
+    if (!discovered) {
+      // Create a minimal discovered record if it doesn't exist yet
+      if (!global.dbAvailable) {
+        discovered = {
+          id: uuidv4(),
+          enrollment_token: token,
+          identity: "router",
+          model: "unknown",
+          primary_mac: "00:00:00:00:00:00",
+          suggested_wan_interface: "ether1",
+          suggested_lan_ports: [
+            "ether2",
+            "ether3",
+            "ether4",
+            "ether5",
+            "ether6",
+            "ether7",
+            "ether8",
+          ],
+          status: "discovered",
+        };
+        enrollmentMemoryStore.discovered.push(discovered);
+      } else {
+        return res
+          .type("text/plain")
+          .send(
+            "# ERROR: Router not discovered yet. Complete enrollment first.",
+          );
+      }
+    }
+
+    // 2. Mark as approved
+    const now = new Date().toISOString();
+    if (!global.dbAvailable) {
+      discovered.status = "approved";
+      discovered.approved_at = now;
+    } else {
+      await getDb().query(
+        `UPDATE discovered_routers SET status = 'approved', approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE enrollment_token = $1`,
+        [token],
+      );
+    }
+
+    // 3. Create router record with provision token
+    const provisionToken = provisionStore.generateToken();
+    const routerId = `router-${uuidv4().slice(0, 8)}`;
+    const routerName = discovered.identity || "ztp-router";
+    const wanIface = discovered.suggested_wan_interface || "ether1";
+    const lanIface = discovered.suggested_lan_interface || "bridge1";
+    const lanPorts = discovered.suggested_lan_ports || [
+      "ether2",
+      "ether3",
+      "ether4",
+    ];
+    const macAddr = discovered.primary_mac || `00:00:00:00:00:00`;
+
+    if (!global.dbAvailable) {
+      const store = provisionStore.extendStore();
+      const existing = store.routers.find(
+        (r) => r.provision_token === provisionToken,
+      );
+      if (!existing) {
+        store.routers.push({
+          id: routerId,
+          project_id: null,
+          name: routerName,
+          identity: routerName,
+          model: discovered.model || "unknown",
+          mac_address: macAddr,
+          ip_address: "",
+          wan_interface: wanIface,
+          lan_interface: lanIface,
+          provision_token: provisionToken,
+          provision_status: "pending",
+          last_provisioned_at: null,
+          provision_attempts: 0,
+          dns_servers: ["8.8.8.8", "8.8.4.4"],
+          ntp_servers: ["pool.ntp.org"],
+          radius_server: "",
+          radius_secret: "",
+          radius_port: 1812,
+          hotspot_enabled: false,
+          pppoe_enabled: false,
+          pppoe_interface: "",
+          pppoe_service_name: "",
+          mgmt_port: 8728,
+          notes: "",
+          lan_ports: lanPorts,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    } else {
+      // Check if router already exists for this token
+      const existingRouter = await getDb().query(
+        "SELECT id FROM routers WHERE provision_token = $1",
+        [provisionToken],
+      );
+      if (existingRouter.rows.length === 0) {
+        await getDb().query(
+          `INSERT INTO routers (id, name, identity, model, mac_address, wan_interface, lan_interface, provision_token, provision_status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            routerId,
+            routerName,
+            routerName,
+            discovered.model || "unknown",
+            macAddr,
+            wanIface,
+            lanIface,
+            provisionToken,
+          ],
+        );
+      }
+    }
+
+    console.log(
+      `[Enrollment] Auto-complete - token: ${token}, provisionToken: ${provisionToken}, router: ${routerName}`,
+    );
+
+    // Return RouterOS script that sets the provision token variable
+    res.type("text/plain").send(`:global provisionToken "${provisionToken}"`);
+  } catch (error) {
+    console.error("[Enrollment] Auto-complete error:", error.message);
+    res.type("text/plain").send("# ERROR: " + error.message);
+  }
+});
+
+/**
+ * GET /mikrotik/ztp/one-shot/:token
+ * ONE-STEP Zero-Touch Provisioning — discover + auto-approve + provision in a single script.
+ * Just run this ONE command on the router and it's fully set up.
+ */
+router.get("/ztp/one-shot/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const serverUrl = getServerBaseUrl(req);
+    const cleanUrl = serverUrl.replace(/\/$/, "");
+    const isHttps = cleanUrl.startsWith("https");
+    const mode = isHttps ? "https" : "http";
+    const certCheck = "check-certificate=no";
+
+    const fetchNoKeep = (urlExpr) =>
+      `/tool fetch mode=${mode} ${certCheck} url=${urlExpr} keep-result=no`;
+    const fetchSaveFile = (urlExpr, dst) =>
+      `/tool fetch mode=${mode} ${certCheck} url=${urlExpr} dst-path=${dst}`;
+
+    const script = [
+      "#############################################",
+      "# MikroTik One-Shot ZTP Script",
+      "# Generated by MikroTik Billing Platform",
+      `# Token: ${token}`,
+      `# Server: ${cleanUrl}`,
+      "# Discover + Auto-Approve + Provision in ONE step",
+      "# Works on RouterOS v6.49+ and v7.x",
+      "#############################################",
+      "",
+      ':local enrollToken "' + token + '"',
+      ':local serverUrl "' + cleanUrl + '"',
+      "",
+      "# ── Step 1: Collect system info ──",
+      ":local sysIdentity [/system identity get name]",
+      ':local sysModel ""',
+      ':local sysVersion ""',
+      ':local sysUptime ""',
+      ':local sysSerial ""',
+      ':local sysMac ""',
+      "",
+      ":do { :set sysModel [/system resource get board-name] } on-error={}",
+      ":do { :set sysVersion [/system resource get version] } on-error={}",
+      ":do { :set sysUptime [/system resource get uptime] } on-error={}",
+      ":do { :set sysSerial [/system routerboard get serial-number] } on-error={}",
+      "",
+      "# Get first ethernet MAC as primary identifier",
+      ":do {",
+      "  :local eths [/interface ethernet find]",
+      "  :if ([:len $eths] > 0) do={",
+      "    :set sysMac [/interface ethernet get ($eths->0) mac-address]",
+      "  }",
+      "} on-error={}",
+      "",
+      "# ── Step 2: Report system info ──",
+      ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . $sysIdentity . "&model=" . $sysModel . "&version=" . $sysVersion . "&uptime=" . $sysUptime . "&serial=" . $sysSerial . "&mac=" . $sysMac)',
+      `:do { ${fetchNoKeep("$reportUrl")} } on-error={}`,
+      ':log info message=("[ZTP] Reported system info: " . $sysIdentity)',
+      "",
+      "# ── Step 3: Report each interface ──",
+      ":foreach iface in=[/interface find] do={",
+      '  :local iName ""',
+      '  :local iType ""',
+      '  :local iMac ""',
+      '  :local iRunning "false"',
+      '  :local iDisabled "false"',
+      "",
+      "  :do { :set iName [/interface get $iface name] } on-error={}",
+      "  :do { :set iType [/interface get $iface type] } on-error={}",
+      "  :do { :set iMac [/interface get $iface mac-address] } on-error={}",
+      '  :do {\n    :if ([/interface get $iface running]) do={ :set iRunning "true" }\n  } on-error={}',
+      '  :do {\n    :if ([/interface get $iface disabled]) do={ :set iDisabled "true" }\n  } on-error={}',
+      "",
+      '  :local ifaceUrl ($serverUrl . "/mikrotik/enroll/iface/" . $enrollToken . "?n=" . $iName . "&t=" . $iType . "&m=" . $iMac . "&r=" . $iRunning . "&d=" . $iDisabled)',
+      `  :do { ${fetchNoKeep("$ifaceUrl")} } on-error={}`,
+      "}",
+      "",
+      "# ── Step 4: Report IP addresses ──",
+      ":foreach addr in=[/ip address find] do={",
+      '  :local aAddr ""',
+      '  :local aIface ""',
+      "  :do { :set aAddr [/ip address get $addr address] } on-error={}",
+      "  :do { :set aIface [/ip address get $addr interface] } on-error={}",
+      '  :local addrUrl ($serverUrl . "/mikrotik/enroll/addr/" . $enrollToken . "?addr=" . $aAddr . "&iface=" . $aIface)',
+      `  :do { ${fetchNoKeep("$addrUrl")} } on-error={}`,
+      "}",
+      "",
+      "# ── Step 5: Auto-complete (server approves + generates provision token) ──",
+      ':log info message="[ZTP] Enrollment complete. Auto-approving and provisioning..."',
+      ':put "[ZTP] Auto-approving and generating provision script..."',
+      `:do { ${fetchSaveFile('($serverUrl . "/mikrotik/enroll/auto-complete/" . $enrollToken)', "ztp-token.rsc")} } on-error={}`,
+      ":delay 2s",
+      "",
+      "# ── Step 6: Read the provision token and fetch the provision script ──",
+      ':do { /import file-name=ztp-token.rsc } on-error={ :put "[ZTP] Failed to get provision token" }',
+      ":delay 1s",
+      "",
+      ":if ([:len $provisionToken] > 0) do={",
+      `  :do { ${fetchSaveFile('($serverUrl . "/mikrotik/provision/" . $provisionToken)', "provision.rsc")} } on-error={ :put "[ZTP] Failed to download provision script" }`,
+      "  :delay 1s",
+      "",
+      "  # Apply the provision script",
+      '  :do { /import file-name=provision.rsc } on-error={ :put "[ZTP] Provision script had errors, check logs" }',
+      "} else={",
+      '  :put "[ZTP] ERROR: No provision token received. Check server logs."',
+      "}",
+      "",
+      "# Cleanup temp files",
+      ":do { /file remove ztp-token.rsc } on-error={}",
+      ":do { /file remove provision.rsc } on-error={}",
+      "",
+      ':put "[ZTP] One-shot provisioning complete! Router is now configured."',
+      ':log info message="[ZTP] One-shot provisioning complete!"',
+      "#############################################",
+      "# End of One-Shot ZTP Script",
+      "#############################################",
+    ].join("\n");
+
+    console.log(`[ZTP] One-shot script fetched - token: ${token}`);
+    res.type("text/plain").send(script);
+  } catch (error) {
+    console.error("[ZTP] One-shot error:", error.message);
+    res.status(500).type("text/plain").send("# ERROR: Internal server error");
   }
 });
 
