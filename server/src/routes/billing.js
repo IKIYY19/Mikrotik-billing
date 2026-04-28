@@ -700,13 +700,13 @@ router.get('/invoices', async (req, res) => {
 router.post('/invoices', async (req, res) => {
   try {
     const invoice = await billing.createInvoice(req.body);
-    
+
     // Send SMS notification
     const customer = invoice.customer || await billing.getCustomerById(invoice.customer_id);
     if (customer?.phone) {
       triggerSMS('invoice_due_soon', { customer, invoice }).catch(e => console.error('SMS error:', e.message));
     }
-    
+
     // Send Telegram alert
     if (invoice.invoice_number) {
       alertSystem.sendNewInvoice(
@@ -716,9 +716,91 @@ router.post('/invoices', async (req, res) => {
         invoice.due_date
       ).catch(e => console.error('Telegram alert error:', e.message));
     }
-    
+
     res.status(201).json(invoice);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Credit Notes
+router.get('/credit-notes', async (req, res) => {
+  try {
+    if (!global.db) {
+      return res.json([]);
+    }
+    const result = await global.db.query(
+      `SELECT cn.*, c.name as customer_name, i.invoice_number
+       FROM credit_notes cn
+       LEFT JOIN customers c ON c.id = cn.customer_id
+       LEFT JOIN invoices i ON i.id = cn.invoice_id
+       ORDER BY cn.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/credit-notes', async (req, res) => {
+  try {
+    const { customer_id, invoice_id, amount, reason } = req.body || {};
+
+    if (!customer_id || !amount) {
+      return res.status(400).json({ error: 'customer_id and amount are required' });
+    }
+
+    if (!global.db) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+
+    // Generate credit note number
+    const now = new Date();
+    const prefix = `CN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const countResult = await global.db.query(
+      `SELECT COUNT(*) FROM credit_notes WHERE credit_note_number LIKE $1`,
+      [`${prefix}%`]
+    );
+    const count = parseInt(countResult.rows[0].count) + 1;
+    const creditNoteNumber = `${prefix}-${String(count).padStart(4, '0')}`;
+
+    const result = await global.db.query(
+      `INSERT INTO credit_notes (id, credit_note_number, customer_id, invoice_id, amount, reason, status)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'pending') RETURNING *`,
+      [creditNoteNumber, customer_id, invoice_id || null, parseFloat(amount), reason || '']
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('Credit note error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/credit-notes/:id', async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    const creditNoteId = req.params.id;
+
+    if (!status) {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    if (!global.db) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+
+    const result = await global.db.query(
+      `UPDATE credit_notes SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, creditNoteId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Credit note not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put('/invoices/:id', async (req, res) => {

@@ -10,6 +10,129 @@ const healthCheckService = require('../services/healthCheckService');
 // Get database connection
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
 
+// ─── BANDWIDTH MONITORING ───
+
+// Get bandwidth history for a customer
+router.get('/bandwidth/customer/:customer_id', async (req, res) => {
+  try {
+    const { customer_id } = req.params;
+    const { hours = 24 } = req.query;
+
+    const startTime = new Date();
+    startTime.setHours(startTime.getHours() - parseInt(hours));
+
+    const result = await getDb().query(
+      `SELECT 
+         DATE_TRUNC('hour', recorded_at) as hour,
+         SUM(bytes_in) as total_bytes_in,
+         SUM(bytes_out) as total_bytes_out,
+         COUNT(*) as record_count
+       FROM usage_records
+       WHERE customer_id = $1 AND recorded_at >= $2
+       GROUP BY DATE_TRUNC('hour', recorded_at)
+       ORDER BY hour ASC`,
+      [customer_id, startTime.toISOString()]
+    );
+
+    res.json(result.rows);
+  } catch (e) {
+    logger.error('Failed to fetch customer bandwidth', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get bandwidth history for a router
+router.get('/bandwidth/router/:router_id', async (req, res) => {
+  try {
+    const { router_id } = req.params;
+    const { hours = 24 } = req.query;
+
+    const startTime = new Date();
+    startTime.setHours(startTime.getHours() - parseInt(hours));
+
+    const result = await getDb().query(
+      `SELECT 
+         DATE_TRUNC('hour', recorded_at) as hour,
+         AVG(bandwidth_in) as avg_bandwidth_in,
+         AVG(bandwidth_out) as avg_bandwidth_out,
+         AVG(active_pppoe) as avg_active_pppoe,
+         AVG(cpu_usage) as avg_cpu_usage,
+         AVG(memory_usage) as avg_memory_usage
+       FROM device_metrics
+       WHERE router_id = $1 AND recorded_at >= $2
+       GROUP BY DATE_TRUNC('hour', recorded_at)
+       ORDER BY hour ASC`,
+      [router_id, startTime.toISOString()]
+    );
+
+    res.json(result.rows);
+  } catch (e) {
+    logger.error('Failed to fetch router bandwidth', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get customer usage summary
+router.get('/usage/customer/:customer_id', async (req, res) => {
+  try {
+    const { customer_id } = req.params;
+    const { days = 30 } = req.query;
+
+    const startTime = new Date();
+    startTime.setDate(startTime.getDate() - parseInt(days));
+
+    const result = await getDb().query(
+      `SELECT 
+         DATE_TRUNC('day', recorded_at) as day,
+         SUM(bytes_in) as total_bytes_in,
+         SUM(bytes_out) as total_bytes_out,
+         SUM(session_time) as total_session_time,
+         COUNT(*) as session_count
+       FROM usage_records
+       WHERE customer_id = $1 AND recorded_at >= $2
+       GROUP BY DATE_TRUNC('day', recorded_at)
+       ORDER BY day ASC`,
+      [customer_id, startTime.toISOString()]
+    );
+
+    res.json(result.rows);
+  } catch (e) {
+    logger.error('Failed to fetch customer usage', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get top bandwidth consumers
+router.get('/bandwidth/top-consumers', async (req, res) => {
+  try {
+    const { limit = 10, days = 7 } = req.query;
+
+    const startTime = new Date();
+    startTime.setDate(startTime.getDate() - parseInt(days));
+
+    const result = await getDb().query(
+      `SELECT 
+         ur.customer_id,
+         c.name as customer_name,
+         c.email,
+         SUM(ur.bytes_in + ur.bytes_out) as total_bytes,
+         COUNT(*) as session_count
+       FROM usage_records ur
+       JOIN customers c ON c.id = ur.customer_id
+       WHERE ur.recorded_at >= $1
+       GROUP BY ur.customer_id, c.name, c.email
+       ORDER BY total_bytes DESC
+       LIMIT $2`,
+      [startTime.toISOString(), parseInt(limit)]
+    );
+
+    res.json(result.rows);
+  } catch (e) {
+    logger.error('Failed to fetch top consumers', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── HEALTH CHECKS ───
 
 // Get health check history for a connection

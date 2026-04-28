@@ -402,6 +402,17 @@ const invoices = {
     );
     return result.rows;
   },
+
+  async getByDueDate(dueDate) {
+    const result = await db.query(
+      `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
+       FROM invoices i JOIN customers c ON c.id = i.customer_id
+       WHERE i.status != 'paid' AND i.due_date = $1
+       ORDER BY i.due_date ASC`,
+      [dueDate]
+    );
+    return result.rows;
+  },
 };
 
 // ─── PAYMENTS ───

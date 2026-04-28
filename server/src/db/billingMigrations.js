@@ -152,6 +152,62 @@ const billingMigrations = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_templates_event_channel
    ON notification_templates(event_type, channel)`,
 
+  // QoS Profiles
+  `CREATE TABLE IF NOT EXISTS qos_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    max_upload VARCHAR(50),
+    max_download VARCHAR(50),
+    burst_upload VARCHAR(50),
+    burst_download VARCHAR(50),
+    burst_time INTEGER,
+    priority VARCHAR(20) DEFAULT 'normal',
+    limit_at VARCHAR(50),
+    parent_profile_id UUID REFERENCES qos_profiles(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_qos_profiles_name ON qos_profiles(name)`,
+
+  // QoS Rules
+  `CREATE TABLE IF NOT EXISTS qos_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    profile_id UUID NOT NULL REFERENCES qos_profiles(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    protocol VARCHAR(20),
+    src_port VARCHAR(50),
+    dst_port VARCHAR(50),
+    src_address VARCHAR(50),
+    dst_address VARCHAR(50),
+    priority INTEGER DEFAULT 0,
+    action VARCHAR(20) DEFAULT 'limit',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_qos_rules_profile ON qos_rules(profile_id)`,
+
+  // Captive Portal Templates
+  `CREATE TABLE IF NOT EXISTS captive_portal_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    theme VARCHAR(50) DEFAULT 'default',
+    logo_url TEXT,
+    background_image TEXT,
+    primary_color VARCHAR(20) DEFAULT '#3b82f6',
+    secondary_color VARCHAR(20) DEFAULT '#1e40af',
+    custom_css TEXT,
+    custom_html TEXT,
+    login_method VARCHAR(20) DEFAULT 'voucher',
+    show_pricing BOOLEAN DEFAULT false,
+    show_terms BOOLEAN DEFAULT false,
+    terms_text TEXT,
+    welcome_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_captive_portal_templates_name ON captive_portal_templates(name)`,
+
   // Users (for auth)
   `CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

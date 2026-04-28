@@ -389,6 +389,12 @@ const startServer = async () => {
       logger.warn('Monitoring API disabled (set ENABLE_MONITORING_API=true to enable)');
     }
 
+    // QoS routes
+    app.use('/api/qos', authenticate, require('./routes/qos'));
+
+    // Captive Portal routes
+    app.use('/api/captive-portal', authenticate, require('./routes/captivePortal'));
+
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());
 
@@ -424,6 +430,15 @@ const startServer = async () => {
         } catch (e) {
           logger.warn('Could not start auto-suspend cron', { error: e.message });
         }
+      }
+
+      // Start payment reminders cron
+      try {
+        const { startCron: startPaymentReminders } = require('./cron/paymentReminders');
+        startPaymentReminders();
+        logger.info('Payment reminders cron started');
+      } catch (e) {
+        logger.warn('Could not start payment reminders cron', { error: e.message });
       }
 
       // Start metrics collection cron

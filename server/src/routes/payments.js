@@ -228,6 +228,64 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Refund a payment
+router.post('/:id/refund', async (req, res) => {
+  try {
+    const { amount, reason, reference } = req.body || {};
+    const paymentId = req.params.id;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Refund amount must be greater than 0' });
+    }
+
+    if (!global.db) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+
+    // Get payment details
+    const paymentResult = await global.db.query(
+      'SELECT * FROM payments WHERE id = $1',
+      [paymentId]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Check if refund amount exceeds payment amount
+    const alreadyRefunded = payment.refund_amount || 0;
+    const availableForRefund = payment.amount - alreadyRefunded;
+
+    if (amount > availableForRefund) {
+      return res.status(400).json({ error: `Refund amount exceeds available amount. Available: ${availableForRefund}` });
+    }
+
+    // Update payment with refund
+    const newRefundAmount = alreadyRefunded + parseFloat(amount);
+    await global.db.query(
+      `UPDATE payments
+       SET refund_amount = $1, refund_reference = $2, notes = COALESCE(notes, '') || ' Refund: ' || $3
+       WHERE id = $4 RETURNING *`,
+      [newRefundAmount, reference || '', reason || '', paymentId]
+    );
+
+    // If full refund, update invoice status back to pending
+    if (newRefundAmount >= payment.amount && payment.invoice_id) {
+      await global.db.query(
+        `UPDATE invoices SET status = 'pending' WHERE id = $1`,
+        [payment.invoice_id]
+      );
+    }
+
+    res.json({ success: true, refund_amount: newRefundAmount, message: 'Refund processed successfully' });
+  } catch (e) {
+    console.error('Refund error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════
 // PAYMENT METHODS CONFIG
 // ═══════════════════════════════════════
