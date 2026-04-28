@@ -61,6 +61,11 @@ export function Devices() {
   const [provisionMethod, setProvisionMethod] = useState("import");
   const [commandLoading, setCommandLoading] = useState({});
   const [activationLoading, setActivationLoading] = useState({});
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [publicProvisionUrl, setPublicProvisionUrl] = useState(
+    getProvisionServerOrigin(),
+  );
   const [formData, setFormData] = useState({
     name: "",
     identity: "",
@@ -68,6 +73,8 @@ export function Devices() {
     dns_servers: ["8.8.8.8", "8.8.4.4"],
     ntp_servers: ["pool.ntp.org"],
     wan_interface: "ether1",
+    lan_interface: "bridge1",
+    lan_ports: ["ether2", "ether3", "ether4", "ether5"],
     radius_server: "",
     radius_secret: "",
     hotspot_enabled: false,
@@ -107,6 +114,8 @@ export function Devices() {
         dns_servers: ["8.8.8.8", "8.8.4.4"],
         ntp_servers: ["pool.ntp.org"],
         wan_interface: "ether1",
+        lan_interface: "bridge1",
+        lan_ports: ["ether2", "ether3", "ether4", "ether5"],
         radius_server: "",
         radius_secret: "",
         hotspot_enabled: false,
@@ -118,6 +127,7 @@ export function Devices() {
         connection_type: "api",
         notes: "",
       });
+      setScanResult(null);
       fetchDevices();
     } catch (e) {
       console.error(e);
@@ -182,6 +192,64 @@ export function Devices() {
     }
   };
 
+  const scanRouter = async () => {
+    if (
+      !formData.ip_address ||
+      !formData.mgmt_username ||
+      !formData.mgmt_password
+    ) {
+      window.alert(
+        "Enter router IP/host, management username, and password before scanning.",
+      );
+      return;
+    }
+
+    setScanLoading(true);
+    try {
+      const { data } = await axios.post(`${API_URL}/devices/scan`, {
+        ip_address: formData.ip_address,
+        mgmt_port: formData.mgmt_port,
+        api_port: formData.mgmt_port,
+        username: formData.mgmt_username,
+        password: formData.mgmt_password,
+      });
+
+      setScanResult(data);
+      setFormData((prev) => ({
+        ...prev,
+        identity: data.identity || prev.identity,
+        model: data.model || prev.model,
+        wan_interface: data.suggested?.wan_interface || prev.wan_interface,
+        lan_interface: data.suggested?.lan_interface || prev.lan_interface,
+        lan_ports: data.suggested?.lan_ports?.length
+          ? data.suggested.lan_ports
+          : prev.lan_ports,
+        connection_type: "api",
+      }));
+    } catch (e) {
+      console.error(e);
+      window.alert(
+        e.response?.data?.message ||
+          e.response?.data?.error ||
+          "Router scan failed. If the router is remote, make sure the server can reach its public/VPN IP and API port.",
+      );
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const toggleLanPort = (portName) => {
+    setFormData((prev) => {
+      const current = prev.lan_ports || [];
+      return {
+        ...prev,
+        lan_ports: current.includes(portName)
+          ? current.filter((port) => port !== portName)
+          : [...current, portName],
+      };
+    });
+  };
+
   const getProvisionCommand = async (
     device,
     method = "import",
@@ -189,7 +257,9 @@ export function Devices() {
   ) => {
     setProvisionMethod(method);
     setCommandLoading((prev) => ({ ...prev, [device.id]: true }));
-    const serverUrl = getProvisionServerOrigin();
+    const serverUrl = (
+      publicProvisionUrl || getProvisionServerOrigin()
+    ).replace(/\/$/, "");
 
     try {
       const request = regenerate
@@ -319,6 +389,23 @@ export function Devices() {
         </Button>
       </div>
 
+      <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
+        <CardContent className="p-4 space-y-2">
+          <Label htmlFor="public-provision-url">Public Provisioning URL</Label>
+          <Input
+            id="public-provision-url"
+            value={publicProvisionUrl}
+            onChange={(e) => setPublicProvisionUrl(e.target.value)}
+            placeholder="https://your-domain.com or http://public-ip:5000"
+          />
+          <p className="text-xs text-slate-400">
+            Use a URL reachable by the MikroTik router. For remote routers, this
+            must be your public domain, public IP, VPN address, or tunnel URL —
+            not localhost.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Devices Grid */}
       {devices.length === 0 ? (
         <div className="text-center py-16">
@@ -437,6 +524,14 @@ export function Devices() {
               <CardContent className="p-4 grid grid-cols-2 gap-3 text-sm border-t border-zinc-800">
                 <div className="text-zinc-400">
                   WAN: <span className="text-white">{dev.wan_interface}</span>
+                </div>
+                <div className="text-zinc-400">
+                  LAN Ports:{" "}
+                  <span className="text-white">
+                    {dev.lan_ports?.length
+                      ? dev.lan_ports.join(", ")
+                      : "Not set"}
+                  </span>
                 </div>
                 <div className="text-zinc-400">
                   DNS:{" "}
@@ -632,6 +727,39 @@ export function Devices() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="device-lan-bridge">LAN Bridge Name</Label>
+                    <Input
+                      id="device-lan-bridge"
+                      value={formData.lan_interface}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          lan_interface: e.target.value,
+                        })
+                      }
+                      placeholder="bridge1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="device-lan-ports">LAN Ports</Label>
+                    <Input
+                      id="device-lan-ports"
+                      value={(formData.lan_ports || []).join(", ")}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          lan_ports: e.target.value
+                            .split(",")
+                            .map((port) => port.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="ether2, ether3, ether4"
+                    />
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="device-ip">Router IP / Host</Label>
@@ -708,6 +836,93 @@ export function Devices() {
                       placeholder="Stored securely for billing link"
                     />
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-white">
+                        Scan MikroTik Before Provisioning
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        The server will connect to the router API, read
+                        identity, model, interfaces, and suggest WAN/LAN ports.
+                        For remote routers, the server must reach the router
+                        public/VPN IP and API port.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={scanRouter}
+                      disabled={scanLoading}
+                      className="shrink-0"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 mr-2 ${scanLoading ? "animate-spin" : ""}`}
+                      />
+                      {scanLoading ? "Scanning..." : "Scan Router"}
+                    </Button>
+                  </div>
+
+                  {scanResult?.interfaces?.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-slate-300">
+                        Found {scanResult.interfaces.length} interfaces on{" "}
+                        <span className="text-white">
+                          {scanResult.identity || scanResult.host}
+                        </span>
+                        {scanResult.model ? ` (${scanResult.model})` : ""}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        {scanResult.interfaces.map((iface) => (
+                          <label
+                            key={iface.id || iface.name}
+                            className="flex items-center justify-between gap-3 rounded border border-zinc-800 bg-zinc-900/70 p-2 text-xs"
+                          >
+                            <div>
+                              <div className="text-white font-medium">
+                                {iface.name}
+                              </div>
+                              <div className="text-slate-500">
+                                {iface.type || "interface"} •{" "}
+                                {iface.running ? "running" : "not running"}
+                                {iface.addresses?.length
+                                  ? ` • ${iface.addresses.join(", ")}`
+                                  : ""}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFormData({
+                                    ...formData,
+                                    wan_interface: iface.name,
+                                  })
+                                }
+                                className={`px-2 py-1 rounded ${
+                                  formData.wan_interface === iface.name
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-zinc-800 text-zinc-300"
+                                }`}
+                              >
+                                WAN
+                              </button>
+                              <input
+                                type="checkbox"
+                                checked={(formData.lan_ports || []).includes(
+                                  iface.name,
+                                )}
+                                onChange={() => toggleLanPort(iface.name)}
+                              />
+                              <span className="text-slate-400">LAN</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="device-dns">

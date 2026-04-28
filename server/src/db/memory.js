@@ -310,22 +310,23 @@ module.exports = {
         ip_address: params[6],
         wan_interface: params[7],
         lan_interface: params[8],
-        provision_token: params[9],
-        provision_status: params[10],
-        dns_servers: params[11],
-        ntp_servers: params[12],
-        radius_server: params[13],
-        radius_secret: params[14],
-        radius_port: params[15],
-        hotspot_enabled: params[16],
-        pppoe_enabled: params[17],
-        pppoe_interface: params[18],
-        pppoe_service_name: params[19],
-        mgmt_port: params[20],
-        mgmt_username: params[21],
-        mgmt_password_encrypted: params[22],
-        connection_type: params[23],
-        notes: params[24],
+        lan_ports: params[9],
+        provision_token: params[10],
+        provision_status: params[11],
+        dns_servers: params[12],
+        ntp_servers: params[13],
+        radius_server: params[14],
+        radius_secret: params[15],
+        radius_port: params[16],
+        hotspot_enabled: params[17],
+        pppoe_enabled: params[18],
+        pppoe_interface: params[19],
+        pppoe_service_name: params[20],
+        mgmt_port: params[21],
+        mgmt_username: params[22],
+        mgmt_password_encrypted: params[23],
+        connection_type: params[24],
+        notes: params[25],
         linked_mikrotik_connection_id: null,
         billing_activated_at: null,
         billing_activation_error: null,
@@ -351,20 +352,21 @@ module.exports = {
       if (lowerText.includes('ip_address =')) router.ip_address = params[4];
       if (lowerText.includes('wan_interface =')) router.wan_interface = params[5];
       if (lowerText.includes('lan_interface =')) router.lan_interface = params[6];
-      if (lowerText.includes('dns_servers =')) router.dns_servers = params[7];
-      if (lowerText.includes('ntp_servers =')) router.ntp_servers = params[8];
-      if (lowerText.includes('radius_server =')) router.radius_server = params[9];
-      if (lowerText.includes('radius_secret =')) router.radius_secret = params[10];
-      if (lowerText.includes('radius_port =')) router.radius_port = params[11];
-      if (lowerText.includes('hotspot_enabled =')) router.hotspot_enabled = params[12];
-      if (lowerText.includes('pppoe_enabled =')) router.pppoe_enabled = params[13];
-      if (lowerText.includes('pppoe_interface =')) router.pppoe_interface = params[14];
-      if (lowerText.includes('pppoe_service_name =')) router.pppoe_service_name = params[15];
-      if (lowerText.includes('mgmt_port =')) router.mgmt_port = params[16];
-      if (lowerText.includes('mgmt_username =')) router.mgmt_username = params[17];
-      if (lowerText.includes('mgmt_password_encrypted =')) router.mgmt_password_encrypted = params[18];
-      if (lowerText.includes('connection_type =')) router.connection_type = params[19];
-      if (lowerText.includes('notes =')) router.notes = params[20];
+      if (lowerText.includes('lan_ports =')) router.lan_ports = params[7];
+      if (lowerText.includes('dns_servers =')) router.dns_servers = params[8];
+      if (lowerText.includes('ntp_servers =')) router.ntp_servers = params[9];
+      if (lowerText.includes('radius_server =')) router.radius_server = params[10];
+      if (lowerText.includes('radius_secret =')) router.radius_secret = params[11];
+      if (lowerText.includes('radius_port =')) router.radius_port = params[12];
+      if (lowerText.includes('hotspot_enabled =')) router.hotspot_enabled = params[13];
+      if (lowerText.includes('pppoe_enabled =')) router.pppoe_enabled = params[14];
+      if (lowerText.includes('pppoe_interface =')) router.pppoe_interface = params[15];
+      if (lowerText.includes('pppoe_service_name =')) router.pppoe_service_name = params[16];
+      if (lowerText.includes('mgmt_port =')) router.mgmt_port = params[17];
+      if (lowerText.includes('mgmt_username =')) router.mgmt_username = params[18];
+      if (lowerText.includes('mgmt_password_encrypted =')) router.mgmt_password_encrypted = params[19];
+      if (lowerText.includes('connection_type =')) router.connection_type = params[20];
+      if (lowerText.includes('notes =')) router.notes = params[21];
       if (lowerText.includes('provision_token =')) router.provision_token = params[0];
       if (lowerText.includes('provision_status =')) router.provision_status = params[0];
       if (lowerText.includes('linked_mikrotik_connection_id =')) router.linked_mikrotik_connection_id = params[0];

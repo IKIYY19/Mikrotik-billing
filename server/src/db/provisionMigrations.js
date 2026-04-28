@@ -15,13 +15,14 @@ const provisioningMigrations = [
     ip_address VARCHAR(45),
     wan_interface VARCHAR(50) DEFAULT 'ether1',
     lan_interface VARCHAR(50) DEFAULT 'bridge1',
-    
+    lan_ports TEXT[] DEFAULT ARRAY['ether2', 'ether3', 'ether4', 'ether5'],
+
     -- Provisioning
     provision_token VARCHAR(128) UNIQUE NOT NULL DEFAULT gen_random_uuid(),
     provision_status VARCHAR(20) DEFAULT 'pending',
     last_provisioned_at TIMESTAMP,
     provision_attempts INTEGER DEFAULT 0,
-    
+
     -- Router settings
     dns_servers TEXT[],
     ntp_servers TEXT[],
@@ -33,7 +34,7 @@ const provisioningMigrations = [
     pppoe_interface VARCHAR(50),
     pppoe_service_name VARCHAR(100),
     mgmt_port INTEGER DEFAULT 8728,
-    
+
     -- Metadata
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -66,6 +67,7 @@ const provisioningMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_routers_project_id ON routers(project_id)`,
   `CREATE INDEX IF NOT EXISTS idx_routers_token ON routers(provision_token)`,
   `CREATE INDEX IF NOT EXISTS idx_routers_status ON routers(provision_status)`,
+  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS lan_ports TEXT[] DEFAULT ARRAY['ether2', 'ether3', 'ether4', 'ether5']`,
   `ALTER TABLE routers ADD COLUMN IF NOT EXISTS mgmt_username VARCHAR(100)`,
   `ALTER TABLE routers ADD COLUMN IF NOT EXISTS mgmt_password_encrypted TEXT`,
   `ALTER TABLE routers ADD COLUMN IF NOT EXISTS connection_type VARCHAR(10) DEFAULT 'api'`,
