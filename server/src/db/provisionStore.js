@@ -100,9 +100,17 @@ function generateProvisionScript(router, options = {}) {
   // NTP Configuration
   lines.push('# NTP Configuration');
   lines.push('/system ntp client set enabled=yes');
-  const ntpServers = router.ntp_servers && router.ntp_servers.length > 0
-    ? router.ntp_servers.filter(s => s && s.trim())
-    : ['pool.ntp.org', 'time.google.com'];
+  let ntpServers = ['pool.ntp.org', 'time.google.com'];
+  if (router.ntp_servers) {
+    if (Array.isArray(router.ntp_servers)) {
+      const filtered = router.ntp_servers.filter(s => s && typeof s === 'string' && s.trim());
+      if (filtered.length > 0) {
+        ntpServers = filtered;
+      }
+    } else if (typeof router.ntp_servers === 'string' && router.ntp_servers.trim()) {
+      ntpServers = [router.ntp_servers.trim()];
+    }
+  }
   if (ntpServers[0]) {
     lines.push(`/system ntp client set primary-ntp=${escapeRouterValue(ntpServers[0])}`);
   }
