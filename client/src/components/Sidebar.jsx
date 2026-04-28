@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   LayoutDashboard,
   Network,
@@ -36,10 +37,13 @@ import {
   Radio,
   Gauge,
   Router,
+  Building2,
 } from 'lucide-react';
 import { clearAuth } from '../lib/auth';
 import { SearchButton } from './GlobalSearch';
 import { canAccessFeature, ROLES } from '../lib/permissions';
+
+const API = import.meta.env.VITE_API_URL || '/api';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', feature: 'dashboard' },
@@ -92,6 +96,7 @@ const billingItems = [
 export function Sidebar({ onSearchOpen }) {
   const [billingOpen, setBillingOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [settings, setSettings] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -102,13 +107,24 @@ export function Sidebar({ onSearchOpen }) {
         setUser(parsed);
       }
     } catch (err) {
-      console.error('Failed to parse user data:', err);
-      setUser(null);
+      console.error('Error parsing user data:', err);
     }
+
+    // Fetch settings
+    fetchSettings();
   }, []);
 
-  const handleLogout = async () => {
-    await clearAuth();
+  const fetchSettings = async () => {
+    try {
+      const { data } = await axios.get(`${API}/settings`);
+      setSettings(data);
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    clearAuth();
     navigate('/login');
   };
 
@@ -117,11 +133,17 @@ export function Sidebar({ onSearchOpen }) {
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800/50">
         <NavLink to="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <SettingsIcon className="w-4 h-4 text-white" />
-          </div>
+          {settings?.company_logo ? (
+            <img src={settings.company_logo} alt="Company Logo" className="w-8 h-8 rounded-lg object-cover" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+          )}
           <div>
-            <div className="text-sm font-semibold text-white">MTK Builder</div>
+            <div className="text-sm font-semibold text-white truncate max-w-[120px]">
+              {settings?.company_name || 'MTK Builder'}
+            </div>
             <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">ISP Platform</div>
           </div>
         </NavLink>
