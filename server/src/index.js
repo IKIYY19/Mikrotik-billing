@@ -1,42 +1,46 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const { loadEnv } = require('./config/loadEnv');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
+const { loadEnv } = require("./config/loadEnv");
 loadEnv();
-const logger = require('./utils/logger');
-const { validateSecrets } = require('./utils/security');
-const { initSentry, sentryErrorHandler } = require('./services/sentry');
+const logger = require("./utils/logger");
+const { validateSecrets } = require("./utils/security");
+const { initSentry, sentryErrorHandler } = require("./services/sentry");
 
-const isTestEnv = process.env.NODE_ENV === 'test';
-const isProductionEnv = process.env.NODE_ENV === 'production';
-
+const isTestEnv = process.env.NODE_ENV === "test";
+const isProductionEnv = process.env.NODE_ENV === "production";
 
 // Prevent crashes from unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Promise Rejection', { error: reason?.message || reason });
-  const Sentry = require('./services/sentry').Sentry;
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error("Unhandled Promise Rejection", {
+    error: reason?.message || reason,
+  });
+  const Sentry = require("./services/sentry").Sentry;
   Sentry.captureException(reason, {
-    tags: { type: 'unhandledRejection' },
+    tags: { type: "unhandledRejection" },
   });
 });
 
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
-  const Sentry = require('./services/sentry').Sentry;
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught Exception", {
+    error: error.message,
+    stack: error.stack,
+  });
+  const Sentry = require("./services/sentry").Sentry;
   Sentry.captureException(error, {
-    tags: { type: 'uncaughtException' },
+    tags: { type: "uncaughtException" },
   });
 });
 
 // Graceful shutdown handling
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM signal received: closing HTTP server");
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
+process.on("SIGINT", () => {
+  logger.info("SIGINT signal received: closing HTTP server");
   process.exit(0);
 });
 
@@ -44,11 +48,14 @@ process.on('SIGINT', () => {
 let db;
 let dbAvailable = false;
 let billingRepo = null;
-const defaultDevCorsOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+const defaultDevCorsOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+];
 
 function parseAllowedOrigins(rawOrigins) {
-  const values = (rawOrigins || '')
-    .split(',')
+  const values = (rawOrigins || "")
+    .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
@@ -65,18 +72,22 @@ function ensureCriticalProductionConfig() {
   }
 
   const missing = [];
-  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
-  if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
-  if (!process.env.CORS_ORIGIN) missing.push('CORS_ORIGIN');
+  if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
+  if (!process.env.ENCRYPTION_KEY) missing.push("ENCRYPTION_KEY");
+  if (!process.env.CORS_ORIGIN) missing.push("CORS_ORIGIN");
 
   // DATABASE_URL is optional - if not provided, app will use in-memory storage
   // This allows deployments without a database (for testing/demo purposes)
   if (!process.env.DATABASE_URL) {
-    logger.warn('DATABASE_URL not set - using in-memory storage (not recommended for production)');
+    logger.warn(
+      "DATABASE_URL not set - using in-memory storage (not recommended for production)",
+    );
   }
 
   if (missing.length > 0) {
-    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+    throw new Error(
+      `Missing required production environment variables: ${missing.join(", ")}`,
+    );
   }
 }
 
@@ -92,44 +103,51 @@ function createCorsOriginHandler() {
       return callback(null, true);
     }
 
-    return callback(new Error('Origin not allowed by CORS'));
+    return callback(new Error("Origin not allowed by CORS"));
   };
 }
 
 function applySecurityHeaders(req, res, next) {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
   next();
 }
 
 async function initDB() {
   if (isTestEnv) {
-    db = require('./db/memory');
-    billingRepo = require('./db/billingStore');
+    db = require("./db/memory");
+    billingRepo = require("./db/billingStore");
     dbAvailable = false;
-    logger.info('Using in-memory database in test environment');
+    logger.info("Using in-memory database in test environment");
     return false;
   }
 
   try {
-    const pgDb = require('./db');
-    await pgDb.query('SELECT 1');
+    const pgDb = require("./db");
+    await pgDb.query("SELECT 1");
     db = pgDb;
     dbAvailable = true;
-    logger.info('Using PostgreSQL database');
+    logger.info("Using PostgreSQL database");
 
     // Load billing repo
-    billingRepo = require('./db/billingRepository');
+    billingRepo = require("./db/billingRepository");
   } catch (err) {
     if (isProductionEnv) {
-      logger.error('PostgreSQL is required in production startup', { error: err.message });
+      logger.error("PostgreSQL is required in production startup", {
+        error: err.message,
+      });
       throw err;
     }
-    logger.warn('PostgreSQL not available, using in-memory storage', { error: err.message });
-    db = require('./db/memory');
-    billingRepo = require('./db/billingStore');
+    logger.warn("PostgreSQL not available, using in-memory storage", {
+      error: err.message,
+    });
+    db = require("./db/memory");
+    billingRepo = require("./db/billingStore");
     dbAvailable = false;
     return false;
   }
@@ -138,26 +156,32 @@ async function initDB() {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-app.disable('x-powered-by');
-app.set('trust proxy', isProductionEnv ? 1 : false);
-const monitoringApiEnabled = process.env.ENABLE_MONITORING_API === 'true';
+app.disable("x-powered-by");
+app.set("trust proxy", isProductionEnv ? 1 : false);
+app.set("query parser", "simple");
+const monitoringApiEnabled = process.env.ENABLE_MONITORING_API === "true";
 
 // Middleware
-app.use(cors({
-  origin: createCorsOriginHandler(),
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: createCorsOriginHandler(),
+    credentials: true,
+  }),
+);
 app.use(applySecurityHeaders);
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Apply general rate limiting to all API routes
-const { trackUserActivity, startOnlineStatusUpdater } = require('./middleware/userActivity');
-const { apiLimiter } = require('./middleware/rateLimiter');
-app.use('/api', apiLimiter);
+const {
+  trackUserActivity,
+  startOnlineStatusUpdater,
+} = require("./middleware/userActivity");
+const { apiLimiter } = require("./middleware/rateLimiter");
+app.use("/api", apiLimiter);
 
 // Track user activity on authenticated requests
-app.use('/api', trackUserActivity);
+app.use("/api", trackUserActivity);
 
 // Start server
 const startServer = async () => {
@@ -166,7 +190,9 @@ const startServer = async () => {
       ensureCriticalProductionConfig();
       const secretsValid = validateSecrets();
       if (!secretsValid && isProductionEnv) {
-        throw new Error('Security validation failed: configure non-default JWT_SECRET and ENCRYPTION_KEY');
+        throw new Error(
+          "Security validation failed: configure non-default JWT_SECRET and ENCRYPTION_KEY",
+        );
       }
     }
 
@@ -182,40 +208,61 @@ const startServer = async () => {
 
     // Run database migrations automatically
     if (dbAvailable) {
-      const { runMigrations } = require('./db/migrate');
+      const { runMigrations } = require("./db/migrate");
       await runMigrations();
-      logger.info('Database migrations done');
+      logger.info("Database migrations done");
     } else {
-      logger.info('Skipping SQL migrations while running in memory mode');
+      logger.info("Skipping SQL migrations while running in memory mode");
     }
 
     // Bootstrap initial admin only when the user table is empty
     try {
-      const bcrypt = require('bcryptjs');
-      const { v4: uuidv4 } = require('uuid');
-      const userCount = await db.query('SELECT COUNT(*) FROM users');
+      const bcrypt = require("bcryptjs");
+      const { v4: uuidv4 } = require("uuid");
+      const userCount = await db.query("SELECT COUNT(*) FROM users");
       if (parseInt(userCount.rows[0].count) === 0) {
-        const configuredAdminEmail = process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '';
-        const configuredAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '';
+        const configuredAdminEmail =
+          process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "";
+        const configuredAdminPassword =
+          process.env.INITIAL_ADMIN_PASSWORD ||
+          process.env.ADMIN_PASSWORD ||
+          "";
 
-        if (isProductionEnv && (!configuredAdminEmail || !configuredAdminPassword)) {
-          throw new Error('INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are required for a fresh production deployment');
+        if (
+          isProductionEnv &&
+          (!configuredAdminEmail || !configuredAdminPassword)
+        ) {
+          throw new Error(
+            "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are required for a fresh production deployment",
+          );
         }
 
-        const adminEmail = configuredAdminEmail || 'admin@example.com';
-        const adminPassword = configuredAdminPassword || 'admin123';
+        const adminEmail = configuredAdminEmail || "admin@example.com";
+        const adminPassword = configuredAdminPassword || "admin123";
         const adminHash = await bcrypt.hash(adminPassword, 10);
         await db.query(
           `INSERT INTO users (id, email, password_hash, name, role, is_active, created_at)
            VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
-          [uuidv4(), adminEmail, adminHash, 'Administrator', 'admin']
+          [uuidv4(), adminEmail, adminHash, "Administrator", "admin"],
         );
-        logger.info('Initial admin created', { email: adminEmail, passwordConfigured: Boolean(configuredAdminPassword) });
+        logger.info("Initial admin created", {
+          email: adminEmail,
+          passwordConfigured: Boolean(configuredAdminPassword),
+        });
       } else {
-        const adminEmail = process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@example.com';
-        const adminCheck = await db.query('SELECT id, email, role FROM users WHERE email = $1', [adminEmail]);
-        if (adminCheck.rows.length > 0 && adminCheck.rows[0].role !== 'admin') {
-          await db.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', adminEmail]);
+        const adminEmail =
+          process.env.INITIAL_ADMIN_EMAIL ||
+          process.env.ADMIN_EMAIL ||
+          "admin@example.com";
+        const adminCheck = await db.query(
+          "SELECT id, email, role FROM users WHERE email = $1",
+          [adminEmail],
+        );
+        if (adminCheck.rows.length > 0 && adminCheck.rows[0].role !== "admin") {
+          await db.query("UPDATE users SET role = $1 WHERE email = $2", [
+            "admin",
+            adminEmail,
+          ]);
           logger.info('Fixed admin role to "admin"');
         }
       }
@@ -223,25 +270,25 @@ const startServer = async () => {
       if (isProductionEnv) {
         throw e;
       }
-      logger.warn('Admin user creation/fix skipped', { error: e.message });
+      logger.warn("Admin user creation/fix skipped", { error: e.message });
     }
 
-    app.get('/api/live', (req, res) => {
+    app.get("/api/live", (req, res) => {
       res.json({
-        status: 'ok',
+        status: "ok",
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
       });
     });
 
-    app.get('/api/ready', async (req, res) => {
+    app.get("/api/ready", async (req, res) => {
       try {
         const ready = !isProductionEnv || dbAvailable;
         const payload = {
-          status: ready ? 'ok' : 'degraded',
+          status: ready ? "ok" : "degraded",
           timestamp: new Date().toISOString(),
-          database: dbAvailable ? 'connected' : 'memory',
-          environment: process.env.NODE_ENV || 'development',
+          database: dbAvailable ? "connected" : "memory",
+          environment: process.env.NODE_ENV || "development",
         };
 
         if (!ready) {
@@ -250,84 +297,114 @@ const startServer = async () => {
 
         return res.json(payload);
       } catch (error) {
-        logger.error('Readiness check failed', { error: error.message });
-        return res.status(503).json({ status: 'error', message: 'Service unavailable' });
+        logger.error("Readiness check failed", { error: error.message });
+        return res
+          .status(503)
+          .json({ status: "error", message: "Service unavailable" });
       }
     });
 
     // Enhanced health check endpoint
-    app.get('/api/health', async (req, res) => {
+    app.get("/api/health", async (req, res) => {
       try {
         const uptime = process.uptime();
         res.json({
-          status: 'ok',
+          status: "ok",
           timestamp: new Date().toISOString(),
-          database: dbAvailable ? 'connected' : 'memory',
-          readiness: !isProductionEnv || dbAvailable ? 'ready' : 'degraded',
+          database: dbAvailable ? "connected" : "memory",
+          readiness: !isProductionEnv || dbAvailable ? "ready" : "degraded",
           uptime: Math.floor(uptime),
-          version: process.env.npm_package_version || '2.0.0',
-          environment: process.env.NODE_ENV || 'development',
+          version: process.env.npm_package_version || "2.0.0",
+          environment: process.env.NODE_ENV || "development",
         });
       } catch (error) {
-        logger.error('Health check failed', { error: error.message });
-        res.status(503).json({ status: 'error', message: 'Service unavailable' });
+        logger.error("Health check failed", { error: error.message });
+        res
+          .status(503)
+          .json({ status: "error", message: "Service unavailable" });
       }
     });
 
     // Public routes (no auth required)
-    app.use('/api/auth', require('./routes/auth'));
-    app.use('/mikrotik', require('./routes/provision'));
-    app.use('/api/portal/auth', require('./routes/customerAuth'));
+    app.use("/api/auth", require("./routes/auth"));
+    app.use("/mikrotik", require("./routes/provision"));
+    app.use("/api/portal/auth", require("./routes/customerAuth"));
 
     // Serve static frontend files
     const possiblePaths = [
-      path.join(__dirname, '..', '..', 'client', 'dist'),
-      path.join(__dirname, '..', 'client', 'dist'),
-      path.join(process.cwd(), 'client', 'dist'),
+      path.join(__dirname, "..", "..", "client", "dist"),
+      path.join(__dirname, "..", "client", "dist"),
+      path.join(process.cwd(), "client", "dist"),
     ];
 
-    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+    let frontendPath = possiblePaths.find((p) =>
+      fs.existsSync(path.join(p, "index.html")),
+    );
 
     if (frontendPath) {
-      logger.info('Serving frontend', { path: frontendPath });
+      logger.info("Serving frontend", { path: frontendPath });
       app.use(express.static(frontendPath));
     } else {
-      logger.warn('Frontend dist not found, skipping static file serving');
+      logger.warn("Frontend dist not found, skipping static file serving");
     }
 
     // Protected routes (require authentication)
     // Each route has auth middleware applied individually
-    const { authenticate, requirePermission, requireRole, ROLES } = require('./middleware/auth');
+    const {
+      authenticate,
+      requirePermission,
+      requireRole,
+      ROLES,
+    } = require("./middleware/auth");
 
     // Admin-only routes
-    app.use('/api/users', authenticate, requireRole(ROLES.ADMIN), require('./routes/users'));
+    app.use(
+      "/api/users",
+      authenticate,
+      requireRole(ROLES.ADMIN),
+      require("./routes/users"),
+    );
 
     // Role-protected routes - separate read and write permissions
     // Billing routes - read for GET, write for POST/PUT/DELETE
-    app.use('/api/billing', authenticate, requirePermission('billing:read'), require('./routes/billing'));
+    app.use(
+      "/api/billing",
+      authenticate,
+      requirePermission("billing:read"),
+      require("./routes/billing"),
+    );
 
     // Customer routes - check permissions per method
-    const { authenticate: auth, requirePermission: perm } = require('./middleware/auth');
-    const billingRoutes = require('./routes/billing');
+    const {
+      authenticate: auth,
+      requirePermission: perm,
+    } = require("./middleware/auth");
+    const billingRoutes = require("./routes/billing");
     const customerAliasRouter = express.Router();
-    const resellerRoutes = require('./routes/resellers');
-    const networkRoutes = require('./routes/network');
+    const resellerRoutes = require("./routes/resellers");
+    const networkRoutes = require("./routes/network");
 
     customerAliasRouter.use((req, res, next) => {
-      req.url = `/customers${req.url === '/' ? '' : req.url}`;
+      req.url = `/customers${req.url === "/" ? "" : req.url}`;
       next();
     });
     customerAliasRouter.use(billingRoutes);
 
-    app.use('/api/customers', auth, (req, res, next) => {
-      const permission = req.method === 'GET' ? 'customers:read' : 'customers:write';
-      return perm(permission)(req, res, next);
-    }, customerAliasRouter);
+    app.use(
+      "/api/customers",
+      auth,
+      (req, res, next) => {
+        const permission =
+          req.method === "GET" ? "customers:read" : "customers:write";
+        return perm(permission)(req, res, next);
+      },
+      customerAliasRouter,
+    );
 
     const createPrefixedAliasRouter = (prefixResolver, targetRouter) => {
       const aliasRouter = express.Router();
       aliasRouter.use((req, res, next) => {
-        const suffix = req.url === '/' ? '' : req.url;
+        const suffix = req.url === "/" ? "" : req.url;
         req.url = prefixResolver(suffix);
         next();
       });
@@ -336,83 +413,129 @@ const startServer = async () => {
     };
 
     const requireNetworkPermission = (req, res, next) => {
-      const permission = req.method === 'GET' ? 'network:read' : 'network:write';
+      const permission =
+        req.method === "GET" ? "network:read" : "network:write";
       return perm(permission)(req, res, next);
     };
 
     const networkAliasRouter = createPrefixedAliasRouter((suffix) => {
-      if (suffix.startsWith('/pppoe/') || suffix.startsWith('/hotspot/')) {
+      if (suffix.startsWith("/pppoe/") || suffix.startsWith("/hotspot/")) {
         return suffix;
       }
       return `/network${suffix}`;
     }, networkRoutes);
-    const pppoeAliasRouter = createPrefixedAliasRouter((suffix) => `/pppoe${suffix}`, networkRoutes);
-    const hotspotAliasRouter = createPrefixedAliasRouter((suffix) => suffix, networkRoutes);
-    const captivePortalAliasRouter = createPrefixedAliasRouter((suffix) => `/captive-portals${suffix}`, resellerRoutes);
+    const pppoeAliasRouter = createPrefixedAliasRouter(
+      (suffix) => `/pppoe${suffix}`,
+      networkRoutes,
+    );
+    const hotspotAliasRouter = createPrefixedAliasRouter(
+      (suffix) => suffix,
+      networkRoutes,
+    );
+    const captivePortalAliasRouter = createPrefixedAliasRouter(
+      (suffix) => `/captive-portals${suffix}`,
+      resellerRoutes,
+    );
 
-    app.use('/api/network', authenticate, requireNetworkPermission, networkAliasRouter);
-    app.use('/api/pppoe', authenticate, requireNetworkPermission, pppoeAliasRouter);
-    app.use('/api/hotspot', authenticate, requireNetworkPermission, hotspotAliasRouter);
-    app.use('/api/captive-portals', authenticate, captivePortalAliasRouter);
+    app.use(
+      "/api/network",
+      authenticate,
+      requireNetworkPermission,
+      networkAliasRouter,
+    );
+    app.use(
+      "/api/pppoe",
+      authenticate,
+      requireNetworkPermission,
+      pppoeAliasRouter,
+    );
+    app.use(
+      "/api/hotspot",
+      authenticate,
+      requireNetworkPermission,
+      hotspotAliasRouter,
+    );
+    app.use("/api/captive-portals", authenticate, captivePortalAliasRouter);
 
     // Standard authenticated routes
-    app.use('/api/projects', authenticate, require('./routes/projects'));
-    app.use('/api/modules', authenticate, require('./routes/modules'));
-    app.use('/api/generator', authenticate, require('./routes/generator'));
-    app.use('/api/templates', authenticate, require('./routes/templates'));
-    app.use('/api/mikrotik', authenticate, require('./routes/mikrotik'));
-    app.use('/api/mikrotik-automation', authenticate, require('./routes/mikrotikAutomation'));
-    app.use('/api/devices', authenticate, require('./routes/devices'));
-    app.use('/api/payments', authenticate, require('./routes/payments'));
-    app.use('/api/sms', authenticate, require('./routes/sms'));
-    app.use('/api/email', authenticate, require('./routes/email'));
-    app.use('/api/telegram', authenticate, require('./routes/telegram'));
-    app.use('/api/storage', authenticate, require('./routes/storage'));
-    app.use('/api/features', authenticate, require('./routes/features'));
-    app.use('/api/portal', authenticate, require('./routes/customerPortal'));
-    app.use('/api/advanced', authenticate, require('./routes/advanced'));
-    app.use('/api/inventory', authenticate, require('./routes/inventory'));
-    app.use('/api/analytics', authenticate, require('./routes/analytics'));
-    app.use('/api/radius', authenticate, require('./routes/radius'));
-    app.use('/api/tickets', authenticate, require('./routes/tickets'));
-    app.use('/api/resellers', authenticate, resellerRoutes);
-    app.use('/api/olt', authenticate, require('./routes/olt'));
-    app.use('/api/integrations', authenticate, require('./routes/integrations'));
-    app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
-    app.use('/api/settings', authenticate, require('./routes/settings'));
-    app.use('/api/fup', authenticate, require('./routes/fup'));
-    app.use('/api/tr069', authenticate, require('./routes/tr069'));
-    app.use('/api/speedtest', authenticate, require('./routes/speedtest'));
+    app.use("/api/projects", authenticate, require("./routes/projects"));
+    app.use("/api/modules", authenticate, require("./routes/modules"));
+    app.use("/api/generator", authenticate, require("./routes/generator"));
+    app.use("/api/templates", authenticate, require("./routes/templates"));
+    app.use("/api/mikrotik", authenticate, require("./routes/mikrotik"));
+    app.use(
+      "/api/mikrotik-automation",
+      authenticate,
+      require("./routes/mikrotikAutomation"),
+    );
+    app.use("/api/devices", authenticate, require("./routes/devices"));
+    app.use("/api/payments", authenticate, require("./routes/payments"));
+    app.use("/api/sms", authenticate, require("./routes/sms"));
+    app.use("/api/email", authenticate, require("./routes/email"));
+    app.use("/api/telegram", authenticate, require("./routes/telegram"));
+    app.use("/api/storage", authenticate, require("./routes/storage"));
+    app.use("/api/features", authenticate, require("./routes/features"));
+    app.use("/api/portal", authenticate, require("./routes/customerPortal"));
+    app.use("/api/advanced", authenticate, require("./routes/advanced"));
+    app.use("/api/inventory", authenticate, require("./routes/inventory"));
+    app.use("/api/analytics", authenticate, require("./routes/analytics"));
+    app.use("/api/radius", authenticate, require("./routes/radius"));
+    app.use("/api/tickets", authenticate, require("./routes/tickets"));
+    app.use("/api/resellers", authenticate, resellerRoutes);
+    app.use("/api/olt", authenticate, require("./routes/olt"));
+    app.use(
+      "/api/integrations",
+      authenticate,
+      require("./routes/integrations"),
+    );
+    app.use("/api/dashboard", authenticate, require("./routes/dashboard"));
+    app.use("/api/settings", authenticate, require("./routes/settings"));
+    app.use("/api/fup", authenticate, require("./routes/fup"));
+    app.use("/api/tr069", authenticate, require("./routes/tr069"));
+    app.use("/api/speedtest", authenticate, require("./routes/speedtest"));
     if (monitoringApiEnabled) {
-      app.use('/api/monitoring', authenticate, require('./routes/monitoring'));
+      app.use("/api/monitoring", authenticate, require("./routes/monitoring"));
     } else {
-      logger.warn('Monitoring API disabled (set ENABLE_MONITORING_API=true to enable)');
+      logger.warn(
+        "Monitoring API disabled (set ENABLE_MONITORING_API=true to enable)",
+      );
     }
 
     // QoS routes
-    app.use('/api/qos', authenticate, require('./routes/qos'));
+    app.use("/api/qos", authenticate, require("./routes/qos"));
 
     // Captive Portal routes
-    app.use('/api/captive-portal', authenticate, require('./routes/captivePortal'));
+    app.use(
+      "/api/captive-portal",
+      authenticate,
+      require("./routes/captivePortal"),
+    );
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());
 
     // Global error handler
     app.use((err, req, res, next) => {
-      logger.error('Unhandled error', { 
-        error: err.message, 
+      logger.error("Unhandled error", {
+        error: err.message,
         stack: err.stack,
         path: req.path,
         method: req.method,
       });
-      res.status(500).json({ error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message });
+      res
+        .status(500)
+        .json({
+          error:
+            process.env.NODE_ENV === "production"
+              ? "Internal server error"
+              : err.message,
+        });
     });
 
     // SPA catch-all route MUST be last - serves index.html for all non-API routes
     if (frontendPath) {
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(frontendPath, 'index.html'));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(frontendPath, "index.html"));
       });
     }
 
@@ -423,85 +546,113 @@ const startServer = async () => {
       // Start auto-suspend cron
       if (!cronStarted) {
         try {
-          const { startCron } = require('./cron/autoSuspend');
+          const { startCron } = require("./cron/autoSuspend");
           startCron();
-          logger.info('Auto-suspend cron started');
+          logger.info("Auto-suspend cron started");
           cronStarted = true;
         } catch (e) {
-          logger.warn('Could not start auto-suspend cron', { error: e.message });
+          logger.warn("Could not start auto-suspend cron", {
+            error: e.message,
+          });
         }
       }
 
       // Start payment reminders cron
       try {
-        const { startCron: startPaymentReminders } = require('./cron/paymentReminders');
+        const {
+          startCron: startPaymentReminders,
+        } = require("./cron/paymentReminders");
         startPaymentReminders();
-        logger.info('Payment reminders cron started');
+        logger.info("Payment reminders cron started");
       } catch (e) {
-        logger.warn('Could not start payment reminders cron', { error: e.message });
+        logger.warn("Could not start payment reminders cron", {
+          error: e.message,
+        });
       }
 
       // Start metrics collection cron
       try {
-        const { startCron: startMetricsCron } = require('./cron/collectMetrics');
+        const {
+          startCron: startMetricsCron,
+        } = require("./cron/collectMetrics");
         startMetricsCron();
-        logger.info('Metrics collection cron started');
+        logger.info("Metrics collection cron started");
       } catch (e) {
-        logger.warn('Could not start metrics collection cron', { error: e.message });
+        logger.warn("Could not start metrics collection cron", {
+          error: e.message,
+        });
       }
 
       const server = app.listen(PORT, () => {
-        logger.info('Server started', { 
-          port: PORT, 
-          environment: process.env.NODE_ENV || 'development',
-          database: dbAvailable ? 'postgres' : 'memory'
+        logger.info("Server started", {
+          port: PORT,
+          environment: process.env.NODE_ENV || "development",
+          database: dbAvailable ? "postgres" : "memory",
         });
-        
+
         // Initialize WebSocket service for real-time monitoring
-        const websocketService = require('./services/websocketService');
+        const websocketService = require("./services/websocketService");
         websocketService.initialize(server);
-        
+
         // Start user online status updater
         startOnlineStatusUpdater();
-        
+
         // Initialize alert system for Telegram notifications
         try {
-          const alertSystem = require('./services/alertSystem');
-          alertSystem.init().catch(err => {
-            logger.warn('Could not initialize alert system', { error: err.message });
+          const alertSystem = require("./services/alertSystem");
+          alertSystem.init().catch((err) => {
+            logger.warn("Could not initialize alert system", {
+              error: err.message,
+            });
           });
         } catch (error) {
-          logger.warn('Could not initialize alert system', { error: error.message });
+          logger.warn("Could not initialize alert system", {
+            error: error.message,
+          });
         }
-        
+
         // Start TR-069 ACS service
         try {
-          const tr069Service = require('./services/tr069Service');
-          tr069Service.start().catch(err => {
-            logger.error('Failed to initialize TR-069 ACS service', { error: err.message });
+          const tr069Service = require("./services/tr069Service");
+          tr069Service.start().catch((err) => {
+            logger.error("Failed to initialize TR-069 ACS service", {
+              error: err.message,
+            });
           });
         } catch (error) {
-          logger.error('Failed to initialize TR-069 ACS service', { error: error.message });
+          logger.error("Failed to initialize TR-069 ACS service", {
+            error: error.message,
+          });
         }
-        
-        const enableRouterConnectivity = process.env.ENABLE_ROUTER_CONNECTIVITY === 'true';
+
+        const enableRouterConnectivity =
+          process.env.ENABLE_ROUTER_CONNECTIVITY === "true";
         if (enableRouterConnectivity) {
           try {
-            const routerConnectivityService = require('./services/routerConnectivity');
+            const routerConnectivityService = require("./services/routerConnectivity");
             routerConnectivityService.start();
-            logger.info('Router connectivity service started');
+            logger.info("Router connectivity service started");
           } catch (error) {
-            logger.error('Failed to initialize router connectivity service', { error: error.message });
+            logger.error("Failed to initialize router connectivity service", {
+              error: error.message,
+            });
           }
         } else {
-          logger.warn('Router connectivity service disabled (set ENABLE_ROUTER_CONNECTIVITY=true to enable)');
+          logger.warn(
+            "Router connectivity service disabled (set ENABLE_ROUTER_CONNECTIVITY=true to enable)",
+          );
         }
-        
-        logger.info('WebSocket service initialized for real-time bandwidth monitoring');
+
+        logger.info(
+          "WebSocket service initialized for real-time bandwidth monitoring",
+        );
       });
     }
   } catch (error) {
-    logger.error('Failed to start server', { error: error.message, stack: error.stack });
+    logger.error("Failed to start server", {
+      error: error.message,
+      stack: error.stack,
+    });
     if (isTestEnv) {
       throw error;
     }
