@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { useToastStore } from "../stores/toastStore";
 import {
   Router,
   Plus,
@@ -89,6 +90,8 @@ const statusColor = (s) => STATUS_COLORS[s] || STATUS_COLORS.default;
 // ─── main component ──────────────────────────────────────────────────────────
 
 export function Devices() {
+  const addToast = useToastStore((s) => s.addToast);
+
   // tabs
   const [tab, setTab] = useState("enroll"); // enroll | discovered | managed
 
@@ -178,8 +181,13 @@ export function Devices() {
         label: enrollLabel,
       });
       setEnrollToken(data);
+      addToast(
+        "success",
+        "Token Created",
+        "Enrollment token generated successfully. Copy the command to your router.",
+      );
     } catch (e) {
-      window.alert(e.response?.data?.error || e.message);
+      addToast("error", "Token Error", e.response?.data?.error || e.message);
     }
     setEnrollLoading(false);
   };
@@ -230,18 +238,23 @@ export function Devices() {
       fetchDevices();
       setTab("managed");
     } catch (e) {
-      window.alert(e.response?.data?.error || e.message);
+      addToast("error", "Approval Error", e.response?.data?.error || e.message);
     }
     setApproveLoading(false);
   };
 
   const deleteDiscoveredRouter = async (id) => {
-    if (!window.confirm("Delete this discovered router? This action cannot be undone.")) return;
+    if (
+      !window.confirm(
+        "Delete this discovered router? This action cannot be undone.",
+      )
+    )
+      return;
     try {
       await axios.delete(`${API_URL}/devices/discovered/${id}`);
       fetchDiscovered();
     } catch (e) {
-      window.alert(e.response?.data?.error || e.message);
+      addToast("error", "Delete Error", e.response?.data?.error || e.message);
     }
   };
 
@@ -313,12 +326,16 @@ export function Devices() {
         `${API_URL}/devices/${device.id}/activate-billing`,
       );
       const synced = data.subscriptions_synced || 0;
-      window.alert(
+      addToast(
+        "success",
+        "Billing Linked",
         `Billing link ${data.connection ? "activated" : "processed"} successfully.${synced ? ` ${synced} subscriptions processed.` : ""}`,
       );
       fetchDevices();
     } catch (e) {
-      window.alert(
+      addToast(
+        "error",
+        "Billing Error",
         e.response?.data?.error || e.response?.data?.message || e.message,
       );
     } finally {
@@ -382,7 +399,7 @@ export function Devices() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      window.alert(e.response?.data?.error || e.message);
+      addToast("error", "Download Error", e.response?.data?.error || e.message);
     }
   };
 
@@ -394,7 +411,11 @@ export function Devices() {
       !createForm.mgmt_username ||
       !createForm.mgmt_password
     ) {
-      window.alert("Enter router IP, username, and password before scanning.");
+      addToast(
+        "warning",
+        "Missing Fields",
+        "Enter router IP, username, and password before scanning.",
+      );
       return;
     }
     setScanLoading(true);
@@ -417,7 +438,9 @@ export function Devices() {
           : prev.lan_ports,
       }));
     } catch (e) {
-      window.alert(
+      addToast(
+        "error",
+        "Scan Error",
         e.response?.data?.message ||
           e.response?.data?.error ||
           "Scan failed — server could not reach the router.",
@@ -437,7 +460,7 @@ export function Devices() {
       fetchDevices();
       setTab("managed");
     } catch (e) {
-      window.alert(e.response?.data?.error || e.message);
+      addToast("error", "Create Error", e.response?.data?.error || e.message);
     }
     setCreateLoading(false);
   };
