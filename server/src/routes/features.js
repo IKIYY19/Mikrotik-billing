@@ -2,23 +2,31 @@
  * API Routes for: Branches, Agents, Vouchers, Monitoring, Auto-suspend
  */
 
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
-const multiStore = require('../db/multiFeatureStore');
-const billing = require('../db/billingStore');
+const { v4: uuidv4 } = require("uuid");
+const multiStore = require("../db/multiFeatureStore");
+const billing = require("../db/billingStore");
 
 // ═══════════════════════════════════════
 // BRANCHES
 // ═══════════════════════════════════════
-router.get('/branches', (req, res) => {
-  const branchStats = multiStore.branches.map(b => {
-    const customers = billing.store.customers.filter(c => c.branch_id === b.id).length;
-    const routers = billing.store.routers ? billing.store.routers.filter(r => r.branch_id === b.id).length : 0;
+router.get("/branches", (req, res) => {
+  const branchStats = multiStore.branches.map((b) => {
+    const customers = billing.store.customers.filter(
+      (c) => c.branch_id === b.id,
+    ).length;
+    const routers = billing.store.routers
+      ? billing.store.routers.filter((r) => r.branch_id === b.id).length
+      : 0;
     const revenue = billing.store.payments
-      .filter(p => {
-        const inv = billing.store.invoices.find(i => i.id === p.invoice_id);
-        return inv && billing.store.customers.find(c => c.id === inv.customer_id)?.branch_id === b.id;
+      .filter((p) => {
+        const inv = billing.store.invoices.find((i) => i.id === p.invoice_id);
+        return (
+          inv &&
+          billing.store.customers.find((c) => c.id === inv.customer_id)
+            ?.branch_id === b.id
+        );
       })
       .reduce((sum, p) => sum + p.amount, 0);
     return { ...b, customer_count: customers, router_count: routers, revenue };
@@ -26,8 +34,13 @@ router.get('/branches', (req, res) => {
   res.json(branchStats);
 });
 
-router.post('/branches', (req, res) => {
-  const branch = { id: uuidv4(), ...req.body, created_at: new Date().toISOString(), status: 'active' };
+router.post("/branches", (req, res) => {
+  const branch = {
+    id: uuidv4(),
+    ...req.body,
+    created_at: new Date().toISOString(),
+    status: "active",
+  };
   multiStore.branches.push(branch);
   res.status(201).json(branch);
 });
@@ -35,51 +48,64 @@ router.post('/branches', (req, res) => {
 // ═══════════════════════════════════════
 // AGENTS/RESELLERS
 // ═══════════════════════════════════════
-router.get('/agents', (req, res) => {
-  const agentStats = multiStore.agents.map(a => {
-    const sold = multiStore.vouchers.filter(v => v.sold_by === a.id).length;
-    const revenue = multiStore.vouchers.filter(v => v.sold_by === a.id).reduce((sum, v) => sum + v.price, 0);
+router.get("/agents", (req, res) => {
+  const agentStats = multiStore.agents.map((a) => {
+    const sold = multiStore.vouchers.filter((v) => v.sold_by === a.id).length;
+    const revenue = multiStore.vouchers
+      .filter((v) => v.sold_by === a.id)
+      .reduce((sum, v) => sum + v.price, 0);
     const commission = revenue * (a.commission_rate / 100);
-    return { ...a, vouchers_sold: sold, voucher_revenue: revenue, commission_earned: commission };
+    return {
+      ...a,
+      vouchers_sold: sold,
+      voucher_revenue: revenue,
+      commission_earned: commission,
+    };
   });
   res.json(agentStats);
 });
 
-router.post('/agents', (req, res) => {
-  const agent = { id: uuidv4(), ...req.body, balance: 0, status: 'active', created_at: new Date().toISOString() };
+router.post("/agents", (req, res) => {
+  const agent = {
+    id: uuidv4(),
+    ...req.body,
+    balance: 0,
+    status: "active",
+    created_at: new Date().toISOString(),
+  };
   multiStore.agents.push(agent);
   res.status(201).json(agent);
 });
 
-router.put('/agents/:id', (req, res) => {
-  const idx = multiStore.agents.findIndex(a => a.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Agent not found' });
+router.put("/agents/:id", (req, res) => {
+  const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: "Agent not found" });
   multiStore.agents[idx] = { ...multiStore.agents[idx], ...req.body };
   res.json(multiStore.agents[idx]);
 });
 
-router.delete('/agents/:id', (req, res) => {
-  const idx = multiStore.agents.findIndex(a => a.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Agent not found' });
+router.delete("/agents/:id", (req, res) => {
+  const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: "Agent not found" });
   multiStore.agents.splice(idx, 1);
-  res.json({ message: 'Agent deleted' });
+  res.json({ message: "Agent deleted" });
 });
 
 // ═══════════════════════════════════════
 // VOUCHERS
 // ═══════════════════════════════════════
-router.get('/vouchers', (req, res) => {
+router.get("/vouchers", (req, res) => {
   const { status, agent_id } = req.query;
   let filtered = [...multiStore.vouchers];
-  if (status) filtered = filtered.filter(v => v.status === status);
-  if (agent_id) filtered = filtered.filter(v => v.sold_by === agent_id);
+  if (status) filtered = filtered.filter((v) => v.status === status);
+  if (agent_id) filtered = filtered.filter((v) => v.sold_by === agent_id);
   res.json(filtered);
 });
 
-router.post('/vouchers/generate', (req, res) => {
+router.post("/vouchers/generate", (req, res) => {
   const { count, plan_id, agent_id } = req.body;
-  const plan = billing.store.service_plans.find(p => p.id === plan_id);
-  if (!plan) return res.status(404).json({ error: 'Plan not found' });
+  const plan = billing.store.service_plans.find((p) => p.id === plan_id);
+  if (!plan) return res.status(404).json({ error: "Plan not found" });
 
   const generated = [];
   for (let i = 0; i < (count || 1); i++) {
@@ -92,8 +118,8 @@ router.post('/vouchers/generate', (req, res) => {
       duration_days: 30,
       price: plan.price,
       sold_by: agent_id || null,
-      sold_to: '',
-      status: agent_id ? 'sold' : 'available',
+      sold_to: "",
+      status: agent_id ? "sold" : "available",
       redeemed_at: null,
       created_at: new Date().toISOString(),
     };
@@ -103,33 +129,40 @@ router.post('/vouchers/generate', (req, res) => {
 
   // If agent specified, deduct from balance
   if (agent_id) {
-    const agent = multiStore.agents.find(a => a.id === agent_id);
+    const agent = multiStore.agents.find((a) => a.id === agent_id);
     if (agent) agent.balance -= generated.reduce((sum, v) => sum + v.price, 0);
   }
 
   res.json({ generated, total: generated.length });
 });
 
-router.post('/vouchers/redeem', (req, res) => {
+router.post("/vouchers/redeem", (req, res) => {
   const { code, customer_id } = req.body;
-  const voucher = multiStore.vouchers.find(v => v.code === code && v.status !== 'redeemed');
+  const voucher = multiStore.vouchers.find(
+    (v) => v.code === code && v.status !== "redeemed",
+  );
 
-  if (!voucher) return res.status(404).json({ error: 'Invalid or already redeemed voucher' });
+  if (!voucher)
+    return res
+      .status(404)
+      .json({ error: "Invalid or already redeemed voucher" });
 
-  voucher.status = 'redeemed';
-  voucher.sold_to = customer_id || '';
+  voucher.status = "redeemed";
+  voucher.sold_to = customer_id || "";
   voucher.redeemed_at = new Date().toISOString();
 
   // Activate customer subscription
-  const customer = billing.store.customers.find(c => c.id === customer_id);
+  const customer = billing.store.customers.find((c) => c.id === customer_id);
   if (customer) {
-    const plan = billing.store.service_plans.find(p => p.name === voucher.plan_name);
+    const plan = billing.store.service_plans.find(
+      (p) => p.name === voucher.plan_name,
+    );
     billing.createSubscription({
       customer_id: customer_id,
       plan_id: plan?.id,
-      status: 'active',
-      start_date: new Date().toISOString().split('T')[0],
-      billing_cycle: 'prepaid',
+      status: "active",
+      start_date: new Date().toISOString().split("T")[0],
+      billing_cycle: "prepaid",
     });
   }
 
@@ -139,36 +172,43 @@ router.post('/vouchers/redeem', (req, res) => {
 // ═══════════════════════════════════════
 // NETWORK MONITORING
 // ═══════════════════════════════════════
-router.get('/monitoring/dashboard', async (req, res) => {
+router.get("/monitoring/dashboard", async (req, res) => {
   try {
     // Get all MikroTik connections
-    const db = global.db || require('../db/memory');
+    const db = global.db || require("../db/memory");
     let connections = [];
 
     try {
       if (global.dbAvailable && db) {
-        const result = await db.query('SELECT * FROM mikrotik_connections');
+        const result = await db.query("SELECT * FROM mikrotik_connections");
         connections = result.rows;
       }
     } catch (e) {
-      console.warn('[Monitoring] Could not fetch connections:', e.message);
+      console.warn("[Monitoring] Could not fetch connections:", e.message);
     }
 
     // Decrypt password helper
     function decryptPassword(encryptedPassword) {
       try {
-        const crypto = require('crypto');
-        const algorithm = 'aes-256-gcm';
-        const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
-        const [ivHex, authTagHex, encrypted] = encryptedPassword.split(':');
-        const iv = Buffer.from(ivHex, 'hex');
-        const authTag = Buffer.from(authTagHex, 'hex');
-        const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+        const crypto = require("crypto");
+        const algorithm = "aes-256-gcm";
+        const ENCRYPTION_KEY =
+          process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
+        const [ivHex, authTagHex, encrypted] = encryptedPassword.split(":");
+        const iv = Buffer.from(ivHex, "hex");
+        const authTag = Buffer.from(authTagHex, "hex");
+        const decipher = crypto.createDecipheriv(
+          algorithm,
+          Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
+          iv,
+        );
         decipher.setAuthTag(authTag);
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
+        let decrypted = decipher.update(encrypted, "hex", "utf8");
+        decrypted += decipher.final("utf8");
         return decrypted;
-      } catch (e) { return null; }
+      } catch (e) {
+        return null;
+      }
     }
 
     // Parse MikroTik bytes
@@ -179,8 +219,14 @@ router.get('/monitoring/dashboard', async (req, res) => {
       const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
       if (!match) return 0;
       const value = parseFloat(match[1]);
-      const unit = (match[2] || '').toLowerCase().replace('ib', '');
-      const multipliers = { '': 1, k: 1024, m: 1048576, g: 1073741824, t: 1099511627776 };
+      const unit = (match[2] || "").toLowerCase().replace("ib", "");
+      const multipliers = {
+        "": 1,
+        k: 1024,
+        m: 1048576,
+        g: 1073741824,
+        t: 1099511627776,
+      };
       return Math.round(value * (multipliers[unit] || 1));
     }
 
@@ -200,6 +246,13 @@ router.get('/monitoring/dashboard', async (req, res) => {
       return totalSeconds;
     }
 
+    function getMemoryUsage(resource) {
+      const total = parseBytes(resource["total-memory"]);
+      const free = parseBytes(resource["free-memory"]);
+      if (!total) return 0;
+      return Math.max(0, Math.min(100, ((total - free) / total) * 100));
+    }
+
     const allSessions = [];
     let totalBandwidthIn = 0;
     let totalBandwidthOut = 0;
@@ -215,52 +268,72 @@ router.get('/monitoring/dashboard', async (req, res) => {
       if (!device.password) continue;
 
       try {
-        const MikroNode = require('mikronode');
-        const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
+        const MikroNode = require("mikronode");
+        const mikrotik = new MikroNode(device.ip_address, {
+          port: device.api_port || 8728,
+        });
         const conn = await mikrotik.connect(device.username, device.password);
         const close = conn.closeOnDone(true);
 
-        // Get PPPoE active sessions
+        // Get real router resources and PPPoE active sessions from MikroTik
+        const resourceChan = conn.openChannel();
+        resourceChan.write("/system/resource/print");
+        const resources = await resourceChan.done;
+
         const pppoeChan = conn.openChannel();
-        pppoeChan.write('/ppp/active/print');
+        pppoeChan.write("/ppp/active/print");
         const pppoeActive = await pppoeChan.done;
         close();
+
+        const resource = Array.isArray(resources) ? resources[0] || {} : {};
+        const cpuUsage = parseFloat(resource["cpu-load"] || 0);
+        const memoryUsage = getMemoryUsage(resource);
 
         let branchIn = 0;
         let branchOut = 0;
 
-        for (const session of (Array.isArray(pppoeActive) ? pppoeActive : [])) {
+        for (const session of Array.isArray(pppoeActive) ? pppoeActive : []) {
           const username = session.name || session.username;
           if (!username) continue;
 
-          const bytesIn = parseBytes(session['bytes-in'] || session.bytes_in);
-          const bytesOut = parseBytes(session['bytes-out'] || session.bytes_out);
-          const uptimeSeconds = parseUptime(session.uptime || session['uptime']);
+          const bytesIn = parseBytes(session["bytes-in"] || session.bytes_in);
+          const bytesOut = parseBytes(
+            session["bytes-out"] || session.bytes_out,
+          );
+          const uptimeSeconds = parseUptime(
+            session.uptime || session["uptime"],
+          );
 
           branchIn += bytesIn;
           branchOut += bytesOut;
 
           // Try to find customer
-          let customerName = 'Unknown';
+          let customerName = "Unknown";
           try {
-            const billingStore = require('../db/billingStore');
-            const sub = billingStore.store.subscriptions.find(s => s.pppoe_username === username && s.status === 'active');
+            const billingStore = require("../db/billingStore");
+            const sub = billingStore.store.subscriptions.find(
+              (s) => s.pppoe_username === username && s.status === "active",
+            );
             if (sub) {
-              const customer = billingStore.store.customers.find(c => c.id === sub.customer_id);
+              const customer = billingStore.store.customers.find(
+                (c) => c.id === sub.customer_id,
+              );
               if (customer) customerName = customer.name;
             }
           } catch (e) {}
 
           allSessions.push({
-            id: session['.id'] || session.id || username,
+            id: session[".id"] || session.id || username,
             username,
             customer_name: customerName,
-            ip_address: session.address || '',
+            ip_address: session.address || "",
             bytes_in: bytesIn,
             bytes_out: bytesOut,
             uptime_seconds: uptimeSeconds,
-            uptime: session.uptime || '',
-            connected_at: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
+            uptime: session.uptime || "",
+            connected_at: new Date(
+              Date.now() - uptimeSeconds * 1000,
+            ).toISOString(),
             router_name: device.name,
           });
         }
@@ -273,13 +346,15 @@ router.get('/monitoring/dashboard', async (req, res) => {
           active_pppoe: (Array.isArray(pppoeActive) ? pppoeActive : []).length,
           bandwidth_in: Math.round(branchIn / (1024 * 1024)), // MB
           bandwidth_out: Math.round(branchOut / (1024 * 1024)),
-          cpu: 0, // Would require /system/resource query
-          memory: 0,
+          cpu: Number(cpuUsage.toFixed(1)),
+          memory: Number(memoryUsage.toFixed(1)),
           online_routers: 1,
           total_routers: 1,
         });
       } catch (e) {
-        console.warn(`[Monitoring] Failed to fetch from ${device.name}: ${e.message}`);
+        console.warn(
+          `[Monitoring] Failed to fetch from ${device.name}: ${e.message}`,
+        );
         branchMetrics.push({
           branch: { id: device.id, name: device.name },
           active_pppoe: 0,
@@ -293,97 +368,108 @@ router.get('/monitoring/dashboard', async (req, res) => {
       }
     }
 
-    // If no MikroTik connections, fallback to existing fake data generation
     if (connections.length === 0) {
-      multiStore.pppoeSessions.length = 0;
-      billing.store.subscriptions.filter(s => s.pppoe_username && s.status === 'active').forEach(sub => {
-        multiStore.pppoeSessions.push({
-          id: uuidv4(),
-          username: sub.pppoe_username,
-          customer_name: sub.customer?.name || 'Unknown',
-          plan_name: sub.plan?.name || 'Unknown',
-          ip_address: `10.10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`,
-          bytes_in: Math.floor(Math.random() * 5000000000),
-          bytes_out: Math.floor(Math.random() * 10000000000),
-          uptime_seconds: Math.floor(Math.random() * 86400 * 7),
-          connected_at: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-        });
+      return res.json({
+        total_sessions: 0,
+        total_bandwidth_in_gb: "0.0",
+        total_bandwidth_out_gb: "0.0",
+        branch_metrics: [],
+        sessions: [],
+        metrics_24h: [],
+        monitoring_source: "real_mikrotik",
+        status: "not_configured",
+        message:
+          "No MikroTik connections configured. Add a MikroTik API connection to enable real monitoring.",
       });
     }
 
-    const totalSessions = allSessions.length > 0 ? allSessions.length : multiStore.pppoeSessions.length;
-    const finalSessions = allSessions.length > 0 ? allSessions : multiStore.pppoeSessions;
-    const totalInGB = (allSessions.length > 0 ? totalBandwidthIn : multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_in, 0)) / (1024 * 1024 * 1024);
-    const totalOutGB = (allSessions.length > 0 ? totalBandwidthOut : multiStore.pppoeSessions.reduce((s, p) => s + p.bytes_out, 0)) / (1024 * 1024 * 1024);
-    const finalBranchMetrics = branchMetrics.length > 0 ? branchMetrics : multiStore.branches.map(b => {
-      const metrics = multiStore.deviceMetrics.filter(m => m.branch_id === b.id);
-      const latest = metrics[metrics.length - 1] || {};
-      return {
-        branch: b,
-        active_pppoe: latest.active_pppoe || 0,
-        bandwidth_in: latest.bandwidth_in_mbps || 0,
-        bandwidth_out: latest.bandwidth_out_mbps || 0,
-        cpu: latest.cpu_usage || 0,
-        memory: latest.memory_usage || 0,
-        online_routers: latest.online_routers || 0,
-        total_routers: latest.total_routers || 0,
-      };
-    });
+    const totalSessions = allSessions.length;
+    const totalInGB = totalBandwidthIn / (1024 * 1024 * 1024);
+    const totalOutGB = totalBandwidthOut / (1024 * 1024 * 1024);
 
     res.json({
       total_sessions: totalSessions,
       total_bandwidth_in_gb: totalInGB.toFixed(1),
       total_bandwidth_out_gb: totalOutGB.toFixed(1),
-      branch_metrics: finalBranchMetrics,
-      sessions: finalSessions,
-      metrics_24h: multiStore.deviceMetrics.slice(-72),
+      branch_metrics: branchMetrics,
+      sessions: allSessions,
+      metrics_24h: [],
+      monitoring_source: "real_mikrotik",
+      status: branchMetrics.some((b) => b.online_routers > 0)
+        ? "online"
+        : "offline",
+      message: branchMetrics.some((b) => b.online_routers > 0)
+        ? "Monitoring data collected from MikroTik RouterOS API"
+        : "Configured MikroTik routers are offline or unreachable. No dummy monitoring data is being shown.",
     });
   } catch (e) {
-    console.error('[Monitoring] Dashboard error:', e);
+    console.error("[Monitoring] Dashboard error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-router.get('/monitoring/branch/:branchId', (req, res) => {
-  const metrics = multiStore.deviceMetrics.filter(m => m.branch_id === req.params.branchId).slice(-24);
+router.get("/monitoring/branch/:branchId", (req, res) => {
+  const metrics = multiStore.deviceMetrics
+    .filter((m) => m.branch_id === req.params.branchId)
+    .slice(-24);
   res.json(metrics);
 });
 
 // ═══════════════════════════════════════
 // AUTO-SUSPEND WITH GRACE PERIOD
 // ═══════════════════════════════════════
-router.get('/auto-suspend/config', (req, res) => {
+router.get("/auto-suspend/config", (req, res) => {
   res.json(multiStore.graceConfig);
 });
 
-router.put('/auto-suspend/config', (req, res) => {
+router.put("/auto-suspend/config", (req, res) => {
   Object.assign(multiStore.graceConfig, req.body);
   res.json(multiStore.graceConfig);
 });
 
-router.post('/auto-suspend/run', async (req, res) => {
+router.post("/auto-suspend/run", async (req, res) => {
   const { warn_days, throttle_days, suspend_days } = multiStore.graceConfig;
   const results = { warned: [], throttled: [], suspended: [] };
 
   // Find overdue invoices
-  const overdueInvoices = billing.store.invoices.filter(i => i.status !== 'paid' && new Date(i.due_date) < new Date());
+  const overdueInvoices = billing.store.invoices.filter(
+    (i) => i.status !== "paid" && new Date(i.due_date) < new Date(),
+  );
 
   for (const invoice of overdueInvoices) {
-    const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (24 * 60 * 60 * 1000));
-    const subs = billing.store.subscriptions.filter(s => s.customer_id === invoice.customer_id && s.status === 'active');
+    const daysOverdue = Math.floor(
+      (Date.now() - new Date(invoice.due_date).getTime()) /
+        (24 * 60 * 60 * 1000),
+    );
+    const subs = billing.store.subscriptions.filter(
+      (s) => s.customer_id === invoice.customer_id && s.status === "active",
+    );
 
     for (const sub of subs) {
-      if (daysOverdue >= suspend_days && sub.status === 'active') {
-        sub.status = 'suspended';
+      if (daysOverdue >= suspend_days && sub.status === "active") {
+        sub.status = "suspended";
         sub.updated_at = new Date().toISOString();
-        results.suspended.push({ subscription_id: sub.id, customer: sub.customer?.name, days_overdue: daysOverdue });
+        results.suspended.push({
+          subscription_id: sub.id,
+          customer: sub.customer?.name,
+          days_overdue: daysOverdue,
+        });
       } else if (daysOverdue >= throttle_days && !sub.throttled) {
         sub.throttled = true;
         sub.throttle_speed = `${multiStore.graceConfig.throttle_speed_up}/${multiStore.graceConfig.throttle_speed_down}`;
-        results.throttled.push({ subscription_id: sub.id, customer: sub.customer?.name, days_overdue: daysOverdue, throttle_speed: sub.throttle_speed });
+        results.throttled.push({
+          subscription_id: sub.id,
+          customer: sub.customer?.name,
+          days_overdue: daysOverdue,
+          throttle_speed: sub.throttle_speed,
+        });
       } else if (daysOverdue >= warn_days && !sub.warned) {
         sub.warned = true;
-        results.warned.push({ subscription_id: sub.id, customer: sub.customer?.name, days_overdue: daysOverdue });
+        results.warned.push({
+          subscription_id: sub.id,
+          customer: sub.customer?.name,
+          days_overdue: daysOverdue,
+        });
       }
     }
   }
@@ -394,9 +480,9 @@ router.post('/auto-suspend/run', async (req, res) => {
 // ═══════════════════════════════════════
 // CUSTOMER BRANCH ASSIGNMENT
 // ═══════════════════════════════════════
-router.put('/customers/:id/branch', (req, res) => {
-  const customer = billing.store.customers.find(c => c.id === req.params.id);
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
+router.put("/customers/:id/branch", (req, res) => {
+  const customer = billing.store.customers.find((c) => c.id === req.params.id);
+  if (!customer) return res.status(404).json({ error: "Customer not found" });
   customer.branch_id = req.body.branch_id || null;
   res.json(customer);
 });
@@ -404,16 +490,17 @@ router.put('/customers/:id/branch', (req, res) => {
 // ═══════════════════════════════════════
 // SETUP WIZARD
 // ═══════════════════════════════════════
-router.post('/setup', async (req, res) => {
+router.post("/setup", async (req, res) => {
   try {
-    const { companyName, plans, paymentMethods, mpesa, notifications } = req.body;
+    const { companyName, plans, paymentMethods, mpesa, notifications } =
+      req.body;
 
     // Save company info
     multiStore.companyInfo = {
-      name: companyName || 'My ISP',
-      contactEmail: req.body.contactEmail || '',
-      contactPhone: req.body.contactPhone || '',
-      address: req.body.address || '',
+      name: companyName || "My ISP",
+      contactEmail: req.body.contactEmail || "",
+      contactPhone: req.body.contactPhone || "",
+      address: req.body.address || "",
       setupCompleted: true,
       setupDate: new Date().toISOString(),
     };
@@ -425,8 +512,8 @@ router.post('/setup', async (req, res) => {
         billing.store.plans.push({
           id: uuidv4(),
           name: plan.name,
-          speed_up: plan.speedUp || '1M',
-          speed_down: plan.speedDown || '1M',
+          speed_up: plan.speedUp || "1M",
+          speed_down: plan.speedDown || "1M",
           price: plan.price || 0,
           quota_gb: plan.quotaGb || null,
           is_active: true,
@@ -437,7 +524,12 @@ router.post('/setup', async (req, res) => {
 
     // Save payment settings
     multiStore.paymentSettings = {
-      methods: paymentMethods || { cash: true, bank: true, mpesa: false, card: false },
+      methods: paymentMethods || {
+        cash: true,
+        bank: true,
+        mpesa: false,
+        card: false,
+      },
       mpesa: mpesa || {},
     };
 
@@ -448,15 +540,15 @@ router.post('/setup', async (req, res) => {
       reminderDays: notifications?.reminderDays || 3,
     };
 
-    console.log('✅ Setup wizard completed');
-    res.json({ success: true, message: 'Setup completed successfully' });
+    console.log("✅ Setup wizard completed");
+    res.json({ success: true, message: "Setup completed successfully" });
   } catch (error) {
-    console.error('Setup error:', error);
-    res.status(500).json({ error: 'Setup failed' });
+    console.error("Setup error:", error);
+    res.status(500).json({ error: "Setup failed" });
   }
 });
 
-router.get('/setup/status', (req, res) => {
+router.get("/setup/status", (req, res) => {
   res.json({ completed: !!multiStore.companyInfo?.setupCompleted });
 });
 
