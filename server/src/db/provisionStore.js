@@ -599,7 +599,7 @@ function generateProvisionScript(router, options = {}) {
     );
     lines.push(`:local hasRadius ([:len $existingRadius] > 0);`);
     lines.push(
-      `:if (!$hasRadius) do={ ${safeAdd(`/radius add address="${safeRadiusServer}" secret="${safeRadiusSecret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`)} /ppp aaa set use-radius=yes accounting=yes /ip hotspot aaa set use-radius=yes accounting=yes } else={ /log info message="[ZTP] RADIUS SKIPPED - already configured for ${safeRadiusServer}" };`,
+      `:if (!$hasRadius) do={ ${safeAdd(`/radius add address="${safeRadiusServer}" secret="${safeRadiusSecret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`)}; /ppp aaa set use-radius=yes accounting=yes; /ip hotspot aaa set use-radius=yes accounting=yes } else={ /log info message="[ZTP] RADIUS SKIPPED - already configured for ${safeRadiusServer}" };`,
     );
     lines.push("");
   }
