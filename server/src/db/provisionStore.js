@@ -90,15 +90,235 @@ function generateProvisionScript(router, options = {}) {
   lines.push("#############################################");
   lines.push("");
 
-  // System Identity
+  // ==================================================================
+  // SECTION 1: PRE-FLIGHT DISCOVERY & SCANNING
+  // ==================================================================
+  lines.push("#############################################");
+  lines.push("# PRE-FLIGHT DISCOVERY & SCANNING");
+  lines.push("# Scans existing configuration before applying changes");
+  lines.push("#############################################");
+  lines.push("");
+
+  // -- Discover system identity --
+  lines.push(":local currentIdentity [/system identity get name];");
+  lines.push(
+    `/log info message="[ZTP] Current system identity: $currentIdentity";`,
+  );
+  lines.push("");
+
+  // -- Discover all interfaces --
+  lines.push(":local allIfaces [/interface find];");
+  lines.push(":local allIfaceCount [:len $allIfaces];");
+  lines.push(
+    '/log info message="[ZTP] Found $allIfaceCount total interfaces";',
+  );
+  lines.push("");
+
+  // -- Discover running interfaces --
+  lines.push(":local runningIfaces [/interface find where running=yes];");
+  lines.push(":local runningIfaceCount [:len $runningIfaces];");
+  lines.push(
+    '/log info message="[ZTP] $runningIfaceCount interfaces are running";',
+  );
+  lines.push("");
+
+  // -- Check for the target WAN interface --
+  lines.push(`:local wanIfaceFound [/interface find name="${wanIface}"];`);
+  lines.push(":local wanIfaceExists ([:len $wanIfaceFound] > 0);");
+  lines.push(":if ($wanIfaceExists) do={");
+  lines.push(
+    '  :local wanRunning [/interface get [find name=\\"${wanIface}\\"] running];',
+  );
+  lines.push(
+    `  /log info message="[ZTP] WAN interface ${wanIface} exists (running=$wanRunning)";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] WAN interface ${wanIface} NOT found!";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Detect default routes (to confirm WAN) --
+  lines.push(
+    ":local defaultRoutes [/ip route find where dst-address=0.0.0.0/0];",
+  );
+  lines.push(":local defaultRouteCount [:len $defaultRoutes];");
+  lines.push(":if ($defaultRouteCount > 0) do={");
+  lines.push(
+    "  :local defGwIface [/ip route get [:pick $defaultRoutes 0] gateway];",
+  );
+  lines.push(
+    '  /log info message="[ZTP] Default route exists via: $defGwIface";',
+  );
+  lines.push(`  :if ($defGwIface = "${wanIface}") do={`);
+  lines.push(
+    `    /log info message="[ZTP] WAN interface confirmed: ${wanIface}";`,
+  );
+  lines.push("  } else={");
+  lines.push(
+    `    /log info message="[ZTP] WARNING: Default route gateway ($defGwIface) differs from configured WAN (${wanIface})";`,
+  );
+  lines.push("  };");
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] No default route found - will add DHCP client on ${wanIface}";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing bridges --
+  lines.push(":local existingBridges [/interface bridge find];");
+  lines.push(":local bridgeCount [:len $existingBridges];");
+  lines.push(
+    `:local targetBridgeFound [/interface bridge find name="${lanBridge}"];`,
+  );
+  lines.push(`:local targetBridgeExists ([:len $targetBridgeFound] > 0);`);
+  lines.push(
+    '/log info message="[ZTP] Found $bridgeCount existing bridge(s)";',
+  );
+  lines.push(`:if ($targetBridgeExists) do={`);
+  lines.push(
+    `  /log info message="[ZTP] Found existing bridge: ${lanBridge}";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] Bridge ${lanBridge} does not exist yet";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover bridge ports --
+  lines.push(
+    `:local existingBridgePorts [/interface bridge port find bridge="${lanBridge}"];`,
+  );
+  lines.push(`:local bridgePortCount [:len $existingBridgePorts];`);
+  lines.push(`:local hasBridgePorts ($bridgePortCount > 0);`);
+  lines.push(":if ($targetBridgeExists && $hasBridgePorts) do={");
+  lines.push(
+    `  /log info message="[ZTP] Bridge ${lanBridge} has $bridgePortCount port(s) attached";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing IP addresses on the bridge --
+  lines.push(
+    `:local existingBridgeIps [/ip address find where interface="${lanBridge}"];`,
+  );
+  lines.push(`:local bridgeIpCount [:len $existingBridgeIps];`);
+  lines.push(
+    `:local targetIpFound [/ip address find where interface="${lanBridge}" address="${lanIp}"];`,
+  );
+  lines.push(`:local targetIpExists ([:len $targetIpFound] > 0);`);
+  lines.push(`:if ($targetIpExists) do={`);
+  lines.push(
+    `  /log info message="[ZTP] IP ${lanIp} already configured on ${lanBridge}";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] IP ${lanIp} NOT configured on ${lanBridge}";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing NAT masquerade rules --
+  lines.push(
+    `:local existingNatRules [/ip firewall nat find where chain=srcnat action=masquerade out-interface="${wanIface}"];`,
+  );
+  lines.push(`:local natRuleCount [:len $existingNatRules];`);
+  lines.push(`:local hasNATRule ($natRuleCount > 0);`);
+  lines.push(":if ($hasNATRule) do={");
+  lines.push(
+    `  /log info message="[ZTP] NAT masquerade already exists on ${wanIface}";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] No NAT masquerade found on ${wanIface} - will add";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing firewall filter rules --
+  lines.push(
+    ":local existingInputRules [/ip firewall filter find where chain=input];",
+  );
+  lines.push(":local inputRuleCount [:len $existingInputRules];");
+  lines.push(":local hasInputRules ($inputRuleCount > 0);");
+  lines.push(":if ($hasInputRules) do={");
+  lines.push(
+    '  /log info message="[ZTP] Found $inputRuleCount existing input firewall rules";',
+  );
+  lines.push("} else={");
+  lines.push('  /log info message="[ZTP] No input firewall rules found";');
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing DHCP server on the bridge --
+  lines.push(
+    `:local existingDhcpServers [/ip dhcp-server find where interface="${lanBridge}"];`,
+  );
+  lines.push(`:local dhcpServerCount [:len $existingDhcpServers];`);
+  lines.push(`:local hasDHCPServer ($dhcpServerCount > 0);`);
+  lines.push(":if ($hasDHCPServer) do={");
+  lines.push(
+    `  /log info message="[ZTP] DHCP server already exists on ${lanBridge}";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] No DHCP server on ${lanBridge} - will create";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing DHCP pools --
+  lines.push(":local dhcpPoolFound [/ip pool find where name=dhcp_pool];");
+  lines.push(":local dhcpPoolExists ([:len $dhcpPoolFound] > 0);");
+  lines.push(":if ($dhcpPoolExists) do={");
+  lines.push('  /log info message="[ZTP] DHCP pool dhcp_pool already exists";');
+  lines.push("} else={");
+  lines.push(
+    '  /log info message="[ZTP] DHCP pool dhcp_pool does not exist - will create";',
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing DHCP networks --
+  lines.push(
+    `:local dhcpNetFound [/ip dhcp-server network find where address="${lanNetwork}"];`,
+  );
+  lines.push(`:local dhcpNetExists ([:len $dhcpNetFound] > 0);`);
+  lines.push(":if ($dhcpNetExists) do={");
+  lines.push(
+    `  /log info message="[ZTP] DHCP network ${lanNetwork} already configured";`,
+  );
+  lines.push("} else={");
+  lines.push(
+    `  /log info message="[ZTP] DHCP network ${lanNetwork} not configured - will add";`,
+  );
+  lines.push("};");
+  lines.push("");
+
+  // -- Pre-flight summary --
+  lines.push("#############################################");
+  lines.push("# END OF PRE-FLIGHT DISCOVERY");
+  lines.push("#############################################");
+  lines.push("");
+
+  // ==================================================================
+  // SECTION 2: SYSTEM IDENTITY & CLOCK
+  // ==================================================================
   lines.push("# System Identity");
   lines.push(
-    `/system identity set name="${escapeRouterValue(router.identity || router.name)}"`,
+    safeAdd(
+      `/system identity set name="${escapeRouterValue(router.identity || router.name)}"`,
+    ),
   );
   lines.push("/system clock set time-zone-name=Africa/Nairobi");
   lines.push("");
 
-  // DNS Configuration
+  // ==================================================================
+  // SECTION 3: DNS CONFIGURATION
+  // ==================================================================
   lines.push("# DNS Configuration");
   let dnsServers = "8.8.8.8,8.8.4.4,1.1.1.1";
   if (router.dns_servers) {
@@ -121,7 +341,9 @@ function generateProvisionScript(router, options = {}) {
   lines.push("/ip dns set cache-size=10000KiB");
   lines.push("");
 
-  // NTP Configuration
+  // ==================================================================
+  // SECTION 4: NTP CONFIGURATION
+  // ==================================================================
   lines.push("# NTP Configuration");
   lines.push("/system ntp client set enabled=yes");
   let ntpServers = ["pool.ntp.org", "time.google.com"];
@@ -150,7 +372,9 @@ function generateProvisionScript(router, options = {}) {
   lines.push("/system ntp client set mode=unicast");
   lines.push("");
 
-  // Logging
+  // ==================================================================
+  // SECTION 5: LOGGING CONFIGURATION
+  // ==================================================================
   lines.push("# Logging Configuration");
   lines.push(
     ":do { /system logging set 0 action=memory topics=info } on-error={}",
@@ -172,24 +396,33 @@ function generateProvisionScript(router, options = {}) {
   );
   lines.push("");
 
-  // WAN Configuration
+  // ==================================================================
+  // SECTION 6: WAN DHCP CLIENT (CONDITIONAL)
+  // ==================================================================
   lines.push("# WAN Configuration");
   lines.push(
-    `:do { /ip dhcp-client add interface=${wanIface} add-default-route=yes use-peer-dns=no comment="WAN - Auto-configured" } on-error={}`,
+    "# Only add DHCP client if no default route exists on the WAN interface",
   );
-  lines.push("");
-
-  // LAN Bridge
-  lines.push("# LAN Bridge Configuration");
   lines.push(
-    safeAdd(
-      `/interface bridge add name=${lanBridge} protocol=rstp comment="Auto-created LAN bridge"`,
-    ),
+    `:if ($defaultRouteCount = 0) do={ :do { /ip dhcp-client add interface=${wanIface} add-default-route=yes use-peer-dns=no comment="WAN - Auto-configured" } on-error={ /log info message="[ZTP] Failed to add DHCP client on ${wanIface}" } } else={ /log info message="[ZTP] DHCP client SKIPPED - default route already exists" };`,
   );
   lines.push("");
 
-  // Add LAN ports to bridge (ether2-ether8 or all ports except WAN)
+  // ==================================================================
+  // SECTION 7: LAN BRIDGE (CONDITIONAL)
+  // ==================================================================
+  lines.push("# LAN Bridge Configuration");
+  lines.push("# Only create bridge if it doesn't already exist");
+  lines.push(
+    `:if (!$targetBridgeExists) do={ ${safeAdd(`/interface bridge add name=${lanBridge} protocol=rstp comment="Auto-created LAN bridge"`)} } else={ /log info message="[ZTP] Bridge creation SKIPPED - ${lanBridge} already exists" };`,
+  );
+  lines.push("");
+
+  // ==================================================================
+  // SECTION 8: BRIDGE LAN PORTS (CONDITIONAL)
+  // ==================================================================
   lines.push("# Bridge LAN Ports");
+  lines.push("# Only add ports to bridge if it has no ports yet");
   const lanPorts = router.lan_ports || [
     "ether2",
     "ether3",
@@ -199,141 +432,159 @@ function generateProvisionScript(router, options = {}) {
     "ether7",
     "ether8",
   ];
+  const safeWanIface = wanIface;
+  // Emit a conditional block that adds ports only if the bridge exists and has no ports
+  lines.push(`:if ($targetBridgeExists && !$hasBridgePorts) do={`);
   lanPorts.forEach((port) => {
-    if (port !== wanIface) {
+    if (port !== safeWanIface) {
       lines.push(
-        safeAdd(
-          `/interface bridge port add bridge=${lanBridge} interface=${port} comment="Auto-bridge ${port}"`,
-        ),
+        `  ${safeAdd(`/interface bridge port add bridge=${lanBridge} interface=${port} comment="Auto-bridge ${port}"`)}`,
       );
     }
   });
+  lines.push(
+    `  /log info message="[ZTP] Added LAN ports to bridge ${lanBridge}";`,
+  );
+  lines.push(`} else={`);
+  lines.push(
+    `  :if ($targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - ${lanBridge} already has $bridgePortCount port(s)"; };`,
+  );
+  lines.push(
+    `  :if (!$targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - ${lanBridge} does not exist"; };`,
+  );
+  lines.push(`};`);
   lines.push("");
 
-  // LAN IP Address
+  // ==================================================================
+  // SECTION 9: LAN IP ADDRESS (CONDITIONAL)
+  // ==================================================================
   lines.push("# LAN IP Address");
+  lines.push("# Only add IP if it doesn't already exist on the bridge");
   lines.push(
-    safeAdd(
-      `/ip address add address=${lanIp} interface=${lanBridge} comment="LAN Gateway"`,
-    ),
+    `:if (!$targetIpExists) do={ ${safeAdd(`/ip address add address=${lanIp} interface=${lanBridge} comment="LAN Gateway"`)} } else={ /log info message="[ZTP] LAN IP SKIPPED - ${lanIp} already configured on ${lanBridge}" };`,
   );
   lines.push("");
 
-  // NAT Masquerade
+  // ==================================================================
+  // SECTION 10: NAT MASQUERADE (CONDITIONAL)
+  // ==================================================================
   lines.push("# NAT Configuration");
   lines.push(
-    safeAdd(
-      `/ip firewall nat add chain=srcnat action=masquerade out-interface=${wanIface} comment="Auto-NAT Masquerade"`,
-    ),
+    "# Only add NAT masquerade if one doesn't already exist on the WAN interface",
+  );
+  lines.push(
+    `:if (!$hasNATRule) do={ ${safeAdd(`/ip firewall nat add chain=srcnat action=masquerade out-interface=${wanIface} comment="Auto-NAT Masquerade"`)} } else={ /log info message="[ZTP] NAT masquerade SKIPPED - already exists on ${wanIface}" };`,
   );
   lines.push("");
 
-  // DHCP Server for LAN
+  // ==================================================================
+  // SECTION 11: DHCP SERVER FOR LAN (CONDITIONAL)
+  // ==================================================================
   lines.push("# DHCP Server Configuration");
   lines.push(
-    safeAdd("/ip pool add name=dhcp_pool ranges=" + dhcpStart + "-" + dhcpEnd),
+    "# Only create DHCP server components if one doesn't already exist on the bridge",
   );
   lines.push(
-    safeAdd(
-      `/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`,
-    ),
+    `:if (!$dhcpPoolExists) do={ ${safeAdd(`/ip pool add name=dhcp_pool ranges=${dhcpStart}-${dhcpEnd}`)} } else={ /log info message="[ZTP] DHCP pool SKIPPED - already exists" };`,
   );
   lines.push(
-    safeAdd(
-      `/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`,
-    ),
+    `:if (!$dhcpNetExists) do={ ${safeAdd(`/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`)} } else={ /log info message="[ZTP] DHCP network SKIPPED - already configured" };`,
+  );
+  lines.push(
+    `:if (!$hasDHCPServer) do={ ${safeAdd(`/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`)} } else={ /log info message="[ZTP] DHCP server SKIPPED - already exists on ${lanBridge}" };`,
   );
   lines.push("");
 
-  // Advanced Firewall Rules
+  // ==================================================================
+  // SECTION 12: FIREWALL FILTER RULES (CONDITIONAL)
+  // ==================================================================
   lines.push("# Firewall Filter Rules");
+  lines.push(
+    "# Only add firewall rules if no input rules exist (fresh deployment)",
+  );
   lines.push("# Input Chain");
+  lines.push(`:if (!$hasInputRules) do={`);
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="Allow established connections"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="Allow established connections"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input action=drop connection-state=invalid comment="Drop invalid connections"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input action=drop connection-state=invalid comment="Drop invalid connections"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=icmp action=accept comment="Allow ICMP ping"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=icmp action=accept comment="Allow ICMP ping"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=udp port=123 action=accept comment="Allow NTP"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=udp port=123 action=accept comment="Allow NTP"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=tcp dst-port=22 action=accept comment="Allow SSH"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=tcp dst-port=22 action=accept comment="Allow SSH"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow WinBox"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow WinBox"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=tcp dst-port=8728 action=accept comment="Allow API"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=tcp dst-port=8728 action=accept comment="Allow API"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input protocol=tcp dst-port=443 action=accept comment="Allow HTTPS"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input protocol=tcp dst-port=443 action=accept comment="Allow HTTPS"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=input action=drop comment="Drop all other input"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=input action=drop comment="Drop all other input"')}`,
+  );
+  lines.push(`  /log info message="[ZTP] Input firewall rules added";`);
+  lines.push(
+    `} else={ /log info message="[ZTP] Input firewall rules SKIPPED - $inputRuleCount rule(s) already exist"; };`,
   );
   lines.push("");
-  lines.push("# Forward Chain");
+  lines.push("# Forward Chain (only if no forward rules exist)");
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="Forward established"',
-    ),
+    `:local existingForwardRules [/ip firewall filter find where chain=forward];`,
+  );
+  lines.push(`:local forwardRuleCount [:len $existingForwardRules];`);
+  lines.push(`:if ($forwardRuleCount = 0) do={`);
+  lines.push(
+    `  ${safeAdd('/ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="Forward established"')}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"')}`,
   );
   lines.push(
-    safeAdd(
-      `/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`,
-    ),
+    `  ${safeAdd(`/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`)}`,
   );
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=forward action=drop comment="Drop all other forward"',
-    ),
+    `  ${safeAdd('/ip firewall filter add chain=forward action=drop comment="Drop all other forward"')}`,
+  );
+  lines.push(`  /log info message="[ZTP] Forward firewall rules added";`);
+  lines.push(
+    `} else={ /log info message="[ZTP] Forward firewall rules SKIPPED - $forwardRuleCount rule(s) already exist"; };`,
   );
   lines.push("");
 
-  // FastTrack for performance
+  // ==================================================================
+  // SECTION 13: FASTTRACK (CONDITIONAL)
+  // ==================================================================
   lines.push("# FastTrack Connection Tracking");
   lines.push(
-    safeAdd(
-      '/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack established connections"',
-    ),
+    `:local fastTrackFound [/ip firewall filter find where chain=forward action=fasttrack-connection];`,
+  );
+  lines.push(`:local hasFastTrack ([:len $fastTrackFound] > 0);`);
+  lines.push(
+    `:if (!$hasFastTrack) do={ ${safeAdd('/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack established connections"')} } else={ /log info message="[ZTP] FastTrack SKIPPED - already exists"; };`,
   );
   lines.push("");
 
-  // Connection Tracking
+  // ==================================================================
+  // SECTION 14: CONNECTION TRACKING
+  // ==================================================================
   lines.push("# Connection Tracking Settings");
   lines.push(
     "/ip firewall connection tracking set tcp-close-wait-time=10s tcp-time-wait-time=10s",
   );
   lines.push("");
 
-  // RADIUS Configuration
+  // ==================================================================
+  // SECTION 15: RADIUS CONFIGURATION (CONDITIONAL)
+  // ==================================================================
   if (
     router.radius_server &&
     router.radius_secret &&
@@ -341,17 +592,21 @@ function generateProvisionScript(router, options = {}) {
     router.radius_secret.trim()
   ) {
     lines.push("# RADIUS Configuration");
+    const safeRadiusServer = escapeRouterValue(router.radius_server);
+    const safeRadiusSecret = escapeRouterValue(router.radius_secret);
     lines.push(
-      safeAdd(
-        `/radius add address="${escapeRouterValue(router.radius_server)}" secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`,
-      ),
+      `:local existingRadius [/radius find where address="${safeRadiusServer}"];`,
     );
-    lines.push("/ppp aaa set use-radius=yes accounting=yes");
-    lines.push("/ip hotspot aaa set use-radius=yes accounting=yes");
+    lines.push(`:local hasRadius ([:len $existingRadius] > 0);`);
+    lines.push(
+      `:if (!$hasRadius) do={ ${safeAdd(`/radius add address="${safeRadiusServer}" secret="${safeRadiusSecret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`)} /ppp aaa set use-radius=yes accounting=yes /ip hotspot aaa set use-radius=yes accounting=yes } else={ /log info message="[ZTP] RADIUS SKIPPED - already configured for ${safeRadiusServer}" };`,
+    );
     lines.push("");
   }
 
-  // PPPoE Server
+  // ==================================================================
+  // SECTION 16: PPPoE SERVER (CONDITIONAL)
+  // ==================================================================
   if (router.pppoe_enabled) {
     lines.push("# PPPoE Server Configuration");
     const pppoeIface = router.pppoe_interface || "ether2";
@@ -359,17 +614,26 @@ function generateProvisionScript(router, options = {}) {
     const pppoePool = router.pppoe_pool || "10.10.0.100-10.10.0.200";
     const pppoeGateway = router.pppoe_gateway || "10.10.0.1";
     const rateLimit = router.pppoe_rate_limit || "10M/10M";
+    const safeServiceName = escapeRouterValue(serviceName);
 
     lines.push(
-      safeAdd(
-        `/interface pppoe-server server add service-name="${escapeRouterValue(serviceName)}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`,
-      ),
+      `:local existingPPPoEServer [/interface pppoe-server server find where service-name="${safeServiceName}"];`,
     );
-    lines.push(safeAdd("/ip pool add name=pppoe_pool ranges=" + pppoePool));
+    lines.push(`:local hasPPPoEServer ([:len $existingPPPoEServer] > 0);`);
     lines.push(
-      safeAdd(
-        `/ppp profile add name=pppoe_default local-address=${pppoeGateway} remote-address=pppoe_pool rate-limit=${rateLimit} change-tcp-mss=yes comment="Auto PPPoE Profile"`,
-      ),
+      `:if (!$hasPPPoEServer) do={ ${safeAdd(`/interface pppoe-server server add service-name="${safeServiceName}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`)} } else={ /log info message="[ZTP] PPPoE server SKIPPED - already exists"; };`,
+    );
+    lines.push(
+      `:local pppoePoolExists ([:len [/ip pool find where name=pppoe_pool]] > 0);`,
+    );
+    lines.push(
+      `:if (!$pppoePoolExists) do={ ${safeAdd("/ip pool add name=pppoe_pool ranges=" + pppoePool)} } else={ /log info message="[ZTP] PPPoE pool SKIPPED - already exists"; };`,
+    );
+    lines.push(
+      `:local pppoeProfileExists ([:len [/ppp profile find where name=pppoe_default]] > 0);`,
+    );
+    lines.push(
+      `:if (!$pppoeProfileExists) do={ ${safeAdd(`/ppp profile add name=pppoe_default local-address=${pppoeGateway} remote-address=pppoe_pool rate-limit=${rateLimit} change-tcp-mss=yes comment="Auto PPPoE Profile"`)} } else={ /log info message="[ZTP] PPPoE profile SKIPPED - already exists"; };`,
     );
     lines.push(
       "/ppp profile set default use-compression=yes use-encryption=yes",
@@ -377,88 +641,115 @@ function generateProvisionScript(router, options = {}) {
     lines.push("");
   }
 
-  // Hotspot Configuration
+  // ==================================================================
+  // SECTION 17: HOTSPOT CONFIGURATION (CONDITIONAL)
+  // ==================================================================
   if (router.hotspot_enabled) {
     lines.push("# Hotspot Configuration");
     const hotspotIp = router.hotspot_ip || "192.168.90.1/24";
     const hotspotGateway = hotspotIp.split("/")[0];
     const hotspotNetwork = hotspotIp.replace(/\d+\/\d+/, "0/24");
     const hotspotPool = router.hotspot_pool || "192.168.90.100-192.168.90.200";
+    const safeHotspotGw = escapeRouterValue(hotspotGateway);
 
-    lines.push(safeAdd("/ip pool add name=hs_pool ranges=" + hotspotPool));
     lines.push(
-      safeAdd(
-        '/ip hotspot profile add name=hs-prof dns-name="login.local" hotspot-address="' +
-          hotspotGateway +
-          '" login-by=cookie,http-pap',
-      ),
+      `:local hsPoolExists ([:len [/ip pool find where name=hs_pool]] > 0);`,
     );
     lines.push(
-      `/ip hotspot user profile set default idle-timeout=10m keepalive-timeout=2m shared-users=1`,
+      `:if (!$hsPoolExists) do={ ${safeAdd("/ip pool add name=hs_pool ranges=" + hotspotPool)} } else={ /log info message="[ZTP] Hotspot pool SKIPPED - already exists"; };`,
     );
     lines.push(
-      safeAdd(
-        `/ip hotspot add name=hotspot1 interface=${lanBridge} address-pool=hs_pool profile=hs-prof disabled=no`,
-      ),
+      `:local hsProfileExists ([:len [/ip hotspot profile find where name=hs-prof]] > 0);`,
     );
     lines.push(
-      safeAdd(
-        `/ip address add address=${hotspotIp} interface=${lanBridge} comment="Hotspot Gateway"`,
-      ),
+      `:if (!$hsProfileExists) do={ ${safeAdd(`/ip hotspot profile add name=hs-prof dns-name="login.local" hotspot-address="${safeHotspotGw}" login-by=cookie,http-pap`)} } else={ /log info message="[ZTP] Hotspot profile SKIPPED - already exists"; };`,
     );
     lines.push(
-      safeAdd(
-        `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotGateway} dns-server=${hotspotGateway}`,
-      ),
+      "/ip hotspot user profile set default idle-timeout=10m keepalive-timeout=2m shared-users=1",
+    );
+    lines.push(
+      `:local hsServerExists ([:len [/ip hotspot find where name=hotspot1]] > 0);`,
+    );
+    lines.push(
+      `:if (!$hsServerExists) do={ ${safeAdd(`/ip hotspot add name=hotspot1 interface=${lanBridge} address-pool=hs_pool profile=hs-prof disabled=no`)} } else={ /log info message="[ZTP] Hotspot server SKIPPED - already exists"; };`,
+    );
+    lines.push(
+      `:local hsIpExists ([:len [/ip address find where address="${hotspotIp}"]] > 0);`,
+    );
+    lines.push(
+      `:if (!$hsIpExists) do={ ${safeAdd(`/ip address add address=${hotspotIp} interface=${lanBridge} comment="Hotspot Gateway"`)} } else={ /log info message="[ZTP] Hotspot IP SKIPPED - already configured"; };`,
+    );
+    lines.push(
+      `:local hsDhcpNetExists ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] > 0);`,
+    );
+    lines.push(
+      `:if (!$hsDhcpNetExists) do={ ${safeAdd(`/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotGateway} dns-server=${hotspotGateway}`)} } else={ /log info message="[ZTP] Hotspot DHCP network SKIPPED - already configured"; };`,
     );
     lines.push("");
   }
 
-  // Bandwidth Control / Simple Queues
+  // ==================================================================
+  // SECTION 18: BANDWIDTH CONTROL (CONDITIONAL)
+  // ==================================================================
   if (router.bandwidth_control) {
     lines.push("# Bandwidth Control");
     lines.push(
-      safeAdd(
-        '/queue simple add name=default-limit target=192.168.88.0/24 max-limit=10M/10M comment="Default bandwidth limit"',
-      ),
+      `:local bwLimitExists ([:len [/queue simple find where name=default-limit]] > 0);`,
+    );
+    lines.push(
+      `:if (!$bwLimitExists) do={ ${safeAdd('/queue simple add name=default-limit target=192.168.88.0/24 max-limit=10M/10M comment="Default bandwidth limit"')} } else={ /log info message="[ZTP] Bandwidth limit SKIPPED - already exists"; };`,
     );
     lines.push("");
   }
 
-  // VLAN Support (if configured)
+  // ==================================================================
+  // SECTION 19: VLAN SUPPORT (CONDITIONAL)
+  // ==================================================================
   if (router.vlans && router.vlans.length > 0) {
     lines.push("# VLAN Configuration");
     router.vlans.forEach((vlan) => {
+      const vlanName = `vlan${vlan.id}`;
+      const safeVlanComment = escapeRouterValue(vlan.name || `VLAN ${vlan.id}`);
       lines.push(
-        safeAdd(
-          `/interface vlan add name=vlan${vlan.id} vlan-id=${vlan.id} interface=${lanBridge} comment="${vlan.name || "VLAN " + vlan.id}"`,
-        ),
+        `:local vlanExists ([:len [/interface vlan find where name="${vlanName}"]] > 0);`,
+      );
+      lines.push(
+        `:if (!$vlanExists) do={ ${safeAdd(`/interface vlan add name=${vlanName} vlan-id=${vlan.id} interface=${lanBridge} comment="${safeVlanComment}"`)} } else={ /log info message="[ZTP] VLAN ${vlanName} SKIPPED - already exists"; };`,
       );
       if (vlan.ip) {
         lines.push(
-          safeAdd(
-            `/ip address add address=${vlan.ip} interface=vlan${vlan.id} comment="VLAN ${vlan.id} IP"`,
-          ),
+          `:local vlanIpExists ([:len [/ip address find where address="${vlan.ip}"]] > 0);`,
+        );
+        lines.push(
+          `:if (!$vlanIpExists) do={ ${safeAdd(`/ip address add address=${vlan.ip} interface=${vlanName} comment="VLAN ${vlan.id} IP"`)} } else={ /log info message="[ZTP] VLAN ${vlan.id} IP SKIPPED - already configured"; };`,
         );
       }
     });
     lines.push("");
   }
 
-  // Static Routes (if configured)
+  // ==================================================================
+  // SECTION 20: STATIC ROUTES (CONDITIONAL)
+  // ==================================================================
   if (router.static_routes && router.static_routes.length > 0) {
     lines.push("# Static Routes");
     router.static_routes.forEach((route) => {
+      const safeDst = route.dst;
+      const safeGw = route.gateway;
+      const safeComment = escapeRouterValue(route.comment || "Static route");
       lines.push(
-        safeAdd(
-          `/ip route add dst-address=${route.dst} gateway=${route.gateway} comment="${route.comment || "Static route"}"`,
-        ),
+        `:local routeExists ([:len [/ip route find where dst-address="${safeDst}" gateway="${safeGw}"]] > 0);`,
+      );
+      lines.push(
+        `:if (!$routeExists) do={ ${safeAdd(`/ip route add dst-address=${safeDst} gateway=${safeGw} comment="${safeComment}"`)} } else={ /log info message="[ZTP] Route ${safeDst} via ${safeGw} SKIPPED - already exists"; };`,
       );
     });
     lines.push("");
   }
 
-  // Security Hardening
+  // ==================================================================
+  // SECTION 21: SECURITY HARDENING
+  // ==================================================================
   lines.push("# Management Services");
   lines.push(
     "# Review and apply these manually after first successful provisioning if needed.",
@@ -470,7 +761,9 @@ function generateProvisionScript(router, options = {}) {
   lines.push(`# Recommended API port: ${router.mgmt_port || 8728}`);
   lines.push("");
 
-  // SNMP (if configured)
+  // ==================================================================
+  // SECTION 22: SNMP (CONDITIONAL)
+  // ==================================================================
   if (router.snmp_enabled) {
     lines.push("# SNMP Configuration");
     lines.push(
@@ -488,12 +781,16 @@ function generateProvisionScript(router, options = {}) {
     lines.push("");
   }
 
-  // Backup Configuration
+  // ==================================================================
+  // SECTION 23: BACKUP CONFIGURATION
+  // ==================================================================
   lines.push("# Backup Configuration");
   lines.push("/system backup save name=auto-provision-backup");
   lines.push("");
 
-  // Callback to provisioning server
+  // ==================================================================
+  // SECTION 24: CALLBACK TO PROVISIONING SERVER
+  // ==================================================================
   lines.push("# Callback to Provisioning Server");
   const callbackBaseUrl =
     options.callbackBaseUrl ||
@@ -515,7 +812,9 @@ function generateProvisionScript(router, options = {}) {
   }
   lines.push("");
 
-  // Success Message
+  // ==================================================================
+  // SECTION 25: SUCCESS MESSAGE
+  // ==================================================================
   lines.push("# Provisioning Complete");
   lines.push(
     '/log info message="MikroTik Router provisioned successfully by billing system"',
