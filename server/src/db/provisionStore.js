@@ -66,6 +66,10 @@ function logProvision(store, token, routerId, action, status, details, ip, ua) {
   });
 }
 
+function safeAdd(command) {
+  return `:do { ${command} } on-error={}`;
+}
+
 function generateProvisionScript(router, options = {}) {
   const lines = [];
   const wanIface = router.wan_interface || "ether1";
@@ -178,7 +182,9 @@ function generateProvisionScript(router, options = {}) {
   // LAN Bridge
   lines.push("# LAN Bridge Configuration");
   lines.push(
-    `/interface bridge add name=${lanBridge} protocol=rstp comment="Auto-created LAN bridge"`,
+    safeAdd(
+      `/interface bridge add name=${lanBridge} protocol=rstp comment="Auto-created LAN bridge"`,
+    ),
   );
   lines.push("");
 
@@ -196,7 +202,9 @@ function generateProvisionScript(router, options = {}) {
   lanPorts.forEach((port) => {
     if (port !== wanIface) {
       lines.push(
-        `/interface bridge port add bridge=${lanBridge} interface=${port} comment="Auto-bridge ${port}"`,
+        safeAdd(
+          `/interface bridge port add bridge=${lanBridge} interface=${port} comment="Auto-bridge ${port}"`,
+        ),
       );
     }
   });
@@ -205,25 +213,35 @@ function generateProvisionScript(router, options = {}) {
   // LAN IP Address
   lines.push("# LAN IP Address");
   lines.push(
-    `/ip address add address=${lanIp} interface=${lanBridge} comment="LAN Gateway"`,
+    safeAdd(
+      `/ip address add address=${lanIp} interface=${lanBridge} comment="LAN Gateway"`,
+    ),
   );
   lines.push("");
 
   // NAT Masquerade
   lines.push("# NAT Configuration");
   lines.push(
-    `/ip firewall nat add chain=srcnat action=masquerade out-interface=${wanIface} comment="Auto-NAT Masquerade"`,
+    safeAdd(
+      `/ip firewall nat add chain=srcnat action=masquerade out-interface=${wanIface} comment="Auto-NAT Masquerade"`,
+    ),
   );
   lines.push("");
 
   // DHCP Server for LAN
   lines.push("# DHCP Server Configuration");
-  lines.push("/ip pool add name=dhcp_pool ranges=" + dhcpStart + "-" + dhcpEnd);
   lines.push(
-    `/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`,
+    safeAdd("/ip pool add name=dhcp_pool ranges=" + dhcpStart + "-" + dhcpEnd),
   );
   lines.push(
-    `/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`,
+    safeAdd(
+      `/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`,
+    ),
+  );
+  lines.push(
+    safeAdd(
+      `/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`,
+    ),
   );
   lines.push("");
 
@@ -231,52 +249,80 @@ function generateProvisionScript(router, options = {}) {
   lines.push("# Firewall Filter Rules");
   lines.push("# Input Chain");
   lines.push(
-    '/ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="Allow established connections"',
+    safeAdd(
+      '/ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="Allow established connections"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input action=drop connection-state=invalid comment="Drop invalid connections"',
+    safeAdd(
+      '/ip firewall filter add chain=input action=drop connection-state=invalid comment="Drop invalid connections"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=icmp action=accept comment="Allow ICMP ping"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=icmp action=accept comment="Allow ICMP ping"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=udp port=123 action=accept comment="Allow NTP"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=udp port=123 action=accept comment="Allow NTP"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=tcp dst-port=22 action=accept comment="Allow SSH"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=tcp dst-port=22 action=accept comment="Allow SSH"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow WinBox"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow WinBox"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=tcp dst-port=8728 action=accept comment="Allow API"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=tcp dst-port=8728 action=accept comment="Allow API"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input protocol=tcp dst-port=443 action=accept comment="Allow HTTPS"',
+    safeAdd(
+      '/ip firewall filter add chain=input protocol=tcp dst-port=443 action=accept comment="Allow HTTPS"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=input action=drop comment="Drop all other input"',
+    safeAdd(
+      '/ip firewall filter add chain=input action=drop comment="Drop all other input"',
+    ),
   );
   lines.push("");
   lines.push("# Forward Chain");
   lines.push(
-    '/ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="Forward established"',
+    safeAdd(
+      '/ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="Forward established"',
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"',
+    safeAdd(
+      '/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"',
+    ),
   );
   lines.push(
-    `/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`,
+    safeAdd(
+      `/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`,
+    ),
   );
   lines.push(
-    '/ip firewall filter add chain=forward action=drop comment="Drop all other forward"',
+    safeAdd(
+      '/ip firewall filter add chain=forward action=drop comment="Drop all other forward"',
+    ),
   );
   lines.push("");
 
   // FastTrack for performance
   lines.push("# FastTrack Connection Tracking");
   lines.push(
-    '/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack established connections"',
+    safeAdd(
+      '/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack established connections"',
+    ),
   );
   lines.push("");
 
@@ -296,7 +342,9 @@ function generateProvisionScript(router, options = {}) {
   ) {
     lines.push("# RADIUS Configuration");
     lines.push(
-      `/radius add address="${escapeRouterValue(router.radius_server)}" secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`,
+      safeAdd(
+        `/radius add address="${escapeRouterValue(router.radius_server)}" secret="${escapeRouterValue(router.radius_secret)}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`,
+      ),
     );
     lines.push("/ppp aaa set use-radius=yes accounting=yes");
     lines.push("/ip hotspot aaa set use-radius=yes accounting=yes");
@@ -313,11 +361,15 @@ function generateProvisionScript(router, options = {}) {
     const rateLimit = router.pppoe_rate_limit || "10M/10M";
 
     lines.push(
-      `/interface pppoe-server server add service-name="${escapeRouterValue(serviceName)}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`,
+      safeAdd(
+        `/interface pppoe-server server add service-name="${escapeRouterValue(serviceName)}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`,
+      ),
     );
-    lines.push("/ip pool add name=pppoe_pool ranges=" + pppoePool);
+    lines.push(safeAdd("/ip pool add name=pppoe_pool ranges=" + pppoePool));
     lines.push(
-      `/ppp profile add name=pppoe_default local-address=${pppoeGateway} remote-address=pppoe_pool rate-limit=${rateLimit} change-tcp-mss=yes comment="Auto PPPoE Profile"`,
+      safeAdd(
+        `/ppp profile add name=pppoe_default local-address=${pppoeGateway} remote-address=pppoe_pool rate-limit=${rateLimit} change-tcp-mss=yes comment="Auto PPPoE Profile"`,
+      ),
     );
     lines.push(
       "/ppp profile set default use-compression=yes use-encryption=yes",
@@ -333,23 +385,31 @@ function generateProvisionScript(router, options = {}) {
     const hotspotNetwork = hotspotIp.replace(/\d+\/\d+/, "0/24");
     const hotspotPool = router.hotspot_pool || "192.168.90.100-192.168.90.200";
 
-    lines.push("/ip pool add name=hs_pool ranges=" + hotspotPool);
+    lines.push(safeAdd("/ip pool add name=hs_pool ranges=" + hotspotPool));
     lines.push(
-      '/ip hotspot profile add name=hs-prof dns-name="login.local" hotspot-address="' +
-        hotspotGateway +
-        '" login-by=cookie,http-pap',
+      safeAdd(
+        '/ip hotspot profile add name=hs-prof dns-name="login.local" hotspot-address="' +
+          hotspotGateway +
+          '" login-by=cookie,http-pap',
+      ),
     );
     lines.push(
       `/ip hotspot user profile set default idle-timeout=10m keepalive-timeout=2m shared-users=1`,
     );
     lines.push(
-      `/ip hotspot add name=hotspot1 interface=${lanBridge} address-pool=hs_pool profile=hs-prof disabled=no`,
+      safeAdd(
+        `/ip hotspot add name=hotspot1 interface=${lanBridge} address-pool=hs_pool profile=hs-prof disabled=no`,
+      ),
     );
     lines.push(
-      `/ip address add address=${hotspotIp} interface=${lanBridge} comment="Hotspot Gateway"`,
+      safeAdd(
+        `/ip address add address=${hotspotIp} interface=${lanBridge} comment="Hotspot Gateway"`,
+      ),
     );
     lines.push(
-      `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotGateway} dns-server=${hotspotGateway}`,
+      safeAdd(
+        `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotGateway} dns-server=${hotspotGateway}`,
+      ),
     );
     lines.push("");
   }
@@ -358,7 +418,9 @@ function generateProvisionScript(router, options = {}) {
   if (router.bandwidth_control) {
     lines.push("# Bandwidth Control");
     lines.push(
-      '/queue simple add name=default-limit target=192.168.88.0/24 max-limit=10M/10M comment="Default bandwidth limit"',
+      safeAdd(
+        '/queue simple add name=default-limit target=192.168.88.0/24 max-limit=10M/10M comment="Default bandwidth limit"',
+      ),
     );
     lines.push("");
   }
@@ -368,11 +430,15 @@ function generateProvisionScript(router, options = {}) {
     lines.push("# VLAN Configuration");
     router.vlans.forEach((vlan) => {
       lines.push(
-        `/interface vlan add name=vlan${vlan.id} vlan-id=${vlan.id} interface=${lanBridge} comment="${vlan.name || "VLAN " + vlan.id}"`,
+        safeAdd(
+          `/interface vlan add name=vlan${vlan.id} vlan-id=${vlan.id} interface=${lanBridge} comment="${vlan.name || "VLAN " + vlan.id}"`,
+        ),
       );
       if (vlan.ip) {
         lines.push(
-          `/ip address add address=${vlan.ip} interface=vlan${vlan.id} comment="VLAN ${vlan.id} IP"`,
+          safeAdd(
+            `/ip address add address=${vlan.ip} interface=vlan${vlan.id} comment="VLAN ${vlan.id} IP"`,
+          ),
         );
       }
     });
@@ -384,7 +450,9 @@ function generateProvisionScript(router, options = {}) {
     lines.push("# Static Routes");
     router.static_routes.forEach((route) => {
       lines.push(
-        `/ip route add dst-address=${route.dst} gateway=${route.gateway} comment="${route.comment || "Static route"}"`,
+        safeAdd(
+          `/ip route add dst-address=${route.dst} gateway=${route.gateway} comment="${route.comment || "Static route"}"`,
+        ),
       );
     });
     lines.push("");
