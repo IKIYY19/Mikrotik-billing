@@ -136,15 +136,12 @@ function generateProvisionScript(router, options = {}) {
       ntpServers = [router.ntp_servers.trim()];
     }
   }
-  if (ntpServers[0]) {
-    lines.push(
-      `/system ntp client set primary-ntp="${escapeRouterValue(ntpServers[0])}"`,
-    );
-  }
-  if (ntpServers[1]) {
-    lines.push(
-      `/system ntp client set secondary-ntp="${escapeRouterValue(ntpServers[1])}"`,
-    );
+  if (ntpServers.length > 0) {
+    const serversStr = ntpServers
+      .filter((s) => s && typeof s === "string" && s.trim())
+      .map((s) => escapeRouterValue(s.trim()))
+      .join(",");
+    lines.push(`/system ntp client set servers="${serversStr}"`);
   }
   lines.push("/system ntp client set mode=unicast");
   lines.push("");
