@@ -116,7 +116,11 @@ router.get("/provision/:token", async (req, res) => {
     res.type("text/plain").send(script);
   } catch (error) {
     console.error("Provision error:", error);
-    res.status(500).type("text/plain").send("# ERROR: Internal server error");
+    console.error("Provision error stack:", error.stack);
+    res
+      .status(500)
+      .type("text/plain")
+      .send(`# ERROR: ${error.message || "Internal server error"}`);
   }
 });
 
@@ -191,7 +195,11 @@ router.get("/provision/callback/:token", async (req, res) => {
       .send(`# OK: Router marked as provisioned\n# ${activationStatus}`);
   } catch (error) {
     console.error("Callback error:", error);
-    res.status(500).type("text/plain").send("# ERROR: Internal server error");
+    console.error("Callback error stack:", error.stack);
+    res
+      .status(500)
+      .type("text/plain")
+      .send(`# ERROR: ${error.message || "Internal server error"}`);
   }
 });
 

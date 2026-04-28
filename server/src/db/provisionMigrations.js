@@ -34,6 +34,14 @@ const provisioningMigrations = [
     pppoe_interface VARCHAR(50),
     pppoe_service_name VARCHAR(100),
     mgmt_port INTEGER DEFAULT 8728,
+    mgmt_username VARCHAR(100),
+    mgmt_password_encrypted TEXT,
+    connection_type VARCHAR(10) DEFAULT 'api',
+
+    -- Billing link
+    linked_mikrotik_connection_id UUID,
+    billing_activated_at TIMESTAMP,
+    billing_activation_error TEXT,
 
     -- Metadata
     notes TEXT,
@@ -108,13 +116,20 @@ const provisioningMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_routers_project_id ON routers(project_id)`,
   `CREATE INDEX IF NOT EXISTS idx_routers_token ON routers(provision_token)`,
   `CREATE INDEX IF NOT EXISTS idx_routers_status ON routers(provision_status)`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS lan_ports TEXT[] DEFAULT ARRAY['ether2', 'ether3', 'ether4', 'ether5']`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS mgmt_username VARCHAR(100)`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS mgmt_password_encrypted TEXT`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS connection_type VARCHAR(10) DEFAULT 'api'`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS linked_mikrotik_connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS billing_activated_at TIMESTAMP`,
-  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS billing_activation_error TEXT`,
+  // Safely add FK constraint on linked_mikrotik_connection_id (column already exists from CREATE TABLE)
+  // Using a DO block to avoid errors if mikrotik_connections table doesn't exist
+  `DO $$ BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.table_constraints
+      WHERE constraint_name = 'fk_routers_linked_mikrotik_connection'
+      AND table_name = 'routers'
+    ) THEN
+      ALTER TABLE routers ADD CONSTRAINT fk_routers_linked_mikrotik_connection
+        FOREIGN KEY (linked_mikrotik_connection_id) REFERENCES mikrotik_connections(id) ON DELETE SET NULL;
+    END IF;
+  EXCEPTION WHEN undefined_table THEN
+    -- mikrotik_connections table doesn't exist yet; skip FK creation
+  END $$`,
   `CREATE INDEX IF NOT EXISTS idx_routers_linked_mikrotik_connection ON routers(linked_mikrotik_connection_id)`,
   `CREATE INDEX IF NOT EXISTS idx_enrollment_tokens_token ON enrollment_tokens(token)`,
   `CREATE INDEX IF NOT EXISTS idx_enrollment_tokens_status ON enrollment_tokens(status)`,
