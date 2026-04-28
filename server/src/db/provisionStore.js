@@ -18,9 +18,14 @@ function generateToken() {
 }
 
 function escapeRouterValue(value) {
-  return String(value ?? '')
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  return str
     .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"');
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '')
+    .replace(/\r/g, '')
+    .replace(/\t/g, ' ');
 }
 
 function buildFetchCommand(url, destination, keepResult = true) {
