@@ -34,6 +34,23 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key)`,
 
+  // Notification settings table
+  `CREATE TABLE IF NOT EXISTS notification_settings (
+    id SERIAL PRIMARY KEY,
+    notification_type VARCHAR(100) NOT NULL,
+    enabled BOOLEAN DEFAULT true,
+    email_enabled BOOLEAN DEFAULT false,
+    sms_enabled BOOLEAN DEFAULT false,
+    webhook_enabled BOOLEAN DEFAULT false,
+    webhook_url TEXT,
+    email_recipients TEXT,
+    sms_recipients TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(notification_type)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_settings_type ON notification_settings(notification_type)`,
+
   // Projects table
   `CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

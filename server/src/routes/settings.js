@@ -372,9 +372,85 @@ PersistentKeepalive = 25`;
   res.json({ config });
 });
 
+// Notification settings store
+const notificationSettingsStore = [
+  { notification_type: 'invoice_due', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'invoice_overdue', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'payment_received', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'subscription_activated', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'subscription_suspended', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'low_balance', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+  { notification_type: 'router_offline', enabled: true, email_enabled: false, sms_enabled: false, webhook_enabled: false, webhook_url: '', email_recipients: '', sms_recipients: '' },
+];
+
+// Get notification settings
+router.get('/notifications', async (req, res) => {
+  if (!getDb()) {
+    res.json(notificationSettingsStore);
+    return;
+  }
+
+  try {
+    const result = await getDb().query('SELECT * FROM notification_settings ORDER BY notification_type');
+    if (result.rows.length === 0) {
+      // Initialize with defaults if table is empty
+      for (const setting of notificationSettingsStore) {
+        await getDb().query(
+          `INSERT INTO notification_settings (notification_type, enabled, email_enabled, sms_enabled, webhook_enabled, webhook_url, email_recipients, sms_recipients)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [setting.notification_type, setting.enabled, setting.email_enabled, setting.sms_enabled, setting.webhook_enabled, setting.webhook_url, setting.email_recipients, setting.sms_recipients]
+        );
+      }
+      const initResult = await getDb().query('SELECT * FROM notification_settings ORDER BY notification_type');
+      res.json(initResult.rows);
+    } else {
+      res.json(result.rows);
+    }
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+    res.status(500).json({ error: 'Failed to get notification settings' });
+  }
+});
+
+// Update notification settings
+router.put('/notifications', async (req, res) => {
+  const settings = req.body;
+
+  if (!getDb()) {
+    // Update in-memory store
+    for (const setting of settings) {
+      const idx = notificationSettingsStore.findIndex(s => s.notification_type === setting.notification_type);
+      if (idx !== -1) {
+        Object.assign(notificationSettingsStore[idx], setting);
+      }
+    }
+    res.json(notificationSettingsStore);
+    return;
+  }
+
+  try {
+    for (const setting of settings) {
+      await getDb().query(
+        `INSERT INTO notification_settings (notification_type, enabled, email_enabled, sms_enabled, webhook_enabled, webhook_url, email_recipients, sms_recipients)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (notification_type) DO UPDATE SET
+           enabled = $2, email_enabled = $3, sms_enabled = $4, webhook_enabled = $5,
+           webhook_url = $6, email_recipients = $7, sms_recipients = $8, updated_at = CURRENT_TIMESTAMP`,
+        [setting.notification_type, setting.enabled, setting.email_enabled, setting.sms_enabled, setting.webhook_enabled, setting.webhook_url, setting.email_recipients, setting.sms_recipients]
+      );
+    }
+    const result = await getDb().query('SELECT * FROM notification_settings ORDER BY notification_type');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    res.status(500).json({ error: 'Failed to update notification settings' });
+  }
+});
+
 // Export the stores for use in other modules
 module.exports = router;
 module.exports.paymentGatewayStore = paymentGatewayStore;
 module.exports.bankPaybillStore = bankPaybillStore;
 module.exports.settingsStore = settingsStore;
 module.exports.wireguardStore = wireguardStore;
+module.exports.notificationSettingsStore = notificationSettingsStore;
