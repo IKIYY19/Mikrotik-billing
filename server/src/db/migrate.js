@@ -1,8 +1,8 @@
-const db = require('./index');
-const { runAuthMigrations } = require('./authMigrations');
-const { runBillingMigrations } = require('./billingMigrations');
-const { runIntegrationsMigration } = require('./integrationsMigration');
-const provisioningMigrations = require('./provisionMigrations');
+const db = require("./index");
+const { runAuthMigrations } = require("./authMigrations");
+const { runBillingMigrations } = require("./billingMigrations");
+const { runIntegrationsMigration } = require("./integrationsMigration");
+const provisioningMigrations = require("./provisionMigrations");
 
 const coreMigrations = [
   // Users table (MUST be first - required for auth)
@@ -284,11 +284,6 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
 
-  // Alerts table removed from migrations - created on-demand in service
-  // This prevents black screen if table creation fails during startup
-
-  // Disable monitoring migrations - causing black screen
-  /*
   // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
   `CREATE TABLE IF NOT EXISTS health_checks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -355,44 +350,43 @@ const coreMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_connection ON monitoring_rules(connection_id)`,
   `CREATE INDEX IF NOT EXISTS idx_monitoring_rules_type ON monitoring_rules(rule_type)`,
-  */
 ];
 
 async function runMigrations() {
-  console.log('Running database migrations...');
+  console.log("Running database migrations...");
   try {
     for (const migration of coreMigrations) {
       try {
         await db.query(migration);
       } catch (error) {
-        console.error('Migration failed (continuing anyway):', error.message);
+        console.error("Migration failed (continuing anyway):", error.message);
         // Continue with other migrations even if one fails
       }
     }
-    console.log('Core migrations completed');
+    console.log("Core migrations completed");
 
     const authOk = await runAuthMigrations();
     if (!authOk) {
-      throw new Error('Auth migrations reported failure');
+      throw new Error("Auth migrations reported failure");
     }
 
     await runBillingMigrations(db);
-    console.log('Billing migrations completed successfully');
+    console.log("Billing migrations completed successfully");
 
     const integrationsOk = await runIntegrationsMigration();
     if (!integrationsOk) {
-      throw new Error('Integrations migration reported failure');
+      throw new Error("Integrations migration reported failure");
     }
 
     // Run provisioning migrations (routers table)
     for (const migration of provisioningMigrations) {
       await db.query(migration);
     }
-    console.log('Provisioning migrations completed successfully');
+    console.log("Provisioning migrations completed successfully");
 
-    console.log('All migrations completed successfully');
+    console.log("All migrations completed successfully");
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error("Migration failed:", error);
     throw error;
   }
 }

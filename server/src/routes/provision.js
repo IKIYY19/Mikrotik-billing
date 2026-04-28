@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
+const logger = require("../utils/logger");
 const provisionStore = require("../db/provisionStore");
 const memoryDb = require("../db/memory");
 const zeroTouchBilling = require("../services/zeroTouchBilling");
@@ -130,15 +131,15 @@ router.get("/provision/:token", async (req, res) => {
     setCachedScript(token, script);
 
     // Log the script for debugging
-    console.log(
+    logger.info(
       `[Provision] Generated script for router ${routerData.id} (${routerData.name}):`,
     );
-    console.log("--- SCRIPT START ---");
+    logger.info("--- SCRIPT START ---");
     const scriptLines = script.split("\n");
     scriptLines.forEach((line, idx) => {
-      console.log(`${String(idx + 1).padStart(3)}: ${line}`);
+      logger.info(`${String(idx + 1).padStart(3)}: ${line}`);
     });
-    console.log("--- SCRIPT END ---");
+    logger.info("--- SCRIPT END ---");
 
     // Log the event
     await getDb().query(
@@ -148,8 +149,10 @@ router.get("/provision/:token", async (req, res) => {
 
     res.type("text/plain").send(script);
   } catch (error) {
-    console.error("Provision error:", error);
-    console.error("Provision error stack:", error.stack);
+    logger.error("Provision error:", {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .type("text/plain")
@@ -230,8 +233,10 @@ router.get("/provision/callback/:token", async (req, res) => {
       .type("text/plain")
       .send(`# OK: Router marked as provisioned\n# ${activationStatus}`);
   } catch (error) {
-    console.error("Callback error:", error);
-    console.error("Callback error stack:", error.stack);
+    logger.error("Callback error:", {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .type("text/plain")
@@ -269,7 +274,7 @@ router.get("/provision/command/:routerId", async (req, res) => {
       copyText: command.replace(/\\\n/g, " "),
     });
   } catch (error) {
-    console.error("Command generation error:", error);
+    logger.error("Command generation error:", { error: error.message });
     res.status(500).json({ error: error.message });
   }
 });
@@ -318,7 +323,7 @@ router.post("/provision/command/:routerId", async (req, res) => {
       message: "Token regenerated",
     });
   } catch (error) {
-    console.error("Command regeneration error:", error);
+    logger.error("Command regeneration error:", { error: error.message });
     res.status(500).json({ error: error.message });
   }
 });
@@ -468,7 +473,9 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
     );
     return result.rows[0];
   } catch (e) {
-    console.error("[Enrollment] upsertDiscoveredRouter error:", e.message);
+    logger.error("[Enrollment] upsertDiscoveredRouter error:", {
+      error: e.message,
+    });
     return null;
   }
 }
@@ -525,7 +532,7 @@ function appendInterfaceToDiscovered(enrollToken, iface) {
       ],
     )
     .catch((e) =>
-      console.error("[Enrollment] appendInterface error:", e.message),
+      logger.error("[Enrollment] appendInterface error:", { error: e.message }),
     );
 }
 
@@ -560,7 +567,7 @@ function appendAddressToDiscovered(enrollToken, addr) {
       [JSON.stringify([addr]), enrollToken],
     )
     .catch((e) =>
-      console.error("[Enrollment] appendAddress error:", e.message),
+      logger.error("[Enrollment] appendAddress error:", { error: e.message }),
     );
 }
 
@@ -752,11 +759,11 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
     ].join("\n");
 
     // Log the bootstrap download
-    console.log(`[Enrollment] Bootstrap fetched - token: ${token}, ip: ${ip}`);
+    logger.info(`[Enrollment] Bootstrap fetched - token: ${token}, ip: ${ip}`);
 
     res.type("text/plain").send(script);
   } catch (error) {
-    console.error("[Enrollment] Bootstrap error:", error.message);
+    logger.error("[Enrollment] Bootstrap error:", { error: error.message });
     res.status(500).type("text/plain").send("# ERROR: Internal server error");
   }
 });
@@ -801,12 +808,12 @@ router.all("/enroll/report/:token", async (req, res) => {
 
     await upsertDiscoveredRouter(token, tokenRecord, data, ip, ua);
 
-    console.log(
+    logger.info(
       `[Enrollment] System report received - identity: ${data.identity}, model: ${data.model}, ip: ${ip}`,
     );
     res.type("text/plain").send("# OK: System info received");
   } catch (error) {
-    console.error("[Enrollment] Report error:", error.message);
+    logger.error("[Enrollment] Report error:", { error: error.message });
     res.type("text/plain").send("# ERROR: " + error.message);
   }
 });
@@ -843,7 +850,7 @@ router.get("/enroll/iface/:token", async (req, res) => {
 
     res.type("text/plain").send("# OK");
   } catch (error) {
-    console.error("[Enrollment] Iface error:", error.message);
+    logger.error("[Enrollment] Iface error:", { error: error.message });
     res.type("text/plain").send("# ERROR: " + error.message);
   }
 });
@@ -871,7 +878,7 @@ router.get("/enroll/addr/:token", async (req, res) => {
 
     res.type("text/plain").send("# OK");
   } catch (error) {
-    console.error("[Enrollment] Addr error:", error.message);
+    logger.error("[Enrollment] Addr error:", { error: error.message });
     res.type("text/plain").send("# ERROR: " + error.message);
   }
 });
@@ -942,7 +949,7 @@ router.get("/enroll/done/:token", async (req, res) => {
       }
     }
 
-    console.log(
+    logger.info(
       `[Enrollment] Done signal received - token: ${token}, ip: ${ip}`,
     );
     res
@@ -951,7 +958,7 @@ router.get("/enroll/done/:token", async (req, res) => {
         "# OK: Enrollment complete. Check the platform to approve this router.",
       );
   } catch (error) {
-    console.error("[Enrollment] Done error:", error.message);
+    logger.error("[Enrollment] Done error:", { error: error.message });
     res.type("text/plain").send("# ERROR: " + error.message);
   }
 });
@@ -1119,7 +1126,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
       }
     }
 
-    console.log(
+    logger.info(
       `[Enrollment] Auto-complete - token: ${token}, provisionToken: ${provisionToken}, router: ${routerName}`,
     );
 
@@ -1134,7 +1141,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
 
     res.type("text/plain").send(response);
   } catch (error) {
-    console.error("[Enrollment] Auto-complete error:", error.message);
+    logger.error("[Enrollment] Auto-complete error:", { error: error.message });
     res.type("text/plain").send("# ERROR: " + error.message);
   }
 });
@@ -1297,10 +1304,10 @@ router.get("/ztp/one-shot/:token", async (req, res) => {
       "#############################################",
     ].join("\n");
 
-    console.log(`[ZTP] One-shot script fetched - token: ${token}`);
+    logger.info(`[ZTP] One-shot script fetched - token: ${token}`);
     res.type("text/plain").send(script);
   } catch (error) {
-    console.error("[ZTP] One-shot error:", error.message);
+    logger.error("[ZTP] One-shot error:", { error: error.message });
     res.status(500).type("text/plain").send("# ERROR: Internal server error");
   }
 });

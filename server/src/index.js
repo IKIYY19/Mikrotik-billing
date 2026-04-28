@@ -199,7 +199,12 @@ const {
   trackUserActivity,
   startOnlineStatusUpdater,
 } = require("./middleware/userActivity");
-const { apiLimiter } = require("./middleware/rateLimiter");
+const {
+  apiLimiter,
+  authLimiter,
+  paymentLimiter,
+  messagingLimiter,
+} = require("./middleware/rateLimiter");
 app.use("/api", apiLimiter);
 
 // Track user activity on authenticated requests
@@ -348,7 +353,7 @@ const startServer = async () => {
     });
 
     // Public routes (no auth required)
-    app.use("/api/auth", require("./routes/auth"));
+    app.use("/api/auth", authLimiter, require("./routes/auth"));
     app.use("/mikrotik", require("./routes/provision"));
     app.use("/api/portal/auth", require("./routes/customerAuth"));
 
@@ -491,10 +496,30 @@ const startServer = async () => {
       require("./routes/mikrotikAutomation"),
     );
     app.use("/api/devices", authenticate, require("./routes/devices"));
-    app.use("/api/payments", authenticate, require("./routes/payments"));
-    app.use("/api/sms", authenticate, require("./routes/sms"));
-    app.use("/api/email", authenticate, require("./routes/email"));
-    app.use("/api/telegram", authenticate, require("./routes/telegram"));
+    app.use(
+      "/api/payments",
+      authenticate,
+      paymentLimiter,
+      require("./routes/payments"),
+    );
+    app.use(
+      "/api/sms",
+      authenticate,
+      messagingLimiter,
+      require("./routes/sms"),
+    );
+    app.use(
+      "/api/email",
+      authenticate,
+      messagingLimiter,
+      require("./routes/email"),
+    );
+    app.use(
+      "/api/telegram",
+      authenticate,
+      messagingLimiter,
+      require("./routes/telegram"),
+    );
     app.use("/api/storage", authenticate, require("./routes/storage"));
     app.use("/api/features", authenticate, require("./routes/features"));
     app.use("/api/portal", authenticate, require("./routes/customerPortal"));
