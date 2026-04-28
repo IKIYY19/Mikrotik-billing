@@ -235,6 +235,16 @@ export function Devices() {
     setApproveLoading(false);
   };
 
+  const deleteDiscoveredRouter = async (id) => {
+    if (!window.confirm("Delete this discovered router? This action cannot be undone.")) return;
+    try {
+      await axios.delete(`${API_URL}/devices/discovered/${id}`);
+      fetchDiscovered();
+    } catch (e) {
+      window.alert(e.response?.data?.error || e.message);
+    }
+  };
+
   const toggleApproveLanPort = (portName) => {
     setApproveForm((prev) => {
       const current = prev.lan_ports || [];
@@ -787,6 +797,7 @@ export function Devices() {
               key={dr.id}
               router={dr}
               onApprove={() => openApproval(dr)}
+              onDelete={() => deleteDiscoveredRouter(dr.id)}
             />
           ))}
         </div>
@@ -1640,7 +1651,7 @@ export function Devices() {
 
 // ─── DiscoveredRouterCard ────────────────────────────────────────────────────
 
-function DiscoveredRouterCard({ router, onApprove }) {
+function DiscoveredRouterCard({ router, onApprove, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const interfaces = Array.isArray(router.interfaces) ? router.interfaces : [];
   const addresses = Array.isArray(router.ip_addresses)
@@ -1695,6 +1706,14 @@ function DiscoveredRouterCard({ router, onApprove }) {
                 <CheckCircle className="w-3 h-3 mr-1" /> Approve
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDelete}
+              className="text-red-400 border-red-400/30 hover:bg-red-400/10"
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
           </div>
         </div>
 
