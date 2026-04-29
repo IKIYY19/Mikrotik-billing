@@ -123,6 +123,12 @@ export function CustomerPortal() {
   const [updatingCredentials, setUpdatingCredentials] = useState(false);
 
   useEffect(() => {
+    // Check auth - redirect to login if not authenticated
+    const token = localStorage.getItem("customerToken");
+    if (!token) {
+      navigate("/portal/login", { replace: true });
+      return;
+    }
     fetchData();
     fetchPaymentHistory();
     fetchSupportTickets();
@@ -130,6 +136,20 @@ export function CustomerPortal() {
     fetchCustomerReview();
     fetchPasswordInfo();
   }, [customerId]);
+
+  // Handle browser back/forward cache (bfcache) - page may restore from cache
+  useEffect(() => {
+    const handlePageShow = (e) => {
+      if (e.persisted) {
+        const token = localStorage.getItem("customerToken");
+        if (!token) {
+          navigate("/portal/login", { replace: true });
+        }
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   useEffect(() => {
     checkUsageAlerts();
@@ -419,6 +439,12 @@ export function CustomerPortal() {
     { id: "settings", label: "Settings", icon: Lock },
   ];
 
+  const handleLogout = () => {
+    localStorage.removeItem("customerToken");
+    localStorage.removeItem("customer");
+    navigate("/portal/login", { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0b0f]">
       {/* Header */}
@@ -453,7 +479,7 @@ export function CustomerPortal() {
               <span className="hidden sm:inline">Pay Now</span>
             </button>
             <button
-              onClick={() => navigate("/portal/login")}
+              onClick={handleLogout}
               className="text-zinc-400 hover:text-white p-2 rounded-lg hover:bg-zinc-800/50 transition-colors"
               title="Logout"
             >
