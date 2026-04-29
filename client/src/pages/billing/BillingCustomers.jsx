@@ -105,30 +105,48 @@ export function BillingCustomers() {
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [fupProfiles, setFupProfiles] = useState([]);
+  const [settings, setSettings] = useState({});
   const [portalUrl, setPortalUrl] = useState(null);
   const [portalCredentials, setPortalCredentials] = useState(null);
 
-  // Auto-generate account number from company name (matches server format: 4 letters + sequential)
-  const generateAccountNumber = (companyName, existingCustomers) => {
-    if (!companyName) return "";
-    // Extract first 4 letters of company name, uppercase
-    const prefix =
-      companyName
-        .trim()
-        .substring(0, 4)
+  // Derive company abbreviation: first letter of each word (e.g. GIRAFFE NETWORKS -> GN)
+  const getCompanyAbbreviation = () => {
+    const cn = settings?.company_name || "";
+    const abbr = settings?.company_abbreviation || "";
+    if (abbr)
+      return (
+        abbr
+          .trim()
+          .substring(0, 6)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "") || "CUST"
+      );
+    if (cn) {
+      const words = cn.trim().split(/\s+/);
+      const derived = words
+        .map((w) => w.charAt(0))
+        .join("")
         .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "") || "CUST";
-    // Get next sequential number
+        .substring(0, 4);
+      if (derived) return derived;
+    }
+    return "CUST";
+  };
+
+  // Auto-generate account number from company prefix
+  const generateAccountNumber = (existingCustomers) => {
+    const prefix = getCompanyAbbreviation();
     const nextNum =
       (existingCustomers?.filter((c) => c.account_number?.startsWith(prefix))
         .length || 0) + 1;
-    return `${prefix}-${String(nextNum).padStart(4, "0")}`;
+    return `${prefix}-${String(nextNum).padStart(5, "0")}`;
   };
 
   useEffect(() => {
     fetchCustomers();
     fetchConnections();
     fetchFUPProfiles();
+    fetchSettings();
   }, []);
   useEffect(() => {
     if (selectedConnection) fetchOnlineStatus();
@@ -170,6 +188,17 @@ export function BillingCustomers() {
       setFupProfiles(data);
     } catch (error) {
       console.error("Failed to fetch FUP profiles:", error);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const { data } = await axios
+        .get(`${API}/settings`)
+        .catch(() => ({ data: {} }));
+      setSettings(data.settings || data);
+    } catch (error) {
+      // Silent
     }
   };
 
@@ -512,10 +541,8 @@ export function BillingCustomers() {
                       onChange={(e) => {
                         const newName = e.target.value;
                         if (!editing && !form.account_number) {
-                          const newAccountNum = generateAccountNumber(
-                            newName,
-                            customers,
-                          );
+                          const newAccountNum =
+                            generateAccountNumber(customers);
                           setForm({
                             ...form,
                             name: newName,
@@ -533,8 +560,7 @@ export function BillingCustomers() {
                     <Input
                       id="account-number"
                       value={
-                        form.account_number ||
-                        generateAccountNumber(form.name, customers)
+                        form.account_number || generateAccountNumber(customers)
                       }
                       onChange={(e) =>
                         setForm({ ...form, account_number: e.target.value })

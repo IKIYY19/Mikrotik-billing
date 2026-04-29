@@ -215,13 +215,53 @@ async function getCustomerDetail(id) {
   };
 }
 
-async function generateAccountNumber(prefix) {
-  const namePrefix =
-    (prefix || "CUST")
-      .trim()
-      .substring(0, 4)
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "") || "CUST";
+async function getCompanyAbbreviation() {
+  try {
+    let companyName = "";
+    let abbreviation = "";
+
+    // Try to get from settings
+    if (global.dbAvailable && global.db) {
+      const result = await global.db.query(
+        `SELECT key, value FROM settings WHERE key IN ('company_name', 'company_abbreviation')`,
+      );
+      for (const row of result.rows) {
+        if (row.key === "company_abbreviation" && row.value)
+          abbreviation = row.value;
+        if (row.key === "company_name" && row.value) companyName = row.value;
+      }
+    }
+
+    // Use abbreviation if set
+    if (abbreviation) {
+      return (
+        abbreviation
+          .trim()
+          .substring(0, 6)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "") || "CUST"
+      );
+    }
+
+    // Derive from company name: first letter of each word, max 4 chars
+    if (companyName) {
+      const words = companyName.trim().split(/\s+/);
+      const derived = words
+        .map((w) => w.charAt(0))
+        .join("")
+        .toUpperCase()
+        .substring(0, 4);
+      if (derived) return derived;
+    }
+  } catch (e) {
+    // Silent fallback
+  }
+
+  return "CUST";
+}
+
+async function generateAccountNumber() {
+  const namePrefix = await getCompanyAbbreviation();
 
   if (usesRepositoryBackend() && global.db) {
     const result = await global.db.query(
@@ -229,14 +269,14 @@ async function generateAccountNumber(prefix) {
       [`${namePrefix}-%`],
     );
     const count = parseInt(result.rows[0]?.count || 0);
-    return `${namePrefix}-${String(count + 1).padStart(4, "0")}`;
+    return `${namePrefix}-${String(count + 1).padStart(5, "0")}`;
   }
 
   const store = getStore();
   const existing = store.customers.filter(
     (c) => c.account_number && c.account_number.startsWith(namePrefix),
   );
-  return `${namePrefix}-${String(existing.length + 1).padStart(4, "0")}`;
+  return `${namePrefix}-${String(existing.length + 1).padStart(5, "0")}`;
 }
 
 async function createCustomer(data) {

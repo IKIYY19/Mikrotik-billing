@@ -59,6 +59,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState({
     // General
     company_name: "",
+    company_abbreviation: "",
     company_logo: "",
     contact_email: "",
     contact_phone: "",
@@ -643,6 +644,31 @@ export function SettingsPage() {
                     placeholder="Your ISP Name"
                     required
                   />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Used for invoice headers and portal branding
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="company-abbreviation">
+                    Account Number Prefix
+                  </Label>
+                  <Input
+                    id="company-abbreviation"
+                    type="text"
+                    value={settings.company_abbreviation}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        company_abbreviation: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. GFN (Giraffe Networks)"
+                    maxLength={6}
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Used for account numbers: GFN-00001. Leave empty to derive
+                    from company name
+                  </p>
                 </div>
                 <div className="md:col-span-2">
                   <Label>Company Logo</Label>
