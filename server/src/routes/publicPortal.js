@@ -35,7 +35,9 @@ router.post("/register", async (req, res) => {
   try {
     const { name, phone, email, pin, plan_id } = req.body;
     if (!name || !phone || !pin || !plan_id) {
-      return res.status(400).json({ error: "Name, phone, PIN, and plan are required" });
+      return res
+        .status(400)
+        .json({ error: "Name, phone, PIN, and plan are required" });
     }
     if (!/^\d{4,8}$/.test(String(pin))) {
       return res.status(400).json({ error: "PIN must be 4-8 digits" });
@@ -79,12 +81,23 @@ router.post("/register", async (req, res) => {
       created_at: new Date().toISOString(),
     });
 
-    // Store the PIN hash on the customer record
+    // Store the PIN hash on the customer record for portal login
+    const bcrypt2 = require("bcryptjs");
+    const pinHashStored = await bcrypt2.hash(pin, 10);
     if (!global.dbAvailable) {
       const store = getDb()._getStore ? getDb()._getStore() : {};
       if (store.customers) {
         const c = store.customers.find((c) => c.id === customer.id);
-        if (c) c.pin_hash = pinHash;
+        if (c) c.portal_pin_hash = pinHashStored;
+      }
+    } else {
+      try {
+        await getDb().query(
+          `UPDATE customers SET portal_pin_hash = $1 WHERE id = $2`,
+          [pinHashStored, customer.id],
+        );
+      } catch (dbErr) {
+        // portal_pin_hash column might not exist yet
       }
     }
 
@@ -92,7 +105,11 @@ router.post("/register", async (req, res) => {
       success: true,
       customer: { id: customer.id, name: customer.name, phone: customer.phone },
       subscription: { id: sub.id, plan_id: plan.id, status: sub.status },
-      invoice: { id: invoice.id, amount: invoice.amount, status: invoice.status },
+      invoice: {
+        id: invoice.id,
+        amount: invoice.amount,
+        status: invoice.status,
+      },
       plan: { name: plan.name, price: plan.price },
     });
   } catch (e) {
@@ -104,7 +121,8 @@ router.post("/register", async (req, res) => {
 router.post("/confirm-payment", async (req, res) => {
   try {
     const { invoice_id, mpesa_code } = req.body;
-    if (!invoice_id) return res.status(400).json({ error: "Invoice ID required" });
+    if (!invoice_id)
+      return res.status(400).json({ error: "Invoice ID required" });
 
     const billing = require("../services/billingData");
 
@@ -130,7 +148,9 @@ router.post("/confirm-payment", async (req, res) => {
     }
 
     // Get customer and plan for response
-    const customer = sub ? await billing.getCustomerById(sub.customer_id) : null;
+    const customer = sub
+      ? await billing.getCustomerById(sub.customer_id)
+      : null;
     const plan = sub ? await billing.getPlanById(sub.plan_id) : null;
 
     // Generate credentials (PPPoE username/password or hotspot voucher)

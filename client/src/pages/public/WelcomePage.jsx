@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Wifi, CheckCircle, User, Key, Download, ExternalLink, Copy, Check } from "lucide-react";
+import {
+  Wifi,
+  CheckCircle,
+  User,
+  Key,
+  Download,
+  ExternalLink,
+  Copy,
+  Check,
+} from "lucide-react";
 
 export function WelcomePage() {
   const navigate = useNavigate();
@@ -55,15 +64,21 @@ export function WelcomePage() {
               <Wifi className="w-6 h-6 text-blue-400" />
             </div>
             <h2 className="text-xl font-semibold text-white">{planName}</h2>
-            <p className="text-sm text-zinc-400">Credentials for your internet connection</p>
+            <p className="text-sm text-zinc-400">
+              Credentials for your internet connection
+            </p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider">PPPoE / Hotspot Username</label>
+              <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider">
+                PPPoE / Hotspot Username
+              </label>
               <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-700/50 rounded-lg p-3">
                 <User className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                <code className="flex-1 text-sm text-white font-mono">{username}</code>
+                <code className="flex-1 text-sm text-white font-mono">
+                  {username}
+                </code>
                 <button
                   onClick={() => handleCopy(username, "username")}
                   className="text-zinc-400 hover:text-white transition-colors"
@@ -79,10 +94,14 @@ export function WelcomePage() {
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider">Password</label>
+              <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider">
+                Password
+              </label>
               <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-700/50 rounded-lg p-3">
                 <Key className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                <code className="flex-1 text-sm text-white font-mono">{password}</code>
+                <code className="flex-1 text-sm text-white font-mono">
+                  {password}
+                </code>
                 <button
                   onClick={() => handleCopy(password, "password")}
                   className="text-zinc-400 hover:text-white transition-colors"
@@ -110,8 +129,8 @@ export function WelcomePage() {
 
           {customerId && (
             <Link
-              to={`/portal/${customerId}`}
-              className="w-full py-3 bg-zinc-800/50 border border-zinc-700/50 text-zinc-300 rounded-lg font-medium hover:bg-zinc-700/50 transition-all flex items-center justify-center gap-2"
+              to={`/portal/login?phone=${encodeURIComponent(sessionStorage.getItem("signup_phone") || "")}`}
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-violet-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-violet-700 transition-all flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               Go to Customer Portal
@@ -120,7 +139,8 @@ export function WelcomePage() {
         </div>
 
         <p className="text-center text-xs text-zinc-500 mt-6">
-          Please save your credentials. You'll need them to configure your router.
+          Please save your credentials. You'll need them to configure your
+          router.
         </p>
       </div>
     </div>

@@ -61,6 +61,7 @@ import { SignupPage } from "./pages/public/SignupPage";
 import { PlansPage } from "./pages/public/PlansPage";
 import { CheckoutPage } from "./pages/public/CheckoutPage";
 import { WelcomePage } from "./pages/public/WelcomePage";
+import CustomerPortalLogin from "./pages/CustomerPortalLogin";
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -114,6 +115,7 @@ function App() {
         <Route path="/setup" element={<SetupWizard />} />
 
         {/* Customer portal - public (different UI) */}
+        <Route path="/portal/login" element={<CustomerPortalLogin />} />
         <Route path="/portal/:customerId" element={<CustomerPortal />} />
         <Route path="/pay/:invoiceId" element={<PaymentPage />} />
 

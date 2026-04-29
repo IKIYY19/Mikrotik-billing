@@ -1,13 +1,27 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { Wifi, User, Phone, Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import {
+  Wifi,
+  User,
+  Phone,
+  Mail,
+  Lock,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "/api";
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", phone: "", email: "", pin: "", confirmPin: "" });
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    pin: "",
+    confirmPin: "",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,7 +47,9 @@ export function SignupPage() {
       sessionStorage.setItem("signup_pin", form.pin);
       navigate("/plans");
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed. Please try again.");
+      setError(
+        err.response?.data?.error || "Registration failed. Please try again.",
+      );
     }
     setLoading(false);
   };
@@ -46,10 +62,15 @@ export function SignupPage() {
             <Wifi className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">Get Connected</h1>
-          <p className="text-zinc-400 mt-2">Sign up for high-speed internet today</p>
+          <p className="text-zinc-400 mt-2">
+            Sign up for high-speed internet today
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-zinc-800/50 backdrop-blur border border-zinc-700/50 rounded-2xl p-8 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-zinc-800/50 backdrop-blur border border-zinc-700/50 rounded-2xl p-8 space-y-4"
+        >
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
               {error}
@@ -57,7 +78,9 @@ export function SignupPage() {
           )}
 
           <div>
-            <label className="block text-sm text-zinc-300 mb-1.5">Full Name</label>
+            <label className="block text-sm text-zinc-300 mb-1.5">
+              Full Name
+            </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -72,7 +95,9 @@ export function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-300 mb-1.5">Phone Number</label>
+            <label className="block text-sm text-zinc-300 mb-1.5">
+              Phone Number
+            </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -87,7 +112,9 @@ export function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-300 mb-1.5">Email (optional)</label>
+            <label className="block text-sm text-zinc-300 mb-1.5">
+              Email (optional)
+            </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -101,7 +128,9 @@ export function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-300 mb-1.5">Set PIN (4-8 digits)</label>
+            <label className="block text-sm text-zinc-300 mb-1.5">
+              Set PIN (4-8 digits)
+            </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -109,7 +138,9 @@ export function SignupPage() {
                 inputMode="numeric"
                 maxLength={8}
                 value={form.pin}
-                onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "") })}
+                onChange={(e) =>
+                  setForm({ ...form, pin: e.target.value.replace(/\D/g, "") })
+                }
                 className="w-full pl-10 pr-4 py-2.5 bg-zinc-900/60 border border-zinc-700/50 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 placeholder="1234"
                 required
@@ -118,7 +149,9 @@ export function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-300 mb-1.5">Confirm PIN</label>
+            <label className="block text-sm text-zinc-300 mb-1.5">
+              Confirm PIN
+            </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -126,7 +159,12 @@ export function SignupPage() {
                 inputMode="numeric"
                 maxLength={8}
                 value={form.confirmPin}
-                onChange={(e) => setForm({ ...form, confirmPin: e.target.value.replace(/\D/g, "") })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    confirmPin: e.target.value.replace(/\D/g, ""),
+                  })
+                }
                 className="w-full pl-10 pr-4 py-2.5 bg-zinc-900/60 border border-zinc-700/50 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 placeholder="1234"
                 required
@@ -145,8 +183,11 @@ export function SignupPage() {
 
           <p className="text-center text-xs text-zinc-500 mt-4">
             Already have an account?{" "}
-            <Link to="/portal/login" className="text-blue-400 hover:text-blue-300">
-              Sign in
+            <Link
+              to={`/portal/login?phone=${encodeURIComponent(form.phone || "")}`}
+              className="text-blue-400 hover:text-blue-300"
+            >
+              Sign in to portal
             </Link>
           </p>
         </form>
