@@ -1,14 +1,21 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Smartphone, Lock, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import {
+  Smartphone,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react";
+import { useToast } from "../hooks/useToast";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || "/api";
 
 export default function CustomerPortalLogin() {
-  const [phone, setPhone] = useState('');
-  const [pin, setPin] = useState('');
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -19,22 +26,22 @@ export default function CustomerPortalLogin() {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/portal/auth/login`, {
+      const response = await axios.post(`${API}/portal/auth/login`, {
         phone,
         pin,
       });
 
       // Store customer token
-      localStorage.setItem('customerToken', response.data.token);
-      localStorage.setItem('customer', JSON.stringify(response.data.customer));
+      localStorage.setItem("customerToken", response.data.token);
+      localStorage.setItem("customer", JSON.stringify(response.data.customer));
 
-      toast.success('Login successful!');
+      toast.success("Login successful!");
       navigate(`/portal/${response.data.customer.id}`);
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       toast.error(
-        'Login failed',
-        error.response?.data?.error || 'Invalid phone number or PIN'
+        "Login failed",
+        error.response?.data?.error || "Invalid phone number or PIN",
       );
     } finally {
       setLoading(false);
@@ -46,7 +53,7 @@ export default function CustomerPortalLogin() {
       <div className="w-full max-w-md">
         {/* Back button */}
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -61,9 +68,7 @@ export default function CustomerPortalLogin() {
           <h1 className="text-3xl font-bold text-white mb-2">
             Customer Portal
           </h1>
-          <p className="text-gray-400">
-            Sign in to view your account
-          </p>
+          <p className="text-gray-400">Sign in to view your account</p>
         </div>
 
         {/* Login Form */}
@@ -92,7 +97,7 @@ export default function CustomerPortalLogin() {
               </label>
               <div className="relative">
                 <input
-                  type={showPin ? 'text' : 'password'}
+                  type={showPin ? "text" : "password"}
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent pr-12"

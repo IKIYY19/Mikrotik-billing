@@ -69,12 +69,16 @@ router.post("/register", async (req, res) => {
       auto_renew: true,
     });
 
+    const planPrice = Number(plan.price) || 0;
+    const planTax = Math.round(planPrice * 0.16 * 100) / 100;
+
     // Create first invoice
     const invoice = await billing.createInvoice({
       customer_id: customer.id,
       subscription_id: sub.id,
-      amount: plan.price,
-      tax: plan.price * 0.16,
+      amount: planPrice,
+      tax: planTax,
+      total: planPrice + planTax,
       status: "unpaid",
       due_date: new Date(Date.now() + 7 * 86400000).toISOString(),
       description: `${plan.name} - ${plan.description || "Internet Service"}`,
