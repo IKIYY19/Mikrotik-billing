@@ -173,50 +173,63 @@ function generateProvisionScript(router, options = {}) {
   lines.push(
     `:local targetBridgeFound [/interface bridge find name="${lanBridge}"];`,
   );
-  lines.push(`:local targetBridgeExists ([:len $targetBridgeFound] > 0);`);
+  lines.push(':local targetBridgeName "";');
+  lines.push(`:if ([:len $targetBridgeFound] > 0) do={`);
+  lines.push(`  :set targetBridgeName "${lanBridge}";`);
+  lines.push(`  :set targetBridgeExists true;`);
   lines.push(
-    '/log info message="[ZTP] Found $bridgeCount existing bridge(s)";',
-  );
-  lines.push(`:if ($targetBridgeExists) do={`);
-  lines.push(
-    `  /log info message="[ZTP] Found existing bridge: ${lanBridge}";`,
+    `  /log info message="[ZTP] Using configured bridge: ${lanBridge}";`,
   );
   lines.push("} else={");
+  lines.push(`  :if ($bridgeCount > 0) do={`);
   lines.push(
-    `  /log info message="[ZTP] Bridge ${lanBridge} does not exist yet";`,
+    `    :set targetBridgeName [/interface bridge get ($existingBridges->0) name];`,
   );
+  lines.push(`    :set targetBridgeFound $existingBridges;`);
+  lines.push(`    :set targetBridgeExists true;`);
+  lines.push(`    :set autoBridge "true";`);
+  lines.push(
+    `    /log info message="[ZTP] Using existing bridge: $targetBridgeName (no bridge named '${lanBridge}' found)";`,
+  );
+  lines.push("  } else={");
+  lines.push(`    :set targetBridgeName "${lanBridge}";`);
+  lines.push(`    :set targetBridgeExists false;`);
+  lines.push(
+    `    /log info message="[ZTP] No bridges found - will create: ${lanBridge}";`,
+  );
+  lines.push("  };");
   lines.push("};");
   lines.push("");
 
   // -- Discover bridge ports --
   lines.push(
-    `:local existingBridgePorts [/interface bridge port find bridge="${lanBridge}"];`,
+    `:local existingBridgePorts [/interface bridge port find bridge=$targetBridgeName];`,
   );
   lines.push(`:local bridgePortCount [:len $existingBridgePorts];`);
   lines.push(`:local hasBridgePorts ($bridgePortCount > 0);`);
   lines.push(":if ($targetBridgeExists && $hasBridgePorts) do={");
   lines.push(
-    `  /log info message="[ZTP] Bridge ${lanBridge} has $bridgePortCount port(s) attached";`,
+    `  /log info message="[ZTP] Bridge $targetBridgeName has $bridgePortCount port(s) attached";`,
   );
   lines.push("};");
   lines.push("");
 
   // -- Discover existing IP addresses on the bridge --
   lines.push(
-    `:local existingBridgeIps [/ip address find where interface="${lanBridge}"];`,
+    `:local existingBridgeIps [/ip address find where interface=$targetBridgeName];`,
   );
   lines.push(`:local bridgeIpCount [:len $existingBridgeIps];`);
   lines.push(
-    `:local targetIpFound [/ip address find where interface="${lanBridge}" address="${lanIp}"];`,
+    `:local targetIpFound [/ip address find where interface=$targetBridgeName address="${lanIp}"];`,
   );
   lines.push(`:local targetIpExists ([:len $targetIpFound] > 0);`);
   lines.push(`:if ($targetIpExists) do={`);
   lines.push(
-    `  /log info message="[ZTP] IP ${lanIp} already configured on ${lanBridge}";`,
+    `  /log info message="[ZTP] IP ${lanIp} already configured on $targetBridgeName";`,
   );
   lines.push("} else={");
   lines.push(
-    `  /log info message="[ZTP] IP ${lanIp} NOT configured on ${lanBridge}";`,
+    `  /log info message="[ZTP] IP ${lanIp} NOT configured on $targetBridgeName";`,
   );
   lines.push("};");
   lines.push("");
@@ -255,17 +268,17 @@ function generateProvisionScript(router, options = {}) {
 
   // -- Discover existing DHCP server on the bridge --
   lines.push(
-    `:local existingDhcpServers [/ip dhcp-server find where interface="${lanBridge}"];`,
+    `:local existingDhcpServers [/ip dhcp-server find where interface=$targetBridgeName];`,
   );
   lines.push(`:local dhcpServerCount [:len $existingDhcpServers];`);
   lines.push(`:local hasDHCPServer ($dhcpServerCount > 0);`);
   lines.push(":if ($hasDHCPServer) do={");
   lines.push(
-    `  /log info message="[ZTP] DHCP server already exists on ${lanBridge}";`,
+    `  /log info message="[ZTP] DHCP server already exists on $targetBridgeName";`,
   );
   lines.push("} else={");
   lines.push(
-    `  /log info message="[ZTP] No DHCP server on ${lanBridge} - will create";`,
+    `  /log info message="[ZTP] No DHCP server on $targetBridgeName - will create";`,
   );
   lines.push("};");
   lines.push("");
@@ -295,6 +308,45 @@ function generateProvisionScript(router, options = {}) {
   lines.push(
     `  /log info message="[ZTP] DHCP network ${lanNetwork} not configured - will add";`,
   );
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing RADIUS servers --
+  lines.push(":local existingRadius [/radius find];");
+  lines.push(":local radiusCount [:len $existingRadius];");
+  lines.push(":local hasRadius ($radiusCount > 0);");
+  lines.push(":if ($hasRadius) do={");
+  lines.push(
+    '  /log info message="[ZTP] Found $radiusCount existing RADIUS server(s) - will only add if needed";',
+  );
+  lines.push("} else={");
+  lines.push('  /log info message="[ZTP] No RADIUS servers found";');
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing PPPoE servers --
+  lines.push(
+    ":local existingPPPoEServers [/interface pppoe-server server find];",
+  );
+  lines.push(":local pppoeServerCount [:len $existingPPPoEServers];");
+  lines.push(":if ($pppoeServerCount > 0) do={");
+  lines.push(
+    '  /log info message="[ZTP] Found $pppoeServerCount existing PPPoE server(s) - will only add if needed";',
+  );
+  lines.push("} else={");
+  lines.push('  /log info message="[ZTP] No PPPoE servers found";');
+  lines.push("};");
+  lines.push("");
+
+  // -- Discover existing Hotspot servers --
+  lines.push(":local existingHotspot [/ip hotspot find];");
+  lines.push(":local hotspotCount [:len $existingHotspot];");
+  lines.push(":if ($hotspotCount > 0) do={");
+  lines.push(
+    '  /log info message="[ZTP] Found $hotspotCount existing Hotspot server(s) - will only add if needed";',
+  );
+  lines.push("} else={");
+  lines.push('  /log info message="[ZTP] No Hotspot servers found";');
   lines.push("};");
   lines.push("");
 
@@ -424,7 +476,7 @@ function generateProvisionScript(router, options = {}) {
   lines.push("# LAN Bridge Configuration");
   lines.push("# Only create bridge if it doesn't already exist");
   lines.push(
-    `:if (!$targetBridgeExists) do={ ${safeAdd(`/interface bridge add name=${lanBridge} protocol=rstp comment="Auto-created LAN bridge"`)} } else={ /log info message="[ZTP] Bridge creation SKIPPED - ${lanBridge} already exists" };`,
+    `:if (!$targetBridgeExists) do={ ${safeAdd(`/interface bridge add name=$targetBridgeName protocol=rstp comment="Auto-created LAN bridge"`)} } else={ /log info message="[ZTP] Bridge creation SKIPPED - $targetBridgeName already exists" };`,
   );
   lines.push("");
 
@@ -448,19 +500,19 @@ function generateProvisionScript(router, options = {}) {
   lanPorts.forEach((port) => {
     if (port !== safeWanIface) {
       lines.push(
-        `  ${safeAdd(`/interface bridge port add bridge=${lanBridge} interface=${port} comment="Auto-bridge ${port}"`)}`,
+        `  ${safeAdd(`/interface bridge port add bridge=$targetBridgeName interface=${port} comment="Auto-bridge ${port}"`)}`,
       );
     }
   });
   lines.push(
-    `  /log info message="[ZTP] Added LAN ports to bridge ${lanBridge}";`,
+    `  /log info message="[ZTP] Added LAN ports to bridge $targetBridgeName";`,
   );
   lines.push(`} else={`);
   lines.push(
-    `  :if ($targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - ${lanBridge} already has $bridgePortCount port(s)"; };`,
+    `  :if ($targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - $targetBridgeName already has $bridgePortCount port(s)"; };`,
   );
   lines.push(
-    `  :if (!$targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - ${lanBridge} does not exist"; };`,
+    `  :if (!$targetBridgeExists) do={ /log info message="[ZTP] Bridge ports SKIPPED - $targetBridgeName does not exist"; };`,
   );
   lines.push(`};`);
   lines.push("");
@@ -471,7 +523,7 @@ function generateProvisionScript(router, options = {}) {
   lines.push("# LAN IP Address");
   lines.push("# Only add IP if it doesn't already exist on the bridge");
   lines.push(
-    `:if (!$targetIpExists) do={ ${safeAdd(`/ip address add address=${lanIp} interface=${lanBridge} comment="LAN Gateway"`)} } else={ /log info message="[ZTP] LAN IP SKIPPED - ${lanIp} already configured on ${lanBridge}" };`,
+    `:if (!$targetIpExists) do={ ${safeAdd(`/ip address add address=${lanIp} interface=$targetBridgeName comment="LAN Gateway"`)} } else={ /log info message="[ZTP] LAN IP SKIPPED - ${lanIp} already configured on $targetBridgeName" };`,
   );
   lines.push("");
 
@@ -501,7 +553,7 @@ function generateProvisionScript(router, options = {}) {
     `:if (!$dhcpNetExists) do={ ${safeAdd(`/ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${lanGateway} domain="local"`)} } else={ /log info message="[ZTP] DHCP network SKIPPED - already configured" };`,
   );
   lines.push(
-    `:if (!$hasDHCPServer) do={ ${safeAdd(`/ip dhcp-server add name=dhcp_lan interface=${lanBridge} address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`)} } else={ /log info message="[ZTP] DHCP server SKIPPED - already exists on ${lanBridge}" };`,
+    `:if (!$hasDHCPServer) do={ ${safeAdd(`/ip dhcp-server add name=dhcp_lan interface=$targetBridgeName address-pool=dhcp_pool disabled=no lease-time=3d comment="Auto DHCP Server"`)} } else={ /log info message="[ZTP] DHCP server SKIPPED - already exists on $targetBridgeName" };`,
   );
   lines.push("");
 
@@ -559,7 +611,7 @@ function generateProvisionScript(router, options = {}) {
     `  ${safeAdd('/ip firewall filter add chain=forward action=drop connection-state=invalid comment="Drop invalid forward"')}`,
   );
   lines.push(
-    `  ${safeAdd(`/ip firewall filter add chain=forward in-interface=${lanBridge} action=accept comment="Allow LAN to WAN"`)}`,
+    `  ${safeAdd(`/ip firewall filter add chain=forward in-interface=$targetBridgeName action=accept comment="Allow LAN to WAN"`)}`,
   );
   lines.push(
     `  ${safeAdd('/ip firewall filter add chain=forward action=drop comment="Drop all other forward"')}`,
@@ -605,11 +657,10 @@ function generateProvisionScript(router, options = {}) {
     const safeRadiusServer = escapeRouterValue(router.radius_server);
     const safeRadiusSecret = escapeRouterValue(router.radius_secret);
     lines.push(
-      `:local existingRadius [/radius find where address="${safeRadiusServer}"];`,
+      `:local hasRadiusServer ([:len [/radius find where address="${safeRadiusServer}"]] > 0);`,
     );
-    lines.push(`:local hasRadius ([:len $existingRadius] > 0);`);
     lines.push(
-      `:if (!$hasRadius) do={ ${safeAdd(`/radius add address="${safeRadiusServer}" secret="${safeRadiusSecret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`)}; /ppp aaa set use-radius=yes accounting=yes; /ip hotspot aaa set use-radius=yes accounting=yes } else={ /log info message="[ZTP] RADIUS SKIPPED - already configured for ${safeRadiusServer}" };`,
+      `:if (!$hasRadius && !$hasRadiusServer) do={ ${safeAdd(`/radius add address="${safeRadiusServer}" secret="${safeRadiusSecret}" service=ppp,hotspot timeout=3s comment="Auto-provisioned RADIUS"`)}; /ppp aaa set use-radius=yes accounting=yes; /ip hotspot aaa set use-radius=yes accounting=yes } else={ /log info message="[ZTP] RADIUS SKIPPED - already configured for ${safeRadiusServer}" };`,
     );
     lines.push("");
   }
@@ -627,11 +678,10 @@ function generateProvisionScript(router, options = {}) {
     const safeServiceName = escapeRouterValue(serviceName);
 
     lines.push(
-      `:local existingPPPoEServer [/interface pppoe-server server find where service-name="${safeServiceName}"];`,
+      `:local hasPPPoEServerService ([:len [/interface pppoe-server server find where service-name="${safeServiceName}"]] > 0);`,
     );
-    lines.push(`:local hasPPPoEServer ([:len $existingPPPoEServer] > 0);`);
     lines.push(
-      `:if (!$hasPPPoEServer) do={ ${safeAdd(`/interface pppoe-server server add service-name="${safeServiceName}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`)} } else={ /log info message="[ZTP] PPPoE server SKIPPED - already exists"; };`,
+      `:if ($pppoeServerCount = 0 || !$hasPPPoEServerService) do={ ${safeAdd(`/interface pppoe-server server add service-name="${safeServiceName}" interface=${pppoeIface} max-mtu=1492 max-mru=1492 authentication=mschap2 disabled=no comment="Auto-provisioned PPPoE"`)} } else={ /log info message="[ZTP] PPPoE server SKIPPED - already exists"; };`,
     );
     lines.push(
       `:local pppoePoolExists ([:len [/ip pool find where name=pppoe_pool]] > 0);`,
@@ -681,13 +731,13 @@ function generateProvisionScript(router, options = {}) {
       `:local hsServerExists ([:len [/ip hotspot find where name=hotspot1]] > 0);`,
     );
     lines.push(
-      `:if (!$hsServerExists) do={ ${safeAdd(`/ip hotspot add name=hotspot1 interface=${lanBridge} address-pool=hs_pool profile=hs-prof disabled=no`)} } else={ /log info message="[ZTP] Hotspot server SKIPPED - already exists"; };`,
+      `:if ($hotspotCount = 0 || !$hsServerExists) do={ ${safeAdd(`/ip hotspot add name=hotspot1 interface=$targetBridgeName address-pool=hs_pool profile=hs-prof disabled=no`)} } else={ /log info message="[ZTP] Hotspot server SKIPPED - already exists"; };`,
     );
     lines.push(
       `:local hsIpExists ([:len [/ip address find where address="${hotspotIp}"]] > 0);`,
     );
     lines.push(
-      `:if (!$hsIpExists) do={ ${safeAdd(`/ip address add address=${hotspotIp} interface=${lanBridge} comment="Hotspot Gateway"`)} } else={ /log info message="[ZTP] Hotspot IP SKIPPED - already configured"; };`,
+      `:if (!$hsIpExists) do={ ${safeAdd(`/ip address add address=${hotspotIp} interface=$targetBridgeName comment="Hotspot Gateway"`)} } else={ /log info message="[ZTP] Hotspot IP SKIPPED - already configured"; };`,
     );
     lines.push(
       `:local hsDhcpNetExists ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] > 0);`,
@@ -724,7 +774,7 @@ function generateProvisionScript(router, options = {}) {
         `:local vlanExists ([:len [/interface vlan find where name="${vlanName}"]] > 0);`,
       );
       lines.push(
-        `:if (!$vlanExists) do={ ${safeAdd(`/interface vlan add name=${vlanName} vlan-id=${vlan.id} interface=${lanBridge} comment="${safeVlanComment}"`)} } else={ /log info message="[ZTP] VLAN ${vlanName} SKIPPED - already exists"; };`,
+        `:if (!$vlanExists) do={ ${safeAdd(`/interface vlan add name=${vlanName} vlan-id=${vlan.id} interface=$targetBridgeName comment="${safeVlanComment}"`)} } else={ /log info message="[ZTP] VLAN ${vlanName} SKIPPED - already exists"; };`,
       );
       if (vlan.ip) {
         lines.push(
