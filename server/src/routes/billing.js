@@ -239,7 +239,7 @@ router.post("/customers", async (req, res) => {
       ...customer,
       portal_url: portalUrl,
       portal_username: portalUsername,
-      portal_pin: defaultPin,
+      portal_password: defaultPin,
       message: `Customer created. Portal PIN: ${defaultPin}. Share the portal URL with the customer.`,
     });
   } catch (e) {
@@ -532,13 +532,11 @@ router.post("/subscriptions", async (req, res) => {
       { ...expandedSub, plan },
     );
 
-    res
-      .status(201)
-      .json({
-        ...expandedSub,
-        provision_script: provisionScript,
-        mikrotik_sync: syncResult,
-      });
+    res.status(201).json({
+      ...expandedSub,
+      provision_script: provisionScript,
+      mikrotik_sync: syncResult,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -790,11 +788,9 @@ router.post("/reconcile/orphan-secret/import", async (req, res) => {
     } = req.body;
 
     if (!connection_id || !pppoe_username || !plan_id) {
-      return res
-        .status(400)
-        .json({
-          error: "connection_id, pppoe_username, and plan_id are required",
-        });
+      return res.status(400).json({
+        error: "connection_id, pppoe_username, and plan_id are required",
+      });
     }
 
     const connection =
@@ -820,12 +816,9 @@ router.post("/reconcile/orphan-secret/import", async (req, res) => {
         item.pppoe_username === pppoe_username,
     );
     if (alreadyLinked) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "This PPPoE secret is already linked to a billing subscription",
-        });
+      return res.status(409).json({
+        error: "This PPPoE secret is already linked to a billing subscription",
+      });
     }
 
     let customer;
