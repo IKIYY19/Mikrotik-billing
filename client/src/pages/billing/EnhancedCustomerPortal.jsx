@@ -35,6 +35,7 @@ import {
   Star,
   ThumbsUp,
   ThumbsDown,
+  LogOut,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -450,6 +451,13 @@ export function CustomerPortal() {
             >
               <Smartphone className="w-4 h-4" />
               <span className="hidden sm:inline">Pay Now</span>
+            </button>
+            <button
+              onClick={() => navigate("/portal/login")}
+              className="text-zinc-400 hover:text-white p-2 rounded-lg hover:bg-zinc-800/50 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
