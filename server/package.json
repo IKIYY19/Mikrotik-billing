@@ -27,6 +27,7 @@
     "express-validator": "^7.0.1",
     "form-data": "^4.0.0",
     "genieacs": "^1.2.16",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mikronode": "^2.3.11",
     "multer": "^2.1.1",

@@ -7,6 +7,7 @@ loadEnv();
 const logger = require("./utils/logger");
 const { validateSecrets } = require("./utils/security");
 const { initSentry, sentryErrorHandler } = require("./services/sentry");
+const helmet = require("helmet");
 
 const isTestEnv = process.env.NODE_ENV === "test";
 const isProductionEnv = process.env.NODE_ENV === "production";
@@ -130,9 +131,7 @@ function createCorsOriginHandler() {
 }
 
 function applySecurityHeaders(req, res, next) {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  // These headers are set by helmet already, but we add extra ones
   res.setHeader(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
@@ -183,6 +182,14 @@ app.set("trust proxy", isProductionEnv ? 1 : false);
 app.set("query parser", "simple");
 const monitoringApiEnabled = process.env.ENABLE_MONITORING_API === "true";
 
+// HTTPS redirect (respects proxy headers from Render, Railway, etc.)
+app.use((req, res, next) => {
+  if (isProductionEnv && req.headers["x-forwarded-proto"] === "http") {
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
 // Middleware
 app.use(
   cors({
@@ -190,6 +197,7 @@ app.use(
     credentials: true,
   }),
 );
+app.use(helmet());
 app.use(applySecurityHeaders);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -204,6 +212,7 @@ const {
   authLimiter,
   paymentLimiter,
   messagingLimiter,
+  mikrotikLimiter,
 } = require("./middleware/rateLimiter");
 app.use("/api", apiLimiter);
 
@@ -354,7 +363,7 @@ const startServer = async () => {
 
     // Public routes (no auth required)
     app.use("/api/auth", authLimiter, require("./routes/auth"));
-    app.use("/mikrotik", require("./routes/provision"));
+    app.use("/mikrotik", mikrotikLimiter, require("./routes/provision"));
     app.use("/api/portal/auth", require("./routes/customerAuth"));
 
     // Serve static frontend files

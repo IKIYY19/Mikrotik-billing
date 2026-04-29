@@ -7,6 +7,12 @@ const memoryDb = require("../db/memory");
 const zeroTouchBilling = require("../services/zeroTouchBilling");
 const enrollmentMemoryStore = require("../services/enrollmentMemoryStore");
 
+const isProduction = process.env.NODE_ENV === "production";
+
+function safeError(error) {
+  return isProduction ? "Internal server error" : error.message;
+}
+
 function getDb() {
   return global.db || memoryDb;
 }
@@ -156,7 +162,7 @@ router.get("/provision/:token", async (req, res) => {
     res
       .status(500)
       .type("text/plain")
-      .send(`# ERROR: ${error.message || "Internal server error"}`);
+      .send(`# ERROR: ${safeError(error)}`);
   }
 });
 
@@ -240,7 +246,7 @@ router.get("/provision/callback/:token", async (req, res) => {
     res
       .status(500)
       .type("text/plain")
-      .send(`# ERROR: ${error.message || "Internal server error"}`);
+      .send(`# ERROR: ${safeError(error)}`);
   }
 });
 
@@ -814,7 +820,7 @@ router.all("/enroll/report/:token", async (req, res) => {
     res.type("text/plain").send("# OK: System info received");
   } catch (error) {
     logger.error("[Enrollment] Report error:", { error: error.message });
-    res.type("text/plain").send("# ERROR: " + error.message);
+    res.type("text/plain").send("# ERROR: " + safeError(error));
   }
 });
 
@@ -851,7 +857,7 @@ router.get("/enroll/iface/:token", async (req, res) => {
     res.type("text/plain").send("# OK");
   } catch (error) {
     logger.error("[Enrollment] Iface error:", { error: error.message });
-    res.type("text/plain").send("# ERROR: " + error.message);
+    res.type("text/plain").send("# ERROR: " + safeError(error));
   }
 });
 
@@ -879,7 +885,7 @@ router.get("/enroll/addr/:token", async (req, res) => {
     res.type("text/plain").send("# OK");
   } catch (error) {
     logger.error("[Enrollment] Addr error:", { error: error.message });
-    res.type("text/plain").send("# ERROR: " + error.message);
+    res.type("text/plain").send("# ERROR: " + safeError(error));
   }
 });
 
@@ -959,7 +965,7 @@ router.get("/enroll/done/:token", async (req, res) => {
       );
   } catch (error) {
     logger.error("[Enrollment] Done error:", { error: error.message });
-    res.type("text/plain").send("# ERROR: " + error.message);
+    res.type("text/plain").send("# ERROR: " + safeError(error));
   }
 });
 
@@ -1142,7 +1148,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
     res.type("text/plain").send(response);
   } catch (error) {
     logger.error("[Enrollment] Auto-complete error:", { error: error.message });
-    res.type("text/plain").send("# ERROR: " + error.message);
+    res.type("text/plain").send("# ERROR: " + safeError(error));
   }
 });
 
