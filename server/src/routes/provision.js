@@ -663,6 +663,9 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
     const fetchCmd = (urlExpr) =>
       `/tool fetch mode=${mode} ${certCheck} url=${urlExpr} keep-result=no`;
 
+    const fetchSaveFile = (urlExpr, dst) =>
+      `/tool fetch mode=${mode} ${certCheck} url=${urlExpr} dst-path=${dst}`;
+
     // RouterOS enrollment script - works on RouterOS v6.49+ and all v7
     const script = [
       "#############################################",
@@ -781,10 +784,22 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       "# ── Step 5: Signal enrollment complete ──",
       `:do { ${fetchCmd('($serverUrl . "/mikrotik/enroll/done/" . $enrollToken)')} } on-error={}`,
       "",
-      ':log info message="[ZTP] Enrollment complete. Check the platform Discovered Routers tab to approve this router."',
-      ':put "[ZTP] Done. Visit the platform and approve this router in the Discovered Routers tab."',
+      ':log info message="[ZTP] Enrollment complete. Auto-provisioning now..."',
+      ':put "[ZTP] Auto-approving and provisioning..."',
+      "",
+      "# ── Step 6: Auto-complete (approve + get provision script) ──",
+      `:local autoUrl ($serverUrl . "/mikrotik/enroll/auto-complete/" . $enrollToken . "?serverUrl=" . [$ztpUrlEncode $serverUrl])`,
+      `:do { ${fetchSaveFile("$autoUrl", "ztp-provision.rsc")} } on-error={ :put "[ZTP] Failed to get provision script" }`,
+      "",
+      ":delay 2s;",
+      "",
+      "# ── Step 7: Apply the provision script ──",
+      ':do { /import file-name=ztp-provision.rsc } on-error={ :put "[ZTP] Provision script failed - check server logs" }',
+      "",
+      ':log info message="[ZTP] Zero-touch provisioning complete"',
+      ':put "[ZTP] Done. Router is fully provisioned."',
       "#############################################",
-      "# End of Zero-Touch Enrollment Script",
+      "# End of Zero-Touch Provisioning Script",
       "#############################################",
     ].join("\n");
 
