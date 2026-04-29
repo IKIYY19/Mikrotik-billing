@@ -364,6 +364,7 @@ const startServer = async () => {
     // Public routes (no auth required)
     app.use("/api/auth", authLimiter, require("./routes/auth"));
     app.use("/mikrotik", mikrotikLimiter, require("./routes/provision"));
+    app.use("/metrics", require("./routes/metrics"));
     app.use("/api/portal/auth", require("./routes/customerAuth"));
 
     // Serve static frontend files
