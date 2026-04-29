@@ -580,23 +580,19 @@ export function Devices() {
                   },
                   {
                     n: "2",
-                    text: 'Click "Generate Onboarding Script" to create a one-time enrollment token.',
+                    text: 'Click "Generate Script" and paste the one command into the MikroTik terminal, SSH, or WinBox.',
                   },
                   {
                     n: "3",
-                    text: "Copy the one-line command and paste it into the MikroTik terminal or run it via SSH / WinBox.",
+                    text: "The router scans all interfaces, prints a port summary, auto-detects WAN/LAN, auto-approves itself, downloads and applies the provision script — fully configured in ONE step. No web UI needed.",
                   },
                   {
                     n: "4",
-                    text: "The router runs the script, collects its identity, model, interfaces and IP addresses, and reports them to this platform.",
+                    text: "(Optional) Customize WAN/LAN ports: set :global ztpWanPort and :global ztpLanPorts on the router before running the command.",
                   },
                   {
                     n: "5",
-                    text: 'Go to the "Discovered Routers" tab. The router appears automatically. Review its interfaces, pick WAN / LAN ports, then approve.',
-                  },
-                  {
-                    n: "6",
-                    text: "The platform generates a tailored provisioning script. The router downloads and applies it — fully configured.",
+                    text: "The router is now fully provisioned with your chosen or auto-detected WAN/LAN ports.",
                   },
                 ].map(({ n, text }) => (
                   <li key={n} className="flex gap-3 text-sm text-zinc-300">
@@ -614,12 +610,12 @@ export function Devices() {
           <Card className="border-zinc-800">
             <CardHeader className="p-5 pb-3">
               <CardTitle className="text-white text-base flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-400" /> Generate Onboarding
+                <Zap className="w-4 h-4 text-amber-400" /> Generate One-Command
                 Script
               </CardTitle>
               <CardDescription>
-                Creates a one-time enrollment token and a RouterOS bootstrap
-                command.
+                Creates a single command that scans, auto-approves, and fully
+                provisions the router.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 pt-0 space-y-4">
@@ -656,7 +652,7 @@ export function Devices() {
                 ) : (
                   <Zap className="w-4 h-4 mr-2" />
                 )}
-                {enrollLoading ? "Generating…" : "Generate Onboarding Script"}
+                {enrollLoading ? "Generating…" : "Generate One-Command Script"}
               </Button>
 
               {enrollToken && (
@@ -673,7 +669,7 @@ export function Devices() {
 
                   <div className="space-y-1">
                     <Label className="text-zinc-300 text-xs uppercase tracking-wider">
-                      One-Line Bootstrap Command
+                      One-Command Provisioning Script
                     </Label>
                     <p className="text-xs text-zinc-400">
                       Paste this into MikroTik terminal, SSH, or WinBox
@@ -697,18 +693,19 @@ export function Devices() {
                         <Copy className="w-3 h-3" />
                         {enrollCopied ? "Copied!" : "Copy Command"}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEnrollToken(null);
-                          setTab("discovered");
-                        }}
-                        className="flex items-center gap-1 text-blue-400"
-                      >
-                        <Radio className="w-3 h-3" />
-                        Watch Discovered Routers
-                      </Button>
+                      <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-300 space-y-1 mt-3">
+                        <p className="font-semibold">Port Customization:</p>
+                        <p>
+                          To choose specific WAN/LAN ports, set these globals on
+                          the router BEFORE running:
+                        </p>
+                        <pre className="text-xs bg-zinc-900 p-2 rounded mt-1 font-mono text-blue-200">{`:global ztpWanPort "ether1"
+:global ztpLanPorts "ether2,ether3,ether4"`}</pre>
+                        <p className="mt-1">
+                          If not set, the script auto-detects: first ethernet =
+                          WAN, rest = LAN.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -720,12 +717,12 @@ export function Devices() {
                         automatically.
                       </li>
                       <li>
-                        Any router that runs this script will appear as a
-                        Discovered Router pending your approval.
+                        Any router that runs this script will be auto-approved
+                        and provisioned automatically.
                       </li>
                       <li>
-                        No configuration is applied until you approve the
-                        router.
+                        The router auto-approves and provisions itself — no
+                        manual approval needed.
                       </li>
                     </ul>
                   </div>
@@ -783,7 +780,7 @@ export function Devices() {
                   className="mt-4"
                   onClick={() => setTab("enroll")}
                 >
-                  <Zap className="w-3 h-3 mr-2" /> Generate Onboarding Script
+                  <Zap className="w-3 h-3 mr-2" /> Generate One-Command Script
                 </Button>
               </CardContent>
             </Card>
