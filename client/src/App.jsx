@@ -57,6 +57,10 @@ import { TR069Devices } from "./pages/network/TR069Devices";
 import { SpeedTest } from "./pages/network/SpeedTest";
 // import { Alerts } from './pages/network/Alerts';
 // import { Monitoring } from './pages/network/Monitoring';
+import { SignupPage } from "./pages/public/SignupPage";
+import { PlansPage } from "./pages/public/PlansPage";
+import { CheckoutPage } from "./pages/public/CheckoutPage";
+import { WelcomePage } from "./pages/public/WelcomePage";
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -112,6 +116,12 @@ function App() {
         {/* Customer portal - public (different UI) */}
         <Route path="/portal/:customerId" element={<CustomerPortal />} />
         <Route path="/pay/:invoiceId" element={<PaymentPage />} />
+
+        {/* Self-provisioning portal */}
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/plans" element={<PlansPage />} />
+        <Route path="/checkout/:invoiceId" element={<CheckoutPage />} />
+        <Route path="/welcome" element={<WelcomePage />} />
 
         {/* Protected routes - require authentication */}
         <Route

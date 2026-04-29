@@ -366,6 +366,7 @@ const startServer = async () => {
     app.use("/mikrotik", mikrotikLimiter, require("./routes/provision"));
     app.use("/metrics", require("./routes/metrics"));
     app.use("/api/portal/auth", require("./routes/customerAuth"));
+    app.use("/api/public", require("./routes/publicPortal"));
 
     // Serve static frontend files
     const possiblePaths = [
