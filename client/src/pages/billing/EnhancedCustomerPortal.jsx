@@ -456,11 +456,13 @@ export function CustomerPortal() {
             </h1>
             <p className="text-zinc-400 text-sm">
               {data.customer.phone} • {data.customer.email}
-              {data.customer.account_number && (
-                <span className="ml-2 px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs font-mono">
-                  Acct: {data.customer.account_number}
-                </span>
-              )}
+              <span className="ml-2 px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs font-mono">
+                Acct:{" "}
+                {data.customer.account_number ||
+                  data.customer.id_number ||
+                  data.customer.id?.substring(0, 8) ||
+                  "-"}
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-3">
