@@ -38,9 +38,12 @@ import {
   Gauge,
   Router,
   Building2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
+import { useTheme } from "../contexts/ThemeContext";
 import { canAccessFeature, ROLES } from "../lib/permissions";
 
 const API = import.meta.env.VITE_API_URL || "/api";
@@ -230,6 +233,7 @@ export function Sidebar({ onSearchOpen }) {
   const [settings, setSettings] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
+  const { mode, setMode } = useTheme();
 
   useEffect(() => {
     try {
@@ -424,6 +428,19 @@ export function Sidebar({ onSearchOpen }) {
             </div>
           </div>
         )}
+        <button
+          onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+          className="p-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-zinc-400 hover:text-white"
+          title={
+            mode === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
+          }
+        >
+          {mode === "dark" ? (
+            <Sun className="w-4 h-4" />
+          ) : (
+            <Moon className="w-4 h-4" />
+          )}
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
