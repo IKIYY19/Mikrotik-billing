@@ -1,10 +1,12 @@
-const fallbackBilling = require('../db/billingStore');
+const fallbackBilling = require("../db/billingStore");
 
 const MAX_LIST_LIMIT = 10000;
 
 function usesRepositoryBackend() {
   const backend = global.billingRepo;
-  return Boolean(global.dbAvailable && backend && backend.customers && !backend.store);
+  return Boolean(
+    global.dbAvailable && backend && backend.customers && !backend.store,
+  );
 }
 
 function getBackend() {
@@ -16,7 +18,7 @@ function getStore() {
 }
 
 function toNumber(value, fallback = 0) {
-  if (value === null || value === undefined || value === '') return fallback;
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -35,8 +37,14 @@ function normalizePlan(plan) {
   return {
     ...plan,
     price: toNumber(plan.price, 0),
-    quota_gb: plan.quota_gb === null || plan.quota_gb === undefined ? null : toNumber(plan.quota_gb, null),
-    priority: plan.priority === null || plan.priority === undefined ? null : toNumber(plan.priority, null),
+    quota_gb:
+      plan.quota_gb === null || plan.quota_gb === undefined
+        ? null
+        : toNumber(plan.quota_gb, null),
+    priority:
+      plan.priority === null || plan.priority === undefined
+        ? null
+        : toNumber(plan.priority, null),
     active_subscribers: toNumber(plan.active_subscribers, 0),
   };
 }
@@ -46,11 +54,11 @@ function normalizeCustomerRef(row) {
   if (row.customer) return normalizeCustomer(row.customer);
   return normalizeCustomer({
     id: row.customer_id,
-    name: row.customer_name || '',
-    email: row.customer_email || '',
-    phone: row.customer_phone || '',
-    address: row.customer_address || '',
-    city: row.customer_city || '',
+    name: row.customer_name || "",
+    email: row.customer_email || "",
+    phone: row.customer_phone || "",
+    address: row.customer_address || "",
+    city: row.customer_city || "",
     status: row.customer_status || undefined,
   });
 }
@@ -60,9 +68,9 @@ function normalizePlanRef(row) {
   if (row.plan) return normalizePlan(row.plan);
   return normalizePlan({
     id: row.plan_id,
-    name: row.plan_name || '',
-    speed_up: row.speed_up || row.plan_speed_up || '',
-    speed_down: row.speed_down || row.plan_speed_down || '',
+    name: row.plan_name || "",
+    speed_up: row.speed_up || row.plan_speed_up || "",
+    speed_down: row.speed_down || row.plan_speed_down || "",
     price: row.plan_price !== undefined ? row.plan_price : row.price,
     quota_gb: row.plan_quota_gb ?? null,
     priority: row.plan_priority ?? null,
@@ -75,16 +83,16 @@ function normalizeRouterRef(row) {
   if (row?.mikrotik_connection_id || row?.mikrotik_connection_name) {
     return {
       id: row.mikrotik_connection_id || null,
-      name: row.mikrotik_connection_name || '',
-      ip_address: row.mikrotik_connection_ip || '',
-      type: 'mikrotik_connection',
+      name: row.mikrotik_connection_name || "",
+      ip_address: row.mikrotik_connection_ip || "",
+      type: "mikrotik_connection",
     };
   }
   if (!row?.router_id && !row?.router_name) return null;
   return {
     id: row.router_id || null,
-    name: row.router_name || '',
-    type: 'router',
+    name: row.router_name || "",
+    type: "router",
   };
 }
 
@@ -93,7 +101,11 @@ function normalizeSubscription(subscription) {
   return {
     ...subscription,
     auto_provision: subscription.auto_provision !== false,
-    mikrotik_connection_id: subscription.mikrotik_connection_id || subscription.router?.id || subscription.router_id || null,
+    mikrotik_connection_id:
+      subscription.mikrotik_connection_id ||
+      subscription.router?.id ||
+      subscription.router_id ||
+      null,
     customer: normalizeCustomerRef(subscription),
     plan: normalizePlanRef(subscription),
     router: normalizeRouterRef(subscription),
@@ -111,18 +123,28 @@ function normalizeInvoice(invoice) {
     tax_rate: toNumber(invoice.tax_rate, 0),
     total,
     paid_amount: paidAmount,
-    balance: invoice.balance === null || invoice.balance === undefined ? total - paidAmount : toNumber(invoice.balance, total - paidAmount),
+    balance:
+      invoice.balance === null || invoice.balance === undefined
+        ? total - paidAmount
+        : toNumber(invoice.balance, total - paidAmount),
     customer: normalizeCustomerRef(invoice),
   };
 }
 
 function normalizePayment(payment) {
   if (!payment) return null;
-  const invoice = payment.invoice ? normalizeInvoice(payment.invoice) : payment.invoice_id ? {
-    id: payment.invoice_id,
-    invoice_number: payment.invoice_number || '',
-    total: payment.invoice_total === undefined ? undefined : toNumber(payment.invoice_total, 0),
-  } : null;
+  const invoice = payment.invoice
+    ? normalizeInvoice(payment.invoice)
+    : payment.invoice_id
+      ? {
+          id: payment.invoice_id,
+          invoice_number: payment.invoice_number || "",
+          total:
+            payment.invoice_total === undefined
+              ? undefined
+              : toNumber(payment.invoice_total, 0),
+        }
+      : null;
 
   return {
     ...payment,
@@ -135,15 +157,25 @@ function normalizePayment(payment) {
 async function listCustomers() {
   if (usesRepositoryBackend()) {
     const backend = getBackend();
-    const { data } = await backend.customers.list({ page: 1, limit: MAX_LIST_LIMIT });
+    const { data } = await backend.customers.list({
+      page: 1,
+      limit: MAX_LIST_LIMIT,
+    });
     return data.map(normalizeCustomer);
   }
 
   const store = getStore();
   return store.customers.map((customer) => {
-    const subscriptions = store.subscriptions.filter((item) => item.customer_id === customer.id);
-    const invoices = store.invoices.filter((item) => item.customer_id === customer.id && item.status !== 'paid');
-    const outstandingBalance = invoices.reduce((sum, item) => sum + toNumber(item.total, 0), 0);
+    const subscriptions = store.subscriptions.filter(
+      (item) => item.customer_id === customer.id,
+    );
+    const invoices = store.invoices.filter(
+      (item) => item.customer_id === customer.id && item.status !== "paid",
+    );
+    const outstandingBalance = invoices.reduce(
+      (sum, item) => sum + toNumber(item.total, 0),
+      0,
+    );
     return normalizeCustomer({
       ...customer,
       subscription_count: subscriptions.length,
@@ -160,7 +192,9 @@ async function getCustomerById(id) {
   }
 
   const store = getStore();
-  return normalizeCustomer(store.customers.find((customer) => customer.id === id));
+  return normalizeCustomer(
+    store.customers.find((customer) => customer.id === id),
+  );
 }
 
 async function getCustomerDetail(id) {
@@ -181,12 +215,41 @@ async function getCustomerDetail(id) {
   };
 }
 
+async function generateAccountNumber(prefix) {
+  const namePrefix =
+    (prefix || "CUST")
+      .trim()
+      .substring(0, 4)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "") || "CUST";
+
+  if (usesRepositoryBackend() && global.db) {
+    const result = await global.db.query(
+      `SELECT COUNT(*) as count FROM customers WHERE account_number ILIKE $1`,
+      [`${namePrefix}-%`],
+    );
+    const count = parseInt(result.rows[0]?.count || 0);
+    return `${namePrefix}-${String(count + 1).padStart(4, "0")}`;
+  }
+
+  const store = getStore();
+  const existing = store.customers.filter(
+    (c) => c.account_number && c.account_number.startsWith(namePrefix),
+  );
+  return `${namePrefix}-${String(existing.length + 1).padStart(4, "0")}`;
+}
+
 async function createCustomer(data) {
+  const enriched = { ...data };
+  if (!enriched.account_number) {
+    enriched.account_number = await generateAccountNumber(data.name);
+  }
+
   const backend = getBackend();
   if (usesRepositoryBackend()) {
-    return normalizeCustomer(await backend.customers.create(data));
+    return normalizeCustomer(await backend.customers.create(enriched));
   }
-  return normalizeCustomer(await backend.createCustomer(data));
+  return normalizeCustomer(await backend.createCustomer(enriched));
 }
 
 async function updateCustomer(id, data) {
@@ -213,7 +276,9 @@ async function listPlans() {
 
   const store = getStore();
   return store.service_plans.map((plan) => {
-    const activeSubscribers = store.subscriptions.filter((item) => item.plan_id === plan.id && item.status === 'active').length;
+    const activeSubscribers = store.subscriptions.filter(
+      (item) => item.plan_id === plan.id && item.status === "active",
+    ).length;
     return normalizePlan({
       ...plan,
       active_subscribers: activeSubscribers,
@@ -258,17 +323,29 @@ async function deletePlan(id) {
 async function listSubscriptions() {
   if (usesRepositoryBackend()) {
     const backend = getBackend();
-    const { data } = await backend.subscriptions.list({ page: 1, limit: MAX_LIST_LIMIT });
+    const { data } = await backend.subscriptions.list({
+      page: 1,
+      limit: MAX_LIST_LIMIT,
+    });
     return data.map(normalizeSubscription);
   }
 
   const store = getStore();
-  return store.subscriptions.map((subscription) => normalizeSubscription({
-    ...subscription,
-    customer: store.customers.find((customer) => customer.id === subscription.customer_id) || null,
-    plan: store.service_plans.find((plan) => plan.id === subscription.plan_id) || null,
-    router: store.routers?.find((router) => router.id === subscription.router_id) || null,
-  }));
+  return store.subscriptions.map((subscription) =>
+    normalizeSubscription({
+      ...subscription,
+      customer:
+        store.customers.find(
+          (customer) => customer.id === subscription.customer_id,
+        ) || null,
+      plan:
+        store.service_plans.find((plan) => plan.id === subscription.plan_id) ||
+        null,
+      router:
+        store.routers?.find((router) => router.id === subscription.router_id) ||
+        null,
+    }),
+  );
 }
 
 async function getSubscriptionById(id) {
@@ -320,13 +397,17 @@ async function deleteSubscription(id) {
 async function listInvoices() {
   if (usesRepositoryBackend()) {
     const backend = getBackend();
-    const { data } = await backend.invoices.list({ page: 1, limit: MAX_LIST_LIMIT });
+    const { data } = await backend.invoices.list({
+      page: 1,
+      limit: MAX_LIST_LIMIT,
+    });
     return data.map(normalizeInvoice);
   }
 
   const store = getStore();
   return store.invoices.map((invoice) => {
-    const customer = store.customers.find((item) => item.id === invoice.customer_id) || null;
+    const customer =
+      store.customers.find((item) => item.id === invoice.customer_id) || null;
     const paidAmount = store.payments
       .filter((payment) => payment.invoice_id === invoice.id)
       .reduce((sum, payment) => sum + toNumber(payment.amount, 0), 0);
@@ -382,19 +463,27 @@ async function listPayments(options = {}) {
     const { data } = await backend.payments.list({
       page: 1,
       limit: MAX_LIST_LIMIT,
-      customer_id: options.customerId || '',
+      customer_id: options.customerId || "",
     });
     return data.map(normalizePayment);
   }
 
   const store = getStore();
   return store.payments
-    .filter((payment) => !options.customerId || payment.customer_id === options.customerId)
-    .map((payment) => normalizePayment({
-      ...payment,
-      customer: store.customers.find((item) => item.id === payment.customer_id) || null,
-      invoice: store.invoices.find((item) => item.id === payment.invoice_id) || null,
-    }));
+    .filter(
+      (payment) =>
+        !options.customerId || payment.customer_id === options.customerId,
+    )
+    .map((payment) =>
+      normalizePayment({
+        ...payment,
+        customer:
+          store.customers.find((item) => item.id === payment.customer_id) ||
+          null,
+        invoice:
+          store.invoices.find((item) => item.id === payment.invoice_id) || null,
+      }),
+    );
 }
 
 async function getPaymentById(id) {
@@ -422,8 +511,8 @@ async function updatePayment(id, data) {
     const payment = await backend.payments.update(id, data);
     return payment ? getPaymentById(payment.id) : null;
   }
-  if (typeof backend.updatePayment !== 'function') {
-    throw new Error('Payment updates are not supported by current backend');
+  if (typeof backend.updatePayment !== "function") {
+    throw new Error("Payment updates are not supported by current backend");
   }
   return normalizePayment(await backend.updatePayment(id, data));
 }
@@ -436,7 +525,12 @@ async function getDashboardStats() {
   return backend.getDashboardStats();
 }
 
-async function listUsageRecords({ customerId, startTime = null, endTime = null, limit = 100 } = {}) {
+async function listUsageRecords({
+  customerId,
+  startTime = null,
+  endTime = null,
+  limit = 100,
+} = {}) {
   if (usesRepositoryBackend() && global.db) {
     const params = [];
     const where = [];
@@ -458,7 +552,7 @@ async function listUsageRecords({ customerId, startTime = null, endTime = null, 
     const query = `
       SELECT *
       FROM usage_records
-      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY recorded_at DESC
       LIMIT $${params.length}
     `;
@@ -472,10 +566,14 @@ async function listUsageRecords({ customerId, startTime = null, endTime = null, 
     records = records.filter((record) => record.customer_id === customerId);
   }
   if (startTime) {
-    records = records.filter((record) => new Date(record.recorded_at) >= new Date(startTime));
+    records = records.filter(
+      (record) => new Date(record.recorded_at) >= new Date(startTime),
+    );
   }
   if (endTime) {
-    records = records.filter((record) => new Date(record.recorded_at) <= new Date(endTime));
+    records = records.filter(
+      (record) => new Date(record.recorded_at) <= new Date(endTime),
+    );
   }
 
   return records

@@ -549,6 +549,8 @@ const billingMigrations = [
       ALTER TABLE customers ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
     END IF;
   END $$`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS account_number VARCHAR(50)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_account_number ON customers(account_number)`,
 
   // Create branches table for network map
   `CREATE TABLE IF NOT EXISTS branches (
@@ -568,15 +570,15 @@ const billingMigrations = [
   )`,
 
   // Seed initial branches
-  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng)
    SELECT 'branch-nairobi-main', 'Nairobi Main POP', 'Nairobi', 'Moi Avenue', '+254700000001', 'active', -1.2921, 36.8219
    WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-nairobi-main')`,
-  
-  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng)
    SELECT 'branch-mombasa', 'Mombasa POP', 'Mombasa', 'Moi Road', '+254700000002', 'active', -4.0435, 39.6682
    WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-mombasa')`,
-  
-  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng) 
+
+  `INSERT INTO branches (id, name, city, address, contact, status, lat, lng)
    SELECT 'branch-kisumu', 'Kisumu POP', 'Kisumu', 'Oginga Odinga St', '+254700000003', 'active', -0.0917, 34.7679
    WHERE NOT EXISTS (SELECT 1 FROM branches WHERE id = 'branch-kisumu')`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id)`,
@@ -626,7 +628,9 @@ const billingMigrations = [
 const seedData = async (db) => {
   try {
     // Seed plans
-    const existingPlans = await db.query('SELECT id FROM service_plans LIMIT 1');
+    const existingPlans = await db.query(
+      "SELECT id FROM service_plans LIMIT 1",
+    );
     if (existingPlans.rows.length === 0) {
       await db.query(`INSERT INTO service_plans (id, name, speed_up, speed_down, price, quota_gb, priority, description) VALUES
         ('550e8400-e29b-41d4-a716-446655440001', 'Bronze 5M', '5M', '5M', 15.00, NULL, 8, 'Basic browsing and email'),
@@ -638,7 +642,7 @@ const seedData = async (db) => {
     }
 
     // Seed tax rate
-    const existingTax = await db.query('SELECT id FROM tax_rates LIMIT 1');
+    const existingTax = await db.query("SELECT id FROM tax_rates LIMIT 1");
     if (existingTax.rows.length === 0) {
       await db.query(`INSERT INTO tax_rates (name, rate, is_default, is_active) VALUES
         ('VAT', 16.00, true, true)
@@ -663,7 +667,7 @@ const seedData = async (db) => {
         body = EXCLUDED.body,
         is_active = EXCLUDED.is_active`);
   } catch (error) {
-    console.error('Seed error:', error.message);
+    console.error("Seed error:", error.message);
     throw error;
   }
 };
