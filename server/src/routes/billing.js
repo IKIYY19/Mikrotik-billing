@@ -347,6 +347,48 @@ router.get("/customers/:id/portal-info", async (req, res) => {
   }
 });
 
+// Reset portal PIN to a new 4-digit number (for phone+PIN login)
+router.post("/customers/:id/reset-pin", async (req, res) => {
+  try {
+    const db = global.dbAvailable ? global.db : require("../db/memory");
+    const bcrypt = require("bcryptjs");
+
+    // Generate random 4-digit PIN
+    const newPin = String(Math.floor(1000 + Math.random() * 9000));
+    const pinHash = await bcrypt.hash(newPin, 10);
+
+    if (global.dbAvailable) {
+      const result = await db.query(
+        `UPDATE customers SET portal_pin_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, phone`,
+        [pinHash, req.params.id],
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+    } else {
+      const store = db._getStore ? db._getStore() : {};
+      if (store.customers) {
+        const c = store.customers.find((c) => c.id === req.params.id);
+        if (c) {
+          c.portal_pin_hash = pinHash;
+        } else {
+          return res.status(404).json({ error: "Customer not found" });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      pin: newPin,
+      message: `New portal PIN: ${newPin}. Customer can log in with their phone number and this PIN.`,
+    });
+  } catch (e) {
+    console.error("Reset PIN error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Generate new password for customer
 router.post("/customers/:id/reset-password", async (req, res) => {
   try {
