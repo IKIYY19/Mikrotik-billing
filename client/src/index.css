@@ -419,85 +419,68 @@
     );
 }
 
-/* ─── Light Mode: Force readable text over Tailwind hardcoded colors ─── */
-/* The app was built dark-mode-first so most components use hardcoded    */
-/* Tailwind zinc/gray colors. These overrides make them readable in      */
-/* light mode without refactoring every component.                       */
-.light .text-zinc-400,
-.light .text-zinc-500,
-.light .text-zinc-600,
-.light .text-gray-400,
-.light .text-gray-500,
-.light .text-slate-400,
-.light .text-slate-500,
-.light .text-neutral-400,
-.light .text-neutral-500 {
-    color: #52525b !important;
-}
+/* ─── Light Mode: Comprehensive overrides for dark-mode-first app ─── */
+/* Uses attribute-contains selectors to catch ALL utility classes       */
+/* without needing to know every shade number used across 40+ pages.    */
 
-.light .text-zinc-300,
-.light .text-gray-300,
-.light .text-slate-300 {
+/* Force all muted text and white text to dark gray */
+.light [class*="text-zinc-"],
+.light [class*="text-gray-"],
+.light [class*="text-slate-"],
+.light [class*="text-neutral-"] {
     color: #3f3f46 !important;
 }
-
-.light .text-zinc-700,
-.light .text-gray-700 {
+.light .text-white {
     color: #18181b !important;
 }
 
-.light .border-zinc-700,
-.light .border-zinc-800,
-.light .border-white\/10,
-.light .border-white\/5 {
+/* Backgrounds - only non-hover, non-group variants */
+.light [class^="bg-zinc-"],
+.light [class*=" bg-zinc-"],
+.light [class^="bg-gray-"],
+.light [class*=" bg-gray-"],
+.light [class^="bg-slate-"],
+.light [class*=" bg-slate-"],
+.light [class^="bg-neutral-"],
+.light [class*=" bg-neutral-"],
+.light [class^="bg-white/"],
+.light [class*=" bg-white/"],
+.light [class^="bg-black/"],
+.light [class*=" bg-black/"] {
+    background-color: rgba(235, 231, 224, 0.85) !important;
+}
+
+/* Force all dark borders to warm beige */
+.light [class^="border-zinc-"],
+.light [class*=" border-zinc-"],
+.light [class^="border-gray-"],
+.light [class*=" border-gray-"],
+.light [class^="border-slate-"],
+.light [class*=" border-slate-"],
+.light [class^="border-white/"],
+.light [class*=" border-white/"],
+.light [class^="border-black/"],
+.light [class*=" border-black/"] {
     border-color: rgba(210, 205, 195, 0.6) !important;
 }
 
-.light .bg-zinc-800,
-.light .bg-zinc-900,
-.light .bg-white\/5,
-.light .bg-black\/50 {
-    background-color: rgba(235, 231, 224, 0.7) !important;
+/* Hover text - dark on hover */
+.light [class*="hover:text-"]:hover {
+    color: #18181b !important;
+}
+/* Hover bg specifically - warm cream on hover */
+.light [class*="hover:bg-"]:hover {
+    background-color: rgba(220, 215, 205, 0.7) !important;
 }
 
-.light .bg-white\/10 {
-    background-color: rgba(225, 220, 210, 0.5) !important;
-}
-
-.light .ring-white\/10 {
+/* Ring */
+.light [class*="ring-white/"] {
     --tw-ring-color: rgba(210, 205, 195, 0.3) !important;
 }
 
-/* Sidebar & surface overrides */
+/* Sidebar special case */
 .light .bg-\[\#09090b\]\/95 {
     background-color: rgba(245, 243, 239, 0.95) !important;
-}
-
-.light .bg-zinc-800\/30,
-.light .bg-zinc-800\/40,
-.light .bg-zinc-800\/50,
-.light .bg-zinc-800\/60 {
-    background-color: rgba(225, 220, 210, 0.5) !important;
-}
-
-.light .hover\:bg-zinc-800\/40:hover {
-    background-color: rgba(215, 210, 200, 0.6) !important;
-}
-
-.light .hover\:text-zinc-200:hover {
-    color: #27272a !important;
-}
-
-.light .hover\:text-white:hover {
-    color: #18181b !important;
-}
-
-.light .text-zinc-600 {
-    color: #71717a !important;
-}
-
-.light .border-zinc-800\/50 {
-    border-color: rgba(210, 205, 195, 0.5) !important;
 }
 
 * {
