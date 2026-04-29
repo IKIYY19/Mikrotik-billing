@@ -214,6 +214,16 @@ const {
   messagingLimiter,
   mikrotikLimiter,
 } = require("./middleware/rateLimiter");
+
+// Health endpoint bypasses rate limiter (Render load balancer hits it frequently)
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    database: "checking",
+  });
+});
+
 app.use("/api", apiLimiter);
 
 // Track user activity on authenticated requests
@@ -648,7 +658,7 @@ const startServer = async () => {
 
         // Initialize WebSocket service for real-time monitoring
         const websocketService = require("./services/websocketService");
-        websocketService.initialize(server);
+        websocketService.initialize(serverInstance);
 
         // Start user online status updater
         startOnlineStatusUpdater();
