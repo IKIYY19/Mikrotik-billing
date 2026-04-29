@@ -1,19 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
-  FolderPlus, TrendingUp, Users, UserCheck, AlertTriangle,
-  RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign,
-  FileCode, Router, Settings, Network, Plus, Clock,
-  FolderOpen, Trash2, Sparkles, Shield, MapPin, Activity, UserPlus, Key
-} from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { useStore } from '../store';
+  FolderPlus,
+  TrendingUp,
+  Users,
+  UserCheck,
+  AlertTriangle,
+  RefreshCw,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
+  FileCode,
+  Router,
+  Settings,
+  Network,
+  Plus,
+  Clock,
+  FolderOpen,
+  Trash2,
+  Sparkles,
+  Shield,
+  MapPin,
+  Activity,
+  UserPlus,
+  Key,
+} from "lucide-react";
+import { useToast } from "../hooks/useToast";
+import { useStore } from "../store";
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 /* ─── Animated Counter ─── */
-function AnimatedNumber({ value, prefix = '', suffix = '' }) {
+function AnimatedNumber({ value, prefix = "", suffix = "" }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
     const duration = 800;
@@ -23,36 +42,64 @@ function AnimatedNumber({ value, prefix = '', suffix = '' }) {
     const timer = setInterval(() => {
       current += (value - 0) / steps;
       setDisplay(Math.round(current * 100) / 100);
-      if (current >= value) { clearInterval(timer); setDisplay(value); }
+      if (current >= value) {
+        clearInterval(timer);
+        setDisplay(value);
+      }
     }, stepTime);
     return () => clearInterval(timer);
   }, [value]);
-  return <span>{prefix}{typeof value === 'number' && value % 1 !== 0 ? display.toFixed(2) : Math.round(display)}{suffix}</span>;
+  return (
+    <span>
+      {prefix}
+      {typeof value === "number" && value % 1 !== 0
+        ? display.toFixed(2)
+        : Math.round(display)}
+      {suffix}
+    </span>
+  );
 }
 
 /* ─── Stat Card ─── */
-function StatCard({ icon: Icon, label, value, prefix, suffix, trend, color, onClick }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  prefix,
+  suffix,
+  trend,
+  color,
+  onClick,
+}) {
   const colorMap = {
-    blue: 'from-blue-500 to-cyan-500',
-    emerald: 'from-emerald-500 to-teal-500',
-    violet: 'from-violet-500 to-purple-500',
-    amber: 'from-amber-500 to-orange-500',
-    red: 'from-red-500 to-rose-500',
-    green: 'from-green-500 to-emerald-500',
+    blue: "from-blue-500 to-cyan-500",
+    emerald: "from-emerald-500 to-teal-500",
+    violet: "from-violet-500 to-purple-500",
+    amber: "from-amber-500 to-orange-500",
+    red: "from-red-500 to-rose-500",
+    green: "from-green-500 to-emerald-500",
   };
 
   return (
-    <div 
+    <div
       onClick={onClick}
-      className={`bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all ${onClick ? 'cursor-pointer hover:bg-white/10' : ''}`}
+      className={`bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all ${onClick ? "cursor-pointer hover:bg-white/10" : ""}`}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorMap[color]} flex items-center justify-center`}>
+        <div
+          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorMap[color]} flex items-center justify-center`}
+        >
           <Icon className="w-5 h-5 text-white" />
         </div>
         {trend !== undefined && (
-          <div className={`flex items-center gap-1 text-sm ${trend >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {trend >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+          <div
+            className={`flex items-center gap-1 text-sm ${trend >= 0 ? "text-green-400" : "text-red-400"}`}
+          >
+            {trend >= 0 ? (
+              <ArrowUpRight className="w-4 h-4" />
+            ) : (
+              <ArrowDownRight className="w-4 h-4" />
+            )}
             {Math.abs(trend)}%
           </div>
         )}
@@ -68,12 +115,13 @@ function StatCard({ icon: Icon, label, value, prefix, suffix, trend, color, onCl
 /* ─── Quick Action Button ─── */
 function QuickAction({ icon: Icon, label, color, onClick }) {
   const colorMap = {
-    blue: 'hover:bg-blue-500/20 hover:border-blue-500/30 text-blue-400',
-    emerald: 'hover:bg-emerald-500/20 hover:border-emerald-500/30 text-emerald-400',
-    violet: 'hover:bg-violet-500/20 hover:border-violet-500/30 text-violet-400',
-    amber: 'hover:bg-amber-500/20 hover:border-amber-500/30 text-amber-400',
-    cyan: 'hover:bg-cyan-500/20 hover:border-cyan-500/30 text-cyan-400',
-    orange: 'hover:bg-orange-500/20 hover:border-orange-500/30 text-orange-400',
+    blue: "hover:bg-blue-500/20 hover:border-blue-500/30 text-blue-400",
+    emerald:
+      "hover:bg-emerald-500/20 hover:border-emerald-500/30 text-emerald-400",
+    violet: "hover:bg-violet-500/20 hover:border-violet-500/30 text-violet-400",
+    amber: "hover:bg-amber-500/20 hover:border-amber-500/30 text-amber-400",
+    cyan: "hover:bg-cyan-500/20 hover:border-cyan-500/30 text-cyan-400",
+    orange: "hover:bg-orange-500/20 hover:border-orange-500/30 text-orange-400",
   };
 
   return (
@@ -95,7 +143,9 @@ function FeatureCard({ to, icon: Icon, label, desc, color, bg, ring }) {
       onClick={() => navigate(to)}
       className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all cursor-pointer hover:bg-white/10 group"
     >
-      <div className={`w-12 h-12 rounded-xl ${bg} ring-1 ${ring} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+      <div
+        className={`w-12 h-12 rounded-xl ${bg} ring-1 ${ring} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
+      >
         <Icon className="w-6 h-6 text-white" />
       </div>
       <h3 className="text-lg font-semibold text-white mb-1">{label}</h3>
@@ -105,30 +155,78 @@ function FeatureCard({ to, icon: Icon, label, desc, color, bg, ring }) {
 }
 
 const featureCards = [
-  { to: '/topology', icon: Network, label: 'Topology Builder', desc: 'Visual network design', color: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', ring: 'ring-blue-500/20' },
-  { to: '/devices', icon: Settings, label: 'Auto Provision', desc: 'Zero-touch device setup', color: 'from-violet-500 to-purple-500', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20' },
-  { to: '/billing', icon: DollarSign, label: 'ISP Billing', desc: 'Manage customers & revenue', color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20' },
-  { to: '/billing-map', icon: MapPin, label: 'Network Map', desc: 'GIS customer locations', color: 'from-amber-500 to-orange-500', bg: 'bg-amber-500/10', ring: 'ring-amber-500/20' },
+  {
+    to: "/topology",
+    icon: Network,
+    label: "Topology Builder",
+    desc: "Visual network design",
+    color: "from-blue-500 to-cyan-500",
+    bg: "bg-blue-500/10",
+    ring: "ring-blue-500/20",
+  },
+  {
+    to: "/devices",
+    icon: Settings,
+    label: "Auto Provision",
+    desc: "Zero-touch device setup",
+    color: "from-violet-500 to-purple-500",
+    bg: "bg-violet-500/10",
+    ring: "ring-violet-500/20",
+  },
+  {
+    to: "/billing",
+    icon: DollarSign,
+    label: "ISP Billing",
+    desc: "Manage customers & revenue",
+    color: "from-emerald-500 to-teal-500",
+    bg: "bg-emerald-500/10",
+    ring: "ring-emerald-500/20",
+  },
+  {
+    to: "/billing-map",
+    icon: MapPin,
+    label: "Network Map",
+    desc: "GIS customer locations",
+    color: "from-amber-500 to-orange-500",
+    bg: "bg-amber-500/10",
+    ring: "ring-amber-500/20",
+  },
 ];
 
 /* ─── Main Dashboard ─── */
 export function Dashboard() {
-  const { projects, fetchProjects, createProject, deleteProject, loading: storeLoading } = useStore();
+  const {
+    projects,
+    fetchProjects,
+    createProject,
+    deleteProject,
+    loading: storeLoading,
+  } = useStore();
   const [stats, setStats] = useState(null);
   const [quickActions, setQuickActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', description: '', routeros_version: 'v7' });
+  const [newProject, setNewProject] = useState({
+    name: "",
+    description: "",
+    routeros_version: "v7",
+  });
+  const [currencySymbol, setCurrencySymbol] = useState("KES");
   const navigate = useNavigate();
   const toast = useToast();
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, actionsRes] = await Promise.all([
+      const [statsRes, actionsRes, settingsRes] = await Promise.all([
         axios.get(`${API_URL}/dashboard/stats`),
         axios.get(`${API_URL}/dashboard/quick-actions`),
+        axios.get(`${API_URL}/settings`).catch(() => ({ data: {} })),
       ]);
+
+      // Read currency symbol from settings
+      const settings = settingsRes.data?.settings || settingsRes.data || {};
+      setCurrencySymbol(settings.currency_symbol || settings.currency || "KES");
 
       if (statsRes.data.success) {
         setStats(statsRes.data.stats || {});
@@ -142,12 +240,12 @@ export function Dashboard() {
       setLastRefresh(new Date());
       setLoading(false);
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      console.error("Failed to fetch dashboard data:", error);
       setLoading(false);
     }
   };
 
-  useEffect(() => { 
+  useEffect(() => {
     fetchDashboardData();
     fetchProjects();
   }, []);
@@ -162,11 +260,11 @@ export function Dashboard() {
     setLoading(true);
     fetchDashboardData();
     fetchProjects();
-    toast.success('Dashboard refreshed');
+    toast.success("Dashboard refreshed");
   };
 
   const handleQuickAction = (action) => {
-    if (action.id === 'new-project') {
+    if (action.id === "new-project") {
       setShowCreate(true);
     } else {
       navigate(action.route);
@@ -176,15 +274,15 @@ export function Dashboard() {
   const handleCreate = async (e) => {
     e.preventDefault();
     const project = await createProject(newProject);
-    if (project) { 
-      setShowCreate(false); 
-      navigate(`/project/${project.id}`); 
+    if (project) {
+      setShowCreate(false);
+      navigate(`/project/${project.id}`);
     }
   };
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (window.confirm('Delete this project?')) await deleteProject(id);
+    if (window.confirm("Delete this project?")) await deleteProject(id);
   };
 
   if (loading && !stats) {
@@ -210,19 +308,24 @@ export function Dashboard() {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-sm font-semibold text-blue-400 uppercase tracking-wider">MikroTik Config Builder</span>
+                <span className="text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                  MikroTik Config Builder
+                </span>
               </div>
               <h1 className="text-3xl font-bold text-white mb-1">Dashboard</h1>
               <p className="text-gray-400">
-                {lastRefresh && `Last updated: ${lastRefresh.toLocaleTimeString()}`}
+                {lastRefresh &&
+                  `Last updated: ${lastRefresh.toLocaleTimeString()}`}
               </p>
             </div>
-            
+
             <button
               onClick={handleRefresh}
               className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
               Refresh
             </button>
           </div>
@@ -238,59 +341,70 @@ export function Dashboard() {
               label="Total Projects"
               value={stats.totalProjects}
               color="blue"
-              trend={stats.recentProjects > 0 ? Math.round((stats.recentProjects / Math.max(stats.totalProjects - stats.recentProjects, 1)) * 100) : 0}
-              onClick={() => navigate('/')}
+              trend={
+                stats.recentProjects > 0
+                  ? Math.round(
+                      (stats.recentProjects /
+                        Math.max(
+                          stats.totalProjects - stats.recentProjects,
+                          1,
+                        )) *
+                        100,
+                    )
+                  : 0
+              }
+              onClick={() => navigate("/")}
             />
             <StatCard
               icon={Users}
               label="Total Customers"
               value={stats.totalCustomers}
               color="emerald"
-              onClick={() => navigate('/billing-customers')}
+              onClick={() => navigate("/billing-customers")}
             />
             <StatCard
               icon={UserCheck}
               label="Active Customers"
               value={stats.activeCustomers}
               color="green"
-              onClick={() => navigate('/billing')}
+              onClick={() => navigate("/billing")}
             />
             <StatCard
               icon={DollarSign}
               label="Total Revenue"
               value={stats.totalRevenue}
-              prefix="$"
+              prefix={currencySymbol}
               color="amber"
-              onClick={() => navigate('/billing-reports')}
+              onClick={() => navigate("/billing-reports")}
             />
             <StatCard
               icon={FileCode}
               label="Templates"
               value={stats.totalTemplates}
               color="violet"
-              onClick={() => navigate('/templates')}
+              onClick={() => navigate("/templates")}
             />
             <StatCard
               icon={Router}
               label="Connected Devices"
               value={stats.activeDevices}
               color="cyan"
-              onClick={() => navigate('/mikrotik-api')}
+              onClick={() => navigate("/mikrotik-api")}
             />
             <StatCard
               icon={AlertTriangle}
               label="Overdue Invoices"
               value={stats.overdueInvoices}
               color="red"
-              onClick={() => navigate('/billing-invoices')}
+              onClick={() => navigate("/billing-invoices")}
             />
             <StatCard
               icon={Activity}
               label="Pending Revenue"
               value={stats.pendingRevenue}
-              prefix="$"
+              prefix={currencySymbol}
               color="amber"
-              onClick={() => navigate('/billing-invoices')}
+              onClick={() => navigate("/billing-invoices")}
             />
           </div>
         )}
@@ -298,11 +412,17 @@ export function Dashboard() {
         {/* Quick Actions */}
         {quickActions.length > 0 && (
           <div>
-            <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Quick Actions
+            </h2>
             <div className="flex flex-wrap gap-3">
-              {quickActions.map(action => {
+              {quickActions.map((action) => {
                 const iconMap = {
-                  FolderPlus, UserPlus, Key, Users, FileCode,
+                  FolderPlus,
+                  UserPlus,
+                  Key,
+                  Users,
+                  FileCode,
                 };
                 const Icon = iconMap[action.icon] || FolderPlus;
                 return (
@@ -332,7 +452,9 @@ export function Dashboard() {
         {/* Recent Projects */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">Recent Projects</h2>
+            <h2 className="text-xl font-semibold text-white">
+              Recent Projects
+            </h2>
             <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
@@ -344,8 +466,11 @@ export function Dashboard() {
 
           {storeLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6 animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="bg-white/5 border border-white/10 rounded-2xl p-6 animate-pulse"
+                >
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-10 h-10 bg-white/10 rounded-xl" />
                     <div className="w-8 h-4 bg-white/10 rounded" />
@@ -358,8 +483,12 @@ export function Dashboard() {
           ) : projects.length === 0 ? (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
               <FolderOpen className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">No projects yet</h3>
-              <p className="text-gray-400 mb-6">Create your first project to get started</p>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                No projects yet
+              </h3>
+              <p className="text-gray-400 mb-6">
+                Create your first project to get started
+              </p>
               <button
                 onClick={() => setShowCreate(true)}
                 className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
@@ -369,7 +498,7 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map(project => (
+              {projects.map((project) => (
                 <div
                   key={project.id}
                   onClick={() => navigate(`/project/${project.id}`)}
@@ -386,8 +515,12 @@ export function Dashboard() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-1">{project.name}</h3>
-                  <p className="text-sm text-gray-400 mb-3 line-clamp-2">{project.description || 'No description'}</p>
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    {project.name}
+                  </h3>
+                  <p className="text-sm text-gray-400 mb-3 line-clamp-2">
+                    {project.description || "No description"}
+                  </p>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <Clock className="w-3 h-3" />
                     {new Date(project.updated_at).toLocaleDateString()}
@@ -402,14 +535,20 @@ export function Dashboard() {
         {showCreate && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-zinc-900 border border-white/10 rounded-2xl p-8 w-full max-w-md">
-              <h2 className="text-xl font-bold text-white mb-6">Create New Project</h2>
+              <h2 className="text-xl font-bold text-white mb-6">
+                Create New Project
+              </h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Project Name</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Project Name
+                  </label>
                   <input
                     type="text"
                     value={newProject.name}
-                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, name: e.target.value })
+                    }
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="My ISP Network"
                     required
@@ -417,20 +556,34 @@ export function Dashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Description
+                  </label>
                   <textarea
                     value={newProject.description}
-                    onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                    onChange={(e) =>
+                      setNewProject({
+                        ...newProject,
+                        description: e.target.value,
+                      })
+                    }
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Brief description of your project"
                     rows={3}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">RouterOS Version</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    RouterOS Version
+                  </label>
                   <select
                     value={newProject.routeros_version}
-                    onChange={(e) => setNewProject({ ...newProject, routeros_version: e.target.value })}
+                    onChange={(e) =>
+                      setNewProject({
+                        ...newProject,
+                        routeros_version: e.target.value,
+                      })
+                    }
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="v7">RouterOS v7</option>
