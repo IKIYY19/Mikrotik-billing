@@ -782,6 +782,103 @@ function generateProvisionScript(router, options = {}) {
   }
 
   // ==================================================================
+  // SECTION 22b: WIREGUARD TUNNEL (CONDITIONAL)
+  // ==================================================================
+  const wgEndpoint =
+    options.wireguard_endpoint || process.env.WIREGUARD_ENDPOINT || "";
+  const wgServerPubkey =
+    options.wireguard_server_pubkey ||
+    process.env.WIREGUARD_SERVER_PUBKEY ||
+    "";
+  const wgTunnelIp = router.wireguard_tunnel_ip || "";
+  const wgListenPort = Number(router.wireguard_listen_port || 13231);
+
+  if (wgEndpoint && wgServerPubkey) {
+    lines.push("# WireGuard Tunnel Configuration");
+    lines.push("# Connects router to central management VPN for remote access");
+    lines.push(
+      "# Requires RouterOS v7.x with built-in WireGuard support (or wireguard package on v6)",
+    );
+
+    // Declare global variable for public key (used in callback)
+    lines.push(':global wgPubKey; :local wgPubKeyLocal "";');
+
+    // Check if WireGuard interface already exists
+    lines.push(
+      `:local wgExists ([:len [/interface wireguard find where name=mgmt-tunnel]] > 0);`,
+    );
+    lines.push(":if (!$wgExists) do={");
+    lines.push(
+      `  /log info message="[ZTP] Setting up WireGuard tunnel to management server";`,
+    );
+
+    // Generate keypair and create interface
+    lines.push(
+      `  /interface wireguard add name=mgmt-tunnel listen-port=${wgListenPort} comment="Management tunnel to billing platform";`,
+    );
+
+    // For RouterOS v7, we need to generate keys manually
+    // The private key is auto-generated when interface is created, we extract the public key
+    lines.push(
+      `  :local wgPrivKey [/interface wireguard get [find name=mgmt-tunnel] private-key];`,
+    );
+
+    // If private key is empty (RouterOS v6/v7 difference), generate one
+    lines.push(`  :if ([:len $wgPrivKey] = 0) do={`);
+    lines.push(`    :set wgPrivKey [:identity 64];`);
+    lines.push(
+      `    /interface wireguard set [find name=mgmt-tunnel] private-key=$wgPrivKey;`,
+    );
+    lines.push(`  };`);
+
+    // Extract public key
+    lines.push(
+      `  :set wgPubKeyLocal [/interface wireguard get [find name=mgmt-tunnel] public-key];`,
+    );
+    lines.push(
+      `  :if ([:len $wgPubKeyLocal] = 0) do={ :set wgPubKeyLocal "unknown"; };`,
+    );
+    lines.push(`  :set wgPubKey $wgPubKeyLocal;`);
+
+    // Add peer (the central server)
+    lines.push(
+      `  /interface wireguard peers add interface=mgmt-tunnel public-key="${wgServerPubkey}" endpoint-address="${wgEndpoint}" endpoint-port=${wgListenPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="Management Server";`,
+    );
+
+    // Add IP to the tunnel interface
+    if (wgTunnelIp) {
+      lines.push(
+        `  /ip address add address=${wgTunnelIp} interface=mgmt-tunnel comment="Management tunnel IP";`,
+      );
+    }
+
+    // Allow WireGuard traffic through firewall
+    lines.push(
+      `  /ip firewall filter add chain=input protocol=udp dst-port=${wgListenPort} action=accept comment="Allow WireGuard";`,
+    );
+
+    // Only route management traffic through tunnel (not default route)
+    lines.push(
+      `  /ip route add dst-address=${wgEndpoint} gateway=${wanIface} comment="Route WG server directly (no tunnel routing)";`,
+    );
+
+    lines.push(
+      `  /log info message="[ZTP] WireGuard tunnel mgmt-tunnel configured (public key: $wgPubKey)";`,
+    );
+
+    lines.push(`} else={`);
+    lines.push(
+      `  /log info message="[ZTP] WireGuard tunnel SKIPPED - mgmt-tunnel already exists";`,
+    );
+    lines.push(
+      `  :do { :set wgPubKeyLocal [/interface wireguard get [find name=mgmt-tunnel] public-key]; } on-error={}`,
+    );
+    lines.push(`  :set wgPubKey $wgPubKeyLocal;`);
+    lines.push(`};`);
+    lines.push("");
+  }
+
+  // ==================================================================
   // SECTION 23: BACKUP CONFIGURATION
   // ==================================================================
   lines.push("# Backup Configuration");
@@ -799,11 +896,13 @@ function generateProvisionScript(router, options = {}) {
     "";
   if (callbackBaseUrl) {
     lines.push(
-      buildFetchCommand(
-        `${callbackBaseUrl.replace(/\/$/, "")}/mikrotik/provision/callback/${router.provision_token}`,
-        null,
-        false,
-      ),
+      `:local cbUrl "${`${callbackBaseUrl.replace(/\/$/, "")}/mikrotik/provision/callback/${router.provision_token}`}";`,
+    );
+    lines.push(
+      `:if ([:len \$wgPubKey] > 0 && \$wgPubKey != "unknown") do={ :set cbUrl (\$cbUrl . "\&wg_pubkey=" . \$wgPubKey) };`,
+    );
+    lines.push(
+      `/tool fetch mode=https check-certificate=no url=\$cbUrl keep-result=no`,
     );
   } else {
     lines.push(

@@ -131,6 +131,9 @@ router.get("/provision/:token", async (req, res) => {
     // Generate the provisioning script
     const script = provisionStore.generateProvisionScript(routerData, {
       callbackBaseUrl: getServerBaseUrl(req),
+      wireguard_endpoint: process.env.WIREGUARD_ENDPOINT,
+      wireguard_server_pubkey: process.env.WIREGUARD_SERVER_PUBKEY,
+      wireguard_tunnel_ip: routerData.wireguard_tunnel_ip,
     });
 
     // Cache the script for subsequent rapid requests (e.g., retries)
@@ -173,6 +176,9 @@ router.get("/provision/callback/:token", async (req, res) => {
     const ip = req.ip || req.connection.remoteAddress;
     const ua = req.get("User-Agent") || "unknown";
 
+    // Optional WireGuard public key from router
+    const wgPubKey = req.query.wg_pubkey || null;
+
     // Find router
     const result = await getDb().query(
       "SELECT * FROM routers WHERE provision_token = $1",
@@ -184,6 +190,24 @@ router.get("/provision/callback/:token", async (req, res) => {
     }
 
     const routerData = result.rows[0];
+
+    // Store WireGuard public key if provided
+    if (wgPubKey && wgPubKey !== "unknown") {
+      try {
+        await getDb().query(
+          `UPDATE routers SET wireguard_pubkey = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [wgPubKey, routerData.id],
+        );
+        logger.info("WireGuard public key stored", {
+          router: routerData.id,
+          pubkey: wgPubKey.substring(0, 20) + "...",
+        });
+      } catch (e) {
+        logger.warn("Failed to store WireGuard public key", {
+          error: e.message,
+        });
+      }
+    }
 
     // Invalidate cached script so next fetch is fresh
     provisionCache.delete(token);

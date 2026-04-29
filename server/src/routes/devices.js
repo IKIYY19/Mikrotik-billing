@@ -553,6 +553,9 @@ router.get("/:id/script", async (req, res) => {
       process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get("host")}`;
     const script = provisionStore.generateProvisionScript(result.rows[0], {
       callbackBaseUrl: baseUrl,
+      wireguard_endpoint: process.env.WIREGUARD_ENDPOINT,
+      wireguard_server_pubkey: process.env.WIREGUARD_SERVER_PUBKEY,
+      wireguard_tunnel_ip: result.rows[0].wireguard_tunnel_ip,
     });
     res.json({ script });
   } catch (error) {
