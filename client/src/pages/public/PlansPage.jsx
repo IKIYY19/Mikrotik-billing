@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Wifi, ArrowLeft, Check, Zap, Clock, Database, Gauge } from "lucide-react";
+import {
+  Wifi,
+  ArrowLeft,
+  Check,
+  Zap,
+  Clock,
+  Database,
+  Gauge,
+} from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "/api";
 
@@ -59,7 +67,9 @@ export function PlansPage() {
 
       navigate(`/checkout/${data.invoice.id}`);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to select plan. Please try again.");
+      setError(
+        err.response?.data?.error || "Failed to select plan. Please try again.",
+      );
     }
     setSelecting(null);
   };
@@ -88,7 +98,9 @@ export function PlansPage() {
             <Wifi className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">Choose Your Plan</h1>
-          <p className="text-zinc-400 mt-2">Select the internet plan that works best for you</p>
+          <p className="text-zinc-400 mt-2">
+            Select the internet plan that works best for you
+          </p>
         </div>
 
         {error && (
@@ -105,9 +117,13 @@ export function PlansPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold text-white">{plan.name}</h3>
+                  <h3 className="text-xl font-semibold text-white">
+                    {plan.name}
+                  </h3>
                   {plan.description && (
-                    <p className="text-sm text-zinc-400 mt-1">{plan.description}</p>
+                    <p className="text-sm text-zinc-400 mt-1">
+                      {plan.description}
+                    </p>
                   )}
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
@@ -116,7 +132,9 @@ export function PlansPage() {
               </div>
 
               <div className="mb-6">
-                <span className="text-3xl font-bold text-white">${plan.price}</span>
+                <span className="text-3xl font-bold text-white">
+                  KES {plan.price}
+                </span>
                 <span className="text-zinc-400 text-sm ml-1">
                   / {plan.duration_days || 30} days
                 </span>
@@ -127,7 +145,10 @@ export function PlansPage() {
                   <div className="flex items-center gap-3 text-sm">
                     <Gauge className="w-4 h-4 text-blue-400" />
                     <span className="text-zinc-300">
-                      Speed: <span className="text-white font-medium">{plan.speed}</span>
+                      Speed:{" "}
+                      <span className="text-white font-medium">
+                        {plan.speed}
+                      </span>
                     </span>
                   </div>
                 )}
@@ -135,14 +156,18 @@ export function PlansPage() {
                   <div className="flex items-center gap-3 text-sm">
                     <Database className="w-4 h-4 text-blue-400" />
                     <span className="text-zinc-300">
-                      Data: <span className="text-white font-medium">{plan.data_cap}</span>
+                      Data:{" "}
+                      <span className="text-white font-medium">
+                        {plan.data_cap}
+                      </span>
                     </span>
                   </div>
                 )}
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="w-4 h-4 text-blue-400" />
                   <span className="text-zinc-300">
-                    Billing: <span className="text-white font-medium">
+                    Billing:{" "}
+                    <span className="text-white font-medium">
                       {plan.duration_days || 30}-day cycle
                     </span>
                   </span>
@@ -150,7 +175,8 @@ export function PlansPage() {
                 <div className="flex items-center gap-3 text-sm">
                   <Check className="w-4 h-4 text-blue-400" />
                   <span className="text-zinc-300">
-                    Connection: <span className="text-white font-medium capitalize">
+                    Connection:{" "}
+                    <span className="text-white font-medium capitalize">
                       {plan.connection_type}
                     </span>
                   </span>

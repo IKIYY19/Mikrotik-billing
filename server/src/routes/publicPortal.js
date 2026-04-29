@@ -10,7 +10,7 @@ function getDb() {
 router.get("/plans", async (req, res) => {
   try {
     const billing = require("../services/billingData");
-    const allPlans = billing.listPlans();
+    const allPlans = await billing.listPlans();
     // Only return active plans, hide internal fields
     const plans = allPlans
       .filter((p) => p.status !== "archived")
