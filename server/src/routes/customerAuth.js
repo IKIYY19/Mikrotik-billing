@@ -210,7 +210,7 @@ router.post("/forgot-pin", async (req, res) => {
     await updateCustomerField(customer.id, "pin_reset_code", resetCode);
     await updateCustomerField(customer.id, "pin_reset_expires", resetExpiry);
 
-    // Try to send SMS via Africa's Talking if configured
+    // Try to send reset code via SMS
     try {
       const { triggerSMS } = require("./sms");
       await triggerSMS("password_reset", {
@@ -219,6 +219,20 @@ router.post("/forgot-pin", async (req, res) => {
       }).catch(() => {});
     } catch (smsErr) {
       // SMS not configured - silently continue
+    }
+
+    // Try to send reset code via WhatsApp
+    try {
+      const WhatsAppService = require("../services/whatsapp");
+      const wa = new WhatsAppService();
+      await wa
+        .sendMessage(
+          customer.phone.replace(/^0/, "254"),
+          `Your internet service password reset code is: ${resetCode}. It expires in 30 minutes.`,
+        )
+        .catch(() => {});
+    } catch (waErr) {
+      // WhatsApp not configured - silently continue
     }
 
     res.json({
