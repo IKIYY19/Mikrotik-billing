@@ -9,7 +9,6 @@ import {
   Download,
   Eye,
   RefreshCw,
-  Terminal,
   X,
   Code,
   FileText,
@@ -119,7 +118,6 @@ export function Devices() {
   // per-device provision command state
   const [showCommand, setShowCommand] = useState(null);
   const [commandLoading, setCommandLoading] = useState({});
-  const [provisionMethod, setProvisionMethod] = useState("script");
   const [cmdCopied, setCmdCopied] = useState(false);
   const [activationLoading, setActivationLoading] = useState({});
 
@@ -318,47 +316,6 @@ export function Devices() {
 
   // ── managed device actions ────────────────────────────────────────────────
 
-  const getProvisionCommand = async (
-    device,
-    method = "script",
-    regenerate = false,
-  ) => {
-    setProvisionMethod(method);
-    setCommandLoading((prev) => ({ ...prev, [device.id]: true }));
-    const serverUrl = publicUrl.replace(/\/$/, "");
-    const endpoint = `${getProvisionServerOrigin()}/mikrotik/provision/command/${device.id}`;
-
-    try {
-      const request = regenerate
-        ? axios.post(endpoint, { method, baseUrl: serverUrl })
-        : axios.get(endpoint, { params: { method, baseUrl: serverUrl } });
-
-      const { data } = await request;
-      setShowCommand({
-        ...device,
-        ...data,
-        provision_token: data.token,
-        method,
-      });
-      if (regenerate) fetchDevices();
-    } catch (e) {
-      const token = device.provision_token;
-      const scriptUrl = `${serverUrl}/mikrotik/provision/${token}`;
-      const fetchMode = scriptUrl.startsWith("https") ? "https" : "http";
-      let command = `/tool fetch mode=${fetchMode} url="${scriptUrl}" dst-path=provision.rsc; /import file-name=provision.rsc`;
-      setShowCommand({
-        ...device,
-        command,
-        copyText: command,
-        method,
-        serverUrl,
-        token,
-      });
-    } finally {
-      setCommandLoading((prev) => ({ ...prev, [device.id]: false }));
-    }
-  };
-
   const copyCmd = (text) => {
     navigator.clipboard.writeText(text);
     setCmdCopied(true);
@@ -522,35 +479,6 @@ export function Devices() {
       };
     });
   };
-
-  // ── provision methods ────────────────────────────────────────────────────
-
-  const PROVISION_METHODS = [
-    {
-      id: "script",
-      name: "Script",
-      icon: Code,
-      description: "Fetch then import",
-    },
-    {
-      id: "inline",
-      name: "Inline",
-      icon: Terminal,
-      description: "Fetch, import, cleanup",
-    },
-    {
-      id: "fetch",
-      name: "Fetch Only",
-      icon: Download,
-      description: "Download for manual import",
-    },
-    {
-      id: "import",
-      name: "Import",
-      icon: Zap,
-      description: "Direct import from URL",
-    },
-  ];
 
   // ── pending count badge ──────────────────────────────────────────────────
 
@@ -1066,12 +994,7 @@ export function Devices() {
                 key={dev.id}
                 device={dev}
                 publicUrl={publicUrl}
-                showCommand={showCommand}
-                setShowCommand={setShowCommand}
                 commandLoading={commandLoading}
-                provisionMethod={provisionMethod}
-                cmdCopied={cmdCopied}
-                onGetCommand={getProvisionCommand}
                 onCopyCmd={copyCmd}
                 onActivate={activateInBilling}
                 onViewScript={viewScript}
@@ -1080,7 +1003,6 @@ export function Devices() {
                 onDownload={downloadScript}
                 onDelete={deleteDevice}
                 activationLoading={activationLoading}
-                PROVISION_METHODS={PROVISION_METHODS}
               />
             ))}
           </div>
@@ -2048,11 +1970,7 @@ function DiscoveredRouterCard({
 function ManagedDeviceCard({
   device: dev,
   publicUrl,
-  showCommand,
   commandLoading,
-  provisionMethod,
-  cmdCopied,
-  onGetCommand,
   onCopyCmd,
   onActivate,
   onViewScript,
@@ -2061,10 +1979,8 @@ function ManagedDeviceCard({
   onDownload,
   onDelete,
   activationLoading,
-  PROVISION_METHODS,
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isActive = showCommand?.id === dev.id;
 
   return (
     <Card className="overflow-hidden border-zinc-800">
@@ -2105,61 +2021,46 @@ function ManagedDeviceCard({
         </div>
       </CardHeader>
 
-      {/* Provision command section */}
+      {/* Zero-Touch Command */}
       <CardContent className="p-4 bg-zinc-900/40 space-y-2">
         <p className="text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-          <Terminal className="w-3 h-3" /> Provision Command
+          <Zap className="w-3 h-3" /> Zero-Touch Command
         </p>
-        <div className="flex flex-wrap gap-1.5">
-          {PROVISION_METHODS.map((m) => {
-            const Icon = m.icon;
-            return (
-              <Button
-                key={m.id}
-                variant={
-                  provisionMethod === m.id && isActive ? "default" : "outline"
-                }
-                size="sm"
-                onClick={() => onGetCommand(dev, m.id)}
-                disabled={commandLoading[dev.id]}
-                className="text-xs"
-                title={m.description}
-              >
-                <Icon className="w-3 h-3 mr-1" /> {m.name}
-              </Button>
-            );
-          })}
-        </div>
-
-        <pre className="text-xs text-green-400 bg-zinc-900 p-3 rounded border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono min-h-[52px] leading-relaxed">
+        <pre className="text-xs text-green-400 bg-zinc-900 p-3 rounded border border-zinc-700 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
           {commandLoading[dev.id]
             ? "Generating…"
-            : isActive
-              ? showCommand.copyText
-              : "Select a method above to generate a provision command"}
+            : `/tool fetch mode=https check-certificate=no url="${publicUrl.replace(/\/$/, "")}/mikrotik/provision/${dev.provision_token}" dst-path=provision.rsc; /import file-name=provision.rsc`}
         </pre>
-
-        {isActive && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const cmd = `/tool fetch mode=https check-certificate=no url="${publicUrl.replace(/\/$/, "")}/mikrotik/provision/${dev.provision_token}" dst-path=provision.rsc; /import file-name=provision.rsc`;
+              navigator.clipboard.writeText(cmd);
+              onCopyCmd(cmd);
+            }}
+            className="text-xs"
+          >
+            <Copy className="w-3 h-3 mr-1" /> Copy Command
+          </Button>
+          {dev.linked_mikrotik_connection_id ? (
+            <span className="flex items-center gap-1 text-xs text-blue-400 px-2">
+              <CheckCircle className="w-3 h-3" /> Linked
+            </span>
+          ) : (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onCopyCmd(showCommand.copyText)}
+              onClick={() => onActivate(dev)}
+              disabled={activationLoading[dev.id]}
               className="text-xs"
             >
-              <Copy className="w-3 h-3 mr-1" /> {cmdCopied ? "Copied!" : "Copy"}
+              <Link2 className="w-3 h-3 mr-1" />
+              {activationLoading[dev.id] ? "Linking..." : "Link to Billing"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onGetCommand(dev, showCommand.method, true)}
-              disabled={commandLoading[dev.id]}
-              className="text-xs text-amber-400"
-            >
-              <RefreshCw className="w-3 h-3 mr-1" /> Regenerate Token
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
 
       {/* Settings summary (collapsible) */}
@@ -2216,16 +2117,6 @@ function ManagedDeviceCard({
 
       {/* Actions */}
       <CardContent className="p-3 border-t border-zinc-800 flex flex-wrap gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onActivate(dev)}
-          disabled={activationLoading[dev.id]}
-          className="text-xs text-blue-400"
-        >
-          <Link2 className="w-3 h-3 mr-1" />
-          {activationLoading[dev.id] ? "Linking…" : "Activate Billing"}
-        </Button>
         <Button
           variant="outline"
           size="sm"
