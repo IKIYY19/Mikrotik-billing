@@ -308,12 +308,13 @@ function generateProvisionScript(router, options = {}) {
   // SECTION 2: SYSTEM IDENTITY & CLOCK
   // ==================================================================
   lines.push("# System Identity");
+  lines.push("# Only set identity if it differs from desired value");
   lines.push(
-    safeAdd(
-      `/system identity set name="${escapeRouterValue(router.identity || router.name)}"`,
-    ),
+    `:if ($currentIdentity != "${escapeRouterValue(router.identity || router.name)}") do={ ${safeAdd(`/system identity set name="${escapeRouterValue(router.identity || router.name)}"`)} } else={ /log info message="[ZTP] Identity already correct: $currentIdentity" };`,
   );
-  lines.push("/system clock set time-zone-name=Africa/Nairobi");
+  lines.push(
+    `:do { /system clock set time-zone-name=Africa/Nairobi } on-error={}`,
+  );
   lines.push("");
 
   // ==================================================================
@@ -336,16 +337,25 @@ function generateProvisionScript(router, options = {}) {
       dnsServers = escapeRouterValue(router.dns_servers.trim());
     }
   }
-  lines.push(`/ip dns set servers=${dnsServers}`);
-  lines.push("/ip dns set allow-remote-requests=yes");
-  lines.push("/ip dns set cache-size=10000KiB");
+  lines.push(`:local currentDnsServers [/ip dns get servers];`);
+  lines.push(
+    `:if ($currentDnsServers != "${dnsServers}") do={ ${safeAdd(`/ip dns set servers=${dnsServers}`)} } else={ /log info message="[ZTP] DNS servers already configured" };`,
+  );
+  lines.push(`:local remoteDns [/ip dns get allow-remote-requests];`);
+  lines.push(
+    `:if ($remoteDns != "yes") do={ ${safeAdd("/ip dns set allow-remote-requests=yes")} } else={ /log info message="[ZTP] Remote DNS already enabled" };`,
+  );
+  lines.push(`:do { /ip dns set cache-size=10000KiB } on-error={}`);
   lines.push("");
 
   // ==================================================================
   // SECTION 4: NTP CONFIGURATION
   // ==================================================================
   lines.push("# NTP Configuration");
-  lines.push("/system ntp client set enabled=yes");
+  lines.push(`:local ntpEnabled [/system ntp client get enabled];`);
+  lines.push(
+    `:if ($ntpEnabled != "yes") do={ ${safeAdd("/system ntp client set enabled=yes")} } else={ /log info message="[ZTP] NTP client already enabled" };`,
+  );
   let ntpServers = ["pool.ntp.org", "time.google.com"];
   if (router.ntp_servers) {
     if (Array.isArray(router.ntp_servers)) {
@@ -369,7 +379,7 @@ function generateProvisionScript(router, options = {}) {
       .join(",");
     lines.push(`/system ntp client set servers="${serversStr}"`);
   }
-  lines.push("/system ntp client set mode=unicast");
+  lines.push(`:do { /system ntp client set mode=unicast } on-error={}`);
   lines.push("");
 
   // ==================================================================
@@ -578,7 +588,7 @@ function generateProvisionScript(router, options = {}) {
   // ==================================================================
   lines.push("# Connection Tracking Settings");
   lines.push(
-    "/ip firewall connection tracking set tcp-close-wait-time=10s tcp-time-wait-time=10s",
+    `:do { /ip firewall connection tracking set tcp-close-wait-time=10s tcp-time-wait-time=10s } on-error={}`,
   );
   lines.push("");
 
@@ -752,12 +762,19 @@ function generateProvisionScript(router, options = {}) {
   // ==================================================================
   lines.push("# Management Services");
   lines.push(
-    "# Review and apply these manually after first successful provisioning if needed.",
+    "# Only disable insecure services on fresh deployments with no input rules",
   );
-  lines.push("/ip service set telnet disabled=yes");
-  lines.push("/ip service set ftp disabled=yes");
-  lines.push("/ip service set www disabled=yes");
-  lines.push("/ip ssh set strong-crypto=yes");
+  lines.push(`:if (!$hasInputRules) do={`);
+  lines.push(`  :do { /ip service set telnet disabled=yes } on-error={}`);
+  lines.push(`  :do { /ip service set ftp disabled=yes } on-error={}`);
+  lines.push(`  :do { /ip service set www disabled=yes } on-error={}`);
+  lines.push(`  :do { /ip ssh set strong-crypto=yes } on-error={}`);
+  lines.push(
+    `  /log info message="[ZTP] Insecure services disabled (fresh deployment)"`,
+  );
+  lines.push(
+    `} else={ /log info message="[ZTP] Management services SKIPPED - existing firewall rules detected" };`,
+  );
   lines.push(`# Recommended API port: ${router.mgmt_port || 8728}`);
   lines.push("");
 
