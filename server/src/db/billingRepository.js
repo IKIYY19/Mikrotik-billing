@@ -3,19 +3,21 @@
  * Replaces the in-memory billingStore.js
  */
 
-const db = require('../db');
-const { v4: uuidv4 } = require('uuid');
+const db = require("../db");
+const { v4: uuidv4 } = require("uuid");
 
 // ─── CUSTOMERS ───
 const customers = {
-  async list({ page = 1, limit = 20, search = '', status = '' } = {}) {
+  async list({ page = 1, limit = 20, search = "", status = "" } = {}) {
     const offset = (page - 1) * limit;
     let where = [];
     let params = [];
     let paramIdx = 1;
 
     if (search) {
-      where.push(`(LOWER(name) LIKE LOWER($${paramIdx}) OR LOWER(email) LIKE LOWER($${paramIdx}) OR phone LIKE $${paramIdx})`);
+      where.push(
+        `(LOWER(name) LIKE LOWER($${paramIdx}) OR LOWER(email) LIKE LOWER($${paramIdx}) OR phone LIKE $${paramIdx})`,
+      );
       params.push(`%${search}%`);
       paramIdx++;
     }
@@ -25,8 +27,11 @@ const customers = {
       paramIdx++;
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const countRes = await db.query(`SELECT COUNT(*) FROM customers ${whereClause}`, params);
+    const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const countRes = await db.query(
+      `SELECT COUNT(*) FROM customers ${whereClause}`,
+      params,
+    );
     const total = parseInt(countRes.rows[0].count);
 
     const dataRes = await db.query(
@@ -37,14 +42,16 @@ const customers = {
        FROM customers c ${whereClause}
        ORDER BY created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, limit, offset]
+      [...params, limit, offset],
     );
 
     return { data: dataRes.rows, total, page, limit };
   },
 
   async findById(id) {
-    const customer = await db.query('SELECT * FROM customers WHERE id = $1', [id]);
+    const customer = await db.query("SELECT * FROM customers WHERE id = $1", [
+      id,
+    ]);
     if (customer.rows.length === 0) return null;
     return customer.rows[0];
   },
@@ -52,12 +59,26 @@ const customers = {
   async create(data, userId = null) {
     const id = uuidv4();
     const result = await db.query(
-      `INSERT INTO customers (id, name, email, phone, address, city, country, lat, lng, id_number, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-      [id, data.name, data.email || '', data.phone || '', data.address || '', data.city || '',
-       data.country || '', data.lat || null, data.lng || null, data.id_number || '', data.status || 'active', data.notes || '']
+      `INSERT INTO customers (id, name, email, phone, address, city, country, lat, lng, id_number, status, notes, account_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [
+        id,
+        data.name,
+        data.email || "",
+        data.phone || "",
+        data.address || "",
+        data.city || "",
+        data.country || "",
+        data.lat || null,
+        data.lng || null,
+        data.id_number || "",
+        data.status || "active",
+        data.notes || "",
+        data.account_number || null,
+      ],
     );
-    if (userId) await audit.log(userId, 'create', 'customer', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(userId, "create", "customer", id, null, result.rows[0]);
     return result.rows[0];
   },
 
@@ -70,18 +91,39 @@ const customers = {
        lat = COALESCE($7, lat), lng = COALESCE($8, lng), id_number = COALESCE($9, id_number),
        status = COALESCE($10, status), notes = COALESCE($11, notes), updated_at = CURRENT_TIMESTAMP
        WHERE id = $12 RETURNING *`,
-      [data.name, data.email, data.phone, data.address, data.city, data.country,
-       data.lat, data.lng, data.id_number, data.status, data.notes, id]
+      [
+        data.name,
+        data.email,
+        data.phone,
+        data.address,
+        data.city,
+        data.country,
+        data.lat,
+        data.lng,
+        data.id_number,
+        data.status,
+        data.notes,
+        id,
+      ],
     );
-    if (userId) await audit.log(userId, 'update', 'customer', id, existing, result.rows[0]);
+    if (userId)
+      await audit.log(
+        userId,
+        "update",
+        "customer",
+        id,
+        existing,
+        result.rows[0],
+      );
     return result.rows[0];
   },
 
   async delete(id, userId = null) {
     const existing = await this.findById(id);
     if (!existing) return null;
-    await db.query('DELETE FROM customers WHERE id = $1', [id]);
-    if (userId) await audit.log(userId, 'delete', 'customer', id, existing, null);
+    await db.query("DELETE FROM customers WHERE id = $1", [id]);
+    if (userId)
+      await audit.log(userId, "delete", "customer", id, existing, null);
     return existing;
   },
 };
@@ -92,13 +134,15 @@ const plans = {
     const result = await db.query(
       `SELECT sp.*,
         (SELECT COUNT(*) FROM subscriptions WHERE plan_id = sp.id AND status = 'active') as active_subscribers
-       FROM service_plans sp WHERE sp.is_active = true ORDER BY price ASC`
+       FROM service_plans sp WHERE sp.is_active = true ORDER BY price ASC`,
     );
     return result.rows;
   },
 
   async findById(id) {
-    const result = await db.query('SELECT * FROM service_plans WHERE id = $1', [id]);
+    const result = await db.query("SELECT * FROM service_plans WHERE id = $1", [
+      id,
+    ]);
     return result.rows[0] || null;
   },
 
@@ -107,10 +151,20 @@ const plans = {
     const result = await db.query(
       `INSERT INTO service_plans (id, name, speed_up, speed_down, price, quota_gb, priority, description, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [id, data.name, data.speed_up, data.speed_down, data.price, data.quota_gb || null,
-       data.priority || 8, data.description || '', data.is_active !== false]
+      [
+        id,
+        data.name,
+        data.speed_up,
+        data.speed_down,
+        data.price,
+        data.quota_gb || null,
+        data.priority || 8,
+        data.description || "",
+        data.is_active !== false,
+      ],
     );
-    if (userId) await audit.log(userId, 'create', 'plan', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(userId, "create", "plan", id, null, result.rows[0]);
     return result.rows[0];
   },
 
@@ -122,25 +176,37 @@ const plans = {
        speed_down = COALESCE($3, speed_down), price = COALESCE($4, price), quota_gb = COALESCE($5, quota_gb),
        priority = COALESCE($6, priority), description = COALESCE($7, description),
        is_active = COALESCE($8, is_active) WHERE id = $9 RETURNING *`,
-      [data.name, data.speed_up, data.speed_down, data.price, data.quota_gb,
-       data.priority, data.description, data.is_active, id]
+      [
+        data.name,
+        data.speed_up,
+        data.speed_down,
+        data.price,
+        data.quota_gb,
+        data.priority,
+        data.description,
+        data.is_active,
+        id,
+      ],
     );
-    if (userId) await audit.log(userId, 'update', 'plan', id, existing, result.rows[0]);
+    if (userId)
+      await audit.log(userId, "update", "plan", id, existing, result.rows[0]);
     return result.rows[0];
   },
 
   async delete(id, userId = null) {
     const existing = await this.findById(id);
     if (!existing) return null;
-    await db.query('UPDATE service_plans SET is_active = false WHERE id = $1', [id]);
-    if (userId) await audit.log(userId, 'delete', 'plan', id, existing, null);
+    await db.query("UPDATE service_plans SET is_active = false WHERE id = $1", [
+      id,
+    ]);
+    if (userId) await audit.log(userId, "delete", "plan", id, existing, null);
     return existing;
   },
 };
 
 // ─── SUBSCRIPTIONS ───
 const subscriptions = {
-  async list({ page = 1, limit = 20, status = '' } = {}) {
+  async list({ page = 1, limit = 20, status = "" } = {}) {
     const offset = (page - 1) * limit;
     let where = [];
     let params = [];
@@ -152,8 +218,11 @@ const subscriptions = {
       paramIdx++;
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const countRes = await db.query(`SELECT COUNT(*) FROM subscriptions s ${whereClause}`, params);
+    const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const countRes = await db.query(
+      `SELECT COUNT(*) FROM subscriptions s ${whereClause}`,
+      params,
+    );
     const total = parseInt(countRes.rows[0].count);
 
     const result = await db.query(
@@ -171,7 +240,7 @@ const subscriptions = {
        ${whereClause}
        ORDER BY s.created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, limit, offset]
+      [...params, limit, offset],
     );
 
     return { data: result.rows, total, page, limit };
@@ -191,7 +260,7 @@ const subscriptions = {
        LEFT JOIN routers r ON r.id = s.router_id
        LEFT JOIN mikrotik_connections mc ON mc.id = s.mikrotik_connection_id
        WHERE s.id = $1`,
-      [id]
+      [id],
     );
     return result.rows[0] || null;
   },
@@ -202,12 +271,34 @@ const subscriptions = {
       `INSERT INTO subscriptions (id, customer_id, plan_id, router_id, mikrotik_connection_id, pppoe_username, pppoe_password,
        pppoe_profile, status, start_date, end_date, billing_cycle, auto_provision, last_synced_at, last_sync_status, last_sync_error)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
-      [id, data.customer_id, data.plan_id, data.router_id || null, data.mikrotik_connection_id || null, data.pppoe_username || '',
-       data.pppoe_password || '', data.pppoe_profile || null, data.status || 'active', data.start_date || new Date().toISOString().split('T')[0],
-       data.end_date || null, data.billing_cycle || 'monthly', data.auto_provision !== false, data.last_synced_at || null,
-       data.last_sync_status || null, data.last_sync_error || null]
+      [
+        id,
+        data.customer_id,
+        data.plan_id,
+        data.router_id || null,
+        data.mikrotik_connection_id || null,
+        data.pppoe_username || "",
+        data.pppoe_password || "",
+        data.pppoe_profile || null,
+        data.status || "active",
+        data.start_date || new Date().toISOString().split("T")[0],
+        data.end_date || null,
+        data.billing_cycle || "monthly",
+        data.auto_provision !== false,
+        data.last_synced_at || null,
+        data.last_sync_status || null,
+        data.last_sync_error || null,
+      ],
     );
-    if (userId) await audit.log(userId, 'create', 'subscription', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(
+        userId,
+        "create",
+        "subscription",
+        id,
+        null,
+        result.rows[0],
+      );
     return result.rows[0];
   },
 
@@ -222,24 +313,53 @@ const subscriptions = {
        pppoe_profile = COALESCE($9, pppoe_profile), last_synced_at = COALESCE($10, last_synced_at),
        last_sync_status = COALESCE($11, last_sync_status), last_sync_error = $12,
        updated_at = CURRENT_TIMESTAMP WHERE id = $13 RETURNING *`,
-      [data.status, data.pppoe_username, data.pppoe_password, data.billing_cycle,
-       data.auto_provision, data.end_date, data.mikrotik_connection_id, data.router_id,
-       data.pppoe_profile, data.last_synced_at, data.last_sync_status,
-       data.last_sync_error !== undefined ? data.last_sync_error : existing.last_sync_error, id]
+      [
+        data.status,
+        data.pppoe_username,
+        data.pppoe_password,
+        data.billing_cycle,
+        data.auto_provision,
+        data.end_date,
+        data.mikrotik_connection_id,
+        data.router_id,
+        data.pppoe_profile,
+        data.last_synced_at,
+        data.last_sync_status,
+        data.last_sync_error !== undefined
+          ? data.last_sync_error
+          : existing.last_sync_error,
+        id,
+      ],
     );
-    if (userId) await audit.log(userId, 'update', 'subscription', id, existing, result.rows[0]);
+    if (userId)
+      await audit.log(
+        userId,
+        "update",
+        "subscription",
+        id,
+        existing,
+        result.rows[0],
+      );
     return result.rows[0];
   },
 
   async toggleStatus(id, userId = null) {
     const existing = await this.findById(id);
     if (!existing) return null;
-    const newStatus = existing.status === 'active' ? 'suspended' : 'active';
+    const newStatus = existing.status === "active" ? "suspended" : "active";
     const result = await db.query(
       `UPDATE subscriptions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
-      [newStatus, id]
+      [newStatus, id],
     );
-    if (userId) await audit.log(userId, 'toggle_status', 'subscription', id, { status: existing.status }, { status: newStatus });
+    if (userId)
+      await audit.log(
+        userId,
+        "toggle_status",
+        "subscription",
+        id,
+        { status: existing.status },
+        { status: newStatus },
+      );
     return result.rows[0];
   },
 
@@ -251,7 +371,7 @@ const subscriptions = {
          SELECT DISTINCT i.customer_id FROM invoices i
          WHERE i.status != 'paid' AND i.due_date < CURRENT_DATE
        ) AND auto_provision = true
-       RETURNING *`
+       RETURNING *`,
     );
     return result.rows;
   },
@@ -259,8 +379,12 @@ const subscriptions = {
   async delete(id, userId = null) {
     const existing = await this.findById(id);
     if (!existing) return null;
-    const result = await db.query('DELETE FROM subscriptions WHERE id = $1 RETURNING *', [id]);
-    if (userId) await audit.log(userId, 'delete', 'subscription', id, existing, null);
+    const result = await db.query(
+      "DELETE FROM subscriptions WHERE id = $1 RETURNING *",
+      [id],
+    );
+    if (userId)
+      await audit.log(userId, "delete", "subscription", id, existing, null);
     return result.rows[0];
   },
 };
@@ -269,16 +393,16 @@ const subscriptions = {
 const invoices = {
   async generateNumber() {
     const now = new Date();
-    const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
     const result = await db.query(
       `SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE $1`,
-      [`${prefix}%`]
+      [`${prefix}%`],
     );
     const count = parseInt(result.rows[0].count) + 1;
-    return `${prefix}-${String(count).padStart(4, '0')}`;
+    return `${prefix}-${String(count).padStart(4, "0")}`;
   },
 
-  async list({ page = 1, limit = 20, status = '', customer_id = '' } = {}) {
+  async list({ page = 1, limit = 20, status = "", customer_id = "" } = {}) {
     const offset = (page - 1) * limit;
     let where = [];
     let params = [];
@@ -295,8 +419,11 @@ const invoices = {
       paramIdx++;
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const countRes = await db.query(`SELECT COUNT(*) FROM invoices i ${whereClause}`, params);
+    const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const countRes = await db.query(
+      `SELECT COUNT(*) FROM invoices i ${whereClause}`,
+      params,
+    );
     const total = parseInt(countRes.rows[0].count);
 
     const result = await db.query(
@@ -310,7 +437,7 @@ const invoices = {
        GROUP BY i.id, c.id
        ORDER BY i.created_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, limit, offset]
+      [...params, limit, offset],
     );
 
     return { data: result.rows, total, page, limit };
@@ -321,19 +448,37 @@ const invoices = {
     const invoiceNumber = await this.generateNumber();
 
     // Get tax rate
-    const taxRes = await db.query('SELECT rate FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1');
-    const taxRate = taxRes.rows.length > 0 ? parseFloat(taxRes.rows[0].rate) : 0;
-    const tax = data.tax !== undefined ? data.tax : (data.amount * taxRate / 100);
+    const taxRes = await db.query(
+      "SELECT rate FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1",
+    );
+    const taxRate =
+      taxRes.rows.length > 0 ? parseFloat(taxRes.rows[0].rate) : 0;
+    const tax =
+      data.tax !== undefined ? data.tax : (data.amount * taxRate) / 100;
     const total = parseFloat(data.amount) + parseFloat(tax);
 
     const result = await db.query(
       `INSERT INTO invoices (id, invoice_number, customer_id, subscription_id, amount, tax, tax_rate, total, due_date, status, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [id, invoiceNumber, data.customer_id, data.subscription_id || null, data.amount, tax, taxRate, total,
-       data.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-       data.status || 'pending', data.notes || '']
+      [
+        id,
+        invoiceNumber,
+        data.customer_id,
+        data.subscription_id || null,
+        data.amount,
+        tax,
+        taxRate,
+        total,
+        data.due_date ||
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+        data.status || "pending",
+        data.notes || "",
+      ],
     );
-    if (userId) await audit.log(userId, 'create', 'invoice', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(userId, "create", "invoice", id, null, result.rows[0]);
     return result.rows[0];
   },
 
@@ -343,9 +488,17 @@ const invoices = {
     const result = await db.query(
       `UPDATE invoices SET status = COALESCE($1, status), notes = COALESCE($2, notes),
        due_date = COALESCE($3, due_date), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *`,
-      [data.status, data.notes, data.due_date, id]
+      [data.status, data.notes, data.due_date, id],
     );
-    if (userId) await audit.log(userId, 'update', 'invoice', id, existing, result.rows[0]);
+    if (userId)
+      await audit.log(
+        userId,
+        "update",
+        "invoice",
+        id,
+        existing,
+        result.rows[0],
+      );
     return result.rows[0];
   },
 
@@ -354,7 +507,7 @@ const invoices = {
       `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
         c.address as customer_address, c.city as customer_city
        FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id WHERE i.id = $1`,
-      [id]
+      [id],
     );
     return result.rows[0] || null;
   },
@@ -365,7 +518,7 @@ const invoices = {
        FROM subscriptions s
        JOIN customers c ON c.id = s.customer_id
        LEFT JOIN service_plans sp ON sp.id = s.plan_id
-       WHERE s.status = 'active'`
+       WHERE s.status = 'active'`,
     );
 
     const created = [];
@@ -377,16 +530,19 @@ const invoices = {
       // Skip if invoice already exists for this month
       const existing = await db.query(
         `SELECT id FROM invoices WHERE customer_id = $1 AND EXTRACT(MONTH FROM created_at) = $2 AND EXTRACT(YEAR FROM created_at) = $3`,
-        [sub.customer_id, thisMonth + 1, thisYear]
+        [sub.customer_id, thisMonth + 1, thisYear],
       );
       if (existing.rows.length > 0) continue;
 
-      const invoice = await this.create({
-        customer_id: sub.customer_id,
-        subscription_id: sub.id,
-        amount: sub.plan_price || 0,
-        notes: `Monthly invoice for ${sub.plan_name || 'service'}`,
-      }, userId);
+      const invoice = await this.create(
+        {
+          customer_id: sub.customer_id,
+          subscription_id: sub.id,
+          amount: sub.plan_price || 0,
+          notes: `Monthly invoice for ${sub.plan_name || "service"}`,
+        },
+        userId,
+      );
       created.push(invoice);
     }
 
@@ -398,7 +554,7 @@ const invoices = {
       `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
        FROM invoices i JOIN customers c ON c.id = i.customer_id
        WHERE i.status != 'paid' AND i.due_date < CURRENT_DATE
-       ORDER BY i.due_date ASC`
+       ORDER BY i.due_date ASC`,
     );
     return result.rows;
   },
@@ -409,7 +565,7 @@ const invoices = {
        FROM invoices i JOIN customers c ON c.id = i.customer_id
        WHERE i.status != 'paid' AND i.due_date = $1
        ORDER BY i.due_date ASC`,
-      [dueDate]
+      [dueDate],
     );
     return result.rows;
   },
@@ -419,13 +575,16 @@ const invoices = {
 const payments = {
   async generateReceiptNumber() {
     const now = new Date();
-    const prefix = `RCP-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const result = await db.query(`SELECT COUNT(*) FROM payments WHERE receipt_number LIKE $1`, [`${prefix}%`]);
+    const prefix = `RCP-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const result = await db.query(
+      `SELECT COUNT(*) FROM payments WHERE receipt_number LIKE $1`,
+      [`${prefix}%`],
+    );
     const count = parseInt(result.rows[0].count) + 1;
-    return `${prefix}-${String(count).padStart(4, '0')}`;
+    return `${prefix}-${String(count).padStart(4, "0")}`;
   },
 
-  async list({ page = 1, limit = 20, customer_id = '' } = {}) {
+  async list({ page = 1, limit = 20, customer_id = "" } = {}) {
     const offset = (page - 1) * limit;
     let where = [];
     let params = [];
@@ -437,8 +596,11 @@ const payments = {
       paramIdx++;
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const countRes = await db.query(`SELECT COUNT(*) FROM payments p ${whereClause}`, params);
+    const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const countRes = await db.query(
+      `SELECT COUNT(*) FROM payments p ${whereClause}`,
+      params,
+    );
     const total = parseInt(countRes.rows[0].count);
 
     const result = await db.query(
@@ -449,7 +611,7 @@ const payments = {
        ${whereClause}
        ORDER BY p.received_at DESC
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, limit, offset]
+      [...params, limit, offset],
     );
 
     return { data: result.rows, total, page, limit };
@@ -462,27 +624,43 @@ const payments = {
     const result = await db.query(
       `INSERT INTO payments (id, invoice_id, customer_id, amount, method, reference, receipt_number, gateway_transaction_id, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [id, data.invoice_id, data.customer_id, data.amount, data.method || 'cash',
-       data.reference || '', receiptNumber, data.gateway_transaction_id || null, data.notes || '']
+      [
+        id,
+        data.invoice_id,
+        data.customer_id,
+        data.amount,
+        data.method || "cash",
+        data.reference || "",
+        receiptNumber,
+        data.gateway_transaction_id || null,
+        data.notes || "",
+      ],
     );
 
     // Update invoice status
     const paymentTotal = await db.query(
       `SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE invoice_id = $1`,
-      [data.invoice_id]
+      [data.invoice_id],
     );
-    const invoice = await db.query('SELECT total FROM invoices WHERE id = $1', [data.invoice_id]);
+    const invoice = await db.query("SELECT total FROM invoices WHERE id = $1", [
+      data.invoice_id,
+    ]);
     if (invoice.rows.length > 0) {
       const paid = parseFloat(paymentTotal.rows[0].total);
       const total = parseFloat(invoice.rows[0].total);
-      const newStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'pending';
-      await db.query('UPDATE invoices SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newStatus, data.invoice_id]);
+      const newStatus =
+        paid >= total ? "paid" : paid > 0 ? "partial" : "pending";
+      await db.query(
+        "UPDATE invoices SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [newStatus, data.invoice_id],
+      );
     }
 
-    if (userId) await audit.log(userId, 'create', 'payment', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(userId, "create", "payment", id, null, result.rows[0]);
 
     // Trigger notification
-    await notifications.trigger('payment_received', {
+    await notifications.trigger("payment_received", {
       customer_id: data.customer_id,
       payment: result.rows[0],
     });
@@ -491,7 +669,10 @@ const payments = {
   },
 
   async update(id, data, userId = null) {
-    const current = await db.query('SELECT * FROM payments WHERE id = $1 LIMIT 1', [id]);
+    const current = await db.query(
+      "SELECT * FROM payments WHERE id = $1 LIMIT 1",
+      [id],
+    );
     if (current.rows.length === 0) return null;
 
     const existing = current.rows[0];
@@ -514,11 +695,18 @@ const payments = {
         data.refund_amount ?? null,
         data.refund_reference ?? null,
         id,
-      ]
+      ],
     );
 
     if (userId) {
-      await audit.log(userId, 'update', 'payment', id, existing, result.rows[0]);
+      await audit.log(
+        userId,
+        "update",
+        "payment",
+        id,
+        existing,
+        result.rows[0],
+      );
     }
 
     return result.rows[0];
@@ -529,10 +717,13 @@ const payments = {
 const creditNotes = {
   async generateNumber() {
     const now = new Date();
-    const prefix = `CN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const result = await db.query(`SELECT COUNT(*) FROM credit_notes WHERE credit_note_number LIKE $1`, [`${prefix}%`]);
+    const prefix = `CN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const result = await db.query(
+      `SELECT COUNT(*) FROM credit_notes WHERE credit_note_number LIKE $1`,
+      [`${prefix}%`],
+    );
     const count = parseInt(result.rows[0].count) + 1;
-    return `${prefix}-${String(count).padStart(4, '0')}`;
+    return `${prefix}-${String(count).padStart(4, "0")}`;
   },
 
   async create(data, userId = null) {
@@ -542,25 +733,48 @@ const creditNotes = {
     const result = await db.query(
       `INSERT INTO credit_notes (id, credit_note_number, invoice_id, customer_id, amount, reason, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [id, number, data.invoice_id || null, data.customer_id, data.amount, data.reason || '', data.status || 'pending']
+      [
+        id,
+        number,
+        data.invoice_id || null,
+        data.customer_id,
+        data.amount,
+        data.reason || "",
+        data.status || "pending",
+      ],
     );
 
     // If linked to invoice, adjust invoice total
     if (data.invoice_id) {
-      const invoice = await db.query('SELECT total FROM invoices WHERE id = $1', [data.invoice_id]);
+      const invoice = await db.query(
+        "SELECT total FROM invoices WHERE id = $1",
+        [data.invoice_id],
+      );
       if (invoice.rows.length > 0) {
-        const newTotal = parseFloat(invoice.rows[0].total) - parseFloat(data.amount);
-        await db.query('UPDATE invoices SET total = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [Math.max(0, newTotal), data.invoice_id]);
+        const newTotal =
+          parseFloat(invoice.rows[0].total) - parseFloat(data.amount);
+        await db.query(
+          "UPDATE invoices SET total = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          [Math.max(0, newTotal), data.invoice_id],
+        );
       }
     }
 
-    if (userId) await audit.log(userId, 'create', 'credit_note', id, null, result.rows[0]);
+    if (userId)
+      await audit.log(
+        userId,
+        "create",
+        "credit_note",
+        id,
+        null,
+        result.rows[0],
+      );
     return result.rows[0];
   },
 
   async list({ page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    const countRes = await db.query('SELECT COUNT(*) FROM credit_notes');
+    const countRes = await db.query("SELECT COUNT(*) FROM credit_notes");
     const total = parseInt(countRes.rows[0].count);
 
     const result = await db.query(
@@ -570,7 +784,7 @@ const creditNotes = {
        LEFT JOIN invoices i ON i.id = cn.invoice_id
        ORDER BY cn.created_at DESC
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      [limit, offset],
     );
 
     return { data: result.rows, total, page, limit };
@@ -584,7 +798,14 @@ const usage = {
     const result = await db.query(
       `INSERT INTO usage_records (id, customer_id, session_id, bytes_in, bytes_out, session_time)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, data.customer_id, data.session_id || null, data.bytes_in || 0, data.bytes_out || 0, data.session_time || 0]
+      [
+        id,
+        data.customer_id,
+        data.session_id || null,
+        data.bytes_in || 0,
+        data.bytes_out || 0,
+        data.session_time || 0,
+      ],
     );
     return result.rows[0];
   },
@@ -592,7 +813,7 @@ const usage = {
   async getByCustomer(customerId, limit = 100) {
     const result = await db.query(
       `SELECT * FROM usage_records WHERE customer_id = $1 ORDER BY recorded_at DESC LIMIT $2`,
-      [customerId, limit]
+      [customerId, limit],
     );
     return result.rows;
   },
@@ -601,25 +822,42 @@ const usage = {
     // Parse RADIUS accounting packet
     return this.record({
       customer_id: data.customer_id,
-      session_id: data.session_id || data['Acct-Session-Id'],
-      bytes_in: parseInt(data['Acct-Input-Octets'] || data.bytes_in || 0),
-      bytes_out: parseInt(data['Acct-Output-Octets'] || data.bytes_out || 0),
-      session_time: parseInt(data['Acct-Session-Time'] || data.session_time || 0),
+      session_id: data.session_id || data["Acct-Session-Id"],
+      bytes_in: parseInt(data["Acct-Input-Octets"] || data.bytes_in || 0),
+      bytes_out: parseInt(data["Acct-Output-Octets"] || data.bytes_out || 0),
+      session_time: parseInt(
+        data["Acct-Session-Time"] || data.session_time || 0,
+      ),
     });
   },
 };
 
 // ─── AUDIT ───
 const audit = {
-  async log(userId, action, entityType, entityId, oldValues, newValues, req = null) {
+  async log(
+    userId,
+    action,
+    entityType,
+    entityId,
+    oldValues,
+    newValues,
+    req = null,
+  ) {
     const id = uuidv4();
     await db.query(
       `INSERT INTO billing_audit_logs (id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, userId, action, entityType, entityId,
-       oldValues ? JSON.stringify(oldValues) : null,
-       newValues ? JSON.stringify(newValues) : null,
-       req?.ip || null, req?.get?.('User-Agent') || null]
+      [
+        id,
+        userId,
+        action,
+        entityType,
+        entityId,
+        oldValues ? JSON.stringify(oldValues) : null,
+        newValues ? JSON.stringify(newValues) : null,
+        req?.ip || null,
+        req?.get?.("User-Agent") || null,
+      ],
     );
     return id;
   },
@@ -627,7 +865,7 @@ const audit = {
   async getByEntity(entityType, entityId, limit = 50) {
     const result = await db.query(
       `SELECT * FROM billing_audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at DESC LIMIT $3`,
-      [entityType, entityId, limit]
+      [entityType, entityId, limit],
     );
     return result.rows;
   },
@@ -638,7 +876,7 @@ const notifications = {
   async getTemplate(eventType, channel) {
     const result = await db.query(
       `SELECT * FROM notification_templates WHERE event_type = $1 AND channel = $2 AND is_active = true LIMIT 1`,
-      [eventType, channel]
+      [eventType, channel],
     );
     return result.rows[0] || null;
   },
@@ -646,16 +884,18 @@ const notifications = {
   async trigger(eventType, data) {
     // In production, this would queue a job to send email/SMS
     // For now, just log it
-    const template = await this.getTemplate(eventType, 'email');
+    const template = await this.getTemplate(eventType, "email");
     if (!template) return;
 
     // Render template with data
     let body = template.body;
     for (const [key, value] of Object.entries(data)) {
-      body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value || '');
+      body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value || "");
     }
 
-    console.log(`[Notification] ${eventType} (${template.channel}): ${body.substring(0, 100)}...`);
+    console.log(
+      `[Notification] ${eventType} (${template.channel}): ${body.substring(0, 100)}...`,
+    );
     // In production: send via SendGrid/Twilio/etc.
     return { event: eventType, channel: template.channel, rendered: body };
   },
@@ -677,25 +917,29 @@ const dashboard = {
       overdueInvoices,
       taxRate,
     ] = await Promise.all([
-      db.query('SELECT COUNT(*) FROM customers'),
+      db.query("SELECT COUNT(*) FROM customers"),
       db.query("SELECT COUNT(*) FROM customers WHERE status = 'active'"),
-      db.query('SELECT COUNT(*) FROM subscriptions'),
+      db.query("SELECT COUNT(*) FROM subscriptions"),
       db.query("SELECT COUNT(*) FROM subscriptions WHERE status = 'active'"),
       db.query("SELECT COUNT(*) FROM subscriptions WHERE status = 'suspended'"),
-      db.query('SELECT COALESCE(SUM(amount), 0) as total FROM payments'),
+      db.query("SELECT COALESCE(SUM(amount), 0) as total FROM payments"),
       db.query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p
         WHERE EXTRACT(MONTH FROM p.received_at) = EXTRACT(MONTH FROM CURRENT_DATE)
         AND EXTRACT(YEAR FROM p.received_at) = EXTRACT(YEAR FROM CURRENT_DATE)`),
-      db.query('SELECT COALESCE(SUM(total), 0) as total FROM invoices'),
+      db.query("SELECT COALESCE(SUM(total), 0) as total FROM invoices"),
       db.query(`SELECT COALESCE(SUM(i.total - COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)), 0) as total
         FROM invoices i WHERE i.status != 'paid'`),
-      db.query(`SELECT COUNT(*) FROM invoices WHERE status != 'paid' AND due_date < CURRENT_DATE`),
-      db.query('SELECT rate FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1'),
+      db.query(
+        `SELECT COUNT(*) FROM invoices WHERE status != 'paid' AND due_date < CURRENT_DATE`,
+      ),
+      db.query(
+        "SELECT rate FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1",
+      ),
     ]);
 
     const activeSubs = await db.query(
       `SELECT COALESCE(SUM(sp.price), 0) as total FROM subscriptions s
-       LEFT JOIN service_plans sp ON sp.id = s.plan_id WHERE s.status = 'active'`
+       LEFT JOIN service_plans sp ON sp.id = s.plan_id WHERE s.status = 'active'`,
     );
 
     const mrr = parseFloat(activeSubs.rows[0].total);
@@ -722,18 +966,22 @@ const dashboard = {
 // ─── TAX ───
 const tax = {
   async getDefault() {
-    const result = await db.query('SELECT * FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1');
-    return result.rows[0] || { rate: 0, name: 'None' };
+    const result = await db.query(
+      "SELECT * FROM tax_rates WHERE is_default = true AND is_active = true LIMIT 1",
+    );
+    return result.rows[0] || { rate: 0, name: "None" };
   },
 
   async list() {
-    const result = await db.query('SELECT * FROM tax_rates ORDER BY rate ASC');
+    const result = await db.query("SELECT * FROM tax_rates ORDER BY rate ASC");
     return result.rows;
   },
 
   async setDefault(id) {
-    await db.query('UPDATE tax_rates SET is_default = false');
-    await db.query('UPDATE tax_rates SET is_default = true WHERE id = $1', [id]);
+    await db.query("UPDATE tax_rates SET is_default = false");
+    await db.query("UPDATE tax_rates SET is_default = true WHERE id = $1", [
+      id,
+    ]);
     return this.getDefault();
   },
 
@@ -741,7 +989,13 @@ const tax = {
     const id = uuidv4();
     const result = await db.query(
       `INSERT INTO tax_rates (id, name, rate, is_default, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [id, data.name, data.rate, data.is_default || false, data.is_active !== false]
+      [
+        id,
+        data.name,
+        data.rate,
+        data.is_default || false,
+        data.is_active !== false,
+      ],
     );
     return result.rows[0];
   },
