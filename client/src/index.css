@@ -338,84 +338,84 @@
 
 /* Light mode overrides */
 .light {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
-    --bg-card: rgba(255, 255, 255, 0.9);
-    --bg-card-hover: rgba(255, 255, 255, 1);
-    --bg-surface: rgba(248, 250, 252, 0.8);
-    --text-primary: rgba(15, 23, 42, 0.95);
-    --text-secondary: rgba(71, 85, 105, 0.9);
-    --text-muted: rgba(100, 116, 139, 0.8);
-    --text-dim: rgba(148, 163, 184, 0.7);
-    --border-subtle: rgba(226, 232, 240, 0.8);
-    --border-medium: rgba(203, 213, 225, 0.6);
-    --border-strong: rgba(148, 163, 184, 0.4);
-    --glass-bg: rgba(255, 255, 255, 0.8);
-    --glass-border: rgba(148, 163, 139, 0.15);
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --bg-primary: #f5f3ef;
+    --bg-secondary: #ebe7e0;
+    --bg-tertiary: #e3dfd7;
+    --bg-card: rgba(245, 243, 239, 0.92);
+    --bg-card-hover: rgba(245, 243, 239, 1);
+    --bg-surface: rgba(235, 231, 224, 0.8);
+    --text-primary: rgba(30, 30, 35, 0.92);
+    --text-secondary: rgba(80, 80, 90, 0.85);
+    --text-muted: rgba(120, 120, 130, 0.75);
+    --text-dim: rgba(160, 160, 165, 0.65);
+    --border-subtle: rgba(210, 205, 195, 0.7);
+    --border-medium: rgba(195, 190, 180, 0.5);
+    --border-strong: rgba(175, 170, 160, 0.35);
+    --glass-bg: rgba(245, 243, 239, 0.85);
+    --glass-border: rgba(195, 190, 180, 0.2);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
     --shadow-md:
-        0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
     --shadow-lg:
-        0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+        0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
     --shadow-xl:
-        0 20px 25px -5px rgba(0, 0, 0, 0.07),
-        0 8px 10px -6px rgba(0, 0, 0, 0.05);
-    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        0 20px 25px -5px rgba(0, 0, 0, 0.05),
+        0 8px 10px -6px rgba(0, 0, 0, 0.03);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
 }
 
 .light .bg-mesh {
-    opacity: 0.4;
+    opacity: 0.25;
 }
 
 .light .bg-noise {
-    opacity: 0.015;
+    opacity: 0.01;
 }
 
 .light .bg-grid {
-    opacity: 0.03;
+    opacity: 0.02;
 }
 
 .light pre {
-    background: rgba(248, 250, 252, 0.9);
-    border-color: rgba(203, 213, 225, 0.6);
+    background: rgba(235, 231, 224, 0.9);
+    border-color: rgba(210, 205, 195, 0.6);
 }
 
 .light .glass {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(245, 243, 239, 0.85);
     border-color: var(--glass-border);
 }
 
 .light .glass:hover {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(245, 243, 239, 0.95);
 }
 
 .light input,
 .light textarea,
 .light select {
-    background: rgba(248, 250, 252, 0.9);
+    background: rgba(235, 231, 224, 0.85);
     color: var(--text-primary);
 }
 
 .light ::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.4);
+    background: rgba(195, 190, 180, 0.4);
 }
 
 .light .btn-ghost:hover {
-    background: rgba(226, 232, 240, 0.6);
+    background: rgba(225, 220, 210, 0.6);
     color: var(--text-primary);
 }
 
 .light .nav-item:hover {
-    background: rgba(226, 232, 240, 0.6);
+    background: rgba(225, 220, 210, 0.6);
     color: var(--text-primary);
 }
 
 .light .card-gradient {
     background: linear-gradient(
         135deg,
-        rgba(248, 250, 252, 0.9) 0%,
-        rgba(241, 245, 249, 0.8) 100%
+        rgba(245, 243, 239, 0.9) 0%,
+        rgba(235, 231, 224, 0.8) 100%
     );
 }
 
