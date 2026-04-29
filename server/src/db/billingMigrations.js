@@ -550,6 +550,8 @@ const billingMigrations = [
     END IF;
   END $$`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS account_number VARCHAR(50)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS pin_reset_code VARCHAR(10)`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS pin_reset_expires TIMESTAMP`,
   `CREATE INDEX IF NOT EXISTS idx_customers_account_number ON customers(account_number)`,
 
   // Create branches table for network map
