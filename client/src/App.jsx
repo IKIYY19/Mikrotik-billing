@@ -43,6 +43,7 @@ import { HotspotManagement } from "./pages/billing/HotspotManagement";
 import { HotspotVouchers } from "./pages/billing/HotspotVouchers";
 import { NetworkServices } from "./pages/billing/NetworkServices";
 import { RadiusManagement } from "./pages/billing/RadiusManagement";
+import { RadiusImport } from "./pages/RadiusImport";
 import { TicketSystem } from "./pages/billing/TicketSystem";
 import { CaptivePortalBuilder } from "./pages/billing/CaptivePortalBuilder";
 import { BandwidthGraphs } from "./pages/billing/BandwidthGraphs";
@@ -52,6 +53,7 @@ import SetupWizard from "./pages/SetupWizard";
 import { UserManagement } from "./pages/UserManagement";
 import IntegrationsSettings from "./pages/IntegrationsSettings";
 import { SettingsPage } from "./pages/SettingsPage";
+import { AuditLogs } from "./pages/AuditLogs";
 import { ProvisionLogs } from "./pages/ProvisionLogs";
 import { FUPProfiles } from "./pages/network/FUPProfiles";
 import { TR069Devices } from "./pages/network/TR069Devices";
@@ -219,6 +221,7 @@ function App() {
                     {/* <Route path="/alerts" element={<Alerts />} /> */}
                     {/* <Route path="/monitoring" element={<Monitoring />} /> */}
                     <Route path="/radius" element={<RadiusManagement />} />
+                    <Route path="/radius-import" element={<RadiusImport />} />
                     <Route path="/tickets" element={<TicketSystem />} />
                     <Route
                       path="/captive-portal"
@@ -239,6 +242,7 @@ function App() {
                       element={<IntegrationsSettings />}
                     />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/audit-logs" element={<AuditLogs />} />
 
                     {/* Fallback */}
                     <Route path="*" element={<Navigate to="/" replace />} />

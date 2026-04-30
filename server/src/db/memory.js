@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require("uuid");
 
 /**
  * In-memory storage fallback when PostgreSQL is not available
@@ -24,6 +24,15 @@ const store = {
   hotspot_vouchers: [],
   fup_profiles: [],
   tr069_devices: [],
+  // RADIUS tables
+  nas: [],
+  radcheck: [],
+  radreply: [],
+  radusergroup: [],
+  radgroupcheck: [],
+  radgroupreply: [],
+  radacct: [],
+  radpostauth: [],
 };
 
 // Seed example templates
@@ -31,13 +40,23 @@ const seedTemplates = () => {
   store.templates = [
     {
       id: uuidv4(),
-      name: 'Basic VLAN Setup',
-      description: 'Creates VLAN interfaces with IP addresses',
-      category: 'interfaces',
+      name: "Basic VLAN Setup",
+      description: "Creates VLAN interfaces with IP addresses",
+      category: "interfaces",
       content: {
         vlans: [
-          { name: 'vlan10', 'vlan-id': '10', interface: 'ether1', comment: 'Management' },
-          { name: 'vlan20', 'vlan-id': '20', interface: 'ether1', comment: 'Users' },
+          {
+            name: "vlan10",
+            "vlan-id": "10",
+            interface: "ether1",
+            comment: "Management",
+          },
+          {
+            name: "vlan20",
+            "vlan-id": "20",
+            interface: "ether1",
+            comment: "Users",
+          },
         ],
       },
       is_public: true,
@@ -46,16 +65,26 @@ const seedTemplates = () => {
     },
     {
       id: uuidv4(),
-      name: 'Basic Firewall',
-      description: 'Standard firewall rules with NAT and FastTrack',
-      category: 'firewall',
+      name: "Basic Firewall",
+      description: "Standard firewall rules with NAT and FastTrack",
+      category: "firewall",
       content: {
         filter_rules: [
-          { chain: 'input', action: 'accept', connection_state: 'established,related,untracked', comment: 'Allow established' },
-          { chain: 'input', action: 'drop', comment: 'Drop everything else' },
+          {
+            chain: "input",
+            action: "accept",
+            connection_state: "established,related,untracked",
+            comment: "Allow established",
+          },
+          { chain: "input", action: "drop", comment: "Drop everything else" },
         ],
         nat_rules: [
-          { chain: 'srcnat', action: 'masquerade', out_interface: 'ether1', comment: 'Masquerade' },
+          {
+            chain: "srcnat",
+            action: "masquerade",
+            out_interface: "ether1",
+            comment: "Masquerade",
+          },
         ],
       },
       is_public: true,
@@ -64,18 +93,24 @@ const seedTemplates = () => {
     },
     {
       id: uuidv4(),
-      name: 'PPPoE Server',
-      description: 'Complete PPPoE server setup with profiles and secrets',
-      category: 'isp',
+      name: "PPPoE Server",
+      description: "Complete PPPoE server setup with profiles and secrets",
+      category: "isp",
       content: {
         pppoe_server: {
-          'service-name': 'ISP-PPPoE',
-          interface: 'ether2',
-          'max-mtu': '1492',
-          'max-mru': '1492',
+          "service-name": "ISP-PPPoE",
+          interface: "ether2",
+          "max-mtu": "1492",
+          "max-mru": "1492",
         },
         ppp_profiles: [
-          { name: 'default', 'local-address': '10.0.0.1', 'remote-address': 'pppoe-pool', 'rate-limit': '10M/10M', 'change-tcp-mss': 'yes' },
+          {
+            name: "default",
+            "local-address": "10.0.0.1",
+            "remote-address": "pppoe-pool",
+            "rate-limit": "10M/10M",
+            "change-tcp-mss": "yes",
+          },
         ],
       },
       is_public: true,
@@ -84,14 +119,19 @@ const seedTemplates = () => {
     },
     {
       id: uuidv4(),
-      name: 'WireGuard VPN',
-      description: 'WireGuard server and peer configuration',
-      category: 'vpn',
+      name: "WireGuard VPN",
+      description: "WireGuard server and peer configuration",
+      category: "vpn",
       content: {
         wireguard: {
-          interface: { name: 'wg1', 'listen-port': '13231', mtu: '1420' },
+          interface: { name: "wg1", "listen-port": "13231", mtu: "1420" },
           peers: [
-            { interface: 'wg1', 'public-key': '(client-public-key)', 'allowed-address': '10.200.0.2/32', comment: 'Client 1' },
+            {
+              interface: "wg1",
+              "public-key": "(client-public-key)",
+              "allowed-address": "10.200.0.2/32",
+              comment: "Client 1",
+            },
           ],
         },
       },
@@ -101,14 +141,14 @@ const seedTemplates = () => {
     },
     {
       id: uuidv4(),
-      name: 'OSPF Single Area',
-      description: 'Basic OSPF configuration with single area',
-      category: 'routing',
+      name: "OSPF Single Area",
+      description: "Basic OSPF configuration with single area",
+      category: "routing",
       content: {
         ospf: {
-          'router-id': '1.1.1.1',
+          "router-id": "1.1.1.1",
           networks: [
-            { network: '192.168.1.0/24', area: 'backbone', comment: 'LAN' },
+            { network: "192.168.1.0/24", area: "backbone", comment: "LAN" },
           ],
         },
       },
@@ -126,100 +166,121 @@ const seedIntegrations = () => {
   store.integrations = [
     {
       id: uuidv4(),
-      service_name: 'africas_talking',
+      service_name: "africas_talking",
       display_name: "Africa's Talking",
-      category: 'sms',
-      config_data: { username: 'sandbox', api_key: '', sender_id: 'MyISP' },
+      category: "sms",
+      config_data: { username: "sandbox", api_key: "", sender_id: "MyISP" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'mpesa',
-      display_name: 'M-Pesa',
-      category: 'payment',
-      config_data: { consumer_key: '', consumer_secret: '', shortcode: '174379', passkey: '', environment: 'sandbox' },
+      service_name: "mpesa",
+      display_name: "M-Pesa",
+      category: "payment",
+      config_data: {
+        consumer_key: "",
+        consumer_secret: "",
+        shortcode: "174379",
+        passkey: "",
+        environment: "sandbox",
+      },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'whatsapp',
-      display_name: 'WhatsApp Business',
-      category: 'messaging',
-      config_data: { access_token: '', phone_number_id: '', verify_token: '' },
+      service_name: "whatsapp",
+      display_name: "WhatsApp Business",
+      category: "messaging",
+      config_data: { access_token: "", phone_number_id: "", verify_token: "" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'sendgrid',
-      display_name: 'SendGrid',
-      category: 'email',
-      config_data: { api_key: '', from_email: '', from_name: '' },
+      service_name: "sendgrid",
+      display_name: "SendGrid",
+      category: "email",
+      config_data: { api_key: "", from_email: "", from_name: "" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'twilio',
-      display_name: 'Twilio SMS',
-      category: 'sms',
-      config_data: { account_sid: '', auth_token: '', phone_number: '' },
+      service_name: "twilio",
+      display_name: "Twilio SMS",
+      category: "sms",
+      config_data: { account_sid: "", auth_token: "", phone_number: "" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'stripe',
-      display_name: 'Stripe',
-      category: 'payment',
-      config_data: { secret_key: '', publishable_key: '', webhook_secret: '', currency: 'usd' },
+      service_name: "stripe",
+      display_name: "Stripe",
+      category: "payment",
+      config_data: {
+        secret_key: "",
+        publishable_key: "",
+        webhook_secret: "",
+        currency: "usd",
+      },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'paypal',
-      display_name: 'PayPal',
-      category: 'payment',
-      config_data: { client_id: '', client_secret: '', environment: 'sandbox', webhook_id: '' },
+      service_name: "paypal",
+      display_name: "PayPal",
+      category: "payment",
+      config_data: {
+        client_id: "",
+        client_secret: "",
+        environment: "sandbox",
+        webhook_id: "",
+      },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'flutterwave',
-      display_name: 'Flutterwave',
-      category: 'payment',
-      config_data: { secret_key: '', public_key: '', encryption_key: '', environment: 'sandbox' },
+      service_name: "flutterwave",
+      display_name: "Flutterwave",
+      category: "payment",
+      config_data: {
+        secret_key: "",
+        public_key: "",
+        encryption_key: "",
+        environment: "sandbox",
+      },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'slack',
-      display_name: 'Slack Notifications',
-      category: 'monitoring',
-      config_data: { webhook_url: '', channel: '#alerts' },
+      service_name: "slack",
+      display_name: "Slack Notifications",
+      category: "monitoring",
+      config_data: { webhook_url: "", channel: "#alerts" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {
       id: uuidv4(),
-      service_name: 'discord',
-      display_name: 'Discord Webhook',
-      category: 'monitoring',
-      config_data: { webhook_url: '' },
+      service_name: "discord",
+      display_name: "Discord Webhook",
+      category: "monitoring",
+      config_data: { webhook_url: "" },
       is_active: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -234,16 +295,20 @@ module.exports = {
     const lowerText = text.toLowerCase();
 
     // SELECT projects
-    if (lowerText.includes('select') && lowerText.includes('from projects')) {
-      if (lowerText.includes('where id =')) {
-        const project = store.projects.find(p => p.id === params[0]);
+    if (lowerText.includes("select") && lowerText.includes("from projects")) {
+      if (lowerText.includes("where id =")) {
+        const project = store.projects.find((p) => p.id === params[0]);
         return { rows: project ? [project] : [] };
       }
-      return { rows: store.projects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)) };
+      return {
+        rows: store.projects.sort(
+          (a, b) => new Date(b.updated_at) - new Date(a.updated_at),
+        ),
+      };
     }
 
     // INSERT projects
-    if (lowerText.includes('insert into projects')) {
+    if (lowerText.includes("insert into projects")) {
       const project = {
         id: params[0],
         name: params[1],
@@ -257,13 +322,14 @@ module.exports = {
     }
 
     // UPDATE projects
-    if (lowerText.includes('update projects')) {
-      const idx = store.projects.findIndex(p => p.id === params[4]);
+    if (lowerText.includes("update projects")) {
+      const idx = store.projects.findIndex((p) => p.id === params[4]);
       if (idx === -1) return { rows: [] };
       const project = {
         ...store.projects[idx],
         name: params[0] || store.projects[idx].name,
-        description: params[1] !== null ? params[1] : store.projects[idx].description,
+        description:
+          params[1] !== null ? params[1] : store.projects[idx].description,
         routeros_version: params[2] || store.projects[idx].routeros_version,
         updated_at: new Date().toISOString(),
       };
@@ -272,34 +338,38 @@ module.exports = {
     }
 
     // DELETE projects
-    if (lowerText.includes('delete from projects')) {
-      const idx = store.projects.findIndex(p => p.id === params[0]);
+    if (lowerText.includes("delete from projects")) {
+      const idx = store.projects.findIndex((p) => p.id === params[0]);
       if (idx === -1) return { rows: [] };
       const deleted = store.projects.splice(idx, 1)[0];
       // Also delete associated modules
-      store.project_modules = store.project_modules.filter(m => m.project_id !== params[0]);
+      store.project_modules = store.project_modules.filter(
+        (m) => m.project_id !== params[0],
+      );
       return { rows: [deleted] };
     }
 
     // SELECT routers
-    if (lowerText.includes('select') && lowerText.includes('from routers')) {
-      if (lowerText.includes('where provision_token =')) {
-        const router = store.routers.find(r => r.provision_token === params[0]);
+    if (lowerText.includes("select") && lowerText.includes("from routers")) {
+      if (lowerText.includes("where provision_token =")) {
+        const router = store.routers.find(
+          (r) => r.provision_token === params[0],
+        );
         return { rows: router ? [router] : [] };
       }
-      if (lowerText.includes('where id =')) {
-        const router = store.routers.find(r => r.id === params[0]);
+      if (lowerText.includes("where id =")) {
+        const router = store.routers.find((r) => r.id === params[0]);
         return { rows: router ? [router] : [] };
       }
-      if (lowerText.includes('where project_id =')) {
-        const routers = store.routers.filter(r => r.project_id === params[0]);
+      if (lowerText.includes("where project_id =")) {
+        const routers = store.routers.filter((r) => r.project_id === params[0]);
         return { rows: routers };
       }
       return { rows: store.routers };
     }
 
     // INSERT routers
-    if (lowerText.includes('insert into routers')) {
+    if (lowerText.includes("insert into routers")) {
       const router = {
         id: params[0],
         project_id: params[1],
@@ -340,57 +410,93 @@ module.exports = {
     }
 
     // UPDATE routers
-    if (lowerText.includes('update routers') && lowerText.includes('set')) {
-      const idx = store.routers.findIndex(r => r.id === params[params.length - 1]);
+    if (lowerText.includes("update routers") && lowerText.includes("set")) {
+      const idx = store.routers.findIndex(
+        (r) => r.id === params[params.length - 1],
+      );
       if (idx === -1) return { rows: [] };
-      const router = { ...store.routers[idx], updated_at: new Date().toISOString() };
+      const router = {
+        ...store.routers[idx],
+        updated_at: new Date().toISOString(),
+      };
       // Handle various SET patterns
-      if (lowerText.includes('name =')) router.name = params[0];
-      if (lowerText.includes('identity =')) router.identity = params[1];
-      if (lowerText.includes('model =')) router.model = params[2];
-      if (lowerText.includes('mac_address =')) router.mac_address = params[3];
-      if (lowerText.includes('ip_address =')) router.ip_address = params[4];
-      if (lowerText.includes('wan_interface =')) router.wan_interface = params[5];
-      if (lowerText.includes('lan_interface =')) router.lan_interface = params[6];
-      if (lowerText.includes('lan_ports =')) router.lan_ports = params[7];
-      if (lowerText.includes('dns_servers =')) router.dns_servers = params[8];
-      if (lowerText.includes('ntp_servers =')) router.ntp_servers = params[9];
-      if (lowerText.includes('radius_server =')) router.radius_server = params[10];
-      if (lowerText.includes('radius_secret =')) router.radius_secret = params[11];
-      if (lowerText.includes('radius_port =')) router.radius_port = params[12];
-      if (lowerText.includes('hotspot_enabled =')) router.hotspot_enabled = params[13];
-      if (lowerText.includes('pppoe_enabled =')) router.pppoe_enabled = params[14];
-      if (lowerText.includes('pppoe_interface =')) router.pppoe_interface = params[15];
-      if (lowerText.includes('pppoe_service_name =')) router.pppoe_service_name = params[16];
-      if (lowerText.includes('mgmt_port =')) router.mgmt_port = params[17];
-      if (lowerText.includes('mgmt_username =')) router.mgmt_username = params[18];
-      if (lowerText.includes('mgmt_password_encrypted =')) router.mgmt_password_encrypted = params[19];
-      if (lowerText.includes('connection_type =')) router.connection_type = params[20];
-      if (lowerText.includes('notes =')) router.notes = params[21];
-      if (lowerText.includes('provision_token =')) router.provision_token = params[0];
-      if (lowerText.includes('provision_status =')) router.provision_status = params[0];
-      if (lowerText.includes('linked_mikrotik_connection_id =')) router.linked_mikrotik_connection_id = params[0];
-      if (lowerText.includes('billing_activated_at = case when')) router.billing_activated_at = params[0] ? new Date().toISOString() : router.billing_activated_at;
-      if (lowerText.includes('billing_activation_error =')) router.billing_activation_error = params[1];
-      if (lowerText.includes('last_provisioned_at = current_timestamp')) router.last_provisioned_at = new Date().toISOString();
-      if (lowerText.includes('provision_attempts = coalesce(provision_attempts, 0) + 1')) router.provision_attempts = (router.provision_attempts || 0) + 1;
-      if (lowerText.includes('last_provisioned_at =') && !lowerText.includes('current_timestamp')) router.last_provisioned_at = params[0];
+      if (lowerText.includes("name =")) router.name = params[0];
+      if (lowerText.includes("identity =")) router.identity = params[1];
+      if (lowerText.includes("model =")) router.model = params[2];
+      if (lowerText.includes("mac_address =")) router.mac_address = params[3];
+      if (lowerText.includes("ip_address =")) router.ip_address = params[4];
+      if (lowerText.includes("wan_interface ="))
+        router.wan_interface = params[5];
+      if (lowerText.includes("lan_interface ="))
+        router.lan_interface = params[6];
+      if (lowerText.includes("lan_ports =")) router.lan_ports = params[7];
+      if (lowerText.includes("dns_servers =")) router.dns_servers = params[8];
+      if (lowerText.includes("ntp_servers =")) router.ntp_servers = params[9];
+      if (lowerText.includes("radius_server ="))
+        router.radius_server = params[10];
+      if (lowerText.includes("radius_secret ="))
+        router.radius_secret = params[11];
+      if (lowerText.includes("radius_port =")) router.radius_port = params[12];
+      if (lowerText.includes("hotspot_enabled ="))
+        router.hotspot_enabled = params[13];
+      if (lowerText.includes("pppoe_enabled ="))
+        router.pppoe_enabled = params[14];
+      if (lowerText.includes("pppoe_interface ="))
+        router.pppoe_interface = params[15];
+      if (lowerText.includes("pppoe_service_name ="))
+        router.pppoe_service_name = params[16];
+      if (lowerText.includes("mgmt_port =")) router.mgmt_port = params[17];
+      if (lowerText.includes("mgmt_username ="))
+        router.mgmt_username = params[18];
+      if (lowerText.includes("mgmt_password_encrypted ="))
+        router.mgmt_password_encrypted = params[19];
+      if (lowerText.includes("connection_type ="))
+        router.connection_type = params[20];
+      if (lowerText.includes("notes =")) router.notes = params[21];
+      if (lowerText.includes("provision_token ="))
+        router.provision_token = params[0];
+      if (lowerText.includes("provision_status ="))
+        router.provision_status = params[0];
+      if (lowerText.includes("linked_mikrotik_connection_id ="))
+        router.linked_mikrotik_connection_id = params[0];
+      if (lowerText.includes("billing_activated_at = case when"))
+        router.billing_activated_at = params[0]
+          ? new Date().toISOString()
+          : router.billing_activated_at;
+      if (lowerText.includes("billing_activation_error ="))
+        router.billing_activation_error = params[1];
+      if (lowerText.includes("last_provisioned_at = current_timestamp"))
+        router.last_provisioned_at = new Date().toISOString();
+      if (
+        lowerText.includes(
+          "provision_attempts = coalesce(provision_attempts, 0) + 1",
+        )
+      )
+        router.provision_attempts = (router.provision_attempts || 0) + 1;
+      if (
+        lowerText.includes("last_provisioned_at =") &&
+        !lowerText.includes("current_timestamp")
+      )
+        router.last_provisioned_at = params[0];
       store.routers[idx] = router;
       return { rows: [router] };
     }
 
     // DELETE routers
-    if (lowerText.includes('delete from routers')) {
-      const idx = store.routers.findIndex(r => r.id === params[0]);
+    if (lowerText.includes("delete from routers")) {
+      const idx = store.routers.findIndex((r) => r.id === params[0]);
       if (idx === -1) return { rows: [] };
       const deleted = store.routers.splice(idx, 1)[0];
       return { rows: [deleted] };
     }
 
     // SELECT provision logs
-    if (lowerText.includes('select') && lowerText.includes('from provision_logs')) {
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from provision_logs")
+    ) {
       let rows = [...store.provision_logs];
-      if (lowerText.includes('where router_id =')) {
+      if (lowerText.includes("where router_id =")) {
         rows = rows.filter((log) => log.router_id === params[0]);
       }
       rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -398,7 +504,7 @@ module.exports = {
     }
 
     // INSERT provision logs
-    if (lowerText.includes('insert into provision_logs')) {
+    if (lowerText.includes("insert into provision_logs")) {
       const log = {
         id: params[0],
         token: params[1],
@@ -415,7 +521,7 @@ module.exports = {
     }
 
     // INSERT provision events
-    if (lowerText.includes('insert into provision_events')) {
+    if (lowerText.includes("insert into provision_events")) {
       const event = {
         id: params[0],
         router_id: params[1],
@@ -428,23 +534,32 @@ module.exports = {
     }
 
     // SELECT project_modules
-    if (lowerText.includes('select') && lowerText.includes('from project_modules')) {
-      if (lowerText.includes('where project_id =')) {
-        const modules = store.project_modules.filter(m => m.project_id === params[0]);
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from project_modules")
+    ) {
+      if (lowerText.includes("where project_id =")) {
+        const modules = store.project_modules.filter(
+          (m) => m.project_id === params[0],
+        );
         return { rows: modules };
       }
       return { rows: store.project_modules };
     }
 
     // SELECT modules by project_id and module_type (check existing)
-    if (lowerText.includes('select id from project_modules')) {
-      const modules = store.project_modules.filter(m => m.project_id === params[0] && m.module_type === params[1]);
+    if (lowerText.includes("select id from project_modules")) {
+      const modules = store.project_modules.filter(
+        (m) => m.project_id === params[0] && m.module_type === params[1],
+      );
       return { rows: modules };
     }
 
     // INSERT/UPDATE project_modules
-    if (lowerText.includes('update project_modules')) {
-      const module = store.project_modules.find(m => m.project_id === params[2] && m.module_type === params[3]);
+    if (lowerText.includes("update project_modules")) {
+      const module = store.project_modules.find(
+        (m) => m.project_id === params[2] && m.module_type === params[3],
+      );
       if (!module) return { rows: [] };
       module.config_data = params[0];
       module.generated_script = params[1] || module.generated_script;
@@ -452,7 +567,7 @@ module.exports = {
       return { rows: [module] };
     }
 
-    if (lowerText.includes('insert into project_modules')) {
+    if (lowerText.includes("insert into project_modules")) {
       const mod = {
         id: params[0],
         project_id: params[1],
@@ -468,27 +583,27 @@ module.exports = {
     }
 
     // DELETE project_modules
-    if (lowerText.includes('delete from project_modules')) {
-      const idx = store.project_modules.findIndex(m => m.id === params[0]);
+    if (lowerText.includes("delete from project_modules")) {
+      const idx = store.project_modules.findIndex((m) => m.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.project_modules.splice(idx, 1) };
     }
 
     // SELECT templates
-    if (lowerText.includes('select') && lowerText.includes('from templates')) {
+    if (lowerText.includes("select") && lowerText.includes("from templates")) {
       let results = [...store.templates];
-      if (lowerText.includes('where')) {
-        if (lowerText.includes('category =')) {
-          results = results.filter(t => t.category === params[0]);
-        } else if (lowerText.includes('id =')) {
-          results = results.filter(t => t.id === params[0]);
+      if (lowerText.includes("where")) {
+        if (lowerText.includes("category =")) {
+          results = results.filter((t) => t.category === params[0]);
+        } else if (lowerText.includes("id =")) {
+          results = results.filter((t) => t.id === params[0]);
         }
       }
       return { rows: results.sort((a, b) => a.name.localeCompare(b.name)) };
     }
 
     // INSERT templates
-    if (lowerText.includes('insert into templates')) {
+    if (lowerText.includes("insert into templates")) {
       const template = {
         id: params[0],
         name: params[1],
@@ -504,16 +619,18 @@ module.exports = {
     }
 
     // UPDATE templates
-    if (lowerText.includes('update templates')) {
-      const idx = store.templates.findIndex(t => t.id === params[5]);
+    if (lowerText.includes("update templates")) {
+      const idx = store.templates.findIndex((t) => t.id === params[5]);
       if (idx === -1) return { rows: [] };
       const template = {
         ...store.templates[idx],
         name: params[0] || store.templates[idx].name,
-        description: params[1] !== null ? params[1] : store.templates[idx].description,
+        description:
+          params[1] !== null ? params[1] : store.templates[idx].description,
         category: params[2] || store.templates[idx].category,
         content: params[3] || store.templates[idx].content,
-        is_public: params[4] !== undefined ? params[4] : store.templates[idx].is_public,
+        is_public:
+          params[4] !== undefined ? params[4] : store.templates[idx].is_public,
         updated_at: new Date().toISOString(),
       };
       store.templates[idx] = template;
@@ -521,33 +638,44 @@ module.exports = {
     }
 
     // DELETE templates
-    if (lowerText.includes('delete from templates')) {
-      const idx = store.templates.findIndex(t => t.id === params[0]);
+    if (lowerText.includes("delete from templates")) {
+      const idx = store.templates.findIndex((t) => t.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.templates.splice(idx, 1) };
     }
 
     // SELECT mikrotik_connections
-    if (lowerText.includes('select') && lowerText.includes('mikrotik_connections')) {
-      if (lowerText.includes('where id =')) {
-        const conn = store.mikrotik_connections.find(c => c.id === params[0]);
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("mikrotik_connections")
+    ) {
+      if (lowerText.includes("where id =")) {
+        const conn = store.mikrotik_connections.find((c) => c.id === params[0]);
         return { rows: conn ? [conn] : [] };
       }
       // Return without password
-      const conns = store.mikrotik_connections.map(c => ({
-        id: c.id, name: c.name, ip_address: c.ip_address,
-        api_port: c.api_port, ssh_port: c.ssh_port, username: c.username,
-        connection_type: c.connection_type, use_tunnel: c.use_tunnel,
-        tunnel_host: c.tunnel_host, tunnel_port: c.tunnel_port,
+      const conns = store.mikrotik_connections.map((c) => ({
+        id: c.id,
+        name: c.name,
+        ip_address: c.ip_address,
+        api_port: c.api_port,
+        ssh_port: c.ssh_port,
+        username: c.username,
+        connection_type: c.connection_type,
+        use_tunnel: c.use_tunnel,
+        tunnel_host: c.tunnel_host,
+        tunnel_port: c.tunnel_port,
         tunnel_username: c.tunnel_username,
-        is_online: c.is_online || false, last_seen: c.last_seen || null,
-        created_at: c.created_at, updated_at: c.updated_at,
+        is_online: c.is_online || false,
+        last_seen: c.last_seen || null,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
       }));
       return { rows: conns };
     }
 
     // INSERT mikrotik_connections
-    if (lowerText.includes('insert into mikrotik_connections')) {
+    if (lowerText.includes("insert into mikrotik_connections")) {
       const conn = {
         id: params[0],
         name: params[1],
@@ -586,9 +714,9 @@ module.exports = {
     }
 
     // UPDATE mikrotik_connections
-    if (lowerText.includes('update mikrotik_connections')) {
+    if (lowerText.includes("update mikrotik_connections")) {
       const id = params[12];
-      const conn = store.mikrotik_connections.find(c => c.id === id);
+      const conn = store.mikrotik_connections.find((c) => c.id === id);
       if (!conn) return { rows: [] };
       conn.name = params[0];
       conn.ip_address = params[1];
@@ -605,58 +733,70 @@ module.exports = {
       conn.updated_at = new Date().toISOString();
 
       return {
-        rows: [{
-          id: conn.id,
-          name: conn.name,
-          ip_address: conn.ip_address,
-          api_port: conn.api_port,
-          ssh_port: conn.ssh_port,
-          username: conn.username,
-          connection_type: conn.connection_type,
-          use_tunnel: conn.use_tunnel,
-          tunnel_host: conn.tunnel_host,
-          tunnel_port: conn.tunnel_port,
-          tunnel_username: conn.tunnel_username,
-          is_online: conn.is_online || false,
-          last_seen: conn.last_seen || null,
-          created_at: conn.created_at,
-          updated_at: conn.updated_at,
-        }]
+        rows: [
+          {
+            id: conn.id,
+            name: conn.name,
+            ip_address: conn.ip_address,
+            api_port: conn.api_port,
+            ssh_port: conn.ssh_port,
+            username: conn.username,
+            connection_type: conn.connection_type,
+            use_tunnel: conn.use_tunnel,
+            tunnel_host: conn.tunnel_host,
+            tunnel_port: conn.tunnel_port,
+            tunnel_username: conn.tunnel_username,
+            is_online: conn.is_online || false,
+            last_seen: conn.last_seen || null,
+            created_at: conn.created_at,
+            updated_at: conn.updated_at,
+          },
+        ],
       };
     }
 
     // DELETE mikrotik_connections
-    if (lowerText.includes('delete from mikrotik_connections')) {
-      const idx = store.mikrotik_connections.findIndex(c => c.id === params[0]);
+    if (lowerText.includes("delete from mikrotik_connections")) {
+      const idx = store.mikrotik_connections.findIndex(
+        (c) => c.id === params[0],
+      );
       if (idx === -1) return { rows: [] };
       return { rows: store.mikrotik_connections.splice(idx, 1) };
     }
 
     // INSERT script_history
-    if (lowerText.includes('insert into script_history')) {
+    if (lowerText.includes("insert into script_history")) {
       return { rows: [] };
     }
 
     // SELECT resellers
-    if (lowerText.includes('select') && lowerText.includes('from resellers')) {
-      if (lowerText.includes('where id =')) {
-        const reseller = store.resellers.find(r => r.id === params[0]);
+    if (lowerText.includes("select") && lowerText.includes("from resellers")) {
+      if (lowerText.includes("where id =")) {
+        const reseller = store.resellers.find((r) => r.id === params[0]);
         return { rows: reseller ? [reseller] : [] };
       }
       // Handle COUNT and COALESCE subqueries for customer_count and total_revenue
-      const resellersWithStats = store.resellers.map(r => {
-        const customers = store.customers.filter(c => c.reseller_id === r.id);
+      const resellersWithStats = store.resellers.map((r) => {
+        const customers = store.customers.filter((c) => c.reseller_id === r.id);
         const customerCount = customers.length;
         const totalRevenue = store.payments
-          .filter(p => customers.some(c => c.id === p.customer_id))
+          .filter((p) => customers.some((c) => c.id === p.customer_id))
           .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-        return { ...r, customer_count: customerCount, total_revenue: totalRevenue };
+        return {
+          ...r,
+          customer_count: customerCount,
+          total_revenue: totalRevenue,
+        };
       });
-      return { rows: resellersWithStats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+      return {
+        rows: resellersWithStats.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
     }
 
     // INSERT resellers
-    if (lowerText.includes('insert into resellers')) {
+    if (lowerText.includes("insert into resellers")) {
       const reseller = {
         id: params[0],
         name: params[1],
@@ -665,7 +805,7 @@ module.exports = {
         phone: params[4],
         commission_rate: params[5] || 10,
         credit_limit: params[6] || 0,
-        status: params[7] || 'active',
+        status: params[7] || "active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -674,18 +814,26 @@ module.exports = {
     }
 
     // UPDATE resellers
-    if (lowerText.includes('update resellers')) {
-      const idx = store.resellers.findIndex(r => r.id === params[7]);
+    if (lowerText.includes("update resellers")) {
+      const idx = store.resellers.findIndex((r) => r.id === params[7]);
       if (idx === -1) return { rows: [] };
       const reseller = {
         ...store.resellers[idx],
         name: params[0] || store.resellers[idx].name,
-        company: params[1] !== undefined ? params[1] : store.resellers[idx].company,
+        company:
+          params[1] !== undefined ? params[1] : store.resellers[idx].company,
         email: params[2] !== undefined ? params[2] : store.resellers[idx].email,
         phone: params[3] !== undefined ? params[3] : store.resellers[idx].phone,
-        commission_rate: params[4] !== undefined ? params[4] : store.resellers[idx].commission_rate,
-        credit_limit: params[5] !== undefined ? params[5] : store.resellers[idx].credit_limit,
-        status: params[6] !== undefined ? params[6] : store.resellers[idx].status,
+        commission_rate:
+          params[4] !== undefined
+            ? params[4]
+            : store.resellers[idx].commission_rate,
+        credit_limit:
+          params[5] !== undefined
+            ? params[5]
+            : store.resellers[idx].credit_limit,
+        status:
+          params[6] !== undefined ? params[6] : store.resellers[idx].status,
         updated_at: new Date().toISOString(),
       };
       store.resellers[idx] = reseller;
@@ -693,35 +841,39 @@ module.exports = {
     }
 
     // DELETE resellers
-    if (lowerText.includes('delete from resellers')) {
-      const idx = store.resellers.findIndex(r => r.id === params[0]);
+    if (lowerText.includes("delete from resellers")) {
+      const idx = store.resellers.findIndex((r) => r.id === params[0]);
       if (idx === -1) return { rows: [] };
       const deleted = store.resellers.splice(idx, 1)[0];
       // Set reseller_id to null for associated customers
-      store.customers.forEach(c => {
+      store.customers.forEach((c) => {
         if (c.reseller_id === params[0]) c.reseller_id = null;
       });
       return { rows: [deleted] };
     }
 
     // SELECT customers (for customer routes)
-    if (lowerText.includes('select') && lowerText.includes('from customers')) {
-      if (lowerText.includes('where id =')) {
-        const customer = store.customers.find(c => c.id === params[0]);
+    if (lowerText.includes("select") && lowerText.includes("from customers")) {
+      if (lowerText.includes("where id =")) {
+        const customer = store.customers.find((c) => c.id === params[0]);
         return { rows: customer ? [customer] : [] };
       }
-      return { rows: store.customers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+      return {
+        rows: store.customers.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
     }
 
     // INSERT customers
-    if (lowerText.includes('insert into customers')) {
+    if (lowerText.includes("insert into customers")) {
       const customer = {
         id: params[0],
-        name: params[1] || '',
-        email: params[2] || '',
-        phone: params[3] || '',
-        address: params[4] || '',
-        status: params[5] || 'active',
+        name: params[1] || "",
+        email: params[2] || "",
+        phone: params[3] || "",
+        address: params[4] || "",
+        status: params[5] || "active",
         service_plan_id: params[6],
         reseller_id: params[7],
         fup_profile_id: params[8] || null,
@@ -733,36 +885,48 @@ module.exports = {
     }
 
     // UPDATE customers
-    if (lowerText.includes('update customers') && lowerText.includes('where id =')) {
-      const idx = store.customers.findIndex(c => c.id === params[params.length - 1]);
+    if (
+      lowerText.includes("update customers") &&
+      lowerText.includes("where id =")
+    ) {
+      const idx = store.customers.findIndex(
+        (c) => c.id === params[params.length - 1],
+      );
       if (idx === -1) return { rows: [] };
-      store.customers[idx] = { 
-        ...store.customers[idx], 
-        ...params[0], 
-        fup_profile_id: params[0].fup_profile_id !== undefined ? params[0].fup_profile_id : store.customers[idx].fup_profile_id,
-        updated_at: new Date().toISOString() 
+      store.customers[idx] = {
+        ...store.customers[idx],
+        ...params[0],
+        fup_profile_id:
+          params[0].fup_profile_id !== undefined
+            ? params[0].fup_profile_id
+            : store.customers[idx].fup_profile_id,
+        updated_at: new Date().toISOString(),
       };
       return { rows: [store.customers[idx]] };
     }
 
     // DELETE customers
-    if (lowerText.includes('delete from customers')) {
-      const idx = store.customers.findIndex(c => c.id === params[0]);
+    if (lowerText.includes("delete from customers")) {
+      const idx = store.customers.findIndex((c) => c.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.customers.splice(idx, 1) };
     }
 
     // SELECT payments
-    if (lowerText.includes('select') && lowerText.includes('from payments')) {
-      if (lowerText.includes('where id =')) {
-        const payment = store.payments.find(p => p.id === params[0]);
+    if (lowerText.includes("select") && lowerText.includes("from payments")) {
+      if (lowerText.includes("where id =")) {
+        const payment = store.payments.find((p) => p.id === params[0]);
         return { rows: payment ? [payment] : [] };
       }
-      return { rows: store.payments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+      return {
+        rows: store.payments.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
     }
 
     // INSERT payments
-    if (lowerText.includes('insert into payments')) {
+    if (lowerText.includes("insert into payments")) {
       const payment = {
         id: params[0],
         customer_id: params[1],
@@ -777,23 +941,30 @@ module.exports = {
     }
 
     // DELETE payments
-    if (lowerText.includes('delete from payments')) {
-      const idx = store.payments.findIndex(p => p.id === params[0]);
+    if (lowerText.includes("delete from payments")) {
+      const idx = store.payments.findIndex((p) => p.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.payments.splice(idx, 1) };
     }
 
     // SELECT olt_connections
-    if (lowerText.includes('select') && lowerText.includes('from olt_connections')) {
-      if (lowerText.includes('where id =')) {
-        const olt = store.olt_connections.find(o => o.id === params[0]);
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from olt_connections")
+    ) {
+      if (lowerText.includes("where id =")) {
+        const olt = store.olt_connections.find((o) => o.id === params[0]);
         return { rows: olt ? [olt] : [] };
       }
-      return { rows: store.olt_connections.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+      return {
+        rows: store.olt_connections.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
     }
 
     // INSERT olt_connections
-    if (lowerText.includes('insert into olt_connections')) {
+    if (lowerText.includes("insert into olt_connections")) {
       const olt = {
         id: params[0],
         name: params[1],
@@ -806,7 +977,7 @@ module.exports = {
         password_encrypted: params[8],
         snmp_community_encrypted: params[9],
         location: params[10],
-        status: params[11] || 'active',
+        status: params[11] || "active",
         custom_oids: params[12],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -816,8 +987,11 @@ module.exports = {
     }
 
     // UPDATE olt_connections
-    if (lowerText.includes('update olt_connections') && lowerText.includes('where id =')) {
-      const idx = store.olt_connections.findIndex(o => o.id === params[0]);
+    if (
+      lowerText.includes("update olt_connections") &&
+      lowerText.includes("where id =")
+    ) {
+      const idx = store.olt_connections.findIndex((o) => o.id === params[0]);
       if (idx === -1) return { rows: [] };
       store.olt_connections[idx] = {
         ...store.olt_connections[idx],
@@ -828,52 +1002,77 @@ module.exports = {
         telnet_port: params[5] || store.olt_connections[idx].telnet_port,
         snmp_port: params[6] || store.olt_connections[idx].snmp_port,
         username: params[7] || store.olt_connections[idx].username,
-        password_encrypted: params[8] || store.olt_connections[idx].password_encrypted,
-        snmp_community_encrypted: params[9] || store.olt_connections[idx].snmp_community_encrypted,
-        location: params[10] !== undefined ? params[10] : store.olt_connections[idx].location,
+        password_encrypted:
+          params[8] || store.olt_connections[idx].password_encrypted,
+        snmp_community_encrypted:
+          params[9] || store.olt_connections[idx].snmp_community_encrypted,
+        location:
+          params[10] !== undefined
+            ? params[10]
+            : store.olt_connections[idx].location,
         status: params[11] || store.olt_connections[idx].status,
-        custom_oids: params[12] !== undefined ? params[12] : store.olt_connections[idx].custom_oids,
+        custom_oids:
+          params[12] !== undefined
+            ? params[12]
+            : store.olt_connections[idx].custom_oids,
         updated_at: new Date().toISOString(),
       };
       return { rows: [store.olt_connections[idx]] };
     }
 
     // DELETE olt_connections
-    if (lowerText.includes('delete from olt_connections')) {
-      const idx = store.olt_connections.findIndex(o => o.id === params[0]);
+    if (lowerText.includes("delete from olt_connections")) {
+      const idx = store.olt_connections.findIndex((o) => o.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.olt_connections.splice(idx, 1) };
     }
 
     // SELECT integrations
-    if (lowerText.includes('select') && lowerText.includes('from integrations')) {
-      if (lowerText.includes('where id =')) {
-        const integration = store.integrations.find(i => i.id === params[0]);
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from integrations")
+    ) {
+      if (lowerText.includes("where id =")) {
+        const integration = store.integrations.find((i) => i.id === params[0]);
         return { rows: integration ? [integration] : [] };
       }
-      return { rows: store.integrations.sort((a, b) => a.category.localeCompare(b.category)) };
+      return {
+        rows: store.integrations.sort((a, b) =>
+          a.category.localeCompare(b.category),
+        ),
+      };
     }
 
     // UPDATE integrations
-    if (lowerText.includes('update integrations')) {
-      const idx = store.integrations.findIndex(i => i.id === params[2]);
+    if (lowerText.includes("update integrations")) {
+      const idx = store.integrations.findIndex((i) => i.id === params[2]);
       if (idx === -1) return { rows: [] };
       store.integrations[idx] = {
         ...store.integrations[idx],
         config_data: params[0],
-        is_active: params[1] !== undefined ? params[1] : store.integrations[idx].is_active,
+        is_active:
+          params[1] !== undefined
+            ? params[1]
+            : store.integrations[idx].is_active,
         updated_at: new Date().toISOString(),
       };
       return { rows: [store.integrations[idx]] };
     }
 
     // SELECT hotspot_vouchers
-    if (lowerText.includes('select') && lowerText.includes('from hotspot_vouchers')) {
-      return { rows: store.hotspot_vouchers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) };
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from hotspot_vouchers")
+    ) {
+      return {
+        rows: store.hotspot_vouchers.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
     }
 
     // INSERT hotspot_vouchers
-    if (lowerText.includes('insert into hotspot_vouchers')) {
+    if (lowerText.includes("insert into hotspot_vouchers")) {
       const voucher = {
         id: params[0],
         username: params[1],
@@ -892,23 +1091,30 @@ module.exports = {
     }
 
     // DELETE hotspot_vouchers
-    if (lowerText.includes('delete from hotspot_vouchers')) {
-      const idx = store.hotspot_vouchers.findIndex(v => v.id === params[0]);
+    if (lowerText.includes("delete from hotspot_vouchers")) {
+      const idx = store.hotspot_vouchers.findIndex((v) => v.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.hotspot_vouchers.splice(idx, 1) };
     }
 
     // SELECT fup_profiles
-    if (lowerText.includes('select') && lowerText.includes('from fup_profiles')) {
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from fup_profiles")
+    ) {
       if (params[0] && params.length === 1) {
-        const fup = store.fup_profiles.find(f => f.id === params[0]);
+        const fup = store.fup_profiles.find((f) => f.id === params[0]);
         return fup ? { rows: [fup] } : { rows: [] };
       }
-      return { rows: store.fup_profiles.sort((a, b) => (a.priority || 100) - (b.priority || 100)) };
+      return {
+        rows: store.fup_profiles.sort(
+          (a, b) => (a.priority || 100) - (b.priority || 100),
+        ),
+      };
     }
 
     // INSERT fup_profiles
-    if (lowerText.includes('insert into fup_profiles')) {
+    if (lowerText.includes("insert into fup_profiles")) {
       const fup = {
         id: params[0],
         name: params[1],
@@ -927,8 +1133,11 @@ module.exports = {
     }
 
     // UPDATE fup_profiles
-    if (lowerText.includes('update fup_profiles') && lowerText.includes('where id =')) {
-      const idx = store.fup_profiles.findIndex(f => f.id === params[8]);
+    if (
+      lowerText.includes("update fup_profiles") &&
+      lowerText.includes("where id =")
+    ) {
+      const idx = store.fup_profiles.findIndex((f) => f.id === params[8]);
       if (idx === -1) return { rows: [] };
       store.fup_profiles[idx] = {
         ...store.fup_profiles[idx],
@@ -946,27 +1155,36 @@ module.exports = {
     }
 
     // DELETE fup_profiles
-    if (lowerText.includes('delete from fup_profiles')) {
-      const idx = store.fup_profiles.findIndex(f => f.id === params[0]);
+    if (lowerText.includes("delete from fup_profiles")) {
+      const idx = store.fup_profiles.findIndex((f) => f.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.fup_profiles.splice(idx, 1) };
     }
 
     // SELECT tr069_devices
-    if (lowerText.includes('select') && lowerText.includes('from tr069_devices')) {
+    if (
+      lowerText.includes("select") &&
+      lowerText.includes("from tr069_devices")
+    ) {
       if (params[0] && params.length === 1) {
-        const device = store.tr069_devices.find(d => d.id === params[0]);
+        const device = store.tr069_devices.find((d) => d.id === params[0]);
         return device ? { rows: [device] } : { rows: [] };
       }
-      if (lowerText.includes('serial_number =')) {
-        const device = store.tr069_devices.find(d => d.serial_number === params[0]);
+      if (lowerText.includes("serial_number =")) {
+        const device = store.tr069_devices.find(
+          (d) => d.serial_number === params[0],
+        );
         return device ? { rows: [device] } : { rows: [] };
       }
-      return { rows: store.tr069_devices.sort((a, b) => new Date(b.last_inform || 0) - new Date(a.last_inform || 0)) };
+      return {
+        rows: store.tr069_devices.sort(
+          (a, b) => new Date(b.last_inform || 0) - new Date(a.last_inform || 0),
+        ),
+      };
     }
 
     // INSERT tr069_devices
-    if (lowerText.includes('insert into tr069_devices')) {
+    if (lowerText.includes("insert into tr069_devices")) {
       const device = {
         id: params[0],
         serial_number: params[1],
@@ -981,9 +1199,15 @@ module.exports = {
         created_at: params[10] || new Date().toISOString(),
         updated_at: params[11] || new Date().toISOString(),
       };
-      const existingIdx = store.tr069_devices.findIndex(d => d.serial_number === device.serial_number);
+      const existingIdx = store.tr069_devices.findIndex(
+        (d) => d.serial_number === device.serial_number,
+      );
       if (existingIdx !== -1) {
-        store.tr069_devices[existingIdx] = { ...store.tr069_devices[existingIdx], ...device, updated_at: new Date().toISOString() };
+        store.tr069_devices[existingIdx] = {
+          ...store.tr069_devices[existingIdx],
+          ...device,
+          updated_at: new Date().toISOString(),
+        };
         return { rows: [store.tr069_devices[existingIdx]] };
       }
       store.tr069_devices.push(device);
@@ -991,8 +1215,11 @@ module.exports = {
     }
 
     // UPDATE tr069_devices
-    if (lowerText.includes('update tr069_devices') && lowerText.includes('where id =')) {
-      const idx = store.tr069_devices.findIndex(d => d.id === params[7]);
+    if (
+      lowerText.includes("update tr069_devices") &&
+      lowerText.includes("where id =")
+    ) {
+      const idx = store.tr069_devices.findIndex((d) => d.id === params[7]);
       if (idx === -1) return { rows: [] };
       store.tr069_devices[idx] = {
         ...store.tr069_devices[idx],
@@ -1009,10 +1236,379 @@ module.exports = {
     }
 
     // DELETE tr069_devices
-    if (lowerText.includes('delete from tr069_devices')) {
-      const idx = store.tr069_devices.findIndex(d => d.id === params[0]);
+    if (lowerText.includes("delete from tr069_devices")) {
+      const idx = store.tr069_devices.findIndex((d) => d.id === params[0]);
       if (idx === -1) return { rows: [] };
       return { rows: store.tr069_devices.splice(idx, 1) };
+    }
+
+    // ═══════════════════════════════════════
+    // RADIUS TABLES
+    // ═══════════════════════════════════════
+
+    // SELECT nas
+    if (lowerText.includes("select") && lowerText.includes("from nas")) {
+      return {
+        rows: store.nas.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        ),
+      };
+    }
+
+    // INSERT nas
+    if (lowerText.includes("insert into nas")) {
+      const nas = {
+        id: params[0] || uuidv4(),
+        nasname: params[1],
+        shortname: params[2],
+        secret: params[3],
+        description: params[4],
+        type: params[5] || "other",
+        connection_id: params[6] || null,
+        created_at: new Date().toISOString(),
+      };
+      store.nas.push(nas);
+      return { rows: [nas] };
+    }
+
+    // UPDATE nas
+    if (lowerText.includes("update nas")) {
+      const idx = store.nas.findIndex((n) => n.id === params[5]);
+      if (idx === -1) return { rows: [] };
+      store.nas[idx] = {
+        ...store.nas[idx],
+        nasname: params[0] || store.nas[idx].nasname,
+        shortname: params[1] || store.nas[idx].shortname,
+        secret: params[2] || store.nas[idx].secret,
+        description: params[3] || store.nas[idx].description,
+        type: params[4] || store.nas[idx].type,
+        updated_at: new Date().toISOString(),
+      };
+      return { rows: [store.nas[idx]] };
+    }
+
+    // DELETE nas
+    if (lowerText.includes("delete from nas")) {
+      const idx = store.nas.findIndex((n) => n.id === params[0]);
+      if (idx === -1) return { rows: [] };
+      store.nas.splice(idx, 1);
+      return { rows: [] };
+    }
+
+    // SELECT radcheck
+    if (lowerText.includes("from radcheck")) {
+      if (lowerText.includes("select id from radcheck")) {
+        if (
+          lowerText.includes("where username") &&
+          lowerText.includes("and attribute")
+        ) {
+          const rows = store.radcheck.filter(
+            (r) => r.username === params[0] && r.attribute === params[1],
+          );
+          return { rows };
+        }
+        if (lowerText.includes("where username")) {
+          const rows = store.radcheck.filter((r) => r.username === params[0]);
+          return { rows };
+        }
+        if (
+          lowerText.includes("where username") &&
+          lowerText.includes("and value")
+        ) {
+          const rows = store.radcheck.filter(
+            (r) =>
+              r.username === params[0] &&
+              r.attribute === params[1] &&
+              r.value === params[2],
+          );
+          return { rows };
+        }
+      }
+      if (lowerText.includes("select count(*) from radcheck")) {
+        return { rows: [{ count: String(store.radcheck.length) }] };
+      }
+      if (lowerText.includes("distinct")) {
+        // SELECT DISTINCT rc.username, ... FROM radcheck rc
+        const distinctUsers = [
+          ...new Map(store.radcheck.map((r) => [r.username, r])).values(),
+        ];
+        const result = distinctUsers.map((r) => {
+          const password = store.radcheck.find(
+            (x) =>
+              x.username === r.username && x.attribute === "Cleartext-Password",
+          );
+          const expiration = store.radcheck.find(
+            (x) => x.username === r.username && x.attribute === "Expiration",
+          );
+          const framedIp = store.radreply.find(
+            (x) =>
+              x.username === r.username && x.attribute === "Framed-IP-Address",
+          );
+          const rateLimit = store.radreply.find(
+            (x) =>
+              x.username === r.username &&
+              x.attribute === "Mikrotik-Rate-Limit",
+          );
+          const groups = store.radusergroup
+            .filter((x) => x.username === r.username)
+            .map((x) => x.groupname)
+            .join(", ");
+          const activeSessions = store.radacct.filter(
+            (x) => x.username === r.username && x.acctstoptime === null,
+          ).length;
+          const customer = r.customer_id
+            ? store.customers.find((c) => c.id === r.customer_id)
+            : null;
+          return {
+            username: r.username,
+            customer_id: r.customer_id || null,
+            customer_name: customer ? customer.name : null,
+            password: password ? password.value : null,
+            expiration: expiration ? expiration.value : null,
+            framed_ip: framedIp ? framedIp.value : null,
+            rate_limit: rateLimit ? rateLimit.value : null,
+            groups: groups || null,
+            active_sessions: activeSessions,
+            created_at: r.created_at,
+          };
+        });
+        return {
+          rows: result.sort(
+            (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+          ),
+        };
+      }
+      return { rows: store.radcheck };
+    }
+
+    // INSERT radcheck
+    if (lowerText.includes("insert into radcheck")) {
+      const check = {
+        id: uuidv4(),
+        username: params[0],
+        attribute: params[1],
+        op: params[2] || ":=",
+        value: params[3],
+        customer_id: params[4] || null,
+        subscription_id: params[5] || null,
+        created_at: new Date().toISOString(),
+      };
+      store.radcheck.push(check);
+      return { rows: [check] };
+    }
+
+    // UPDATE radcheck
+    if (lowerText.includes("update radcheck")) {
+      const idx = store.radcheck.findIndex(
+        (r) => r.username === params[1] && r.attribute === params[2],
+      );
+      if (idx !== -1) {
+        store.radcheck[idx].value = params[0];
+        return { rows: [store.radcheck[idx]] };
+      }
+      return { rows: [] };
+    }
+
+    // DELETE radcheck
+    if (lowerText.includes("delete from radcheck")) {
+      if (lowerText.includes("and attribute =")) {
+        store.radcheck = store.radcheck.filter(
+          (r) => !(r.username === params[0] && r.attribute === params[1]),
+        );
+      } else {
+        store.radcheck = store.radcheck.filter((r) => r.username !== params[0]);
+      }
+      return { rows: [] };
+    }
+
+    // SELECT radreply
+    if (lowerText.includes("from radreply")) {
+      if (lowerText.includes("where username")) {
+        const rows = store.radreply.filter((r) => r.username === params[0]);
+        return { rows };
+      }
+      if (lowerText.includes("where groupname")) {
+        const rows = store.radgroupreply.filter(
+          (r) => r.groupname === params[0],
+        );
+        return { rows };
+      }
+      return { rows: store.radreply };
+    }
+
+    // INSERT radreply
+    if (lowerText.includes("insert into radreply")) {
+      const reply = {
+        id: uuidv4(),
+        username: params[0],
+        attribute: params[1],
+        op: params[2] || "=",
+        value: params[3],
+        created_at: new Date().toISOString(),
+      };
+      // ON CONFLICT DO NOTHING - skip if exists
+      const exists = store.radreply.find(
+        (r) =>
+          r.username === reply.username &&
+          r.attribute === reply.attribute &&
+          r.value === reply.value,
+      );
+      if (!exists) {
+        store.radreply.push(reply);
+      }
+      return { rows: [reply] };
+    }
+
+    // DELETE radreply
+    if (lowerText.includes("delete from radreply")) {
+      store.radreply = store.radreply.filter((r) => r.username !== params[0]);
+      return { rows: [] };
+    }
+
+    // SELECT radusergroup
+    if (lowerText.includes("from radusergroup")) {
+      if (lowerText.includes("where groupname")) {
+        const rows = store.radusergroup.filter(
+          (r) => r.groupname === params[0],
+        );
+        return { rows };
+      }
+      if (lowerText.includes("where username")) {
+        const rows = store.radusergroup.filter((r) => r.username === params[0]);
+        return { rows };
+      }
+      return { rows: store.radusergroup };
+    }
+
+    // INSERT radusergroup
+    if (lowerText.includes("insert into radusergroup")) {
+      const entry = {
+        id: uuidv4(),
+        username: params[0],
+        groupname: params[1],
+        priority: params[2] || 1,
+        created_at: new Date().toISOString(),
+      };
+      store.radusergroup.push(entry);
+      return { rows: [entry] };
+    }
+
+    // DELETE radusergroup
+    if (lowerText.includes("delete from radusergroup")) {
+      store.radusergroup = store.radusergroup.filter(
+        (r) => r.username !== params[0],
+      );
+      return { rows: [] };
+    }
+
+    // SELECT radgroupcheck
+    if (lowerText.includes("from radgroupcheck")) {
+      if (lowerText.includes("distinct")) {
+        const groups = [
+          ...new Set(store.radgroupcheck.map((r) => r.groupname)),
+        ];
+        return { rows: groups.map((g) => ({ groupname: g })) };
+      }
+      if (lowerText.includes("where groupname")) {
+        const rows = store.radgroupcheck.filter(
+          (r) => r.groupname === params[0],
+        );
+        return { rows };
+      }
+      return { rows: store.radgroupcheck };
+    }
+
+    // INSERT radgroupcheck
+    if (lowerText.includes("insert into radgroupcheck")) {
+      const entry = {
+        id: uuidv4(),
+        groupname: params[0],
+        attribute: params[1],
+        op: params[2] || "==",
+        value: params[3],
+        created_at: new Date().toISOString(),
+      };
+      store.radgroupcheck.push(entry);
+      return { rows: [entry] };
+    }
+
+    // DELETE radgroupcheck
+    if (lowerText.includes("delete from radgroupcheck")) {
+      store.radgroupcheck = store.radgroupcheck.filter(
+        (r) => r.groupname !== params[0],
+      );
+      return { rows: [] };
+    }
+
+    // SELECT radgroupreply
+    if (lowerText.includes("from radgroupreply")) {
+      if (lowerText.includes("where groupname")) {
+        const rows = store.radgroupreply.filter(
+          (r) => r.groupname === params[0],
+        );
+        return { rows };
+      }
+      return { rows: store.radgroupreply };
+    }
+
+    // INSERT radgroupreply
+    if (lowerText.includes("insert into radgroupreply")) {
+      const entry = {
+        id: uuidv4(),
+        groupname: params[0],
+        attribute: params[1],
+        op: params[2] || "=",
+        value: params[3],
+        created_at: new Date().toISOString(),
+      };
+      store.radgroupreply.push(entry);
+      return { rows: [entry] };
+    }
+
+    // DELETE radgroupreply
+    if (lowerText.includes("delete from radgroupreply")) {
+      store.radgroupreply = store.radgroupreply.filter(
+        (r) => r.groupname !== params[0],
+      );
+      return { rows: [] };
+    }
+
+    // SELECT radacct
+    if (lowerText.includes("from radacct")) {
+      if (lowerText.includes("where acctstoptime is null")) {
+        const activeSessions = store.radacct.filter(
+          (a) => a.acctstoptime === null,
+        );
+        return { rows: activeSessions };
+      }
+      if (lowerText.includes("where customer_id")) {
+        const rows = store.radacct.filter((a) => a.customer_id === params[0]);
+        return {
+          rows: rows.sort(
+            (a, b) =>
+              new Date(b.acctstarttime || 0) - new Date(a.acctstarttime || 0),
+          ),
+        };
+      }
+      if (lowerText.includes("select count(*) from radacct")) {
+        return { rows: [{ count: String(store.radacct.length) }] };
+      }
+      const rows = store.radacct.sort(
+        (a, b) =>
+          new Date(b.acctstarttime || 0) - new Date(a.acctstarttime || 0),
+      );
+      return { rows, total: rows.length };
+    }
+
+    // SELECT radpostauth
+    if (lowerText.includes("from radpostauth")) {
+      if (lowerText.includes("select count(*) from radpostauth")) {
+        return { rows: [{ count: String(store.radpostauth.length) }] };
+      }
+      const rows = store.radpostauth.sort(
+        (a, b) => new Date(b.authdate || 0) - new Date(a.authdate || 0),
+      );
+      return { rows, total: rows.length };
     }
 
     // INSERT/UPDATE anything else (generic fallback)
@@ -1025,32 +1621,60 @@ module.exports = {
 
 // Wrap query to check users first
 const _origQ = module.exports.query;
-module.exports.query = async function(text, params) {
+module.exports.query = async function (text, params) {
   // Users handler
   const lower = text.toLowerCase();
-  if (lower.includes('users')) {
-    if (lower.includes('select count(*) from users')) {
+  if (lower.includes("users")) {
+    if (lower.includes("select count(*) from users")) {
       return { rows: [{ count: String(store.users.length) }] };
     }
-    if (lower.includes('from users') && lower.includes('where email')) {
-      const user = store.users.find(u => u.email === params[0]);
+    if (lower.includes("from users") && lower.includes("where email")) {
+      const user = store.users.find((u) => u.email === params[0]);
       return { rows: user ? [user] : [] };
     }
-    if (lower.includes('from users') && lower.includes('where id')) {
-      const user = store.users.find(u => u.id === params[params.length - 1]);
-      return { rows: user ? [{ id: user.id, email: user.email, name: user.name, role: user.role, created_at: user.created_at }] : [] };
+    if (lower.includes("from users") && lower.includes("where id")) {
+      const user = store.users.find((u) => u.id === params[params.length - 1]);
+      return {
+        rows: user
+          ? [
+              {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                created_at: user.created_at,
+              },
+            ]
+          : [],
+      };
     }
-    if (lower.includes('select id from users')) {
-      return { rows: store.users.length > 0 ? [{ id: store.users[0].id }] : [] };
+    if (lower.includes("select id from users")) {
+      return {
+        rows: store.users.length > 0 ? [{ id: store.users[0].id }] : [],
+      };
     }
-    if (lower.includes('insert into users')) {
-      const user = { id: params[0], email: params[1], password_hash: params[2], name: params[3], role: params[4], created_at: new Date().toISOString() };
+    if (lower.includes("insert into users")) {
+      const user = {
+        id: params[0],
+        email: params[1],
+        password_hash: params[2],
+        name: params[3],
+        role: params[4],
+        created_at: new Date().toISOString(),
+      };
       store.users.push(user);
-      return { rows: [{ id: user.id, email: user.email, name: user.name, role: user.role }] };
+      return {
+        rows: [
+          { id: user.id, email: user.email, name: user.name, role: user.role },
+        ],
+      };
     }
-    if (lower.includes('update users')) {
-      const user = store.users.find(u => u.id === params[params.length - 1]);
-      if (user) { user.last_login_at = new Date().toISOString(); return { rows: [] }; }
+    if (lower.includes("update users")) {
+      const user = store.users.find((u) => u.id === params[params.length - 1]);
+      if (user) {
+        user.last_login_at = new Date().toISOString();
+        return { rows: [] };
+      }
     }
   }
   return _origQ(text, params);
