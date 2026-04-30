@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useBranding } from "../contexts/BrandingContext";
 import {
   LayoutDashboard,
   Network,
@@ -230,7 +231,7 @@ const billingItems = [
 export function Sidebar({ onSearchOpen }) {
   const [billingOpen, setBillingOpen] = useState(false);
   const [user, setUser] = useState(null);
-  const [settings, setSettings] = useState(null);
+  const branding = useBranding();
   const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
@@ -247,17 +248,8 @@ export function Sidebar({ onSearchOpen }) {
     }
 
     // Fetch settings
-    fetchSettings();
   }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const { data } = await axios.get(`${API}/settings`);
-      setSettings(data);
-    } catch (error) {
-      console.error("Failed to fetch settings:", error);
-    }
-  };
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -283,23 +275,23 @@ export function Sidebar({ onSearchOpen }) {
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800/50">
         <NavLink to="/" className="flex items-center gap-3">
-          {settings?.company_logo ? (
+          {branding.company_logo ? (
             <img
               src={settings.company_logo}
               alt="Company Logo"
               className="w-8 h-8 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-primary)]/ flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Building2 className="w-4 h-4 text-white" />
             </div>
           )}
           <div>
             <div className="text-sm font-semibold text-white truncate max-w-[120px]">
-              {settings?.company_name || "MTK Builder"}
+              {branding.appName}
             </div>
             <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
-              ISP Platform
+              {branding.company_name ? "NETWORK PLATFORM" : "ISP PLATFORM"}
             </div>
           </div>
         </NavLink>

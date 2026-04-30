@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BrandingProvider } from "./contexts/BrandingContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import { Sidebar } from "./components/Sidebar";
@@ -108,7 +109,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <BrandingProvider>
       <Routes>
         {/* Public route */}
         <Route path="/login" element={<LoginPage />} />
@@ -250,7 +251,7 @@ function App() {
         />
       </Routes>
       <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-    </>
+    </BrandingProvider>
   );
 }
 

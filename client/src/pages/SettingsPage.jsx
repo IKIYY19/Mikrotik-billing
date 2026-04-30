@@ -76,6 +76,9 @@ export function SettingsPage() {
     invoice_start_number: "1001",
     payment_terms: "14",
     tax_rate: "16",
+    primary_color: "#3b82f6",
+    secondary_color: "#1e293b",
+    branding_title: "",
   });
 
   const [logoPreview, setLogoPreview] = useState(null);
@@ -784,7 +787,50 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Portal Links */}
+          
+          {/* White Label Branding */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" /> White Label Branding
+              </CardTitle>
+              <CardDescription>
+                Customize the platform colors and branding to match your ISP identity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="branding-title">Platform Title</Label>
+                  <Input id="branding-title" value={settings.branding_title} onChange={(e) => setSettings({ ...settings, branding_title: e.target.value })} placeholder="MyISP Billing" />
+                  <p className="text-xs text-zinc-500 mt-1">Overrides company name in sidebar and titles</p>
+                </div>
+                <div>
+                  <Label htmlFor="primary-color">Primary Color</Label>
+                  <div className="flex gap-2">
+                    <Input id="primary-color" type="color" value={settings.primary_color} onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })} className="w-12 h-10 p-1 cursor-pointer" />
+                    <Input value={settings.primary_color} onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })} placeholder="#3b82f6" className="flex-1 font-mono text-sm" />
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1">Used for buttons, sidebar icon, active links</p>
+                </div>
+                <div>
+                  <Label htmlFor="secondary-color">Secondary Color</Label>
+                  <div className="flex gap-2">
+                    <Input id="secondary-color" type="color" value={settings.secondary_color} onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })} className="w-12 h-10 p-1 cursor-pointer" />
+                    <Input value={settings.secondary_color} onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })} placeholder="#1e293b" className="flex-1 font-mono text-sm" />
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1">Used for sidebar and card backgrounds</p>
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" variant="outline" onClick={() => setSettings({ ...settings, primary_color: '#3b82f6', secondary_color: '#1e293b', branding_title: '' })} className="text-xs">
+                    <RotateCcw className="w-3 h-3 mr-1" /> Reset to Defaults
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+{/* Portal Links */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
