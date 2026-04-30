@@ -208,6 +208,35 @@ router.post("/customers", async (req, res) => {
   try {
     const customer = await billing.createCustomer(req.body);
 
+    // Auto-create subscription if plan_id provided
+    let subscription = null;
+    if (req.body.plan_id) {
+      try {
+        subscription = await billing.createSubscription({
+          customer_id: customer.id,
+          plan_id: req.body.plan_id,
+          status: "active",
+          start_date: new Date().toISOString(),
+          billing_cycle: "monthly",
+        });
+
+        // Sync to MikroTik if connection selected
+        if (req.body.mikrotik_connection_id) {
+          try {
+            const expandedSub = await getExpandedSubscription(subscription.id);
+            await syncSubscription("reconcile", expandedSub);
+          } catch (syncErr) {
+            console.error(
+              "Failed to sync subscription to MikroTik:",
+              syncErr.message,
+            );
+          }
+        }
+      } catch (subErr) {
+        console.error("Failed to create subscription:", subErr.message);
+      }
+    }
+
     // Auto-generate portal credentials (4-digit PIN)
     const db = global.dbAvailable ? global.db : require("../db/memory");
     const bcrypt = require("bcryptjs");
@@ -237,6 +266,7 @@ router.post("/customers", async (req, res) => {
     const portalUrl = `${req.protocol}://${req.get("host")}/portal/login?phone=${encodeURIComponent(customer.phone || "")}`;
     res.status(201).json({
       ...customer,
+      subscription: subscription || null,
       portal_url: portalUrl,
       portal_username: portalUsername,
       portal_password: defaultPin,

@@ -100,6 +100,7 @@ export function BillingCustomers() {
     notes: "",
     account_number: "",
     fup_profile_id: "",
+    plan_id: "",
     lat: "",
     lng: "",
   });
@@ -109,6 +110,7 @@ export function BillingCustomers() {
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [fupProfiles, setFupProfiles] = useState([]);
+  const [servicePlans, setServicePlans] = useState([]);
   const [settings, setSettings] = useState({});
   const [portalUrl, setPortalUrl] = useState(null);
   const [portalCredentials, setPortalCredentials] = useState(null);
@@ -154,6 +156,7 @@ export function BillingCustomers() {
     fetchCustomers();
     fetchConnections();
     fetchFUPProfiles();
+    fetchServicePlans();
     fetchSettings();
   }, []);
   useEffect(() => {
@@ -196,6 +199,15 @@ export function BillingCustomers() {
       setFupProfiles(data);
     } catch (error) {
       console.error("Failed to fetch FUP profiles:", error);
+    }
+  };
+
+  const fetchServicePlans = async () => {
+    try {
+      const { data } = await axios.get(`${API}/billing/plans`);
+      setServicePlans(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -254,7 +266,10 @@ export function BillingCustomers() {
     if (document.getElementById("gmaps-script")) return;
     const script = document.createElement("script");
     script.id = "gmaps-script";
-    script.src = "https://maps.googleapis.com/maps/api/js?key=" + GMAPS_KEY + "&libraries=places";
+    script.src =
+      "https://maps.googleapis.com/maps/api/js?key=" +
+      GMAPS_KEY +
+      "&libraries=places";
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);
@@ -266,7 +281,8 @@ export function BillingCustomers() {
     if (!window.google?.maps) return;
 
     requestAnimationFrame(() => {
-      if (!mapPickerRef.current || mapPickerRef.current.offsetHeight === 0) return;
+      if (!mapPickerRef.current || mapPickerRef.current.offsetHeight === 0)
+        return;
       const lat = parseFloat(form.lat) || -1.2921;
       const lng = parseFloat(form.lng) || 36.8219;
       const map = new window.google.maps.Map(mapPickerRef.current, {
@@ -287,14 +303,22 @@ export function BillingCustomers() {
 
       map.addListener("click", (e) => {
         const pos = e.latLng;
-        setForm((prev) => ({ ...prev, lat: pos.lat().toFixed(6), lng: pos.lng().toFixed(6) }));
+        setForm((prev) => ({
+          ...prev,
+          lat: pos.lat().toFixed(6),
+          lng: pos.lng().toFixed(6),
+        }));
         marker.setPosition(pos);
         marker.setVisible(true);
       });
 
       marker.addListener("dragend", () => {
         const pos = marker.getPosition();
-        setForm((prev) => ({ ...prev, lat: pos.lat().toFixed(6), lng: pos.lng().toFixed(6) }));
+        setForm((prev) => ({
+          ...prev,
+          lat: pos.lat().toFixed(6),
+          lng: pos.lng().toFixed(6),
+        }));
       });
     });
   }, [showMapPicker, form.lat, form.lng]);
@@ -312,6 +336,9 @@ export function BillingCustomers() {
       }
       submitData.lat = form.lat || null;
       submitData.lng = form.lng || null;
+      if (selectedConnection) {
+        submitData.mikrotik_connection_id = selectedConnection;
+      }
 
       if (editing) {
         await axios.put(`${API}/billing/customers/${editing.id}`, submitData);
@@ -345,6 +372,7 @@ export function BillingCustomers() {
         notes: "",
         account_number: "",
         fup_profile_id: "",
+        plan_id: "",
         lat: "",
         lng: "",
       });
@@ -387,6 +415,7 @@ export function BillingCustomers() {
       notes: c.notes || "",
       account_number: c.account_number || "",
       fup_profile_id: c.fup_profile_id || "",
+      plan_id: c.subscription?.plan_id || "",
       lat: c.lat || "",
       lng: c.lng || "",
     });
@@ -443,6 +472,7 @@ export function BillingCustomers() {
                 notes: "",
                 account_number: "",
                 fup_profile_id: "",
+                plan_id: "",
                 lat: "",
                 lng: "",
               });
@@ -785,6 +815,27 @@ export function BillingCustomers() {
                       </p>
                     </div>
                   )}
+                  <div>
+                    <Label htmlFor="plan">Service Plan</Label>
+                    <select
+                      id="plan"
+                      value={form.plan_id}
+                      onChange={(e) =>
+                        setForm({ ...form, plan_id: e.target.value })
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">No plan (create customer only)</option>
+                      {servicePlans
+                        .filter((p) => p.is_active !== false)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — KES {p.price}/mo ({p.speed_up}/
+                            {p.speed_down})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <select
