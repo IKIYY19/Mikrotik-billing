@@ -667,6 +667,14 @@ export function Devices() {
                       : `in ${enrollExpiry}h`}
                   </div>
 
+
+                  {enrollToken.mgmt_password && (
+                    <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3">
+                      <p className="text-xs text-green-400 font-semibold mb-1">Router Admin Password (auto-generated)</p>
+                      <p className="text-sm font-mono text-green-300 font-bold">{enrollToken.mgmt_password}</p>
+                      <p className="text-xs text-green-400/60 mt-1">This password is embedded in the script and applied automatically.</p>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-zinc-300 text-xs uppercase tracking-wider">
                       One-Command Provisioning Script

@@ -140,9 +140,21 @@ function generateEnrollmentToken() {
   return `enroll-${require("crypto").randomBytes(32).toString("hex")}`;
 }
 
-function buildEnrollmentBootstrapCommand(serverUrl, token) {
+function buildEnrollmentBootstrapCommand(serverUrl, token, mgmtPassword) {
   const cleanBaseUrl = serverUrl.replace(/\/$/, "");
-  const scriptUrl = `${cleanBaseUrl}/mikrotik/enroll/bootstrap/${token}`;
+
+function generateMgmtPassword() {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let pw = "";
+  for (let i = 0; i < 12; i++) {
+    pw += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return pw;
+}
+  let scriptUrl = `${cleanBaseUrl}/mikrotik/enroll/bootstrap/${token}`;
+    if (mgmtPassword) {
+    scriptUrl += "?mgmt_pass=" + encodeURIComponent(mgmtPassword);
+  }
   return `${provisionStore.buildFetchCommand(scriptUrl, "ztp-enroll.rsc", true)}; /import file-name=ztp-enroll.rsc; /file remove ztp-enroll.rsc`;
 }
 
@@ -152,7 +164,9 @@ async function createEnrollmentToken(req, options = {}) {
   const expiresAt = new Date(
     Date.now() + expiresHours * 60 * 60 * 1000,
   ).toISOString();
+  const mgmtPassword = generateMgmtPassword();
   const metadata = {
+    mgmt_password: mgmtPassword,
     label: options.label || "",
     notes: options.notes || "",
   };
@@ -327,6 +341,7 @@ router.post("/enrollment-token", async (req, res) => {
       notes,
     });
     const serverUrl = getServerBaseUrl(req, baseUrl);
+    const mgmtPassword = enrollment.metadata?.mgmt_password || "";
     const bootstrapCommand = buildEnrollmentBootstrapCommand(
       serverUrl,
       enrollment.token,

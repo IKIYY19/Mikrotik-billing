@@ -629,6 +629,8 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
     const ip = req.ip || req.connection.remoteAddress;
     const ua = req.get("User-Agent") || "RouterOS";
 
+    const mgmtPass = req.query.mgmt_pass || "";
+
     const tokenRecord = await findEnrollmentToken(token);
 
     if (!tokenRecord) {
@@ -702,6 +704,13 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       '#   :global ztpMgmtUser "admin"',
       '#   :global ztpMgmtPass "password"',
       ":global ztpMgmtUser; :global ztpMgmtPass;",
+      ":local ztpPass \"" + mgmtPass + "\"",
+      ":if ([:len \$ztpPass] > 0) do={",
+      "  :put \"[ZTP] Auto-generated admin password: \$ztpPass\"",
+      "  /user set admin password=\$ztpPass",
+      "  :set mgmtUser \"admin\"",
+      "  :set mgmtPass \$ztpPass",
+      "}",
       ":local mgmtUser $ztpMgmtUser",
       ":local mgmtPass $ztpMgmtPass",
       ':if ([:len $mgmtUser] > 0) do={ :log info message="[ZTP] Mgmt user provided: $mgmtUser" }',
@@ -889,6 +898,8 @@ router.all("/enroll/report/:token", async (req, res) => {
     const ua = req.get("User-Agent") || "RouterOS";
     const raw = { ...req.query, ...req.body };
 
+    const mgmtPass = req.query.mgmt_pass || "";
+
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
       return res.type("text/plain").send("# ERROR: Invalid enrollment token");
@@ -945,6 +956,8 @@ router.get("/enroll/iface/:token", async (req, res) => {
     }
 
 
+    const mgmtPass = req.query.mgmt_pass || "";
+
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
       return res.type("text/plain").send("# ERROR: Invalid token");
@@ -983,6 +996,8 @@ router.get("/enroll/addr/:token", async (req, res) => {
       return res.type("text/plain").send("# SKIP: no address");
     }
 
+
+    const mgmtPass = req.query.mgmt_pass || "";
 
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
@@ -1111,6 +1126,8 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
           .map((p) => p.trim())
           .filter(Boolean)
       : null;
+
+    const mgmtPass = req.query.mgmt_pass || "";
 
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
