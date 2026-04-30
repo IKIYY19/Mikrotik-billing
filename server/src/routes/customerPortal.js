@@ -1377,68 +1377,32 @@ router.get("/:customerId/available-plans", async (req, res) => {
 // Change plan
 router.post("/:customerId/change-plan", async (req, res) => {
   try {
-
-    // Also update PostgreSQL if available
-    if (global.dbAvailable) {
-      await db.query(
-        "UPDATE subscriptions SET plan_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-        [plan_id, subscription.id]
-      );
-    }
     const { plan_id } = req.body;
-    if (!plan_id) {
-      return res.status(400).json({ error: "plan_id is required" });
+    const { customerId } = req.params;
+    if (!plan_id) return res.status(400).json({ error: "plan_id is required" });
+
+    let subscription, plan, oldPlan;
+    if (global.dbAvailable) {
+      const subRes = await db.query("SELECT * FROM subscriptions WHERE customer_id = $1 AND status = 'active' LIMIT 1", [customerId]);
+      subscription = subRes.rows[0] || null;
+      if (!subscription) return res.status(404).json({ error: "No active subscription found" });
+      const planRes = await db.query("SELECT * FROM service_plans WHERE id = $1", [plan_id]);
+      plan = planRes.rows[0] || null;
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      const oldPlanRes = await db.query("SELECT * FROM service_plans WHERE id = $1", [subscription.plan_id]);
+      oldPlan = oldPlanRes.rows[0] || null;
+      await db.query("UPDATE subscriptions SET plan_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [plan_id, subscription.id]);
+    } else {
+      subscription = billing.store.subscriptions.find(s => s.customer_id === customerId && s.status === 'active');
+      if (!subscription) return res.status(404).json({ error: "No active subscription found" });
+      plan = billing.store.service_plans.find(p => p.id === plan_id);
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      oldPlan = billing.store.service_plans.find(p => p.id === subscription.plan_id);
+      billing.store.subscriptions = billing.store.subscriptions.map(s => s.id === subscription.id ? { ...s, plan_id, updated_at: new Date().toISOString() } : s);
     }
 
-    const subscription = billing.store.subscriptions.find(
-      (s) => s.customer_id === req.params.customerId && s.status === "active",
-    );
-    if (!subscription) {
-      return res.status(404).json({ error: "No active subscription found" });
-    }
-
-    const plan = billing.store.service_plans.find((p) => p.id === plan_id);
-    if (!plan) {
-      return res.status(404).json({ error: "Plan not found" });
-    }
-
-    const oldPlanId = subscription.plan_id;
-    const oldPlan = billing.store.service_plans.find((p) => p.id === oldPlanId);
-
-    // Update subscription plan
-    billing.store.subscriptions = billing.store.subscriptions.map((s) =>
-      s.id === subscription.id
-        ? { ...s, plan_id, updated_at: new Date().toISOString() }
-        : s,
-    );
-
-    // Log audit event
-    logger.info("Plan changed", {
-      customer_id: req.params.customerId,
-      subscription_id: subscription.id,
-      old_plan: oldPlan?.name,
-      new_plan: plan.name,
-      old_price: oldPlan?.price,
-      new_price: plan.price,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Note: If auto_provision is enabled, the MikroTik will be re-provisioned
-    // on the next sync cycle or via the admin billing panel.
-    if (subscription.auto_provision && subscription.mikrotik_connection_id) {
-      logger.info("Plan change queued for MikroTik re-provision", {
-        subscription_id: subscription.id,
-        connection_id: subscription.mikrotik_connection_id,
-        new_plan: plan.name,
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `Plan changed to ${plan.name}`,
-      plan_name: plan.name,
-      plan_price: plan.price,
-    });
+    logger.info("Plan changed", { customer_id: customerId, old_plan: oldPlan?.name, new_plan: plan.name });
+    res.json({ success: true, message: `Plan changed to ${plan.name}`, plan_name: plan.name, plan_price: plan.price });
   } catch (e) {
     console.error("Change plan error:", e);
     res.status(500).json({ error: e.message });
