@@ -127,7 +127,7 @@ function generateProvisionScript(router, options = {}) {
   lines.push(":local wanIfaceExists ([:len $wanIfaceFound] > 0);");
   lines.push(":if ($wanIfaceExists) do={");
   lines.push(
-    `  :local wanRunning [/interface get [find name="${wanIface}"] running];`,
+    `  :local wanRunning [/interface get [/interface find name="${wanIface}"] running];`,
   );
   lines.push(
     `  /log info message="[ZTP] WAN interface ${wanIface} exists (running=$wanRunning)";`,
@@ -887,20 +887,20 @@ function generateProvisionScript(router, options = {}) {
     // For RouterOS v7, we need to generate keys manually
     // The private key is auto-generated when interface is created, we extract the public key
     lines.push(
-      `  :local wgPrivKey [/interface wireguard get [find name=mgmt-tunnel] private-key];`,
+      `  :local wgPrivKey [/interface wireguard get [/interface wireguard find name=mgmt-tunnel] private-key];`,
     );
 
     // If private key is empty (RouterOS v6/v7 difference), generate one
     lines.push(`  :if ([:len $wgPrivKey] = 0) do={`);
     lines.push(`    :set wgPrivKey [:identity 64];`);
     lines.push(
-      `    /interface wireguard set [find name=mgmt-tunnel] private-key=$wgPrivKey;`,
+      `    /interface wireguard set [/interface wireguard find name=mgmt-tunnel] private-key=$wgPrivKey;`,
     );
     lines.push(`  };`);
 
     // Extract public key
     lines.push(
-      `  :set wgPubKeyLocal [/interface wireguard get [find name=mgmt-tunnel] public-key];`,
+      `  :set wgPubKeyLocal [/interface wireguard get [/interface wireguard find name=mgmt-tunnel] public-key];`,
     );
     lines.push(
       `  :if ([:len $wgPubKeyLocal] = 0) do={ :set wgPubKeyLocal "unknown"; };`,
@@ -938,7 +938,7 @@ function generateProvisionScript(router, options = {}) {
       `  /log info message="[ZTP] WireGuard tunnel SKIPPED - mgmt-tunnel already exists";`,
     );
     lines.push(
-      `  :do { :set wgPubKeyLocal [/interface wireguard get [find name=mgmt-tunnel] public-key]; } on-error={}`,
+      `  :do { :set wgPubKeyLocal [/interface wireguard get [/interface wireguard find name=mgmt-tunnel] public-key]; } on-error={}`,
     );
     lines.push(`  :set wgPubKey $wgPubKeyLocal;`);
     lines.push(`};`);
