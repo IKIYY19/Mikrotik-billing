@@ -14,8 +14,14 @@ import {
   ChevronRight,
   Database,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -86,18 +92,25 @@ function formatTimestamp(ts) {
 }
 
 function ActionBadge({ action }) {
-  const colorClass = ACTION_COLORS[action] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+  const colorClass =
+    ACTION_COLORS[action] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}
+    >
       {action ? action.replace(/_/g, " ") : "—"}
     </span>
   );
 }
 
 function EntityBadge({ entityType }) {
-  const colorClass = ENTITY_COLORS[entityType] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+  const colorClass =
+    ENTITY_COLORS[entityType] ||
+    "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}
+    >
       {entityType || "—"}
     </span>
   );
@@ -120,14 +133,20 @@ function JsonDiffView({ before, after }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
       >
-        {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        {expanded ? (
+          <ChevronUp className="w-3 h-3" />
+        ) : (
+          <ChevronDown className="w-3 h-3" />
+        )}
         {expanded ? "Hide" : "Show"} Change Details
       </button>
       {expanded && (
         <div className="mt-2 grid grid-cols-1 gap-3">
           {beforeObj && (
             <div>
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Before</div>
+              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                Before
+              </div>
               <pre className="text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 overflow-x-auto max-h-48">
                 {JSON.stringify(beforeObj, null, 2)}
               </pre>
@@ -135,7 +154,9 @@ function JsonDiffView({ before, after }) {
           )}
           {afterObj && (
             <div>
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">After</div>
+              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                After
+              </div>
               <pre className="text-xs text-zinc-300 bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 overflow-x-auto max-h-48">
                 {JSON.stringify(afterObj, null, 2)}
               </pre>
@@ -168,6 +189,7 @@ export function AuditLogs() {
   const [entityTypeFilter, setEntityTypeFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(0);
+  const [dbAvailable, setDbAvailable] = useState(true);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -179,11 +201,15 @@ export function AuditLogs() {
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(page * PAGE_SIZE));
 
-      const { data } = await axios.get(`${API}/audit/logs?${params.toString()}`);
+      const { data } = await axios.get(
+        `${API}/audit/logs?${params.toString()}`,
+      );
+      setDbAvailable(true);
       setLogs(data.logs || []);
       setTotal(data.total || 0);
     } catch (e) {
       console.error("Failed to fetch audit logs:", e);
+      setDbAvailable(false);
       setLogs([]);
       setTotal(0);
     }
@@ -193,6 +219,16 @@ export function AuditLogs() {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this audit log entry?")) return;
+    try {
+      await axios.delete(`${API}/audit/logs/${id}`);
+      fetchLogs();
+    } catch (e) {
+      console.error("Failed to delete log:", e);
+    }
+  };
 
   const toggleRow = (id) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -219,21 +255,28 @@ export function AuditLogs() {
           onClick={fetchLogs}
           disabled={loading}
         >
-          <RefreshCw className={`w-3 h-3 mr-1 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-3 h-3 mr-1 ${loading ? "animate-spin" : ""}`}
+          />
           Refresh
         </Button>
       </div>
 
       {/* PostgreSQL required message */}
-      {total === 0 && !loading && (
+      {!dbAvailable && !loading && (
         <Card className="mb-6 border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <Database className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-amber-300">Audit logs require PostgreSQL</p>
+                <p className="text-sm font-medium text-amber-300">
+                  Audit logs require PostgreSQL
+                </p>
                 <p className="text-xs text-amber-400/70 mt-1">
-                  The audit log system requires a PostgreSQL database connection. If you are running with in-memory storage, audit logs will not be available. Deploy with a PostgreSQL database to enable full audit trail capabilities.
+                  The audit log system requires a PostgreSQL database
+                  connection. If you are running with in-memory storage, audit
+                  logs will not be available. Deploy with a PostgreSQL database
+                  to enable full audit trail capabilities.
                 </p>
               </div>
             </div>
@@ -247,10 +290,15 @@ export function AuditLogs() {
           <div className="flex flex-wrap items-end gap-4">
             {/* Action filter */}
             <div className="flex-1 min-w-[160px]">
-              <Label className="text-xs text-zinc-500 mb-1.5 block">Action</Label>
+              <Label className="text-xs text-zinc-500 mb-1.5 block">
+                Action
+              </Label>
               <select
                 value={actionFilter}
-                onChange={(e) => { setActionFilter(e.target.value); setPage(0); }}
+                onChange={(e) => {
+                  setActionFilter(e.target.value);
+                  setPage(0);
+                }}
                 className="w-full h-10 rounded-md border border-zinc-700/60 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40"
               >
                 {COMMON_ACTIONS.map((a) => (
@@ -263,10 +311,15 @@ export function AuditLogs() {
 
             {/* Entity Type filter */}
             <div className="flex-1 min-w-[160px]">
-              <Label className="text-xs text-zinc-500 mb-1.5 block">Entity Type</Label>
+              <Label className="text-xs text-zinc-500 mb-1.5 block">
+                Entity Type
+              </Label>
               <select
                 value={entityTypeFilter}
-                onChange={(e) => { setEntityTypeFilter(e.target.value); setPage(0); }}
+                onChange={(e) => {
+                  setEntityTypeFilter(e.target.value);
+                  setPage(0);
+                }}
                 className="w-full h-10 rounded-md border border-zinc-700/60 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40"
               >
                 {COMMON_ENTITY_TYPES.map((et) => (
@@ -279,13 +332,18 @@ export function AuditLogs() {
 
             {/* Search */}
             <div className="flex-[2] min-w-[200px]">
-              <Label className="text-xs text-zinc-500 mb-1.5 block">Search</Label>
+              <Label className="text-xs text-zinc-500 mb-1.5 block">
+                Search
+              </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                 <Input
                   placeholder="Search logs..."
                   value={searchText}
-                  onChange={(e) => { setSearchText(e.target.value); setPage(0); }}
+                  onChange={(e) => {
+                    setSearchText(e.target.value);
+                    setPage(0);
+                  }}
                   className="pl-9 bg-zinc-900/60 border-zinc-700/60 text-zinc-200"
                 />
               </div>
@@ -300,6 +358,7 @@ export function AuditLogs() {
                 setEntityTypeFilter("");
                 setSearchText("");
                 setPage(0);
+                fetchLogs();
               }}
               className="text-zinc-400 hover:text-zinc-200"
             >
@@ -360,6 +419,9 @@ export function AuditLogs() {
                       IP Address
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                       Details
                     </th>
                   </tr>
@@ -386,7 +448,9 @@ export function AuditLogs() {
                                 {log.user_name || "System"}
                               </p>
                               {log.user_role && (
-                                <p className="text-[10px] text-zinc-500">{log.user_role}</p>
+                                <p className="text-[10px] text-zinc-500">
+                                  {log.user_role}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -398,10 +462,22 @@ export function AuditLogs() {
                           <EntityBadge entityType={log.entity_type} />
                         </td>
                         <td className="py-3 px-4 text-xs text-zinc-500 font-mono truncate max-w-[100px]">
-                          {log.entity_id ? log.entity_id.slice(0, 8) + "..." : "—"}
+                          {log.entity_id
+                            ? log.entity_id.slice(0, 8) + "..."
+                            : "—"}
                         </td>
                         <td className="py-3 px-4 text-xs text-zinc-500 font-mono">
                           {log.ip_address || "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(log.id)}
+                            className="text-zinc-500 hover:text-red-400"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
                         </td>
                         <td className="py-3 px-4">
                           {expandedRows[log.id] ? (
@@ -413,8 +489,11 @@ export function AuditLogs() {
                       </tr>
                       {expandedRows[log.id] && (
                         <tr className="bg-zinc-900/40">
-                          <td colSpan={7} className="py-3 px-6">
-                            <JsonDiffView before={log.before_data} after={log.after_data} />
+                          <td colSpan={8} className="py-3 px-6">
+                            <JsonDiffView
+                              before={log.before_data}
+                              after={log.after_data}
+                            />
                           </td>
                         </tr>
                       )}
