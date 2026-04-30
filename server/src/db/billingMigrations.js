@@ -45,6 +45,8 @@ const billingMigrations = [
     mikrotik_connection_id UUID REFERENCES mikrotik_connections(id) ON DELETE SET NULL,
     pppoe_username VARCHAR(100),
     pppoe_password VARCHAR(255),
+    mac_address VARCHAR(50),
+    mac_binding_enabled BOOLEAN DEFAULT false,
     pppoe_profile VARCHAR(100),
     status VARCHAR(20) DEFAULT 'active',
     start_date DATE,

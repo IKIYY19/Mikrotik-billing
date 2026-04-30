@@ -269,8 +269,8 @@ const subscriptions = {
     const id = uuidv4();
     const result = await db.query(
       `INSERT INTO subscriptions (id, customer_id, plan_id, router_id, mikrotik_connection_id, pppoe_username, pppoe_password,
-       pppoe_profile, status, start_date, end_date, billing_cycle, auto_provision, last_synced_at, last_sync_status, last_sync_error)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+       mac_address, mac_binding_enabled, pppoe_profile, status, start_date, end_date, billing_cycle, auto_provision, last_synced_at, last_sync_status, last_sync_error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
       [
         id,
         data.customer_id,
@@ -279,6 +279,8 @@ const subscriptions = {
         data.mikrotik_connection_id || null,
         data.pppoe_username || "",
         data.pppoe_password || "",
+        data.mac_address || "",
+        data.mac_binding_enabled || false,
         data.pppoe_profile || null,
         data.status || "active",
         data.start_date || new Date().toISOString().split("T")[0],
@@ -307,16 +309,19 @@ const subscriptions = {
     if (!existing) return null;
     const result = await db.query(
       `UPDATE subscriptions SET status = COALESCE($1, status), pppoe_username = COALESCE($2, pppoe_username),
-       pppoe_password = COALESCE($3, pppoe_password), billing_cycle = COALESCE($4, billing_cycle),
-       auto_provision = COALESCE($5, auto_provision), end_date = COALESCE($6, end_date),
-       mikrotik_connection_id = COALESCE($7, mikrotik_connection_id), router_id = COALESCE($8, router_id),
-       pppoe_profile = COALESCE($9, pppoe_profile), last_synced_at = COALESCE($10, last_synced_at),
-       last_sync_status = COALESCE($11, last_sync_status), last_sync_error = $12,
-       updated_at = CURRENT_TIMESTAMP WHERE id = $13 RETURNING *`,
+       pppoe_password = COALESCE($3, pppoe_password), mac_address = COALESCE($4, mac_address),
+       mac_binding_enabled = COALESCE($5, mac_binding_enabled), billing_cycle = COALESCE($6, billing_cycle),
+       auto_provision = COALESCE($7, auto_provision), end_date = COALESCE($8, end_date),
+       mikrotik_connection_id = COALESCE($9, mikrotik_connection_id), router_id = COALESCE($10, router_id),
+       pppoe_profile = COALESCE($11, pppoe_profile), last_synced_at = COALESCE($12, last_synced_at),
+       last_sync_status = COALESCE($13, last_sync_status), last_sync_error = $14,
+       updated_at = CURRENT_TIMESTAMP WHERE id = $15 RETURNING *`,
       [
         data.status,
         data.pppoe_username,
         data.pppoe_password,
+        data.mac_address,
+        data.mac_binding_enabled,
         data.billing_cycle,
         data.auto_provision,
         data.end_date,
