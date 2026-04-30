@@ -31,12 +31,19 @@ export function BrandingProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  const appName = branding.branding_title || branding.company_name || "MikroTik Billing";
+  const appName =
+    branding.branding_title || branding.company_name || "MikroTik Billing";
 
   // Apply primary color as CSS variable
   useEffect(() => {
-    document.documentElement.style.setProperty("--brand-primary", branding.primary_color);
-    document.documentElement.style.setProperty("--brand-secondary", branding.secondary_color);
+    document.documentElement.style.setProperty(
+      "--brand-primary",
+      branding.primary_color,
+    );
+    document.documentElement.style.setProperty(
+      "--brand-secondary",
+      branding.secondary_color,
+    );
   }, [branding.primary_color, branding.secondary_color]);
 
   return (
