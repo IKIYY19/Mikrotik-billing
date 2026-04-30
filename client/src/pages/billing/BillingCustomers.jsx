@@ -30,6 +30,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 
 const API = import.meta.env.VITE_API_URL || "/api";
+const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
 
 /* ─── Online Status Badge ─── */
 function OnlineStatus({
