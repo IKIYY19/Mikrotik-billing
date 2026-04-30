@@ -98,6 +98,8 @@ export function BillingCustomers() {
     notes: "",
     account_number: "",
     fup_profile_id: "",
+    lat: "",
+    lng: "",
   });
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState([]);
@@ -215,6 +217,28 @@ export function BillingCustomers() {
     setOnlineLoading(false);
   };
 
+  const geocodeAddress = async () => {
+    const query = [form.address, form.city, form.country]
+      .filter(Boolean)
+      .join(", ");
+    if (!query) {
+      toast.error("Enter an address or city first");
+      return;
+    }
+    try {
+      const { data } = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+      );
+      if (data && data.length > 0) {
+        setForm({ ...form, lat: data[0].lat, lng: data[0].lon });
+        toast.success("Coordinates found");
+      } else {
+        toast.error("Address not found. Try being more specific.");
+      }
+    } catch (e) {
+      toast.error("Geocoding failed");
+    }
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -226,6 +250,8 @@ export function BillingCustomers() {
           customers,
         );
       }
+      submitData.lat = form.lat || null;
+      submitData.lng = form.lng || null;
 
       if (editing) {
         await axios.put(`${API}/billing/customers/${editing.id}`, submitData);
@@ -259,6 +285,8 @@ export function BillingCustomers() {
         notes: "",
         account_number: "",
         fup_profile_id: "",
+        lat: "",
+        lng: "",
       });
       fetchCustomers();
     } catch (error) {
@@ -299,6 +327,8 @@ export function BillingCustomers() {
       notes: c.notes || "",
       account_number: c.account_number || "",
       fup_profile_id: c.fup_profile_id || "",
+      lat: c.lat || "",
+      lng: c.lng || "",
     });
     setShowForm(true);
   };
@@ -353,6 +383,8 @@ export function BillingCustomers() {
                 notes: "",
                 account_number: "",
                 fup_profile_id: "",
+                lat: "",
+                lng: "",
               });
               setShowForm(true);
             }}
@@ -637,6 +669,39 @@ export function BillingCustomers() {
                       }
                       placeholder="Street address"
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="lat">Latitude</Label>
+                    <Input
+                      id="lat"
+                      value={form.lat}
+                      onChange={(e) =>
+                        setForm({ ...form, lat: e.target.value })
+                      }
+                      placeholder="-1.2921"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lng">Longitude</Label>
+                    <Input
+                      id="lng"
+                      value={form.lng}
+                      onChange={(e) =>
+                        setForm({ ...form, lng: e.target.value })
+                      }
+                      placeholder="36.8219"
+                    />
+                  </div>
+                  <div className="col-span-2 flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={geocodeAddress}
+                      className="text-xs"
+                    >
+                      <Search className="w-3 h-3 mr-1" /> Find Coordinates from
+                      Address
+                    </Button>
                   </div>
                   <div>
                     <Label htmlFor="status">Status</Label>
