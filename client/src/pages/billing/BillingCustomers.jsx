@@ -261,7 +261,7 @@ export function BillingCustomers() {
               {
                 attribution: "\u00a9 OSM",
               },
-            ).addTo(map);
+            ).addTo(map); setTimeout(function() { map.invalidateSize(); }, 200);
             pickerMapRef.current = map;
 
             map.on("click", (e) => {
@@ -282,7 +282,7 @@ export function BillingCustomers() {
               pickerMarkerRef.current = window.L.marker([
                 parseFloat(form.lat),
                 parseFloat(form.lng),
-              ]).addTo(map);
+              ]).addTo(map); setTimeout(function() { map.invalidateSize(); }, 200);
             }
           };
 
@@ -299,7 +299,7 @@ export function BillingCustomers() {
             document.head.appendChild(script);
           }
         }
-      }, 100);
+      }, 500);
     }
   };
   const handleSubmit = async (e) => {
