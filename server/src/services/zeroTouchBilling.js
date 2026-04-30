@@ -83,6 +83,7 @@ function buildConnectionFields(router, overrides = {}) {
     overrides.mgmt_port || router.mgmt_port || 8728,
   );
   const username = overrides.mgmt_username || router.mgmt_username || "";
+  console.log("[ZTP buildConnectionFields] overrides.mgmt_username=", overrides.mgmt_username, "overrides.mgmt_password=", overrides.mgmt_password ? "SET" : "NOT SET", "router.mgmt_username=", router.mgmt_username);
   const passwordEncrypted = overrides.mgmt_password
     ? encryptForMikrotik(overrides.mgmt_password)
     : overrides.mgmt_password_encrypted ||
@@ -120,6 +121,7 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
     };
   }
   if (!fields.username || !fields.password_encrypted) {
+  console.log("[ZTP ensureMikrotikConnection] fields.username=", fields.username, "fields.password_encrypted=", fields.password_encrypted ? "SET(len=" + fields.password_encrypted.length + ")" : "NOT SET");
     return {
       success: false,
       status: "skipped",
