@@ -281,6 +281,25 @@ router.put("/customers/:id", async (req, res) => {
   try {
     const customer = await billing.updateCustomer(req.params.id, req.body);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
+    
+    if (req.body.plan_id) {
+      try {
+        const existingSub = await global.dbAvailable ? (await (global.db || require("../db/memory")).query("SELECT * FROM subscriptions WHERE customer_id = $1 AND status = 'active' LIMIT 1", [req.params.id])).rows[0] || null : billing.store.subscriptions.find(s => s.customer_id === req.params.id && s.status === 'active') || null;
+        if (existingSub) {
+          await billing.updateSubscription(existingSub.id, { plan_id: req.body.plan_id });
+        } else {
+          await billing.createSubscription({
+            customer_id: req.params.id,
+            plan_id: req.body.plan_id,
+            status: 'active',
+            start_date: new Date().toISOString(),
+            billing_cycle: 'monthly',
+          });
+        }
+      } catch (subErr) {
+        console.error('Failed to update subscription:', subErr.message);
+      }
+    }
     res.json(customer);
   } catch (e) {
     res.status(500).json({ error: e.message });
