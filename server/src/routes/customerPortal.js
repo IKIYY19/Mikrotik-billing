@@ -1331,6 +1331,21 @@ router.put("/:customerId/credentials", async (req, res) => {
 // Get available plans for upgrade/downgrade
 router.get("/:customerId/available-plans", async (req, res) => {
   try {
+    const { customerId } = req.params;
+
+    if (global.dbAvailable) {
+      const plansRes = await db.query("SELECT * FROM service_plans WHERE is_active = true");
+      const plans = plansRes.rows;
+      const subRes = await db.query("SELECT * FROM subscriptions WHERE customer_id = $1 AND status = 'active' LIMIT 1", [customerId]);
+      const subscription = subRes.rows[0] || null;
+      const currentPlanId = subscription?.plan_id;
+      const currentPlan = currentPlanId ? plans.find(p => p.id === currentPlanId) : null;
+      return res.json(plans.map(p => ({
+        ...p,
+        is_current: p.id === currentPlanId,
+        change_type: !currentPlan ? "new" : parseFloat(p.price) > parseFloat(currentPlan.price||0) ? "upgrade" : parseFloat(p.price) < parseFloat(currentPlan.price||0) ? "downgrade" : "same"
+      })));
+    }
     const plans = billing.store.service_plans.filter((p) => !p.archived);
     const subscription = billing.store.subscriptions.find(
       (s) => s.customer_id === req.params.customerId && s.status === "active",
@@ -1362,6 +1377,14 @@ router.get("/:customerId/available-plans", async (req, res) => {
 // Change plan
 router.post("/:customerId/change-plan", async (req, res) => {
   try {
+
+    // Also update PostgreSQL if available
+    if (global.dbAvailable) {
+      await db.query(
+        "UPDATE subscriptions SET plan_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [plan_id, subscription.id]
+      );
+    }
     const { plan_id } = req.body;
     if (!plan_id) {
       return res.status(400).json({ error: "plan_id is required" });
