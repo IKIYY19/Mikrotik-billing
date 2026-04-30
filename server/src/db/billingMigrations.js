@@ -626,6 +626,8 @@ const billingMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_message_logs_channel ON message_logs(channel)`,
   `CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at)`,
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS mac_address VARCHAR(50)`,
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS mac_binding_enabled BOOLEAN DEFAULT false`,
 ];
 
 // Seed data
