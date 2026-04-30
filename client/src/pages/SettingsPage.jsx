@@ -18,6 +18,7 @@ import {
   Globe,
   Lock,
   Palette,
+  RotateCcw,
   Sun,
   Moon,
   Wifi,
