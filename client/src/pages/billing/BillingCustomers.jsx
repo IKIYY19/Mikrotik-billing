@@ -246,60 +246,27 @@ export function BillingCustomers() {
   };
   const toggleMapPicker = () => setShowMapPicker((prev) => !prev);
 
-  // Load Leaflet CSS once
-  useEffect(() => {
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-  }, []);
-
-  // Init map when picker is shown and div is rendered
   useEffect(() => {
     if (!showMapPicker || pickerMapRef.current) return;
-
-    const loadMap = () => {
-      if (!mapPickerRef.current) return;
-      const container = mapPickerRef.current;
-      if (container.offsetHeight === 0) {
-        // Retry after a frame
-        requestAnimationFrame(loadMap);
-        return;
-      }
-
+    requestAnimationFrame(() => {
+      if (!mapPickerRef.current || mapPickerRef.current.offsetHeight === 0) return;
       const lat = parseFloat(form.lat) || -1.2921;
       const lng = parseFloat(form.lng) || 36.8219;
-      const map = window.L.map(container).setView([lat, lng], 14);
+      const map = window.L.map(mapPickerRef.current).setView([lat, lng], 14);
       window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OSM",
       }).addTo(map);
       pickerMapRef.current = map;
-
       map.on("click", (e) => {
-        const { lat: clat, lng: clng } = e.latlng;
-        setForm((prev) => ({ ...prev, lat: clat.toFixed(6), lng: clng.toFixed(6) }));
+        setForm((prev) => ({ ...prev, lat: e.latlng.lat.toFixed(6), lng: e.latlng.lng.toFixed(6) }));
         if (pickerMarkerRef.current) map.removeLayer(pickerMarkerRef.current);
-        pickerMarkerRef.current = window.L.marker([clat, clng]).addTo(map);
+        pickerMarkerRef.current = window.L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
       });
-
       if (form.lat && form.lng) {
         pickerMarkerRef.current = window.L.marker([parseFloat(form.lat), parseFloat(form.lng)]).addTo(map);
       }
-
       setTimeout(() => map.invalidateSize(), 100);
-    };
-
-    if (window.L) {
-      requestAnimationFrame(loadMap);
-    } else {
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => requestAnimationFrame(loadMap);
-      document.head.appendChild(script);
-    }
+    });
   }, [showMapPicker]);
 
   const handleSubmit = async (e) => {
