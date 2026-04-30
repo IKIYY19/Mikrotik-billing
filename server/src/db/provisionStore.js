@@ -175,6 +175,7 @@ function generateProvisionScript(router, options = {}) {
   );
   lines.push(':local targetBridgeName "";');
   lines.push(":local targetBridgeExists false;");
+  lines.push(":local autoBridge false;");
   lines.push(`:if ([:len $targetBridgeFound] > 0) do={`);
   lines.push(`  :set targetBridgeName "${lanBridge}";`);
   lines.push(`  :set targetBridgeExists true;`);

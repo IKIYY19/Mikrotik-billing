@@ -85,7 +85,6 @@ router.get("/provision/:token", async (req, res) => {
       return res.type("text/plain").send(cached);
     }
 
-
     // Find router by token
     const result = await getDb().query(
       "SELECT * FROM routers WHERE provision_token = $1",
@@ -111,7 +110,6 @@ router.get("/provision/:token", async (req, res) => {
         .type("text/plain")
         .send("# ERROR: Invalid provisioning token");
     }
-
 
     const routerData = result.rows[0];
 
@@ -191,7 +189,6 @@ router.get("/provision/callback/:token", async (req, res) => {
       return res.type("text/plain").send("# ERROR: Invalid token");
     }
 
-
     const routerData = result.rows[0];
 
     // Store WireGuard public key if provided
@@ -210,9 +207,7 @@ router.get("/provision/callback/:token", async (req, res) => {
           error: e.message,
         });
       }
-
     }
-
 
     // Invalidate cached script so next fetch is fresh
     provisionCache.delete(token);
@@ -294,7 +289,6 @@ router.get("/provision/command/:routerId", async (req, res) => {
       return res.status(404).json({ error: "Router not found" });
     }
 
-
     const router = result.rows[0];
     const serverUrl = getServerBaseUrl(req, baseUrl);
     const token = router.provision_token;
@@ -330,7 +324,6 @@ router.post("/provision/command/:routerId", async (req, res) => {
       return res.status(404).json({ error: "Router not found" });
     }
 
-
     const newToken = provisionStore.generateToken();
     const updateResult = await getDb().query(
       `UPDATE routers
@@ -344,7 +337,6 @@ router.post("/provision/command/:routerId", async (req, res) => {
     if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: "Router not found" });
     }
-
 
     const serverUrl = getServerBaseUrl(req, baseUrl);
     const token = updateResult.rows[0].provision_token;
@@ -479,7 +471,6 @@ async function upsertDiscoveredRouter(enrollToken, tokenRecord, data, ip, ua) {
       return result.rows[0];
     }
 
-
     const result = await getDb().query(
       `INSERT INTO discovered_routers
          (id, enrollment_token, token_id, identity, model, version, serial_number, primary_mac,
@@ -544,7 +535,6 @@ function appendInterfaceToDiscovered(enrollToken, iface) {
         record.suggested_wan_interface = ethRunning[0].name;
         record.suggested_lan_ports = ethRunning.slice(1).map((i) => i.name);
       }
-
     }
 
     return;
@@ -642,7 +632,6 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
         );
     }
 
-
     if (tokenRecord.status === "approved" || tokenRecord.status === "expired") {
       return res
         .status(410)
@@ -651,7 +640,6 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
           `# ERROR: Enrollment token is ${tokenRecord.status}. Generate a new one.`,
         );
     }
-
 
     if (
       tokenRecord.expires_at &&
@@ -664,7 +652,6 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
           "# ERROR: Enrollment token has expired. Generate a new one from the platform.",
         );
     }
-
 
     const serverUrl = getServerBaseUrl(req);
     const cleanUrl = serverUrl.replace(/\/$/, "");
@@ -706,14 +693,14 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       ":global ztpMgmtUser; :global ztpMgmtPass;",
       ":local mgmtUser $ztpMgmtUser",
       ":local mgmtPass $ztpMgmtPass",
-      ":local ztpPass \"" + mgmtPass + "\"",
+      ':local ztpPass "' + mgmtPass + '"',
       ":if ([:len \$ztpPass] > 0) do={",
-      "  :set mgmtUser \"admin\"",
+      '  :set mgmtUser "admin"',
       "  :set mgmtPass \$ztpPass",
-      "  :put \"[ZTP] Auto-generated admin password: \$ztpPass\"",
+      '  :put "[ZTP] Auto-generated admin password: \$ztpPass"',
       "  /user set admin password=\$ztpPass",
       "}",
-      ":if ([:len $mgmtUser] > 0) do={ :log info message=\"[ZTP] Mgmt user provided: $mgmtUser\" }",
+      ':if ([:len $mgmtUser] > 0) do={ :log info message="[ZTP] Mgmt user provided: $mgmtUser" }',
       "",
       "# ── Optional: Port selection overrides ──",
       "# Set these BEFORE running the script to pick WAN / LAN ports:",
@@ -781,9 +768,12 @@ router.get("/enroll/bootstrap/:token", async (req, res) => {
       "",
       "# ── Step 2: Report system info via GET (v6 + v7 compatible) ──",
       ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . [$ztpUrlEncode $sysIdentity] . "&model=" . [$ztpUrlEncode $sysModel] . "&version=" . [$ztpUrlEncode $sysVersion] . "&uptime=" . [$ztpUrlEncode $sysUptime] . "&serial=" . [$ztpUrlEncode $sysSerial] . "&mac=" . [$ztpUrlEncode $sysMac])',
-      ':if ([:len $ztpPass] > 0) do={ :set reportUrl ($reportUrl . "&mgmt_user=admin&mgmt_pass=" . [$ztpUrlEncode $ztpPass]) }',
+      ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . [$ztpUrlEncode $sysIdentity] . "&model=" . [$ztpUrlEncode $sysModel] . "&version=" . [$ztpUrlEncode $sysVersion] . "&uptime=" . [$ztpUrlEncode $sysUptime] . "&serial=" . [$ztpUrlEncode $sysSerial] . "&mac=" . [$ztpUrlEncode $sysMac])',
+      ":if ([:len $ztpPass] > 0) do={",
+      `:do { ${fetchCmd('($reportUrl . "&mgmt_user=admin&mgmt_pass=" . [$ztpUrlEncode $ztpPass])')} } on-error={}`,
+      "} else={",
       `:do { ${fetchCmd("$reportUrl")} } on-error={}`,
-      "",
+      "}",
       ':log info message=("[ZTP] Reported system info: " . $sysIdentity)',
       "",
       "# ── Step 3: Report each interface (one GET per interface) ──",
@@ -944,14 +934,12 @@ router.all("/enroll/report/:token", async (req, res) => {
       return res.type("text/plain").send("# ERROR: Invalid enrollment token");
     }
 
-
     if (
       tokenRecord.expires_at &&
       new Date(tokenRecord.expires_at) < new Date()
     ) {
       return res.type("text/plain").send("# ERROR: Token expired");
     }
-
 
     const data = {
       identity: raw.identity || raw.name || null,
@@ -994,14 +982,12 @@ router.get("/enroll/iface/:token", async (req, res) => {
       return res.type("text/plain").send("# SKIP: no name");
     }
 
-
     const mgmtPass = req.query.mgmt_pass || "";
 
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
       return res.type("text/plain").send("# ERROR: Invalid token");
     }
-
 
     const iface = {
       name,
@@ -1035,14 +1021,12 @@ router.get("/enroll/addr/:token", async (req, res) => {
       return res.type("text/plain").send("# SKIP: no address");
     }
 
-
     const mgmtPass = req.query.mgmt_pass || "";
 
     const tokenRecord = await findEnrollmentToken(token);
     if (!tokenRecord) {
       return res.type("text/plain").send("# ERROR: Invalid token");
     }
-
 
     appendAddressToDiscovered(token, { address: addr, interface: iface || "" });
 
@@ -1075,9 +1059,7 @@ router.get("/enroll/done/:token", async (req, res) => {
           record.suggested_wan_interface = etherRunning[0].name;
           record.suggested_lan_ports = etherRunning.slice(1).map((i) => i.name);
         }
-
       }
-
     } else {
       // Re-compute suggested WAN/LAN from interfaces stored in DB
       try {
@@ -1094,7 +1076,6 @@ router.get("/enroll/done/:token", async (req, res) => {
             } catch (e) {
               interfaces = [];
             }
-
           }
 
           if (Array.isArray(interfaces) && interfaces.length > 0) {
@@ -1116,17 +1097,12 @@ router.get("/enroll/done/:token", async (req, res) => {
                 ],
               );
             }
-
           }
-
         }
-
       } catch (e) {
         console.warn("[Enrollment] done finalization error:", e.message);
       }
-
     }
-
 
     logger.info(
       `[Enrollment] Done signal received - token: ${token}, ip: ${ip}`,
@@ -1173,14 +1149,12 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
       return res.type("text/plain").send("# ERROR: Invalid enrollment token");
     }
 
-
     if (
       tokenRecord.expires_at &&
       new Date(tokenRecord.expires_at) < new Date()
     ) {
       return res.type("text/plain").send("# ERROR: Token expired");
     }
-
 
     // 1. Find the discovered router
     let discovered = null;
@@ -1195,7 +1169,6 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
       );
       discovered = result.rows[0] || null;
     }
-
 
     if (!discovered) {
       if (!global.dbAvailable) {
@@ -1225,9 +1198,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
             "# ERROR: Router not discovered yet. Complete enrollment first.",
           );
       }
-
     }
-
 
     // 2. Mark as approved
     const now = new Date().toISOString();
@@ -1240,7 +1211,6 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
         [token],
       );
     }
-
 
     // 3. Create router record with provision token
     const provisionToken = provisionStore.generateToken();
@@ -1290,7 +1260,6 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
           updated_at: now,
         });
       }
-
     } else {
       const existingRouter = await getDb().query(
         "SELECT id FROM routers WHERE provision_token = $1",
@@ -1318,23 +1287,23 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
           ],
         );
       }
-
     }
-
 
     logger.info(
       `[Enrollment] Auto-complete - token: ${token}, provisionToken: ${provisionToken}, router: ${routerName}`,
     );
 
-
     // 4. Auto-link to billing if management credentials were provided
     try {
-      const billingResult = await zeroTouchBilling.activateRouterInBilling(routerId);
+      const billingResult =
+        await zeroTouchBilling.activateRouterInBilling(routerId);
       logger.info(
-        `[Enrollment] Billing activation for ${routerName}: ${billingResult.success ? 'linked' : 'skipped'}`,
+        `[Enrollment] Billing activation for ${routerName}: ${billingResult.success ? "linked" : "skipped"}`,
       );
     } catch (e) {
-      logger.warn(`[Enrollment] Billing activation failed (non-fatal): ${e.message}`);
+      logger.warn(
+        `[Enrollment] Billing activation failed (non-fatal): ${e.message}`,
+      );
     }
 
     // Return a script that directly fetches AND applies the provision script
@@ -1391,11 +1360,11 @@ router.get("/ztp/one-shot/:token", async (req, res) => {
       '#   :global ztpMgmtUser "admin"',
       '#   :global ztpMgmtPass "password"',
       ":global ztpMgmtUser; :global ztpMgmtPass;",
-      ":local ztpPass \"" + mgmtPass + "\"",
+      ':local ztpPass "' + mgmtPass + '"',
       ":if ([:len $ztpPass] > 0) do={",
-      "  :put \"[ZTP] Auto-generated admin password: $ztpPass\"",
+      '  :put "[ZTP] Auto-generated admin password: $ztpPass"',
       "  /user set admin password=$ztpPass",
-      "  :set mgmtUser \"admin\"",
+      '  :set mgmtUser "admin"',
       "  :set mgmtPass $ztpPass",
       "}",
       ":local mgmtUser $ztpMgmtUser",
@@ -1468,8 +1437,11 @@ router.get("/ztp/one-shot/:token", async (req, res) => {
       "",
       "# ── Step 2: Report system info ──",
       ':local reportUrl ($serverUrl . "/mikrotik/enroll/report/" . $enrollToken . "?identity=" . [$ztpUrlEncode $sysIdentity] . "&model=" . [$ztpUrlEncode $sysModel] . "&version=" . [$ztpUrlEncode $sysVersion] . "&uptime=" . [$ztpUrlEncode $sysUptime] . "&serial=" . [$ztpUrlEncode $sysSerial] . "&mac=" . [$ztpUrlEncode $sysMac])',
-      ':if ([:len $ztpPass] > 0) do={ :set reportUrl ($reportUrl . "&mgmt_user=admin&mgmt_pass=" . [$ztpUrlEncode $ztpPass]) }',
+      ":if ([:len $ztpPass] > 0) do={",
+      `:do { ${fetchNoKeep('($reportUrl . "&mgmt_user=admin&mgmt_pass=" . [$ztpUrlEncode $ztpPass])')} } on-error={}`,
+      "} else={",
       `:do { ${fetchNoKeep("$reportUrl")} } on-error={}`,
+      "}",
       ':log info message=("[ZTP] Reported system info: " . $sysIdentity)',
       "",
       "# ── Step 3: Report each interface ──",
