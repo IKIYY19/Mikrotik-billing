@@ -244,64 +244,64 @@ export function BillingCustomers() {
       toast.error("Geocoding failed");
     }
   };
-  const toggleMapPicker = () => {
-    setShowMapPicker(!showMapPicker);
-    if (!showMapPicker) {
-      setTimeout(() => {
-        if (mapPickerRef.current && !pickerMapRef.current) {
-          const initMap = () => {
-            const lat = parseFloat(form.lat) || -1.2921;
-            const lng = parseFloat(form.lng) || 36.8219;
-            const map = window.L.map(mapPickerRef.current).setView(
-              [lat, lng],
-              14,
-            );
-            window.L.tileLayer(
-              "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-              {
-                attribution: "\u00a9 OSM",
-              },
-            ).addTo(map); setTimeout(function() { map.invalidateSize(); }, 200);
-            pickerMapRef.current = map;
+  const toggleMapPicker = () => setShowMapPicker((prev) => !prev);
 
-            map.on("click", (e) => {
-              const { lat: clat, lng: clng } = e.latlng;
-              setForm((prev) => ({
-                ...prev,
-                lat: clat.toFixed(6),
-                lng: clng.toFixed(6),
-              }));
-              if (pickerMarkerRef.current)
-                map.removeLayer(pickerMarkerRef.current);
-              pickerMarkerRef.current = window.L.marker([clat, clng]).addTo(
-                map,
-              );
-            });
-
-            if (form.lat && form.lng) {
-              pickerMarkerRef.current = window.L.marker([
-                parseFloat(form.lat),
-                parseFloat(form.lng),
-              ]).addTo(map); setTimeout(function() { map.invalidateSize(); }, 200);
-            }
-          };
-
-          if (window.L) {
-            initMap();
-          } else {
-            const link = document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-            document.head.appendChild(link);
-            const script = document.createElement("script");
-            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            script.onload = initMap;
-            document.head.appendChild(script);
-          }
-        }
-      }, 500);
+  // Load Leaflet CSS once
+  useEffect(() => {
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
     }
-  };
+  }, []);
+
+  // Init map when picker is shown and div is rendered
+  useEffect(() => {
+    if (!showMapPicker || pickerMapRef.current) return;
+
+    const loadMap = () => {
+      if (!mapPickerRef.current) return;
+      const container = mapPickerRef.current;
+      if (container.offsetHeight === 0) {
+        // Retry after a frame
+        requestAnimationFrame(loadMap);
+        return;
+      }
+
+      const lat = parseFloat(form.lat) || -1.2921;
+      const lng = parseFloat(form.lng) || 36.8219;
+      const map = window.L.map(container).setView([lat, lng], 14);
+      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OSM",
+      }).addTo(map);
+      pickerMapRef.current = map;
+
+      map.on("click", (e) => {
+        const { lat: clat, lng: clng } = e.latlng;
+        setForm((prev) => ({ ...prev, lat: clat.toFixed(6), lng: clng.toFixed(6) }));
+        if (pickerMarkerRef.current) map.removeLayer(pickerMarkerRef.current);
+        pickerMarkerRef.current = window.L.marker([clat, clng]).addTo(map);
+      });
+
+      if (form.lat && form.lng) {
+        pickerMarkerRef.current = window.L.marker([parseFloat(form.lat), parseFloat(form.lng)]).addTo(map);
+      }
+
+      setTimeout(() => map.invalidateSize(), 100);
+    };
+
+    if (window.L) {
+      requestAnimationFrame(loadMap);
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = () => requestAnimationFrame(loadMap);
+      document.head.appendChild(script);
+    }
+  }, [showMapPicker]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
