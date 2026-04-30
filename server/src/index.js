@@ -257,6 +257,14 @@ const startServer = async () => {
       const { runMigrations } = require("./db/migrate");
       await runMigrations();
       logger.info("Database migrations done");
+      // Run webhook migration
+      require("./db/webhookMigrations")
+        .run()
+        .catch(() => {});
+      // Run IPAM migration
+      require("./db/ipamMigrations")
+        .run()
+        .catch(() => {});
     } else {
       logger.info("Skipping SQL migrations while running in memory mode");
     }
@@ -572,12 +580,21 @@ const startServer = async () => {
     // QoS routes
     app.use("/api/qos", authenticate, require("./routes/qos"));
 
+    // Audit Log routes
+    app.use("/api/audit", authenticate, require("./routes/audit"));
+
     // Captive Portal routes
     app.use(
       "/api/captive-portal",
       authenticate,
       require("./routes/captivePortal"),
     );
+
+    // IPAM routes
+    app.use("/api/ipam", authenticate, require("./routes/ipam"));
+
+    // Webhook routes
+    app.use("/api/webhooks", authenticate, require("./routes/webhooks"));
 
     // Sentry error handler (MUST be before global error handler)
     app.use(sentryErrorHandler());

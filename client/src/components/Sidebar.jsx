@@ -33,6 +33,7 @@ import {
   LifeBuoy,
   Palette,
   LogOut,
+  Webhook,
   User,
   Key,
   Radio,
@@ -182,6 +183,12 @@ const billingItems = [
     icon: Ticket,
     label: "Vouchers",
     feature: "vouchers",
+  },
+  {
+    to: "/ipam",
+    icon: Network,
+    label: "IPAM",
+    feature: "ipam",
   },
   {
     to: "/network-services",
@@ -417,6 +424,19 @@ export function Sidebar({ onSearchOpen }) {
             >
               <FileText2 className="w-[18px] h-[18px] flex-shrink-0" />
               <span className="truncate">Audit Logs</span>
+            </NavLink>
+            <NavLink
+              to="/webhooks"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
+                }`
+              }
+            >
+              <Webhook className="w-[18px] h-[18px] flex-shrink-0" />
+              <span className="truncate">Webhooks</span>
             </NavLink>
           </>
         )}

@@ -3,48 +3,124 @@
  * Mirrors backend permissions defined in server/src/middleware/auth.js
  */
 
-import axios from 'axios';
+import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || '/api';
+const API = import.meta.env.VITE_API_URL || "/api";
 
 export const ROLES = {
-  ADMIN: 'admin',
-  STAFF: 'staff',
-  TECHNICIAN: 'technician',
-  RESELLER: 'reseller',
-  CUSTOMER: 'customer',
+  ADMIN: "admin",
+  STAFF: "staff",
+  TECHNICIAN: "technician",
+  RESELLER: "reseller",
+  CUSTOMER: "customer",
 };
 
 // Default permissions - used as fallback if backend fails
 const DEFAULT_PERMISSIONS = {
-  [ROLES.ADMIN]: ['*'],
-  [ROLES.STAFF]: ['billing:read', 'billing:write', 'customers:read', 'customers:write', 'reports:read'],
-  [ROLES.TECHNICIAN]: ['network:read', 'network:write', 'monitoring:read', 'devices:read', 'devices:write'],
-  [ROLES.RESELLER]: ['customers:read', 'customers:write', 'billing:read', 'invoices:write'],
-  [ROLES.CUSTOMER]: ['own:read', 'billing:read', 'tickets:write'],
+  [ROLES.ADMIN]: ["*"],
+  [ROLES.STAFF]: [
+    "billing:read",
+    "billing:write",
+    "customers:read",
+    "customers:write",
+    "reports:read",
+  ],
+  [ROLES.TECHNICIAN]: [
+    "network:read",
+    "network:write",
+    "monitoring:read",
+    "devices:read",
+    "devices:write",
+  ],
+  [ROLES.RESELLER]: [
+    "customers:read",
+    "customers:write",
+    "billing:read",
+    "invoices:write",
+  ],
+  [ROLES.CUSTOMER]: ["own:read", "billing:read", "tickets:write"],
 };
 
 // Default feature access - used as fallback
 const DEFAULT_FEATURE_ACCESS = {
   [ROLES.ADMIN]: [
-    'dashboard', 'topology', 'router-linking', 'devices', 'templates', 'mikrotik-api', 'integrations', 'settings',
-    'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
-    'network-map', 'monitoring', 'agents', 'auto-suspend', 'reports', 'analytics', 'pppoe', 'hotspot',
-    'vouchers', 'network-services', 'olt', 'radius', 'tickets', 'captive-portal', 'bandwidth', 'resellers',
-    'backups', 'inventory', 'users',
+    "dashboard",
+    "topology",
+    "router-linking",
+    "devices",
+    "templates",
+    "mikrotik-api",
+    "integrations",
+    "settings",
+    "billing",
+    "customers",
+    "plans",
+    "subscriptions",
+    "invoices",
+    "payments",
+    "wallet",
+    "sms",
+    "whatsapp",
+    "network-map",
+    "monitoring",
+    "agents",
+    "auto-suspend",
+    "reports",
+    "analytics",
+    "pppoe",
+    "hotspot",
+    "vouchers",
+    "network-services",
+    "ipam",
+    "olt",
+    "radius",
+    "tickets",
+    "captive-portal",
+    "bandwidth",
+    "resellers",
+    "backups",
+    "inventory",
+    "users",
+    "audit-logs",
   ],
   [ROLES.STAFF]: [
-    'dashboard', 'topology', 'router-linking',
-    'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet', 'sms', 'whatsapp',
-    'network-map', 'monitoring', 'reports', 'analytics', 'pppoe', 'hotspot', 'vouchers', 'tickets',
+    "dashboard",
+    "topology",
+    "router-linking",
+    "billing",
+    "customers",
+    "plans",
+    "subscriptions",
+    "invoices",
+    "payments",
+    "wallet",
+    "sms",
+    "whatsapp",
+    "network-map",
+    "monitoring",
+    "reports",
+    "analytics",
+    "pppoe",
+    "hotspot",
+    "vouchers",
+    "tickets",
   ],
   [ROLES.TECHNICIAN]: [
-    'dashboard', 'devices', 'templates',
-    'monitoring', 'bandwidth',
+    "dashboard",
+    "devices",
+    "templates",
+    "monitoring",
+    "bandwidth",
   ],
   [ROLES.RESELLER]: [
-    'dashboard',
-    'billing', 'customers', 'plans', 'subscriptions', 'invoices', 'payments', 'wallet',
+    "dashboard",
+    "billing",
+    "customers",
+    "plans",
+    "subscriptions",
+    "invoices",
+    "payments",
+    "wallet",
   ],
   [ROLES.CUSTOMER]: [],
 };
@@ -62,7 +138,7 @@ export async function fetchPermissions() {
     cachedFeatureAccess = data;
     return data;
   } catch (error) {
-    console.error('Failed to fetch permissions:', error);
+    console.error("Failed to fetch permissions:", error);
     return DEFAULT_FEATURE_ACCESS;
   }
 }
@@ -83,9 +159,9 @@ export async function getPermissions() {
 export function hasPermission(user, permission) {
   if (!user) return false;
   if (user.role === ROLES.ADMIN) return true;
-  
+
   const userPerms = DEFAULT_PERMISSIONS[user.role] || [];
-  return userPerms.includes('*') || userPerms.includes(permission);
+  return userPerms.includes("*") || userPerms.includes(permission);
 }
 
 /**
@@ -94,9 +170,10 @@ export function hasPermission(user, permission) {
 export function canAccessFeature(user, feature) {
   if (!user) return false;
   if (user.role === ROLES.ADMIN) return true;
-  
+
   // Use cached permissions if available, otherwise use defaults
-  const features = (cachedFeatureAccess?.[user.role]) || DEFAULT_FEATURE_ACCESS[user.role] || [];
+  const features =
+    cachedFeatureAccess?.[user.role] || DEFAULT_FEATURE_ACCESS[user.role] || [];
   return features.includes(feature);
 }
 

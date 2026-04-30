@@ -223,6 +223,15 @@ router.get("/provision/callback/:token", async (req, res) => {
       ["provisioned", routerData.id],
     );
 
+    // Trigger webhook
+    const { triggerWebhook } = require("./webhooks");
+    triggerWebhook("router.provisioned", {
+      router_id: routerData.id,
+      router_name: routerData.name,
+      ip_address: routerData.ip_address || ip,
+      wg_pubkey: wgPubKey || null,
+    }).catch(() => {});
+
     // Log callback
     await getDb().query(
       "INSERT INTO provision_logs (id, token, router_id, ip_address, user_agent, action, status, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -237,7 +246,6 @@ router.get("/provision/callback/:token", async (req, res) => {
         "Router confirmed provisioning",
       ],
     );
-
 
     // Billing activation handled by auto-complete endpoint
     await getDb().query(
@@ -1289,7 +1297,14 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
     );
 
     // 4. Auto-link to billing if management credentials were provided
-    console.log("AUTOCOMPLETE: routerId=" + routerId + " user=" + (discovered.mgmt_username||"none") + " passLen=" + ((mgmtPass||discovered.mgmt_password||"").length));
+    console.log(
+      "AUTOCOMPLETE: routerId=" +
+        routerId +
+        " user=" +
+        (discovered.mgmt_username || "none") +
+        " passLen=" +
+        (mgmtPass || discovered.mgmt_password || "").length,
+    );
     try {
       const billingResult = await zeroTouchBilling.activateRouterInBilling(
         routerId,

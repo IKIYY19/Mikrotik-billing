@@ -1129,6 +1129,14 @@ router.post("/payments", async (req, res) => {
       );
     }
 
+    // Trigger webhooks
+    const { triggerWebhook } = require("./webhooks");
+    triggerWebhook("payment.received", {
+      customer_id: payment.customer_id,
+      amount: payment.amount,
+      invoice_id: payment.invoice_id,
+    }).catch(() => {});
+
     res.status(201).json(payment);
   } catch (e) {
     res.status(500).json({ error: e.message });

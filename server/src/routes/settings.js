@@ -67,9 +67,9 @@ async function getAllSettings() {
       invoice_start_number: "1001",
       payment_terms: "14",
       tax_rate: "16",
-    primary_color: "#3b82f6",
-    secondary_color: "#1e293b",
-    branding_title: "",
+      primary_color: "#3b82f6",
+      secondary_color: "#1e293b",
+      branding_title: "",
     };
   }
 
@@ -124,9 +124,9 @@ const settingsStore = {
   invoice_start_number: "1001",
   payment_terms: "14",
   tax_rate: "16",
-    primary_color: "#3b82f6",
-    secondary_color: "#1e293b",
-    branding_title: "",
+  primary_color: "#3b82f6",
+  secondary_color: "#1e293b",
+  branding_title: "",
 };
 
 // WireGuard settings store
@@ -196,6 +196,7 @@ const featureAccessStore = {
     "hotspot",
     "vouchers",
     "network-services",
+    "ipam",
     "olt",
     "radius",
     "tickets",
@@ -205,6 +206,7 @@ const featureAccessStore = {
     "backups",
     "inventory",
     "users",
+    "audit-logs",
   ],
   staff: [
     "dashboard",

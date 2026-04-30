@@ -33,6 +33,8 @@ const store = {
   radgroupreply: [],
   radacct: [],
   radpostauth: [],
+  ipam_subnets: [],
+  ipam_ips: [],
 };
 
 // Seed example templates
@@ -1609,6 +1611,157 @@ module.exports = {
         (a, b) => new Date(b.authdate || 0) - new Date(a.authdate || 0),
       );
       return { rows, total: rows.length };
+    }
+
+    // ═══════════════════════════════════════
+    // IPAM TABLES
+    // ═══════════════════════════════════════
+
+    // SELECT ipam_subnets
+    if (lowerText.includes("from ipam_subnets")) {
+      if (lowerText.includes("select count(*)")) {
+        return { rows: [{ count: String(store.ipam_subnets.length) }] };
+      }
+      return {
+        rows: store.ipam_subnets.sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+        ),
+      };
+    }
+
+    // INSERT ipam_subnets
+    if (lowerText.includes("insert into ipam_subnets")) {
+      const subnet = {
+        id: params[0],
+        name: params[1],
+        network: params[2],
+        mask: params[3],
+        gateway: params[4],
+        description: params[5] || "",
+        vlan_id: params[6] || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.ipam_subnets.push(subnet);
+      return { rows: [subnet] };
+    }
+
+    // DELETE ipam_subnets
+    if (lowerText.includes("delete from ipam_subnets")) {
+      const idx = store.ipam_subnets.findIndex((s) => s.id === params[0]);
+      if (idx !== -1) store.ipam_subnets.splice(idx, 1);
+      return { rows: [] };
+    }
+
+    // SELECT ipam_ips
+    if (lowerText.includes("from ipam_ips")) {
+      if (
+        lowerText.includes("select count(*)") &&
+        lowerText.includes("status")
+      ) {
+        // SELECT status, COUNT(*) ... GROUP BY status
+        const statusCounts = {};
+        store.ipam_ips.forEach((ip) => {
+          statusCounts[ip.status] = (statusCounts[ip.status] || 0) + 1;
+        });
+        const rows = Object.entries(statusCounts).map(([status, count]) => ({
+          status,
+          count: String(count),
+        }));
+        return { rows };
+      }
+      if (lowerText.includes("select count(*)")) {
+        if (lowerText.includes("and status =")) {
+          const count = store.ipam_ips.filter(
+            (ip) => ip.subnet_id === params[0] && ip.status === params[1],
+          ).length;
+          return { rows: [{ count: String(count) }] };
+        }
+        // COUNT for specific subnet
+        if (lowerText.includes("where subnet_id")) {
+          const count = store.ipam_ips.filter(
+            (ip) => ip.subnet_id === params[0],
+          ).length;
+          return { rows: [{ count: String(count) }] };
+        }
+      }
+      if (lowerText.includes("where subnet_id")) {
+        const rows = store.ipam_ips
+          .filter((ip) => ip.subnet_id === params[0])
+          .sort((a, b) => {
+            const aParts = a.ip_address.split(".").map(Number);
+            const bParts = b.ip_address.split(".").map(Number);
+            for (let i = 0; i < 4; i++) {
+              if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
+            }
+            return 0;
+          });
+        return { rows };
+      }
+      return { rows: store.ipam_ips };
+    }
+
+    // INSERT ipam_ips
+    if (lowerText.includes("insert into ipam_ips")) {
+      const ip = {
+        id: params[0],
+        subnet_id: params[1],
+        ip_address: params[2],
+        status: params[3] || "free",
+        description: "",
+        assigned_to: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.ipam_ips.push(ip);
+      return { rows: [ip] };
+    }
+
+    // UPDATE ipam_ips
+    if (
+      lowerText.includes("update ipam_ips") &&
+      lowerText.includes("where subnet_id") &&
+      lowerText.includes("and ip_address")
+    ) {
+      // Used for marking gateway
+      const subnet_id = params[0];
+      const ip_address = params[1];
+      const ip = store.ipam_ips.find(
+        (i) => i.subnet_id === subnet_id && i.ip_address === ip_address,
+      );
+      if (ip) {
+        if (lowerText.includes("status") && lowerText.includes("description")) {
+          ip.status = "reserved";
+          ip.description = "Gateway";
+        }
+        ip.updated_at = new Date().toISOString();
+      }
+      return { rows: ip ? [ip] : [] };
+    }
+    if (
+      lowerText.includes("update ipam_ips") &&
+      lowerText.includes("where id")
+    ) {
+      const idx = store.ipam_ips.findIndex((i) => i.id === params[3]);
+      if (idx === -1) return { rows: [] };
+      if (params[0] !== undefined && params[0] !== null)
+        store.ipam_ips[idx].status = params[0];
+      if (params[1] !== undefined && params[1] !== null)
+        store.ipam_ips[idx].description = params[1];
+      if (params[2] !== undefined && params[2] !== null)
+        store.ipam_ips[idx].assigned_to = params[2];
+      store.ipam_ips[idx].updated_at = new Date().toISOString();
+      return { rows: [store.ipam_ips[idx]] };
+    }
+
+    // DELETE ipam_ips
+    if (lowerText.includes("delete from ipam_ips")) {
+      if (lowerText.includes("where subnet_id")) {
+        store.ipam_ips = store.ipam_ips.filter(
+          (i) => i.subnet_id !== params[0],
+        );
+      }
+      return { rows: [] };
     }
 
     // INSERT/UPDATE anything else (generic fallback)

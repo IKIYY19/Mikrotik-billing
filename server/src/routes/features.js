@@ -454,6 +454,14 @@ router.post("/auto-suspend/run", async (req, res) => {
           customer: sub.customer?.name,
           days_overdue: daysOverdue,
         });
+
+        // Trigger webhook
+        const { triggerWebhook } = require("./webhooks");
+        triggerWebhook("customer.suspended", {
+          customer_id: invoice.customer_id,
+          subscription_id: sub.id,
+          days_overdue: daysOverdue,
+        }).catch(() => {});
       } else if (daysOverdue >= throttle_days && !sub.throttled) {
         sub.throttled = true;
         sub.throttle_speed = `${multiStore.graceConfig.throttle_speed_up}/${multiStore.graceConfig.throttle_speed_down}`;
