@@ -3,6 +3,7 @@ import axios from "axios";
 import { Copy, X } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "/api";
+const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
 
 export function MapView() {
   const [data, setData] = useState(null);
@@ -18,17 +19,26 @@ export function MapView() {
 
   useEffect(() => {
     fetchData();
-    // Load Leaflet CSS and JS dynamically
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    document.head.appendChild(link);
+  }, []);
 
+  useEffect(() => {
+    if (!GMAPS_KEY) return;
+    if (window.google?.maps) return;
+    if (document.getElementById("gmaps-script")) return;
     const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = () => initMap();
+    script.id = "gmaps-script";
+    script.src =
+      "https://maps.googleapis.com/maps/api/js?key=" +
+      GMAPS_KEY +
+      "&libraries=places";
+    script.async = true;
+    script.defer = true;
     document.head.appendChild(script);
   }, []);
+
+  useEffect(() => {
+    if (data && window.google?.maps) initMap();
+  }, [data]);
 
   const fetchData = async () => {
     try {
@@ -41,41 +51,40 @@ export function MapView() {
   };
 
   const initMap = () => {
-    if (!data || !window.L || mapInstanceRef.current) return;
-
-    const map = window.L.map(mapRef.current).setView(
-      data.center || [-1.2921, 36.8219],
-      data.zoom || 10,
-    );
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
-    }).addTo(map);
-
-    mapInstanceRef.current = map;
-    map.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      setClickedCoords({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
-      if (clickMarkerRef.current) {
-        mapInstanceRef.current.removeLayer(clickMarkerRef.current);
-      }
-      clickMarkerRef.current = window.L.marker([lat, lng], {
-        icon: window.L.divIcon({
-          html: '<div style="background:#f59e0b;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
-          className: '',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        }),
-      }).addTo(mapInstanceRef.current).bindPopup(`📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`).openPopup();
+    if (!mapRef.current || mapInstanceRef.current) return;
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: data.center || { lat: -1.2921, lng: 36.8219 },
+      zoom: data.zoom || 10,
+      mapTypeControl: false,
+      fullscreenControl: false,
     });
+    mapInstanceRef.current = map;
+
+    map.addListener("click", (e) => {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setClickedCoords({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
+      if (clickMarkerRef.current) clickMarkerRef.current.setMap(null);
+      clickMarkerRef.current = new window.google.maps.Marker({
+        map,
+        position: { lat, lng },
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: "#f59e0b",
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+        },
+      });
+    });
+
     renderMarkers();
   };
 
   const renderMarkers = () => {
-    if (!mapInstanceRef.current || !window.L || !data || !data.customers)
-      return;
-
-    // Clear existing markers
-    markersRef.current.forEach((m) => mapInstanceRef.current.removeLayer(m));
+    if (!mapInstanceRef.current || !data) return;
+    markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
     const customers = Array.isArray(data.customers) ? data.customers : [];
@@ -84,30 +93,46 @@ export function MapView() {
       filter === "all"
         ? customers
         : customers.filter((c) => c.status === filter);
+    const customersWithCoords = filteredCustomers.filter(
+      (c) => c.lat != null && c.lng != null,
+    );
 
-    // Branch markers (larger)
+    // Branch markers (blue circles)
     branches.forEach((branch) => {
-      const icon = window.L.divIcon({
-        html: `<div style="background:#3b82f6;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
-        className: "",
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+      const marker = new window.google.maps.Marker({
+        map: mapInstanceRef.current,
+        position: { lat: branch.lat, lng: branch.lng },
+        title: branch.name,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#3b82f6",
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+        },
       });
-      const marker = window.L.marker([branch.lat, branch.lng], { icon })
-        .bindPopup(
-          `
-          <b>${branch.name}</b><br/>
-          City: ${branch.city}<br/>
-          Active PPPoE: ${branch.active_pppoe}<br/>
-          Routers: ${branch.online_routers}/${branch.total_routers} online
-        `,
-        )
-        .addTo(mapInstanceRef.current);
+      const info = new window.google.maps.InfoWindow({
+        content:
+          "<b>" +
+          branch.name +
+          "</b><br/>City: " +
+          (branch.city || "") +
+          "<br/>Active PPPoE: " +
+          (branch.active_pppoe || 0) +
+          "<br/>Routers: " +
+          (branch.online_routers || 0) +
+          "/" +
+          (branch.total_routers || 0) +
+          " online",
+      });
+      marker.addListener("click", () =>
+        info.open(mapInstanceRef.current, marker),
+      );
       markersRef.current.push(marker);
     });
 
     // Customer markers
-    const customersWithCoords = filteredCustomers.filter(c => c.lat != null && c.lng != null);
     customersWithCoords.forEach((customer) => {
       const color =
         customer.status === "active"
@@ -115,23 +140,36 @@ export function MapView() {
           : customer.status === "throttled"
             ? "#f59e0b"
             : "#ef4444";
-      const icon = window.L.divIcon({
-        html: `<div style="background:${color};width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>`,
-        className: "",
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
+      const marker = new window.google.maps.Marker({
+        map: mapInstanceRef.current,
+        position: { lat: customer.lat, lng: customer.lng },
+        title: customer.name,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 5,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: "#fff",
+          strokeWeight: 1.5,
+        },
       });
-      const marker = window.L.marker([customer.lat, customer.lng], { icon })
-        .bindPopup(
-          `
-          <b>${customer.name}</b><br/>
-          Status: <span style="color:${color}">${customer.status}</span><br/>
-          Plan: ${customer.plan || "N/A"}<br/>
-          Phone: ${customer.phone || "N/A"}<br/>
-          <button onclick="window._selectCustomer('${customer.id}')" style="margin-top:4px;padding:2px 8px;background:#3b82f6;color:white;border:none;border-radius:3px;cursor:pointer">View Details</button>
-        `,
-        )
-        .addTo(mapInstanceRef.current);
+      const info = new window.google.maps.InfoWindow({
+        content:
+          "<b>" +
+          customer.name +
+          "</b><br/>Status: <span style='color:" +
+          color +
+          "'>" +
+          customer.status +
+          "</span><br/>Plan: " +
+          (customer.plan || "N/A") +
+          "<br/>Phone: " +
+          (customer.phone || "N/A"),
+      });
+      marker.addListener("click", () => {
+        info.open(mapInstanceRef.current, marker);
+        setSelectedCustomer(customer);
+      });
       markersRef.current.push(marker);
     });
   };
@@ -139,11 +177,6 @@ export function MapView() {
   useEffect(() => {
     renderMarkers();
   }, [data, filter]);
-
-  window._selectCustomer = (id) => {
-    const customer = data?.customers.find((c) => c.id === id);
-    if (customer) setSelectedCustomer(customer);
-  };
 
   if (loading) return <div className="p-8 text-white">Loading map...</div>;
 
@@ -255,11 +288,17 @@ export function MapView() {
         {clickedCoords && (
           <div className="absolute top-4 right-4 bg-slate-800 border border-amber-500/30 rounded-lg p-3 shadow-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-amber-400 font-semibold">Clicked Location</span>
-              <button onClick={() => {
-                if (clickMarkerRef.current) mapInstanceRef.current?.removeLayer(clickMarkerRef.current);
-                setClickedCoords(null);
-              }} className="text-slate-400 hover:text-white">
+              <span className="text-xs text-amber-400 font-semibold">
+                Clicked Location
+              </span>
+              <button
+                onClick={() => {
+                  if (clickMarkerRef.current)
+                    clickMarkerRef.current.setMap(null);
+                  setClickedCoords(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
                 <X className="w-3 h-3" />
               </button>
             </div>
@@ -268,13 +307,16 @@ export function MapView() {
             </div>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${clickedCoords.lat}, ${clickedCoords.lng}`);
+                navigator.clipboard.writeText(
+                  `${clickedCoords.lat}, ${clickedCoords.lng}`,
+                );
                 setCoordCopied(true);
                 setTimeout(() => setCoordCopied(false), 2000);
               }}
               className="mt-2 text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300"
             >
-              <Copy className="w-3 h-3" /> {coordCopied ? 'Copied!' : 'Copy Coordinates'}
+              <Copy className="w-3 h-3" />{" "}
+              {coordCopied ? "Copied!" : "Copy Coordinates"}
             </button>
           </div>
         )}

@@ -246,28 +246,57 @@ export function BillingCustomers() {
   };
   const toggleMapPicker = () => setShowMapPicker((prev) => !prev);
 
+  // Load Google Maps API once
+  useEffect(() => {
+    if (!GMAPS_KEY) return;
+    if (window.google?.maps) return;
+    if (document.getElementById("gmaps-script")) return;
+    const script = document.createElement("script");
+    script.id = "gmaps-script";
+    script.src = "https://maps.googleapis.com/maps/api/js?key=" + GMAPS_KEY + "&libraries=places";
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }, []);
+
+  // Init Google Map when picker shown
   useEffect(() => {
     if (!showMapPicker || pickerMapRef.current) return;
+    if (!window.google?.maps) return;
+
     requestAnimationFrame(() => {
       if (!mapPickerRef.current || mapPickerRef.current.offsetHeight === 0) return;
       const lat = parseFloat(form.lat) || -1.2921;
       const lng = parseFloat(form.lng) || 36.8219;
-      const map = window.L.map(mapPickerRef.current).setView([lat, lng], 14);
-      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OSM",
-      }).addTo(map);
-      pickerMapRef.current = map;
-      map.on("click", (e) => {
-        setForm((prev) => ({ ...prev, lat: e.latlng.lat.toFixed(6), lng: e.latlng.lng.toFixed(6) }));
-        if (pickerMarkerRef.current) map.removeLayer(pickerMarkerRef.current);
-        pickerMarkerRef.current = window.L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
+      const map = new window.google.maps.Map(mapPickerRef.current, {
+        center: { lat, lng },
+        zoom: 14,
+        mapTypeControl: false,
+        streetViewControl: false,
       });
-      if (form.lat && form.lng) {
-        pickerMarkerRef.current = window.L.marker([parseFloat(form.lat), parseFloat(form.lng)]).addTo(map);
-      }
-      setTimeout(() => map.invalidateSize(), 100);
+      pickerMapRef.current = map;
+
+      const marker = new window.google.maps.Marker({
+        map,
+        position: { lat, lng },
+        draggable: true,
+        visible: !!(form.lat && form.lng),
+      });
+      pickerMarkerRef.current = marker;
+
+      map.addListener("click", (e) => {
+        const pos = e.latLng;
+        setForm((prev) => ({ ...prev, lat: pos.lat().toFixed(6), lng: pos.lng().toFixed(6) }));
+        marker.setPosition(pos);
+        marker.setVisible(true);
+      });
+
+      marker.addListener("dragend", () => {
+        const pos = marker.getPosition();
+        setForm((prev) => ({ ...prev, lat: pos.lat().toFixed(6), lng: pos.lng().toFixed(6) }));
+      });
     });
-  }, [showMapPicker]);
+  }, [showMapPicker, form.lat, form.lng]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
