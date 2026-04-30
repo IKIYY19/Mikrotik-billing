@@ -247,7 +247,6 @@ export function Sidebar({ onSearchOpen }) {
       console.error("Error parsing user data:", err);
     }
 
-    // Fetch settings
   }, []);
 
 
@@ -277,7 +276,7 @@ export function Sidebar({ onSearchOpen }) {
         <NavLink to="/" className="flex items-center gap-3">
           {branding.company_logo ? (
             <img
-              src={settings.company_logo}
+              src={branding.company_logo}
               alt="Company Logo"
               className="w-8 h-8 rounded-lg object-cover"
             />
