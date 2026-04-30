@@ -1296,7 +1296,10 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
     // 4. Auto-link to billing if management credentials were provided
     try {
       const billingResult =
-        await zeroTouchBilling.activateRouterInBilling(routerId);
+        await zeroTouchBilling.activateRouterInBilling(routerId, {
+          mgmt_username: discovered.mgmt_username || "admin",
+          mgmt_password: discovered.mgmt_password || null,
+        });
       logger.info(
         `[Enrollment] Billing activation for ${routerName}: ${billingResult.success ? "linked" : "skipped"}`,
       );
