@@ -1328,6 +1328,100 @@ router.put("/:customerId/credentials", async (req, res) => {
   }
 });
 
+// Get available plans for upgrade/downgrade
+router.get("/:customerId/available-plans", async (req, res) => {
+  try {
+    const plans = billing.store.service_plans.filter((p) => !p.archived);
+    const subscription = billing.store.subscriptions.find(
+      (s) => s.customer_id === req.params.customerId && s.status === "active",
+    );
+    const currentPlanId = subscription?.plan_id;
+    const currentPlan = currentPlanId
+      ? billing.store.service_plans.find((p) => p.id === currentPlanId)
+      : null;
+
+    const availablePlans = plans.map((p) => ({
+      ...p,
+      is_current: p.id === currentPlanId,
+      change_type: !currentPlan
+        ? "new"
+        : p.price > currentPlan.price
+          ? "upgrade"
+          : p.price < currentPlan.price
+            ? "downgrade"
+            : "same",
+    }));
+
+    res.json(availablePlans);
+  } catch (e) {
+    console.error("Available plans error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Change plan
+router.post("/:customerId/change-plan", async (req, res) => {
+  try {
+    const { plan_id } = req.body;
+    if (!plan_id) {
+      return res.status(400).json({ error: "plan_id is required" });
+    }
+
+    const subscription = billing.store.subscriptions.find(
+      (s) => s.customer_id === req.params.customerId && s.status === "active",
+    );
+    if (!subscription) {
+      return res.status(404).json({ error: "No active subscription found" });
+    }
+
+    const plan = billing.store.service_plans.find((p) => p.id === plan_id);
+    if (!plan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    const oldPlanId = subscription.plan_id;
+    const oldPlan = billing.store.service_plans.find((p) => p.id === oldPlanId);
+
+    // Update subscription plan
+    billing.store.subscriptions = billing.store.subscriptions.map((s) =>
+      s.id === subscription.id
+        ? { ...s, plan_id, updated_at: new Date().toISOString() }
+        : s,
+    );
+
+    // Log audit event
+    logger.info("Plan changed", {
+      customer_id: req.params.customerId,
+      subscription_id: subscription.id,
+      old_plan: oldPlan?.name,
+      new_plan: plan.name,
+      old_price: oldPlan?.price,
+      new_price: plan.price,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Note: If auto_provision is enabled, the MikroTik will be re-provisioned
+    // on the next sync cycle or via the admin billing panel.
+    if (subscription.auto_provision && subscription.mikrotik_connection_id) {
+      logger.info("Plan change queued for MikroTik re-provision", {
+        subscription_id: subscription.id,
+        connection_id: subscription.mikrotik_connection_id,
+        new_plan: plan.name,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Plan changed to ${plan.name}`,
+      plan_name: plan.name,
+      plan_price: plan.price,
+    });
+  } catch (e) {
+    console.error("Change plan error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get customer review
 router.get("/:customerId/reviews", async (req, res) => {
   try {

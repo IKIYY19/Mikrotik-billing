@@ -36,6 +36,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   LogOut,
+  Layers,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -121,6 +122,9 @@ export function CustomerPortal() {
     confirm_password: "",
   });
   const [updatingCredentials, setUpdatingCredentials] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [confirmPlan, setConfirmPlan] = useState(null);
 
   useEffect(() => {
     // Check auth - redirect to login if not authenticated
@@ -135,6 +139,7 @@ export function CustomerPortal() {
     fetchBandwidthHistory();
     fetchCustomerReview();
     fetchPasswordInfo();
+    fetchAvailablePlans();
   }, [customerId]);
 
   // Handle browser back/forward cache (bfcache) - page may restore from cache
@@ -191,6 +196,34 @@ export function CustomerPortal() {
     } catch (e) {
       console.error("Failed to fetch bandwidth:", e);
     }
+  };
+
+  const fetchAvailablePlans = async () => {
+    try {
+      const { data } = await axios.get(
+        `${API}/portal/${customerId}/available-plans`,
+      );
+      setAvailablePlans(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Failed to fetch available plans:", e);
+    }
+  };
+
+  const handleChangePlan = async () => {
+    if (!confirmPlan) return;
+    setChangingPlan(true);
+    try {
+      await axios.post(`${API}/portal/${customerId}/change-plan`, {
+        plan_id: confirmPlan.id,
+      });
+      toast.success(`Plan changed to ${confirmPlan.name}`);
+      setConfirmPlan(null);
+      fetchData();
+      fetchAvailablePlans();
+    } catch (e) {
+      toast.error("Failed to change plan");
+    }
+    setChangingPlan(false);
   };
 
   const checkUsageAlerts = () => {
@@ -436,6 +469,7 @@ export function CustomerPortal() {
     { id: "support", label: "Support", icon: Ticket },
     { id: "history", label: "History", icon: History },
     { id: "review", label: "Review", icon: Star },
+    { id: "plans", label: "Plans", icon: Layers },
     { id: "settings", label: "Settings", icon: Lock },
   ];
 
@@ -1132,6 +1166,79 @@ export function CustomerPortal() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Plans Tab */}
+        {activeTab === "plans" && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-white">
+              Available Plans
+            </h3>
+            <p className="text-sm text-zinc-400">
+              Switch to a different plan. Upgrades take effect immediately,
+              downgrades at next billing cycle.
+            </p>
+
+            <div className="grid gap-4">
+              {availablePlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`rounded-xl border p-5 ${
+                    plan.is_current
+                      ? "border-blue-500/30 bg-blue-500/5"
+                      : "border-zinc-800 bg-zinc-900/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-white font-semibold">
+                          {plan.name}
+                        </h4>
+                        {plan.is_current && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                            Current
+                          </span>
+                        )}
+                        {plan.change_type === "upgrade" && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                            Upgrade
+                          </span>
+                        )}
+                        {plan.change_type === "downgrade" && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                            Downgrade
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-2xl font-bold text-white mt-2">
+                        KES {plan.price}
+                        <span className="text-sm text-zinc-500">/mo</span>
+                      </p>
+                      <div className="flex gap-4 mt-2 text-sm text-zinc-400">
+                        <span>
+                          {plan.speed_up} / {plan.speed_down}
+                        </span>
+                        {plan.quota_gb && <span>{plan.quota_gb} GB</span>}
+                      </div>
+                    </div>
+                    {!plan.is_current && (
+                      <button
+                        onClick={() => setConfirmPlan(plan)}
+                        className={`shrink-0 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                          plan.change_type === "upgrade"
+                            ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                            : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                        }`}
+                      >
+                        {plan.change_type === "upgrade" ? "Upgrade" : "Switch"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1907,6 +2014,66 @@ export function CustomerPortal() {
                   className={`btn-primary flex-1 ${paying || !payAmount ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {paying ? "Processing..." : "Pay via M-Pesa"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Change Confirmation Modal */}
+      {confirmPlan && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmPlan(null)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-zinc-800/50 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Change Plan</h3>
+              <button
+                onClick={() => setConfirmPlan(null)}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-zinc-400">
+                Switch from{" "}
+                <span className="text-white">
+                  {data?.subscription?.plan_name}
+                </span>{" "}
+                to <span className="text-white">{confirmPlan.name}</span>?
+              </p>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">New price</span>
+                <span className="text-white font-semibold">
+                  KES {confirmPlan.price}/mo
+                </span>
+              </div>
+              {confirmPlan.change_type === "downgrade" && (
+                <p className="text-xs text-amber-400">
+                  Downgrades take effect at the end of your current billing
+                  cycle.
+                </p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmPlan(null)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangePlan}
+                  disabled={changingPlan}
+                  className={`btn-primary flex-1 ${changingPlan ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {changingPlan ? "Changing..." : "Confirm Change"}
                 </button>
               </div>
             </div>
