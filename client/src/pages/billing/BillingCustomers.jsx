@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -16,6 +16,7 @@ import {
   Clock,
   RefreshCw,
   X,
+  MapPin,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { Button } from "../../components/ui/button";
@@ -110,6 +111,10 @@ export function BillingCustomers() {
   const [settings, setSettings] = useState({});
   const [portalUrl, setPortalUrl] = useState(null);
   const [portalCredentials, setPortalCredentials] = useState(null);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const mapPickerRef = useRef(null);
+  const pickerMapRef = useRef(null);
+  const pickerMarkerRef = useRef(null);
 
   // Derive company abbreviation: first letter of each word (e.g. GIRAFFE NETWORKS -> GN)
   const getCompanyAbbreviation = () => {
@@ -237,6 +242,64 @@ export function BillingCustomers() {
       }
     } catch (e) {
       toast.error("Geocoding failed");
+    }
+  };
+  const toggleMapPicker = () => {
+    setShowMapPicker(!showMapPicker);
+    if (!showMapPicker) {
+      setTimeout(() => {
+        if (mapPickerRef.current && !pickerMapRef.current) {
+          const initMap = () => {
+            const lat = parseFloat(form.lat) || -1.2921;
+            const lng = parseFloat(form.lng) || 36.8219;
+            const map = window.L.map(mapPickerRef.current).setView(
+              [lat, lng],
+              14,
+            );
+            window.L.tileLayer(
+              "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              {
+                attribution: "\u00a9 OSM",
+              },
+            ).addTo(map);
+            pickerMapRef.current = map;
+
+            map.on("click", (e) => {
+              const { lat: clat, lng: clng } = e.latlng;
+              setForm((prev) => ({
+                ...prev,
+                lat: clat.toFixed(6),
+                lng: clng.toFixed(6),
+              }));
+              if (pickerMarkerRef.current)
+                map.removeLayer(pickerMarkerRef.current);
+              pickerMarkerRef.current = window.L.marker([clat, clng]).addTo(
+                map,
+              );
+            });
+
+            if (form.lat && form.lng) {
+              pickerMarkerRef.current = window.L.marker([
+                parseFloat(form.lat),
+                parseFloat(form.lng),
+              ]).addTo(map);
+            }
+          };
+
+          if (window.L) {
+            initMap();
+          } else {
+            const link = document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+            document.head.appendChild(link);
+            const script = document.createElement("script");
+            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            script.onload = initMap;
+            document.head.appendChild(script);
+          }
+        }
+      }, 100);
     }
   };
   const handleSubmit = async (e) => {
@@ -703,6 +766,28 @@ export function BillingCustomers() {
                       Address
                     </Button>
                   </div>
+                  <div className="col-span-2 flex items-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={toggleMapPicker}
+                      className={`text-xs ${showMapPicker ? "bg-blue-600/20 border-blue-500/50 text-blue-400" : ""}`}
+                    >
+                      <MapPin className="w-3 h-3 mr-1" />{" "}
+                      {showMapPicker ? "Hide Map" : "Pick from Map"}
+                    </Button>
+                  </div>
+                  {showMapPicker && (
+                    <div className="col-span-2">
+                      <div
+                        ref={mapPickerRef}
+                        className="w-full h-48 rounded border border-zinc-700 z-0"
+                      />
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Click on the map to set customer location
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <select
