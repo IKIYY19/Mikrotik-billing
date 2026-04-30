@@ -238,13 +238,8 @@ router.get("/provision/callback/:token", async (req, res) => {
       ],
     );
 
-    const activation = await zeroTouchBilling.activateRouterInBilling(
-      routerData.id,
-    );
-    const activationStatus = activation.success
-      ? `Billing link activated${activation.subscriptions_synced ? ` (${activation.subscriptions_synced} subscriptions processed)` : ""}`
-      : `Billing link skipped: ${activation.error || "missing credentials"}`;
 
+    // Billing activation handled by auto-complete endpoint
     await getDb().query(
       "INSERT INTO provision_logs (id, token, router_id, ip_address, user_agent, action, status, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       [
@@ -254,8 +249,8 @@ router.get("/provision/callback/:token", async (req, res) => {
         ip,
         ua,
         "billing_activation",
-        activation.success ? "success" : "skipped",
-        activationStatus,
+        "skipped",
+        "Billing activation handled by auto-complete endpoint",
       ],
     );
 
@@ -1295,7 +1290,6 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
 
     // 4. Auto-link to billing if management credentials were provided
     try {
-      logger.info(`[Enrollment] Billing activation: user=${discovered.mgmt_username || "admin"} mgmtPassLen=${mgmtPass ? mgmtPass.length : 0} discoveredPassLen=${discovered.mgmt_password ? discovered.mgmt_password.length : 0}`);
       const billingResult = await zeroTouchBilling.activateRouterInBilling(
         routerId,
         {
