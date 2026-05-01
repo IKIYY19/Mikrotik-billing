@@ -17,8 +17,13 @@ export function BrandingProvider({ children }) {
   const [branding, setBranding] = useState(defaults);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+
     axios
-      .get(`${API}/settings`)
+      .get(`${API}/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then(({ data }) => {
         setBranding({
           company_name: data.company_name || "",
@@ -34,7 +39,6 @@ export function BrandingProvider({ children }) {
   const appName =
     branding.branding_title || branding.company_name || "MikroTik Billing";
 
-  // Apply primary color as CSS variable
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--brand-primary",
