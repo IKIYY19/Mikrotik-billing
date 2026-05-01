@@ -205,6 +205,7 @@ export function AuditLogs() {
         `${API}/audit/logs?${params.toString()}`,
       );
       setDbAvailable(true);
+      setDbAvailable(true);
       setLogs(data.logs || []);
       setTotal(data.total || 0);
     } catch (e) {
@@ -270,7 +271,7 @@ export function AuditLogs() {
               <Database className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-amber-300">
-                  Audit logs require PostgreSQL
+                  No audit events yet
                 </p>
                 <p className="text-xs text-amber-400/70 mt-1">
                   The audit log system requires a PostgreSQL database
