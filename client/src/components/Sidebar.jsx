@@ -293,7 +293,7 @@ export function Sidebar({ onSearchOpen }) {
               className="w-8 h-8 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-[var(--brand-primary)]/ flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Building2 className="w-4 h-4 text-white" />
             </div>
           )}
