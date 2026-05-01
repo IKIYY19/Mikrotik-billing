@@ -1,12 +1,12 @@
-import axios from 'axios';
-import { getToken } from './auth';
+import axios from "axios";
+import { getToken } from "./auth";
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
 
@@ -19,17 +19,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let isRedirecting = false;
 // Handle 401 responses
 api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      window.location.href = '/login';
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      if (!isRedirecting) {
+        isRedirecting = true;
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Convenience exports

@@ -67,6 +67,7 @@ router.get("/logs", async (req, res) => {
     const result = await db.query(query, params);
 
     const countQuery = `SELECT COUNT(*) as total FROM billing_audit_logs ${whereClause}`;
+    console.log("[AUDIT API] Returning", result.rows.length, "logs, total:", countResult.rows[0]?.total);
     const countResult = await db.query(countQuery, params.slice(0, -2));
 
     res.json({
