@@ -1,6 +1,7 @@
 /**
  * SMS Routes - Africa's Talking Integration
  * Handles sending, templates, logs, and settings
+const logger = require("../utils/logger");
  */
 
 const express = require("express");
@@ -30,7 +31,7 @@ async function getIntegrationConfig(serviceName) {
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
-    console.error("Error fetching integration config:", error);
+    logger.error("Error fetching integration config:", error);
     return null;
   }
 }
@@ -287,7 +288,7 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
       results,
     });
   } catch (e) {
-    console.error("Bulk SMS error:", e);
+    logger.error("Bulk SMS error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -636,7 +637,7 @@ async function triggerSMS(event, data) {
 
     return result;
   } catch (e) {
-    console.error("SMS trigger error:", e.message);
+    logger.error("SMS trigger error:", e.message);
     return { success: false, message: e.message };
   }
 }
@@ -693,7 +694,7 @@ router.post("/whatsapp/webhook", async (req, res) => {
         ).toISOString(),
         metadata: { direction: "inbound" },
       });
-      console.log(`[WhatsApp Inbound] ${event.from}: ${event.message}`);
+      logger.info(`[WhatsApp Inbound] ${event.from}: ${event.message}`);
     }
   }
 

@@ -1,6 +1,7 @@
 /**
  * Customer Portal Authentication
  * Secure token-based auth for customer self-service portal
+const logger = require("../utils/logger");
  */
 
 const express = require("express");
@@ -83,7 +84,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Portal login error:", error);
+    logger.error("Portal login error:", error);
     res.status(500).json({ error: "Login failed" });
   }
 });
@@ -155,7 +156,7 @@ router.post("/change-pin", async (req, res) => {
 
     res.json({ message: "PIN changed successfully" });
   } catch (error) {
-    console.error("Change PIN error:", error);
+    logger.error("Change PIN error:", error);
     res.status(500).json({ error: "Failed to change PIN" });
   }
 });
@@ -242,7 +243,7 @@ router.post("/forgot-pin", async (req, res) => {
       reset_code: process.env.NODE_ENV === "production" ? undefined : resetCode,
     });
   } catch (error) {
-    console.error("Forgot PIN error:", error);
+    logger.error("Forgot PIN error:", error);
     res.status(500).json({ error: "Failed to process request" });
   }
 });
@@ -303,7 +304,7 @@ router.post("/reset-pin", async (req, res) => {
       message: "PIN reset successfully. You can now login with your new PIN.",
     });
   } catch (error) {
-    console.error("Reset PIN error:", error);
+    logger.error("Reset PIN error:", error);
     res.status(500).json({ error: "Failed to reset PIN" });
   }
 });

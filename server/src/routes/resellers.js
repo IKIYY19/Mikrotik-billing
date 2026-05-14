@@ -197,7 +197,7 @@ router.post("/captive-portals/push", async (req, res) => {
         "Portal hosted on server (direct push failed). Add this URL to your hotspot walled garden.",
     });
   } catch (e) {
-    console.error("Captive portal push error:", e);
+    logger.error("Captive portal push error:", e);
     res.status(500).json({ error: e.message });
   }
 });

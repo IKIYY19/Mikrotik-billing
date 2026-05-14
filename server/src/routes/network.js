@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
+const logger = require("../utils/logger");
 // Helper: get MikroTik connection
 async function getMikrotikConnection(connectionId) {
   const db = global.db || require('../db/memory');
@@ -54,7 +55,7 @@ async function getFromMikrotik(device, path) {
     close();
     return result;
   } catch (error) {
-    console.error(`MikroTik get error: ${error.message}`);
+    logger.error(`MikroTik get error: ${error.message}`);
     return [];
   }
 }
@@ -339,14 +340,14 @@ router.get('/vouchers', async (req, res) => {
 router.post('/vouchers', async (req, res) => {
   try {
     const { vouchers, connection_id } = req.body;
-    console.log('Received voucher creation request:', { voucherCount: vouchers?.length, connection_id });
+    logger.info('Received voucher creation request:', { voucherCount: vouchers?.length, connection_id });
     
     const db = global.db || require('../db/memory');
     const { v4: uuidv4 } = require('uuid');
 
     for (const v of vouchers) {
       const id = uuidv4();
-      console.log('Inserting voucher:', { username: v.username, id });
+      logger.info('Inserting voucher:', { username: v.username, id });
       await db.query(
         `INSERT INTO hotspot_vouchers (id, username, password, profile, valid_for, rate_limit, data_limit, price, company_name, connection_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -362,14 +363,14 @@ router.post('/vouchers', async (req, res) => {
         if (v.profile) args.profile = v.profile;
         if (v.rate_limit) args['rate-limit'] = v.rate_limit;
         if (v.comment) args.comment = v.comment;
-        try { await executeCommand(device, '/ip/hotspot/user/add', args); } catch (e) { console.error(`Failed to create user ${v.username}:`, e.message); }
+        try { await executeCommand(device, '/ip/hotspot/user/add', args); } catch (e) { logger.error(`Failed to create user ${v.username}:`, e.message); }
       }
     }
 
-    console.log('Vouchers created successfully');
+    logger.info('Vouchers created successfully');
     res.json({ success: true, count: vouchers.length });
   } catch (e) {
-    console.error('Failed to create vouchers:', e);
+    logger.error('Failed to create vouchers:', e);
     res.status(500).json({ error: e.message });
   }
 });

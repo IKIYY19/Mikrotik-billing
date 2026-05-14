@@ -33,7 +33,7 @@ router.get("/admin/reviews", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get all reviews error:", e);
+    logger.error("Get all reviews error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -51,7 +51,7 @@ router.get("/admin/staff-points", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get staff points error:", e);
+    logger.error("Get staff points error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -70,7 +70,7 @@ router.get("/admin/staff-points/:userId", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get staff point history error:", e);
+    logger.error("Get staff point history error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -238,7 +238,7 @@ router.get("/:customerId/dashboard", async (req, res) => {
       recent_tickets: tickets,
     });
   } catch (e) {
-    console.error("Dashboard error:", e);
+    logger.error("Dashboard error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -300,7 +300,7 @@ router.post("/:customerId/pay", async (req, res) => {
       res.status(500).json(mpesaResult);
     }
   } catch (e) {
-    console.error("Payment error:", e);
+    logger.error("Payment error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -357,7 +357,7 @@ router.post("/:customerId/tickets", async (req, res) => {
 
     res.status(201).json(ticketResult.rows[0]);
   } catch (e) {
-    console.error("Ticket creation error:", e);
+    logger.error("Ticket creation error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -397,7 +397,7 @@ router.post("/radius/accounting", async (req, res) => {
     // RADIUS response format
     res.json(result);
   } catch (e) {
-    console.error("RADIUS accounting error:", e);
+    logger.error("RADIUS accounting error:", e);
     res.json({ accepted: true, reply: {} });
   }
 });
@@ -866,7 +866,7 @@ router.get("/:customerId/tickets", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Failed to fetch tickets:", e);
+    logger.error("Failed to fetch tickets:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1044,7 +1044,7 @@ router.post("/:customerId/change-password", async (req, res) => {
 
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) {
-    console.error("Password change error:", e);
+    logger.error("Password change error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1105,7 +1105,7 @@ router.post("/:customerId/generate-portal-token", async (req, res) => {
       expires_at: expiresAt.toISOString(),
     });
   } catch (e) {
-    console.error("Token generation error:", e);
+    logger.error("Token generation error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1138,7 +1138,7 @@ router.get("/token/:token", async (req, res) => {
     // Redirect to customer portal with customer ID
     res.redirect(`/portal/${customer.id}`);
   } catch (e) {
-    console.error("Token access error:", e);
+    logger.error("Token access error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1227,7 +1227,7 @@ router.post("/:customerId/reviews", async (req, res) => {
 
     res.status(201).json(reviewResult.rows[0]);
   } catch (e) {
-    console.error("Review submission error:", e);
+    logger.error("Review submission error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1323,7 +1323,7 @@ router.put("/:customerId/credentials", async (req, res) => {
 
     res.json({ success: true, message: "Credentials updated successfully" });
   } catch (e) {
-    console.error("Update credentials error:", e);
+    logger.error("Update credentials error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1369,7 +1369,7 @@ router.get("/:customerId/available-plans", async (req, res) => {
 
     res.json(availablePlans);
   } catch (e) {
-    console.error("Available plans error:", e);
+    logger.error("Available plans error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1404,7 +1404,7 @@ router.post("/:customerId/change-plan", async (req, res) => {
     logger.info("Plan changed", { customer_id: customerId, old_plan: oldPlan?.name, new_plan: plan.name });
     res.json({ success: true, message: `Plan changed to ${plan.name}`, plan_name: plan.name, plan_price: plan.price });
   } catch (e) {
-    console.error("Change plan error:", e);
+    logger.error("Change plan error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1431,7 +1431,7 @@ router.get("/:customerId/reviews", async (req, res) => {
 
     res.json({ has_review: true, review: reviewResult.rows[0] });
   } catch (e) {
-    console.error("Get review error:", e);
+    logger.error("Get review error:", e);
     res.status(500).json({ error: e.message });
   }
 });

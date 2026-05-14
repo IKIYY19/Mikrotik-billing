@@ -1,6 +1,7 @@
 /**
  * QoS (Quality of Service) Profiles Management
  * Manage bandwidth limiting, prioritization, and traffic shaping profiles
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -91,7 +92,7 @@ router.post('/profiles', async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (e) {
-    console.error('QoS profile creation error:', e);
+    logger.error('QoS profile creation error:', e);
     res.status(500).json({ error: e.message });
   }
 });

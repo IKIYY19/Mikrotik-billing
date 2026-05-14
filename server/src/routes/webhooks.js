@@ -1,6 +1,7 @@
 /**
  * Webhook Routes — CRUD + trigger for event-driven HTTP callbacks.
  *
+const logger = require("../utils/logger");
  * Events:
  *   payment.received   customer.suspended  customer.activated
  *   invoice.created    router.provisioned  *
@@ -200,6 +201,6 @@ module.exports.triggerWebhook = async (event, data) => {
         .catch(() => {});
     }
   } catch (e) {
-    console.error("Webhook trigger error:", e.message);
+    logger.error("Webhook trigger error:", e.message);
   }
 };

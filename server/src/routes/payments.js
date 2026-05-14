@@ -1,6 +1,7 @@
 /**
  * Payment Gateways - Kenyan payment methods
  * M-Pesa, Airtel Money, Bank Transfer, Card (via local gateways)
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -29,7 +30,7 @@ async function getBankPaybills() {
     }
     return [];
   } catch (error) {
-    console.error('Error fetching bank paybills:', error);
+    logger.error('Error fetching bank paybills:', error);
     return [];
   }
 }
@@ -57,7 +58,7 @@ async function getIntegrationConfig(serviceName) {
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
-    console.error('Error fetching integration config:', error);
+    logger.error('Error fetching integration config:', error);
     return null;
   }
 }
@@ -166,7 +167,7 @@ async function finalizeSessionPayment(session, mpesaReceipt, phone) {
   const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
   if (customer?.phone) {
     triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
-      console.error('SMS error:', error.message);
+      logger.error('SMS error:', error.message);
     });
   }
   
@@ -178,7 +179,7 @@ async function finalizeSessionPayment(session, mpesaReceipt, phone) {
       invoice.invoice_number,
       payment.reference
     ).catch((error) => {
-      console.error('Telegram alert error:', error.message);
+      logger.error('Telegram alert error:', error.message);
     });
   }
 
@@ -218,7 +219,7 @@ router.post('/', async (req, res) => {
     const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
     if (customer?.phone) {
       triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
-        console.error('SMS error:', error.message);
+        logger.error('SMS error:', error.message);
       });
     }
 
@@ -281,7 +282,7 @@ router.post('/:id/refund', async (req, res) => {
 
     res.json({ success: true, refund_amount: newRefundAmount, message: 'Refund processed successfully' });
   } catch (e) {
-    console.error('Refund error:', e);
+    logger.error('Refund error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -561,7 +562,7 @@ router.post('/mpesa/paybill/confirm', async (req, res) => {
 
     if (customer?.phone) {
       triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
-        console.error('SMS error:', error.message);
+        logger.error('SMS error:', error.message);
       });
     }
 
@@ -590,7 +591,7 @@ router.post('/bank-paybill/confirm', async (req, res) => {
 
     if (customer?.phone) {
       triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
-        console.error('SMS error:', error.message);
+        logger.error('SMS error:', error.message);
       });
     }
 
@@ -642,7 +643,7 @@ router.post('/mpesa/callback', async (req, res) => {
         const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
         if (customer?.phone) {
           triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
-            console.error('SMS error:', error.message);
+            logger.error('SMS error:', error.message);
           });
         }
       }
@@ -655,7 +656,7 @@ router.post('/mpesa/callback', async (req, res) => {
 
     res.json({ ResultCode: 0, ResultDesc: 'Success' });
   } catch (e) {
-    console.error('M-Pesa callback error:', e);
+    logger.error('M-Pesa callback error:', e);
     res.json({ ResultCode: 0, ResultDesc: 'Success' });
   }
 });
@@ -730,7 +731,7 @@ router.post('/stripe/webhook', async (req, res) => {
     const result = await stripeService.handleWebhook(event);
     res.json(result);
   } catch (e) {
-    console.error('Stripe webhook error:', e);
+    logger.error('Stripe webhook error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -804,7 +805,7 @@ router.post('/paypal/webhook', async (req, res) => {
     const result = await paypalService.handleWebhook(body);
     res.json(result);
   } catch (e) {
-    console.error('PayPal webhook error:', e);
+    logger.error('PayPal webhook error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -877,7 +878,7 @@ router.post('/flutterwave/webhook', async (req, res) => {
     const result = await flutterwaveService.handleWebhook(body);
     res.json(result);
   } catch (e) {
-    console.error('Flutterwave webhook error:', e);
+    logger.error('Flutterwave webhook error:', e);
     res.status(500).json({ error: e.message });
   }
 });

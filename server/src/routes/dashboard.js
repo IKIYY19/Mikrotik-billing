@@ -1,6 +1,7 @@
 /**
  * Dashboard Stats API
  * Returns real-time statistics for the main dashboard
+const logger = require("../utils/logger");
  * Cached for 10 seconds to eliminate repeated DB round-trips
  */
 
@@ -162,7 +163,7 @@ router.get("/stats", async (req, res) => {
       cached: false,
     });
   } catch (error) {
-    console.error("Dashboard stats error:", error);
+    logger.error("Dashboard stats error:", error);
     // Return stale cache if available
     if (cache.stats) {
       return res.json({

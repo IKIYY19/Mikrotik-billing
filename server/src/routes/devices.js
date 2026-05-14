@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
+const logger = require("../utils/logger");
 const provisionStore = require("../db/provisionStore");
 const memoryDb = require("../db/memory");
 const zeroTouchBilling = require("../services/zeroTouchBilling");
@@ -403,7 +404,7 @@ router.delete("/discovered/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Delete discovered router error:", error);
+    logger.error("Delete discovered router error:", error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,6 +1,7 @@
 /**
  * Settings API Routes
  * Stores application-wide settings
+const logger = require("../utils/logger");
  */
 
 const express = require("express");
@@ -25,7 +26,7 @@ async function getSetting(key, defaultValue = "") {
     );
     return result.rows[0]?.value || defaultValue;
   } catch (error) {
-    console.error(`Error getting setting ${key}:`, error);
+    logger.error(`Error getting setting ${key}:`, error);
     return defaultValue;
   }
 }
@@ -43,7 +44,7 @@ async function setSetting(key, value) {
     );
     return true;
   } catch (error) {
-    console.error(`Error setting ${key}:`, error);
+    logger.error(`Error setting ${key}:`, error);
     return false;
   }
 }
@@ -105,7 +106,7 @@ async function getAllSettings() {
     });
     return settings;
   } catch (error) {
-    console.error("Error getting all settings:", error);
+    logger.error("Error getting all settings:", error);
     return defaults;
   }
 }
@@ -358,7 +359,7 @@ router.put("/", async (req, res) => {
     const updatedSettings = await getAllSettings();
     res.json(updatedSettings);
   } catch (error) {
-    console.error("Error updating settings:", error);
+    logger.error("Error updating settings:", error);
     res.status(500).json({ error: "Failed to update settings" });
   }
 });
@@ -574,7 +575,7 @@ router.get("/notifications", async (req, res) => {
       res.json(result.rows);
     }
   } catch (error) {
-    console.error("Error getting notification settings:", error);
+    logger.error("Error getting notification settings:", error);
     res.status(500).json({ error: "Failed to get notification settings" });
   }
 });
@@ -622,7 +623,7 @@ router.put("/notifications", async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    console.error("Error updating notification settings:", error);
+    logger.error("Error updating notification settings:", error);
     res.status(500).json({ error: "Failed to update notification settings" });
   }
 });

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const logger = require("../utils/logger");
 
 // Multi-tenant: auto-inject tenant_id on all write operations
 router.use((req, res, next) => {
@@ -246,14 +247,14 @@ router.post("/customers", async (req, res) => {
             const expandedSub = await getExpandedSubscription(subscription.id);
             await syncSubscription("reconcile", expandedSub);
           } catch (syncErr) {
-            console.error(
+            logger.error(
               "Failed to sync subscription to MikroTik:",
               syncErr.message,
             );
           }
         }
       } catch (subErr) {
-        console.error("Failed to create subscription:", subErr.message);
+        logger.error("Failed to create subscription:", subErr.message);
       }
     }
 
@@ -311,7 +312,7 @@ router.put("/customers/:id", async (req, res) => {
 
     if (req.body.plan_id) {
       try {
-        console.log(
+        logger.info(
           "[CUSTOMER UPDATE] plan_id:",
           req.body.plan_id,
           "customer_id:",
@@ -341,7 +342,7 @@ router.put("/customers/:id", async (req, res) => {
           });
         }
       } catch (subErr) {
-        console.error("Failed to update subscription:", subErr.message);
+        logger.error("Failed to update subscription:", subErr.message);
       }
     }
     res.json(customer);
@@ -401,7 +402,7 @@ router.post("/customers/:id/portal-url", async (req, res) => {
       password: newPassword,
     });
   } catch (e) {
-    console.error("Generate portal URL error:", e);
+    logger.error("Generate portal URL error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -435,7 +436,7 @@ router.get("/customers/:id/portal-info", async (req, res) => {
         customer.portal_username || customer.email || customer.phone,
     });
   } catch (e) {
-    console.error("Get portal info error:", e);
+    logger.error("Get portal info error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -477,7 +478,7 @@ router.post("/customers/:id/reset-pin", async (req, res) => {
       message: `New portal PIN: ${newPin}. Customer can log in with their phone number and this PIN.`,
     });
   } catch (e) {
-    console.error("Reset PIN error:", e);
+    logger.error("Reset PIN error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -514,7 +515,7 @@ router.post("/customers/:id/reset-password", async (req, res) => {
         customer.portal_username || customer.email || customer.phone,
     });
   } catch (e) {
-    console.error("Reset password error:", e);
+    logger.error("Reset password error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -589,7 +590,7 @@ router.post("/customers/:id/payment-prompt", async (req, res) => {
       message: "Payment prompt sent successfully",
     });
   } catch (e) {
-    console.error("Send payment prompt error:", e);
+    logger.error("Send payment prompt error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -721,14 +722,14 @@ router.post("/subscriptions/:id/toggle", async (req, res) => {
           invoice: null,
           payment: null,
         },
-      ).catch((e) => console.error("SMS error:", e.message));
+      ).catch((e) => logger.error("SMS error:", e.message));
     }
 
     // Send Telegram alert for suspension
     if (sub.status !== "active" && expandedSub.plan?.name) {
       alertSystem
         .sendServiceSuspension(expandedSub.customer.id, expandedSub.plan.name)
-        .catch((e) => console.error("Telegram alert error:", e.message));
+        .catch((e) => logger.error("Telegram alert error:", e.message));
     }
 
     res.json({
@@ -1057,7 +1058,7 @@ router.post("/invoices", async (req, res) => {
       invoice.customer || (await billing.getCustomerById(invoice.customer_id));
     if (customer?.phone) {
       triggerSMS("invoice_due_soon", { customer, invoice }).catch((e) =>
-        console.error("SMS error:", e.message),
+        logger.error("SMS error:", e.message),
       );
     }
 
@@ -1070,7 +1071,7 @@ router.post("/invoices", async (req, res) => {
           invoice.total,
           invoice.due_date,
         )
-        .catch((e) => console.error("Telegram alert error:", e.message));
+        .catch((e) => logger.error("Telegram alert error:", e.message));
     }
 
     res.status(201).json(invoice);
@@ -1136,7 +1137,7 @@ router.post("/credit-notes", async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (e) {
-    console.error("Credit note error:", e);
+    logger.error("Credit note error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1218,7 +1219,7 @@ router.post("/payments", async (req, res) => {
       payment.invoice || (await billing.getInvoiceById(payment.invoice_id));
     if (customer?.phone) {
       triggerSMS("payment_received", { customer, invoice, payment }).catch(
-        (e) => console.error("SMS error:", e.message),
+        (e) => logger.error("SMS error:", e.message),
       );
     }
 
@@ -1385,7 +1386,7 @@ router.get("/customers/online-status", async (req, res) => {
       total: pppoeOnline.length + hotspotOnline.length,
     });
   } catch (e) {
-    console.error("Online status error:", e);
+    logger.error("Online status error:", e);
     res.json({
       online: {},
       pppoe: [],
@@ -1514,7 +1515,7 @@ router.get("/usage/history", async (req, res) => {
           }
         }
       } catch (e) {
-        console.warn("[Billing] Failed to get PPPoE data:", e.message);
+        logger.warn("[Billing] Failed to get PPPoE data:", e.message);
       }
     }
 
@@ -1541,7 +1542,7 @@ router.get("/usage/history", async (req, res) => {
       total_bandwidth_out: pppoeBandwidth.total_out,
     });
   } catch (e) {
-    console.error("[Billing] Usage history error:", e);
+    logger.error("[Billing] Usage history error:", e);
     res.status(500).json({ error: e.message, data: [] });
   }
 });
@@ -1638,7 +1639,7 @@ router.get("/reviews", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get all reviews error:", e);
+    logger.error("Get all reviews error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1656,7 +1657,7 @@ router.get("/staff-points", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get staff points error:", e);
+    logger.error("Get staff points error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1675,7 +1676,7 @@ router.get("/staff-points/:userId", async (req, res) => {
     );
     res.json(result.rows);
   } catch (e) {
-    console.error("Get staff point history error:", e);
+    logger.error("Get staff point history error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1879,7 +1880,7 @@ router.post("/customers/merge", async (req, res) => {
       ...results,
     });
   } catch (e) {
-    console.error("Customer merge error:", e);
+    logger.error("Customer merge error:", e);
     res.status(500).json({ error: e.message });
   }
 });

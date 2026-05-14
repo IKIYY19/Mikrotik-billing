@@ -1,13 +1,17 @@
 FROM node:18-alpine
-ARG CACHEBUST=3
+ARG CACHEBUST=4
 
 ARG VITE_GOOGLE_CLIENT_ID
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 # Install nginx and supervisor
-RUN apk add --no-cache nginx supervisor netcat-openbsd
+RUN apk add --no-cache nginx supervisor netcat-openbsd shadow
 
 WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
 # Copy package files first for better caching
 COPY server/package*.json ./server/
@@ -27,8 +31,10 @@ RUN cd client && npm run build
 # Configure nginx
 COPY nginx-dokploy.conf /etc/nginx/http.d/default.conf
 
-# Create logs directory
-RUN mkdir -p /var/log
+# Create logs directory and set permissions
+RUN mkdir -p /var/log && \
+    chown -R appuser:appgroup /app && \
+    chown -R appuser:appgroup /var/log
 
 # Create supervisor config
 COPY supervisord.conf /etc/supervisor.d/supervisord.ini
@@ -38,5 +44,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
 EXPOSE 80 5000
+
+USER appuser
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.d/supervisord.ini"]

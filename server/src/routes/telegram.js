@@ -1,6 +1,7 @@
 /**
  * Telegram Bot Routes
  * Handles sending messages via Telegram Bot API
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -20,7 +21,7 @@ async function getIntegrationConfig(serviceName) {
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
-    console.error('Error fetching integration config:', error);
+    logger.error('Error fetching integration config:', error);
     return null;
   }
 }
@@ -53,7 +54,7 @@ router.post('/send', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send Telegram message error:', e);
+    logger.error('Send Telegram message error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -73,7 +74,7 @@ router.post('/payment-reminder', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send payment reminder error:', e);
+    logger.error('Send payment reminder error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -93,7 +94,7 @@ router.post('/payment-confirmation', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send payment confirmation error:', e);
+    logger.error('Send payment confirmation error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -113,7 +114,7 @@ router.post('/service-alert', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send service alert error:', e);
+    logger.error('Send service alert error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -133,7 +134,7 @@ router.post('/overdue-notice', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send overdue notice error:', e);
+    logger.error('Send overdue notice error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -148,7 +149,7 @@ router.get('/me', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Get bot info error:', e);
+    logger.error('Get bot info error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -163,7 +164,7 @@ router.get('/webhook', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Get webhook info error:', e);
+    logger.error('Get webhook info error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -183,7 +184,7 @@ router.post('/webhook', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Set webhook error:', e);
+    logger.error('Set webhook error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -202,7 +203,7 @@ router.get('/updates', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Get updates error:', e);
+    logger.error('Get updates error:', e);
     res.status(500).json({ error: e.message });
   }
 });
