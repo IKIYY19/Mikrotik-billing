@@ -1,6 +1,7 @@
 /**
  * Captive Portal Builder
  * Create and manage hotspot captive portal pages and configurations
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -99,7 +100,7 @@ router.post('/templates', async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (e) {
-    console.error('Portal template creation error:', e);
+    logger.error('Portal template creation error:', e);
     res.status(500).json({ error: e.message });
   }
 });

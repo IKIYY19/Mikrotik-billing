@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = global.dbAvailable ? global.db : require('../db/memory');
+const logger = require("../utils/logger");
 const { v4: uuidv4 } = require('uuid');
 
 // ═══════════════════════════════════════
@@ -184,7 +185,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (e) {
-    console.error('Ticket creation error:', e);
+    logger.error('Ticket creation error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -222,7 +223,7 @@ router.delete('/:id', async (req, res) => {
 
     res.json({ message: 'Ticket deleted successfully', ticket: result.rows[0] });
   } catch (e) {
-    console.error('Delete ticket error:', e.message);
+    logger.error('Delete ticket error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

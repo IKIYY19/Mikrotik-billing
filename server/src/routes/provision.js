@@ -1143,7 +1143,7 @@ router.get("/enroll/done/:token", async (req, res) => {
           }
         }
       } catch (e) {
-        console.warn("[Enrollment] done finalization error:", e.message);
+        logger.warn("[Enrollment] done finalization error:", e.message);
       }
     }
 

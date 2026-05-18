@@ -1,6 +1,7 @@
 /**
  * API Routes for: Prepaid Wallet, Map View, Auto Backup
  */
+const logger = require("../utils/logger");
 
 const express = require("express");
 const router = express.Router();
@@ -215,7 +216,7 @@ router.get("/map/data", async (req, res) => {
 
     res.json({ branches, customers, center: [centerLat, centerLng], zoom: 10 });
   } catch (e) {
-    console.error("Map data error:", e);
+    logger.error("Map data error:", e);
     res.status(500).json({ error: e.message });
   }
 });

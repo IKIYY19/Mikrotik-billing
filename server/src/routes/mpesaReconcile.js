@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
+const logger = require("../utils/logger");
 
 const pgDb = global.dbAvailable ? require("../db") : null;
 const billingData = !global.dbAvailable ? require("../services/billingData") : null;
@@ -141,7 +142,7 @@ router.post("/reconcile", async (req, res) => {
 
     res.json(results);
   } catch (e) {
-    console.error("M-Pesa reconcile error:", e);
+    logger.error("M-Pesa reconcile error:", e);
     res.status(500).json({ error: e.message });
   }
 });

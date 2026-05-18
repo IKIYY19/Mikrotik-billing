@@ -1,6 +1,7 @@
 /**
  * API Routes for: Branches, Agents, Vouchers, Monitoring, Auto-suspend
  */
+const logger = require("../utils/logger");
 
 const express = require("express");
 const router = express.Router();
@@ -183,7 +184,7 @@ router.get("/monitoring/dashboard", async (req, res) => {
         connections = result.rows;
       }
     } catch (e) {
-      console.warn("[Monitoring] Could not fetch connections:", e.message);
+      logger.warn("[Monitoring] Could not fetch connections:", e.message);
     }
 
     // Decrypt password helper
@@ -402,7 +403,7 @@ router.get("/monitoring/dashboard", async (req, res) => {
         : "Configured MikroTik routers are offline or unreachable. No dummy monitoring data is being shown.",
     });
   } catch (e) {
-    console.error("[Monitoring] Dashboard error:", e);
+    logger.error("[Monitoring] Dashboard error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -554,10 +555,10 @@ router.post("/setup", async (req, res) => {
       reminderDays: notifications?.reminderDays || 3,
     };
 
-    console.log("✅ Setup wizard completed");
+    logger.info("✅ Setup wizard completed");
     res.json({ success: true, message: "Setup completed successfully" });
   } catch (error) {
-    console.error("Setup error:", error);
+    logger.error("Setup error:", error);
     res.status(500).json({ error: "Setup failed" });
   }
 });

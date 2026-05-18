@@ -1,6 +1,7 @@
 /**
  * User Management API
  * Admin-only endpoints for managing users and roles
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(query, params);
     res.json(result.rows);
   } catch (e) {
-    console.error('List users error:', e.message);
+    logger.error('List users error:', e.message);
     res.status(500).json({ error: 'Failed to list users' });
   }
 });
@@ -70,7 +71,7 @@ router.get('/stats', async (req, res) => {
       byRole: roleStats,
     });
   } catch (e) {
-    console.error('User stats error:', e.message);
+    logger.error('User stats error:', e.message);
     res.status(500).json({ error: 'Failed to get user statistics' });
   }
 });
@@ -89,7 +90,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (e) {
-    console.error('Get user error:', e.message);
+    logger.error('Get user error:', e.message);
     res.status(500).json({ error: 'Failed to get user' });
   }
 });
@@ -123,7 +124,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (e) {
-    console.error('Create user error:', e.message);
+    logger.error('Create user error:', e.message);
     res.status(500).json({ error: 'Failed to create user' });
   }
 });
@@ -181,7 +182,7 @@ router.put('/:id', async (req, res) => {
     const result = await db.query(query, params);
     res.json(result.rows[0]);
   } catch (e) {
-    console.error('Update user error:', e.message);
+    logger.error('Update user error:', e.message);
     res.status(500).json({ error: 'Failed to update user' });
   }
 });
@@ -202,7 +203,7 @@ router.delete('/:id', async (req, res) => {
 
     res.json({ message: 'User disabled successfully', user: result.rows[0] });
   } catch (e) {
-    console.error('Disable user error:', e.message);
+    logger.error('Disable user error:', e.message);
     res.status(500).json({ error: 'Failed to disable user' });
   }
 });
@@ -223,7 +224,7 @@ router.delete('/:id/permanent', async (req, res) => {
 
     res.json({ message: 'User deleted successfully', user: result.rows[0] });
   } catch (e) {
-    console.error('Delete user error:', e.message);
+    logger.error('Delete user error:', e.message);
     res.status(500).json({ error: 'Failed to delete user' });
   }
 });
@@ -244,7 +245,7 @@ router.post('/:id/enable', async (req, res) => {
 
     res.json({ message: 'User enabled successfully', user: result.rows[0] });
   } catch (e) {
-    console.error('Enable user error:', e.message);
+    logger.error('Enable user error:', e.message);
     res.status(500).json({ error: 'Failed to enable user' });
   }
 });
@@ -271,7 +272,7 @@ router.post('/:id/reset-password', async (req, res) => {
 
     res.json({ message: 'Password reset successfully', user: result.rows[0] });
   } catch (e) {
-    console.error('Reset password error:', e.message);
+    logger.error('Reset password error:', e.message);
     res.status(500).json({ error: 'Failed to reset password' });
   }
 });
@@ -295,7 +296,7 @@ router.post('/heartbeat', async (req, res) => {
 
     res.json({ success: true, last_seen: now.toISOString() });
   } catch (e) {
-    console.error('Heartbeat error:', e.message);
+    logger.error('Heartbeat error:', e.message);
     res.status(500).json({ error: 'Failed to update activity' });
   }
 });

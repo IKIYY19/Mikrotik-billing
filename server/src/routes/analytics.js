@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const logger = require("../utils/logger");
 
 // ═══════════════════════════════════════
 // ANALYTICS OVERVIEW
@@ -183,7 +184,7 @@ router.get('/overview', async (req, res) => {
       insights,
     });
   } catch (e) {
-    console.error('Analytics overview error:', e);
+    logger.error('Analytics overview error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -224,7 +225,7 @@ router.get('/revenue-trend', async (req, res) => {
       customers: parseInt(row.customers),
     })));
   } catch (e) {
-    console.error('Revenue trend error:', e);
+    logger.error('Revenue trend error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -283,7 +284,7 @@ router.get('/churn', async (req, res) => {
       total_churned: churnedSubs.rows.length,
     });
   } catch (e) {
-    console.error('Churn analysis error:', e);
+    logger.error('Churn analysis error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -333,7 +334,7 @@ router.get('/customer-growth', async (req, res) => {
       })),
     });
   } catch (e) {
-    console.error('Customer growth error:', e);
+    logger.error('Customer growth error:', e);
     res.status(500).json({ error: e.message });
   }
 });

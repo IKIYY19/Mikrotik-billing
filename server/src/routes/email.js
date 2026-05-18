@@ -1,6 +1,7 @@
 /**
  * Email Routes
  * Handles sending emails via multiple providers (Mailgun, AWS SES, SendGrid)
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -22,7 +23,7 @@ async function getIntegrationConfig(serviceName) {
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
-    console.error('Error fetching integration config:', error);
+    logger.error('Error fetching integration config:', error);
     return null;
   }
 }
@@ -81,7 +82,7 @@ router.post('/send', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send email error:', e);
+    logger.error('Send email error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -113,7 +114,7 @@ router.post('/send-template', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Send template email error:', e);
+    logger.error('Send template email error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -141,7 +142,7 @@ router.get('/stats/:provider', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Get stats error:', e);
+    logger.error('Get stats error:', e);
     res.status(500).json({ error: e.message });
   }
 });

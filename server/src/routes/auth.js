@@ -241,16 +241,16 @@ router.post("/heartbeat", async (req, res) => {
     const db = getDb();
     const authHeader = req.headers.authorization;
 
-    console.log("Heartbeat request received");
-    console.log("Auth header:", authHeader ? "Present" : "Missing");
+    logger.info("Heartbeat request received");
+    logger.info("Auth header:", authHeader ? "Present" : "Missing");
 
     if (!authHeader?.startsWith("Bearer ")) {
-      console.log("Heartbeat failed: No valid auth header");
+      logger.info("Heartbeat failed: No valid auth header");
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
-    console.log("Heartbeat for user ID:", decoded.id, "Email:", decoded.email);
+    logger.info("Heartbeat for user ID:", decoded.id, "Email:", decoded.email);
 
     const now = new Date();
 
@@ -262,12 +262,12 @@ router.post("/heartbeat", async (req, res) => {
       [now.toISOString(), decoded.id],
     );
 
-    console.log("Heartbeat update result:", result.rows[0]);
+    logger.info("Heartbeat update result:", result.rows[0]);
 
     res.json({ success: true, last_seen: now.toISOString() });
   } catch (e) {
-    console.error("Heartbeat error:", e.message);
-    console.error("Heartbeat error stack:", e.stack);
+    logger.error("Heartbeat error:", e.message);
+    logger.error("Heartbeat error stack:", e.stack);
     res.status(500).json({ error: "Failed to update activity" });
   }
 });
@@ -325,12 +325,12 @@ router.post("/2fa/enable", authenticate, async (req, res) => {
       "[2FA ENABLE] Secret from DB:",
       secret ? secret.substring(0, 10) + "..." : "MISSING",
     );
-    console.log("[2FA ENABLE] Code received:", code);
+    logger.info("[2FA ENABLE] Code received:", code);
 
     if (!secret) return res.status(400).json({ error: "Setup 2FA first" });
 
     const isValid = authenticator.verify({ token: code, secret });
-    console.log("[2FA ENABLE] Verify result:", isValid);
+    logger.info("[2FA ENABLE] Verify result:", isValid);
     if (!isValid) return res.status(400).json({ error: "Invalid code" });
 
     await db.query("UPDATE users SET two_factor_enabled = true WHERE id = $1", [

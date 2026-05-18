@@ -1,6 +1,7 @@
 /**
  * Storage Routes
  * Handles file storage operations via Google Cloud Storage
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -20,7 +21,7 @@ async function getIntegrationConfig(serviceName) {
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
-    console.error('Error fetching integration config:', error);
+    logger.error('Error fetching integration config:', error);
     return null;
   }
 }
@@ -52,7 +53,7 @@ router.post('/upload', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Upload file error:', e);
+    logger.error('Upload file error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -73,7 +74,7 @@ router.post('/upload-buffer', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Upload buffer error:', e);
+    logger.error('Upload buffer error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -95,7 +96,7 @@ router.get('/download/:filename', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Download file error:', e);
+    logger.error('Download file error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -112,7 +113,7 @@ router.delete('/:filename', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Delete file error:', e);
+    logger.error('Delete file error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -132,7 +133,7 @@ router.get('/list', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('List files error:', e);
+    logger.error('List files error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -149,7 +150,7 @@ router.get('/metadata/:filename', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Get metadata error:', e);
+    logger.error('Get metadata error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -172,7 +173,7 @@ router.post('/signed-url', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Generate signed URL error:', e);
+    logger.error('Generate signed URL error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -192,7 +193,7 @@ router.post('/copy', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Copy file error:', e);
+    logger.error('Copy file error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -212,7 +213,7 @@ router.post('/backup', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Backup database error:', e);
+    logger.error('Backup database error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -227,7 +228,7 @@ router.get('/backups', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('List backups error:', e);
+    logger.error('List backups error:', e);
     res.status(500).json({ error: e.message });
   }
 });

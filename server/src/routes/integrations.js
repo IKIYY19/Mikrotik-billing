@@ -1,6 +1,7 @@
 /**
  * Integrations API Routes
  * Manage external service integrations (SMS, Payments, etc.)
+const logger = require("../utils/logger");
  */
 
 const express = require('express');
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 
     res.json(integrations);
   } catch (error) {
-    console.error('Error fetching integrations:', error);
+    logger.error('Error fetching integrations:', error);
     res.status(500).json({ error: 'Failed to fetch integrations' });
   }
 });
@@ -84,7 +85,7 @@ router.put('/:id', async (req, res) => {
       integration,
     });
   } catch (error) {
-    console.error('Error updating integration:', error);
+    logger.error('Error updating integration:', error);
     res.status(500).json({ error: 'Failed to update integration' });
   }
 });
@@ -177,7 +178,7 @@ router.post('/:id/test', async (req, res) => {
       details: testResult.details,
     });
   } catch (error) {
-    console.error('Test connection error:', error);
+    logger.error('Test connection error:', error);
     res.status(500).json({ error: 'Test failed' });
   }
 });
