@@ -10,7 +10,7 @@ const { v4: uuidv4 } = require("uuid");
 const billingData = require("../services/billingData");
 const radiusStore = require("../db/radiusStore");
 const MpesaService = require("../services/mpesa");
-const { triggerSMS } = require("./sms");
+const notificationService = require("../services/notificationService");
 const logger = require("../utils/logger");
 const db = global.dbAvailable ? global.db : require("../db/memory");
 
@@ -90,7 +90,7 @@ router.post("/login", async (req, res) => {
       (c) => c.phone === phone || c.phone?.replace(/\s/g, "") === normalizedPhone,
     );
 
-    if (!customer) return res.status(401).json({ error: "Customer not found" });
+    if (!customer) {return res.status(401).json({ error: "Customer not found" });}
 
     // Simple PIN check - in production use bcrypt
     const expectedPin = customer.pin || phone?.slice(-4) || "1234";
@@ -338,7 +338,7 @@ router.post("/:customerId/tickets", async (req, res) => {
 
     // Send SMS confirmation
     if (customer.phone) {
-      triggerSMS("payment_received", {
+      notificationService.triggerSMS("payment_received", {
         customer,
         payment: { reference: ticketNumber },
       }).catch((e) => console.error('customerPortal.js async op failed:', e?.message || e));
@@ -897,7 +897,7 @@ router.get("/:customerId/bandwidth", async (req, res) => {
           const grouped = {};
           for (const r of records) {
             const d = new Date(r.recorded_at).toISOString().split("T")[0];
-            if (!grouped[d]) grouped[d] = { bytes_in: 0, bytes_out: 0 };
+            if (!grouped[d]) {grouped[d] = { bytes_in: 0, bytes_out: 0 };}
             grouped[d].bytes_in += parseFloat(r.bytes_in) || 0;
             grouped[d].bytes_out += parseFloat(r.bytes_out) || 0;
           }
@@ -1186,7 +1186,7 @@ router.post("/:customerId/reviews", async (req, res) => {
 
 // Calculate points based on review
 function calculatePoints(rating, serviceQuality) {
-  let basePoints = rating * 10; // 10 points per star
+  const basePoints = rating * 10; // 10 points per star
 
   // Bonus for service quality
   const qualityBonus = {
@@ -1334,26 +1334,26 @@ router.post("/:customerId/change-plan", async (req, res) => {
   try {
     const { plan_id } = req.body;
     const { customerId } = req.params;
-    if (!plan_id) return res.status(400).json({ error: "plan_id is required" });
+    if (!plan_id) {return res.status(400).json({ error: "plan_id is required" });}
 
     let subscription, plan, oldPlan;
     if (global.dbAvailable) {
       const subRes = await db.query("SELECT * FROM subscriptions WHERE customer_id = $1 AND status = 'active' LIMIT 1", [customerId]);
       subscription = subRes.rows[0] || null;
-      if (!subscription) return res.status(404).json({ error: "No active subscription found" });
+      if (!subscription) {return res.status(404).json({ error: "No active subscription found" });}
       const planRes = await db.query("SELECT * FROM service_plans WHERE id = $1", [plan_id]);
       plan = planRes.rows[0] || null;
-      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      if (!plan) {return res.status(404).json({ error: "Plan not found" });}
       const oldPlanRes = await db.query("SELECT * FROM service_plans WHERE id = $1", [subscription.plan_id]);
       oldPlan = oldPlanRes.rows[0] || null;
       await db.query("UPDATE subscriptions SET plan_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [plan_id, subscription.id]);
     } else {
       const allSubscriptions = await billingData.listSubscriptions();
       subscription = allSubscriptions.find(s => s.customer_id === customerId && s.status === 'active');
-      if (!subscription) return res.status(404).json({ error: "No active subscription found" });
+      if (!subscription) {return res.status(404).json({ error: "No active subscription found" });}
       const allPlans = await billingData.listPlans();
       plan = allPlans.find(p => p.id === plan_id);
-      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      if (!plan) {return res.status(404).json({ error: "Plan not found" });}
       oldPlan = allPlans.find(p => p.id === subscription.plan_id);
       await billingData.updateSubscription(subscription.id, { plan_id, updated_at: new Date().toISOString() });
     }

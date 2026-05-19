@@ -56,7 +56,7 @@ function useDatabase() {
 
 function templateName(templateId) {
   const match = DEFAULT_TEMPLATES.find((template) => template.id === templateId);
-  if (match) return match.name;
+  if (match) {return match.name;}
   return templateId
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -64,7 +64,7 @@ function templateName(templateId) {
 }
 
 function normalizeTemplate(row) {
-  if (!row) return null;
+  if (!row) {return null;}
   return {
     id: row.event_type || row.id,
     name: row.name || templateName(row.event_type || row.id),
@@ -75,7 +75,7 @@ function normalizeTemplate(row) {
 }
 
 function normalizeLog(row) {
-  if (!row) return null;
+  if (!row) {return null;}
   return {
     ...row,
     to: row.recipients || row.to || [],
@@ -86,7 +86,7 @@ function normalizeLog(row) {
 }
 
 async function ensureDefaultTemplates(channel = 'sms') {
-  if (!useDatabase()) return;
+  if (!useDatabase()) {return;}
 
   for (const template of DEFAULT_TEMPLATES) {
     await global.db.query(

@@ -12,7 +12,7 @@ const flutterwaveService = require('../services/flutterwave');
 const billing = require('../services/billingData');
 const paymentSessions = require('../services/paymentSessions');
 const { paymentLimiter } = require('../middleware/rateLimiter');
-const { triggerSMS } = require('./sms');
+const notificationService = require('../services/notificationService');
 const { decryptObject } = require('../utils/encryption');
 const alertSystem = require('../services/alertSystem');
 
@@ -48,12 +48,12 @@ async function getIntegrationConfig(serviceName) {
     }
 
     // Fallback to database if available
-    if (!global.db) return null;
+    if (!global.db) {return null;}
     const result = await global.db.query(
       'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
       [serviceName]
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
@@ -114,7 +114,7 @@ async function isPaypalConfigured() {
 }
 
 function ensureWebhookSecretConfigured(provider) {
-  if (!isProductionEnv) return true;
+  if (!isProductionEnv) {return true;}
   if (provider === 'stripe') {
     return Boolean(process.env.STRIPE_WEBHOOK_SECRET);
   }
@@ -165,7 +165,7 @@ async function finalizeSessionPayment(session, mpesaReceipt, phone) {
   const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
   const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
   if (customer?.phone) {
-    triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+    notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
       console.error('SMS error:', error.message);
     });
   }
@@ -217,7 +217,7 @@ router.post('/', async (req, res) => {
     const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
     const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
     if (customer?.phone) {
-      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+      notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
         console.error('SMS error:', error.message);
       });
     }
@@ -416,10 +416,10 @@ router.get('/methods', async (req, res) => {
 router.post('/mpesa/stk', async (req, res) => {
   try {
     const { phone, amount, invoice_id, customer_id } = req.body;
-    if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
+    if (!phone || !amount) {return res.status(400).json({ error: 'phone and amount required' });}
 
     const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
-    if (!customerId) return res.status(404).json({ error: 'Customer not found' });
+    if (!customerId) {return res.status(404).json({ error: 'Customer not found' });}
 
     const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
     const description = invoice ? `Payment for ${invoice.invoice_number}` : 'Wallet top-up';
@@ -560,7 +560,7 @@ router.post('/mpesa/paybill/confirm', async (req, res) => {
     });
 
     if (customer?.phone) {
-      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+      notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
         console.error('SMS error:', error.message);
       });
     }
@@ -589,7 +589,7 @@ router.post('/bank-paybill/confirm', async (req, res) => {
     });
 
     if (customer?.phone) {
-      triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+      notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
         console.error('SMS error:', error.message);
       });
     }
@@ -641,7 +641,7 @@ router.post('/mpesa/callback', async (req, res) => {
         const customer = payment.customer || await billing.getCustomerById(payment.customer_id);
         const invoice = payment.invoice || await billing.getInvoiceById(payment.invoice_id);
         if (customer?.phone) {
-          triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
+          notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch((error) => {
             console.error('SMS error:', error.message);
           });
         }

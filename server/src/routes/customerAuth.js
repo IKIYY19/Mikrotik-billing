@@ -12,6 +12,7 @@ const db = global.dbAvailable ? global.db : require("../db/memory");
 
 const CUSTOMER_JWT_SECRET = JWT_SECRET + "_customer";
 const CUSTOMER_JWT_EXPIRES = "24h";
+const notificationService = require("../services/notificationService");
 
 // Generate secure PIN hash
 const hashPIN = async (pin) => await bcrypt.hash(pin, 10);
@@ -184,7 +185,7 @@ async function updateCustomerField(customerId, field, value) {
     const memoryDb = require("../db/memory");
     const store = memoryDb._getStore ? memoryDb._getStore() : {};
     const customer = (store.customers || []).find((c) => c.id === customerId);
-    if (customer) customer[field] = value;
+    if (customer) {customer[field] = value;}
   }
 }
 
@@ -212,8 +213,7 @@ router.post("/forgot-pin", async (req, res) => {
 
     // Try to send reset code via SMS
     try {
-      const { triggerSMS } = require("./sms");
-      await triggerSMS("password_reset", {
+      await notificationService.triggerSMS("password_reset", {
         customer,
         reset_code: resetCode,
       }).catch((e) => console.error('customerAuth.js async op failed:', e?.message || e));
@@ -223,8 +223,7 @@ router.post("/forgot-pin", async (req, res) => {
 
     // Try to send reset code via WhatsApp
     try {
-      const WhatsAppService = require("../services/whatsapp");
-      const wa = new WhatsAppService();
+      const wa = await notificationService.getWhatsAppService();
       await wa
         .sendMessage(
           customer.phone.replace(/^0/, "254"),

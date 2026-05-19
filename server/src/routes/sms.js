@@ -1,183 +1,26 @@
 /**
- * SMS Routes - Africa's Talking Integration
- * Handles sending, templates, logs, and settings
+ * SMS & WhatsApp Router
+ * Handles all message routing, templates, logs, and webhook integration,
+ * delegating business logic to the centralized NotificationService.
  */
 
 const express = require("express");
 const { v4: uuidv4 } = require("uuid");
-const AfricaTalkingService = require("../services/africasTalking");
-const WhatsAppService = require("../services/whatsapp");
-const SMSLeopardService = require("../services/smsLeopard");
-const BulkSmsKenyaService = require("../services/bulkSmsKenya");
-const NexmoService = require("../services/nexmo");
-const TwilioService = require("../services/twilio");
+const notificationService = require("../services/notificationService");
 const messagingStore = require("../services/messagingStore");
 const { messagingLimiter } = require("../middleware/rateLimiter");
-const { decryptObject } = require("../utils/encryption");
 
 const router = express.Router();
-const whatsapp = new WhatsAppService();
-const isProductionEnv = process.env.NODE_ENV === "production";
-
-async function getIntegrationConfig(serviceName) {
-  try {
-    if (!global.db) return null;
-    const result = await global.db.query(
-      "SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1",
-      [serviceName],
-    );
-    if (result.rows.length === 0) return null;
-    const decrypted = decryptObject(result.rows[0].config_data);
-    return decrypted;
-  } catch (error) {
-    console.error("Error fetching integration config:", error);
-    return null;
-  }
-}
-
-async function getATService() {
-  const integrationConfig = await getIntegrationConfig("africas_talking");
-  if (integrationConfig) {
-    return new AfricaTalkingService({
-      apiKey: integrationConfig.api_key,
-      username:
-        integrationConfig.username || (isProductionEnv ? "" : "sandbox"),
-      senderId: integrationConfig.sender_id || "MyISP",
-    });
-  }
-  return new AfricaTalkingService({
-    apiKey: process.env.AT_API_KEY,
-    username: process.env.AT_USERNAME || (isProductionEnv ? "" : "sandbox"),
-    senderId: process.env.AT_SENDER_ID || "MyISP",
-  });
-}
-
-async function getWhatsAppService() {
-  const integrationConfig = await getIntegrationConfig("whatsapp");
-  if (integrationConfig) {
-    return new WhatsAppService({
-      accessToken: integrationConfig.access_token,
-      phoneNumberId: integrationConfig.phone_number_id,
-      verifyToken: integrationConfig.verify_token,
-    });
-  }
-  return new WhatsAppService();
-}
-
-async function getSmsLeopardService() {
-  const integrationConfig = await getIntegrationConfig("smsleopard");
-  if (integrationConfig) {
-    return new SMSLeopardService({
-      apiKey: integrationConfig.api_key,
-      senderId: integrationConfig.sender_id,
-    });
-  }
-  return new SMSLeopardService();
-}
-
-async function getBulkSmsKenyaService() {
-  const integrationConfig = await getIntegrationConfig("bulksms_kenya");
-  if (integrationConfig) {
-    return new BulkSmsKenyaService({
-      username: integrationConfig.username,
-      apiKey: integrationConfig.api_key,
-      senderId: integrationConfig.sender_id,
-    });
-  }
-  return new BulkSmsKenyaService();
-}
-
-async function getNexmoService() {
-  const integrationConfig = await getIntegrationConfig("nexmo");
-  if (integrationConfig) {
-    return new NexmoService({
-      apiKey: integrationConfig.api_key,
-      apiSecret: integrationConfig.api_secret,
-      senderId: integrationConfig.sender_id,
-    });
-  }
-  return new NexmoService();
-}
-
-async function getTwilioService() {
-  const integrationConfig = await getIntegrationConfig("twilio");
-  if (integrationConfig) {
-    return new TwilioService({
-      accountSid: integrationConfig.account_sid,
-      authToken: integrationConfig.auth_token,
-      phoneNumber: integrationConfig.phone_number,
-    });
-  }
-  return new TwilioService();
-}
-
-function getCompanyInfo() {
-  return {
-    company_name: process.env.COMPANY_NAME || "Your ISP",
-    paybill: process.env.MPESA_PAYBILL || "123456",
-    support_phone: process.env.SUPPORT_PHONE || "+254 700 000 000",
-  };
-}
-
-async function renderTemplate(templateId, variables, channel = "sms") {
-  const template = await messagingStore.getTemplate(templateId, channel);
-  if (!template || !template.is_active) return null;
-
-  let message = template.body;
-  const company = getCompanyInfo();
-
-  for (const [key, value] of Object.entries({ ...variables, ...company })) {
-    message = message.replace(new RegExp(`\\{${key}\\}`, "g"), value || "");
-  }
-
-  return AfricaTalkingService.truncate(message);
-}
-
-async function logMessage(log) {
-  await messagingStore.createLog({
-    id: log.id || uuidv4(),
-    channel: log.channel || "sms",
-    event: log.event || null,
-    template_id: log.template_id || null,
-    to: Array.isArray(log.to) ? log.to : log.to ? [log.to] : [],
-    message: log.message,
-    status: log.status,
-    message_id: log.message_id || null,
-    cost: log.cost || 0,
-    is_sandbox: log.is_sandbox === true,
-    metadata: log.metadata || null,
-    created_at: log.created_at || new Date().toISOString(),
-  });
-}
-
-function buildMessageVariables(data = {}) {
-  return {
-    customer_name: data.customer?.name?.split(" ")[0] || "Customer",
-    invoice_number: data.invoice?.invoice_number || "",
-    amount:
-      data.invoice?.total?.toFixed?.(2) || data.amount?.toFixed?.(2) || "0",
-    due_date: data.invoice?.due_date || "",
-    days_overdue: data.days_overdue || 0,
-    mpesa_receipt: data.payment?.reference || data.mpesa_receipt || "",
-    balance: data.invoice
-      ? (
-          Number(data.invoice.total || 0) - Number(data.paid_amount || 0)
-        ).toFixed(2)
-      : "0",
-    plan_name: data.plan?.name || "",
-    speed: data.plan ? `${data.plan.speed_down}/${data.plan.speed_up}` : "",
-    pppoe_user: data.pppoe_username || data.sub?.pppoe_username || "",
-    pppoe_pass: data.pppoe_password || data.sub?.pppoe_password || "",
-  };
-}
 
 // ═══════════════════════════════════════
-// SEND BULK SMS (to all customers)
+// SEND BULK SMS (raw message to customers)
 // ═══════════════════════════════════════
 router.post("/send-bulk", messagingLimiter, async (req, res) => {
   try {
     const { message, provider, filter = "all" } = req.body;
-    if (!message) return res.status(400).json({ error: "message required" });
+    if (!message) {
+      return res.status(400).json({ error: "message required" });
+    }
 
     // Fetch customers based on filter
     let customers = [];
@@ -204,28 +47,28 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
         .json({ error: "No customers found with phone numbers" });
     }
 
-    let usedProvider = provider || "africas_talking";
+    const usedProvider = provider || "africas_talking";
     let service;
 
     switch (usedProvider) {
       case "smsleopard":
-        service = await getSmsLeopardService();
+        service = await notificationService.getSmsLeopardService();
         break;
       case "bulksms_kenya":
-        service = await getBulkSmsKenyaService();
+        service = await notificationService.getBulkSmsKenyaService();
         break;
       case "nexmo":
-        service = await getNexmoService();
+        service = await notificationService.getNexmoService();
         break;
       case "twilio":
-        service = await getTwilioService();
+        service = await notificationService.getTwilioService();
         break;
       case "whatsapp":
-        service = whatsapp;
+        service = await notificationService.getWhatsAppService();
         break;
       case "africas_talking":
       default:
-        service = await getATService();
+        service = await notificationService.getATService();
         break;
     }
 
@@ -238,9 +81,7 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
       try {
         let result;
         if (usedProvider === "africas_talking") {
-          const formattedPhone = AfricaTalkingService.formatPhone(
-            customer.phone,
-          );
+          const formattedPhone = notificationService.formatPhone(customer.phone);
           result = await service.sendSMS([formattedPhone], message);
         } else if (usedProvider === "whatsapp") {
           result = await service.sendMessage(customer.phone, message);
@@ -248,7 +89,7 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
           result = await service.sendSMS(customer.phone, message);
         }
 
-        await logMessage({
+        await notificationService.logMessage({
           to: [customer.phone],
           message,
           status: result.success ? "sent" : "failed",
@@ -261,81 +102,78 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
         } else {
           failCount++;
         }
-
-        results.push({
-          customer: customer.name,
-          phone: customer.phone,
-          success: result.success,
-          error: result.message,
-        });
-      } catch (error) {
+        results.push({ phone: customer.phone, success: result.success });
+      } catch (err) {
         failCount++;
-        results.push({
-          customer: customer.name,
-          phone: customer.phone,
-          success: false,
-          error: error.message,
-        });
+        results.push({ phone: customer.phone, success: false, error: err.message });
       }
     }
 
     res.json({
       success: true,
+      provider: usedProvider,
       total: customers.length,
-      successCount,
-      failCount,
+      sent: successCount,
+      failed: failCount,
       results,
     });
   } catch (e) {
-    console.error("Bulk SMS error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ═══════════════════════════════════════
-// SEND SMS (direct)
+// SEND SINGLE/RECIPIENTS SMS
 // ═══════════════════════════════════════
 router.post("/send", messagingLimiter, async (req, res) => {
   try {
     const { to, message, provider } = req.body;
-    if (!to || !message)
+    if (!to || !message) {
       return res.status(400).json({ error: "to and message required" });
+    }
 
     const recipients = Array.isArray(to) ? to : [to];
     let result;
-    let usedProvider = provider || "africas_talking";
+    const usedProvider = provider || "africas_talking";
 
     switch (usedProvider) {
-      case "smsleopard":
-        const smsLeopard = await getSmsLeopardService();
+      case "smsleopard": {
+        const smsLeopard = await notificationService.getSmsLeopardService();
         result = await smsLeopard.sendSMS(recipients[0], message);
         break;
-      case "bulksms_kenya":
-        const bulkSms = await getBulkSmsKenyaService();
+      }
+      case "bulksms_kenya": {
+        const bulkSms = await notificationService.getBulkSmsKenyaService();
         result = await bulkSms.sendSMS(recipients[0], message);
         break;
-      case "nexmo":
-        const nexmo = await getNexmoService();
+      }
+      case "nexmo": {
+        const nexmo = await notificationService.getNexmoService();
         result = await nexmo.sendSMS(recipients[0], message);
         break;
-      case "twilio":
-        const twilio = await getTwilioService();
+      }
+      case "twilio": {
+        const twilio = await notificationService.getTwilioService();
         result = await twilio.sendSMS(recipients[0], message);
         break;
-      case "whatsapp":
+      }
+      case "whatsapp": {
+        const whatsapp = await notificationService.getWhatsAppService();
         result = await whatsapp.sendMessage(recipients[0], message);
         break;
+      }
       case "africas_talking":
-      default:
-        const at = await getATService();
+      default: {
+        const at = await notificationService.getATService();
         const formattedRecipients = recipients.map((item) =>
-          AfricaTalkingService.formatPhone(item),
+          notificationService.formatPhone(item),
         );
         result = await at.sendSMS(formattedRecipients, message);
         break;
+      }
     }
 
-    await logMessage({
+    await notificationService.logMessage({
       to: recipients,
       message,
       status: result.success ? "sent" : "failed",
@@ -357,53 +195,57 @@ router.post("/send", messagingLimiter, async (req, res) => {
 router.post("/send-template", messagingLimiter, async (req, res) => {
   try {
     const { template_id, to, variables, provider } = req.body;
-    if (!template_id || !to)
+    if (!template_id || !to) {
       return res.status(400).json({ error: "template_id and to required" });
+    }
 
-    const message = await renderTemplate(template_id, variables || {});
-    if (!message)
+    const message = await notificationService.renderTemplate(template_id, variables || {});
+    if (!message) {
       return res.status(404).json({ error: "Template not found or inactive" });
+    }
 
     const recipients = Array.isArray(to) ? to : [to];
     let result;
-    let usedProvider = provider || "africas_talking";
+    const usedProvider = provider || "africas_talking";
 
     switch (usedProvider) {
       case "smsleopard": {
-        const smsLeopard = await getSmsLeopardService();
+        const smsLeopard = await notificationService.getSmsLeopardService();
         result = await smsLeopard.sendSMS(recipients[0], message);
         break;
       }
       case "bulksms_kenya": {
-        const bulkSms = await getBulkSmsKenyaService();
+        const bulkSms = await notificationService.getBulkSmsKenyaService();
         result = await bulkSms.sendSMS(recipients[0], message);
         break;
       }
       case "nexmo": {
-        const nexmo = await getNexmoService();
+        const nexmo = await notificationService.getNexmoService();
         result = await nexmo.sendSMS(recipients[0], message);
         break;
       }
       case "twilio": {
-        const twilio = await getTwilioService();
+        const twilio = await notificationService.getTwilioService();
         result = await twilio.sendSMS(recipients[0], message);
         break;
       }
-      case "whatsapp":
+      case "whatsapp": {
+        const whatsapp = await notificationService.getWhatsAppService();
         result = await whatsapp.sendMessage(recipients[0], message);
         break;
+      }
       case "africas_talking":
       default: {
-        const at = await getATService();
+        const at = await notificationService.getATService();
         const formattedRecipients = recipients.map((item) =>
-          AfricaTalkingService.formatPhone(item),
+          notificationService.formatPhone(item),
         );
         result = await at.sendSMS(formattedRecipients, message);
         break;
       }
     }
 
-    await logMessage({
+    await notificationService.logMessage({
       template_id,
       to: recipients,
       message,
@@ -446,25 +288,24 @@ router.delete("/logs", async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// BULK SMS (via template)
+// BULK SMS (via template - Africa's Talking)
 // ═══════════════════════════════════════
 router.post("/bulk-send", messagingLimiter, async (req, res) => {
   try {
     const { template_id, recipients } = req.body;
-    if (!template_id || !recipients?.length)
-      return res
-        .status(400)
-        .json({ error: "template_id and recipients required" });
+    if (!template_id || !recipients?.length) {
+      return res.status(400).json({ error: "template_id and recipients required" });
+    }
 
     const messages = (
       await Promise.all(
         recipients.map(async (recipient) => {
-          const message = await renderTemplate(
+          const message = await notificationService.renderTemplate(
             template_id,
             recipient.variables || {},
           );
           return message
-            ? { to: AfricaTalkingService.formatPhone(recipient.to), message }
+            ? { to: notificationService.formatPhone(recipient.to), message }
             : null;
         }),
       )
@@ -474,12 +315,12 @@ router.post("/bulk-send", messagingLimiter, async (req, res) => {
       return res.json({ success: true, sent: 0, message: "No valid messages" });
     }
 
-    const at = await getATService();
+    const at = await notificationService.getATService();
     const result = await at.sendBulkSMS(messages);
 
     await Promise.all(
       messages.map((item, index) =>
-        logMessage({
+        notificationService.logMessage({
           template_id,
           to: [item.to],
           message: item.message,
@@ -540,7 +381,7 @@ router.get("/logs", async (req, res) => {
 // ═══════════════════════════════════════
 router.get("/balance", async (req, res) => {
   try {
-    const at = await getATService();
+    const at = await notificationService.getATService();
     res.json(await at.checkBalance());
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -575,105 +416,16 @@ router.get("/settings", async (req, res) => {
     }
 
     res.json({
-      username: process.env.AT_USERNAME || (isProductionEnv ? null : "sandbox"),
+      username: process.env.AT_USERNAME || "sandbox",
       sender_id: process.env.AT_SENDER_ID || "MyISP",
       is_configured: isConfigured,
       configured_provider: configuredProvider,
-      company: getCompanyInfo(),
+      company: notificationService.getCompanyInfo(),
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
-
-// ═══════════════════════════════════════
-// TRIGGER HELPERS (called from billing routes)
-// ═══════════════════════════════════════
-async function triggerSMS(event, data) {
-  try {
-    const phone = data.customer?.phone;
-    if (!phone) return { success: false, message: "No phone number" };
-
-    const templateId = {
-      invoice_due_soon: "invoice_due_soon",
-      invoice_overdue: "invoice_overdue",
-      payment_received: "payment_received",
-      service_suspended: "service_suspended",
-      service_restored: "service_restored",
-      welcome: "welcome",
-      password_reset: "password_reset",
-    }[event];
-
-    if (!templateId) return { success: false, message: "Unknown event" };
-
-    const message =
-      data.custom_message ||
-      (await renderTemplate(templateId, buildMessageVariables(data)));
-    if (!message) return { success: false, message: "Template not found" };
-
-    // Try all configured SMS providers in order
-    const providers = [
-      {
-        name: "africas_talking",
-        getService: getATService,
-        send: (svc, to, msg) =>
-          svc.sendSMS([AfricaTalkingService.formatPhone(to)], msg),
-      },
-      {
-        name: "twilio",
-        getService: getTwilioService,
-        send: (svc, to, msg) => svc.sendSMS(to, msg),
-      },
-      {
-        name: "bulksms_kenya",
-        getService: getBulkSmsKenyaService,
-        send: (svc, to, msg) => svc.sendSMS(to, msg),
-      },
-      {
-        name: "smsleopard",
-        getService: getSmsLeopardService,
-        send: (svc, to, msg) => svc.sendSMS(to, msg),
-      },
-      {
-        name: "nexmo",
-        getService: getNexmoService,
-        send: (svc, to, msg) => svc.sendSMS(to, msg),
-      },
-    ];
-
-    let result = { success: false, message: "No provider available" };
-    for (const provider of providers) {
-      try {
-        const service = await provider.getService();
-        if (!service || !service.isConfigured) continue;
-        result = await provider.send(service, phone, message);
-        if (result && result.success) {
-          result.provider = provider.name;
-          break;
-        }
-      } catch (e) {
-        continue; // Try next provider
-      }
-    }
-
-    await logMessage({
-      event,
-      template_id: templateId,
-      provider: result.provider || "none",
-      to: [phone],
-      message,
-      status: result.success ? "sent" : "failed",
-      message_id: result.messageId || null,
-      cost: result.cost || 0,
-      is_sandbox: result.isSandbox,
-    });
-
-    return result;
-  } catch (e) {
-    console.error("SMS trigger error:", e.message);
-    return { success: false, message: e.message };
-  }
-}
 
 // ═══════════════════════════════════════
 // WHATSAPP
@@ -682,13 +434,14 @@ async function triggerSMS(event, data) {
 router.post("/whatsapp/send", messagingLimiter, async (req, res) => {
   try {
     const { to, message } = req.body;
-    if (!to || !message)
+    if (!to || !message) {
       return res.status(400).json({ error: "to and message required" });
+    }
 
-    const wa = await getWhatsAppService();
+    const wa = await notificationService.getWhatsAppService();
     const result = await wa.sendMessage(to, message);
 
-    await logMessage({
+    await notificationService.logMessage({
       channel: "whatsapp",
       to: [to],
       message,
@@ -705,19 +458,19 @@ router.post("/whatsapp/send", messagingLimiter, async (req, res) => {
 });
 
 router.get("/whatsapp/webhook", async (req, res) => {
-  const wa = await getWhatsAppService();
+  const wa = await notificationService.getWhatsAppService();
   const challenge = wa.verifyWebhook(req);
   if (challenge) return res.send(challenge.toString());
   return res.sendStatus(403);
 });
 
 router.post("/whatsapp/webhook", async (req, res) => {
-  const wa = await getWhatsAppService();
+  const wa = await notificationService.getWhatsAppService();
   const events = wa.handleWebhook(req.body);
 
   for (const event of events) {
     if (event.type === "message_received") {
-      await logMessage({
+      await notificationService.logMessage({
         channel: "whatsapp_inbound",
         to: [event.from],
         message: event.message,
@@ -737,13 +490,13 @@ router.post("/whatsapp/webhook", async (req, res) => {
 router.post("/whatsapp/send-template", messagingLimiter, async (req, res) => {
   try {
     const { to, template_id, variables } = req.body;
-    const message = await renderTemplate(template_id, variables || {});
+    const message = await notificationService.renderTemplate(template_id, variables || {}, "whatsapp");
     if (!message) return res.status(404).json({ error: "Template not found" });
 
-    const wa = await getWhatsAppService();
+    const wa = await notificationService.getWhatsAppService();
     const result = await wa.sendMessage(to, message);
 
-    await logMessage({
+    await notificationService.logMessage({
       channel: "whatsapp",
       template_id,
       to: [to],
@@ -760,67 +513,17 @@ router.post("/whatsapp/send-template", messagingLimiter, async (req, res) => {
   }
 });
 
-router.get("/whatsapp/settings", (req, res) => {
+router.get("/whatsapp/settings", async (req, res) => {
+  const wa = await notificationService.getWhatsAppService();
   res.json({
-    is_configured: whatsapp.isConfigured,
+    is_configured: wa.isConfigured,
     phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID
       ? `***${process.env.WHATSAPP_PHONE_NUMBER_ID.slice(-4)}`
       : null,
   });
 });
 
-// ═══════════════════════════════════════
-// COMBINED MESSAGING (SMS + WhatsApp)
-// ═══════════════════════════════════════
-
-async function triggerMessage(event, data, channel = "both") {
-  const phone = data.customer?.phone;
-  if (!phone) return { success: false, message: "No phone number" };
-
-  const results = { sms: null, whatsapp: null };
-
-  if (channel === "both" || channel === "sms") {
-    results.sms = await triggerSMS(event, data);
-  }
-
-  if (channel === "both" || channel === "whatsapp") {
-    const templateId = {
-      invoice_due_soon: "invoice_due_soon",
-      invoice_overdue: "invoice_overdue",
-      payment_received: "payment_received",
-      service_suspended: "service_suspended",
-      service_restored: "service_restored",
-      welcome: "welcome",
-    }[event];
-
-    if (templateId) {
-      const message = await renderTemplate(
-        templateId,
-        buildMessageVariables(data),
-      );
-      if (message) {
-        const wa = await getWhatsAppService();
-        results.whatsapp = await wa.sendMessage(phone, message);
-
-        await logMessage({
-          channel: "whatsapp",
-          event,
-          template_id: templateId,
-          to: [phone],
-          message,
-          status: results.whatsapp.success ? "sent" : "failed",
-          message_id: results.whatsapp.messageId,
-          cost: 0,
-          is_sandbox: results.whatsapp.isSandbox,
-        });
-      }
-    }
-  }
-
-  return results;
-}
-
 module.exports = router;
-module.exports.triggerSMS = triggerSMS;
-module.exports.triggerMessage = triggerMessage;
+module.exports.triggerSMS = (event, data) => notificationService.triggerSMS(event, data);
+module.exports.triggerMessage = (event, data, channel) => notificationService.triggerMessage(event, data, channel);
 module.exports.smsLogs = [];

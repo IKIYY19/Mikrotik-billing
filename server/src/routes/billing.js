@@ -21,7 +21,7 @@ router.use((req, res, next) => {
 
 const billing = require("../services/billingData");
 const PPPoEProvisioner = require("../utils/pppoeProvisioner");
-const { triggerSMS } = require("./sms");
+const notificationService = require("../services/notificationService");
 const db = global.dbAvailable ? global.db : require("../db/memory");
 const MpesaService = require("../services/mpesa");
 const alertSystem = require("../services/alertSystem");
@@ -31,7 +31,7 @@ const slack = require("../services/slackNotifier");
 
 async function getExpandedSubscription(subscriptionId) {
   const sub = await billing.getSubscriptionById(subscriptionId);
-  if (!sub) return null;
+  if (!sub) {return null;}
 
   const customer =
     sub.customer || (await billing.getCustomerById(sub.customer_id));
@@ -40,7 +40,7 @@ async function getExpandedSubscription(subscriptionId) {
 }
 
 async function persistSyncState(subscriptionId, syncResult) {
-  if (!subscriptionId || !syncResult) return null;
+  if (!subscriptionId || !syncResult) {return null;}
 
   const payload = {
     last_synced_at: new Date().toISOString(),
@@ -56,7 +56,7 @@ async function persistSyncState(subscriptionId, syncResult) {
 }
 
 async function persistRadiusSyncState(subscriptionId, radiusResult) {
-  if (!subscriptionId || !radiusResult) return null;
+  if (!subscriptionId || !radiusResult) {return null;}
 
   const payload = {
     last_radius_sync_status:
@@ -244,7 +244,7 @@ router.get("/customers", async (req, res) => {
 router.get("/customers/:id", async (req, res) => {
   try {
     const customer = await billing.getCustomerDetail(req.params.id);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    if (!customer) {return res.status(404).json({ error: "Customer not found" });}
     res.json(customer);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -334,7 +334,7 @@ router.post("/customers", async (req, res) => {
 router.put("/customers/:id", async (req, res) => {
   try {
     const customer = await billing.updateCustomer(req.params.id, req.body);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    if (!customer) {return res.status(404).json({ error: "Customer not found" });}
 
     if (req.body.plan_id) {
       try {
@@ -380,7 +380,7 @@ router.put("/customers/:id", async (req, res) => {
 router.delete("/customers/:id", async (req, res) => {
   try {
     const customer = await billing.deleteCustomer(req.params.id);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    if (!customer) {return res.status(404).json({ error: "Customer not found" });}
     res.json({ message: "Customer deleted" });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -644,7 +644,7 @@ router.post("/plans", async (req, res) => {
 router.put("/plans/:id", async (req, res) => {
   try {
     const plan = await billing.updatePlan(req.params.id, req.body);
-    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    if (!plan) {return res.status(404).json({ error: "Plan not found" });}
     res.json(plan);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -654,7 +654,7 @@ router.put("/plans/:id", async (req, res) => {
 router.delete("/plans/:id", async (req, res) => {
   try {
     const plan = await billing.deletePlan(req.params.id);
-    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    if (!plan) {return res.status(404).json({ error: "Plan not found" });}
     res.json({ message: "Plan deleted" });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -708,7 +708,7 @@ router.post("/subscriptions", async (req, res) => {
 router.put("/subscriptions/:id", async (req, res) => {
   try {
     const sub = await billing.updateSubscription(req.params.id, req.body);
-    if (!sub) return res.status(404).json({ error: "Subscription not found" });
+    if (!sub) {return res.status(404).json({ error: "Subscription not found" });}
     const expandedSub = await getExpandedSubscription(sub.id);
     const shouldSync =
       req.body.auto_provision !== false &&
@@ -730,7 +730,7 @@ router.put("/subscriptions/:id", async (req, res) => {
 router.post("/subscriptions/:id/toggle", async (req, res) => {
   try {
     const sub = await billing.toggleSubscriptionStatus(req.params.id);
-    if (!sub) return res.status(404).json({ error: "Subscription not found" });
+    if (!sub) {return res.status(404).json({ error: "Subscription not found" });}
 
     const expandedSub = await getExpandedSubscription(sub.id);
     const action = expandedSub.status === "active" ? "reconcile" : "suspend";
@@ -741,7 +741,7 @@ router.post("/subscriptions/:id/toggle", async (req, res) => {
 
     // Send SMS notification
     if (expandedSub.customer?.phone) {
-      triggerSMS(
+      notificationService.triggerSMS(
         sub.status === "active" ? "service_restored" : "service_suspended",
         {
           customer: expandedSub.customer,
@@ -774,7 +774,7 @@ router.post("/subscriptions/:id/toggle", async (req, res) => {
 router.post("/subscriptions/:id/sync", async (req, res) => {
   try {
     const sub = await getExpandedSubscription(req.params.id);
-    if (!sub) return res.status(404).json({ error: "Subscription not found" });
+    if (!sub) {return res.status(404).json({ error: "Subscription not found" });}
 
     const { syncResult, radiusResult, provisionScript } = await syncSubscription(
       "reconcile",
@@ -807,7 +807,7 @@ router.get("/reconcile", async (req, res) => {
         ).rows;
 
     const subscriptionsInScope = subscriptions.filter((subscription) => {
-      if (!connection_id) return true;
+      if (!connection_id) {return true;}
       return subscription.mikrotik_connection_id === connection_id;
     });
 
@@ -923,7 +923,7 @@ router.get("/reconcile", async (req, res) => {
 router.post("/reconcile/subscriptions/:id/apply", async (req, res) => {
   try {
     const sub = await getExpandedSubscription(req.params.id);
-    if (!sub) return res.status(404).json({ error: "Subscription not found" });
+    if (!sub) {return res.status(404).json({ error: "Subscription not found" });}
 
     const { syncResult, radiusResult, provisionScript } = await syncSubscription(
       "reconcile",
@@ -1057,7 +1057,7 @@ router.delete("/subscriptions/:id", async (req, res) => {
     }
     const deleted = await billing.deleteSubscription(req.params.id);
     if (!deleted)
-      return res.status(404).json({ error: "Subscription not found" });
+      {return res.status(404).json({ error: "Subscription not found" });}
     res.json({
       success: true,
       mikrotik_sync: syncResult,
@@ -1091,7 +1091,7 @@ router.post("/invoices", async (req, res) => {
     const customer =
       invoice.customer || (await billing.getCustomerById(invoice.customer_id));
     if (customer?.phone) {
-      triggerSMS("invoice_due_soon", { customer, invoice }).catch((e) =>
+      notificationService.triggerSMS("invoice_due_soon", { customer, invoice }).catch((e) =>
         console.error("SMS error:", e.message),
       );
     }
@@ -1245,7 +1245,7 @@ router.post("/credit-notes/:id/apply", async (req, res) => {
 router.put("/invoices/:id", async (req, res) => {
   try {
     const invoice = await billing.updateInvoice(req.params.id, req.body);
-    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!invoice) {return res.status(404).json({ error: "Invoice not found" });}
     res.json(invoice);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1290,7 +1290,7 @@ router.post("/payments", async (req, res) => {
     const invoice =
       payment.invoice || (await billing.getInvoiceById(payment.invoice_id));
     if (customer?.phone) {
-      triggerSMS("payment_received", { customer, invoice, payment }).catch(
+      notificationService.triggerSMS("payment_received", { customer, invoice, payment }).catch(
         (e) => console.error("SMS error:", e.message),
       );
     }
@@ -1324,7 +1324,7 @@ router.get("/customers/online-status", async (req, res) => {
   try {
     const { connection_id } = req.query;
     if (!connection_id)
-      return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
+      {return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });}
 
     // Get MikroTik connection
     const db = global.db || require("../db/memory");
@@ -1338,7 +1338,7 @@ router.get("/customers/online-status", async (req, res) => {
       [connection_id],
     );
     if (connResult.rows.length === 0)
-      return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
+      {return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });}
 
     const device = connResult.rows[0];
     const [ivHex, authTagHex, encrypted] = device.password_encrypted.split(":");
@@ -1389,7 +1389,7 @@ router.get("/customers/online-status", async (req, res) => {
 
     for (const session of Array.isArray(pppoeActive) ? pppoeActive : []) {
       const username = session.name || session.user;
-      if (!username) continue;
+      if (!username) {continue;}
 
       // Find subscription with this PPPoE username
       const sub = allSubscriptions.find((s) => s.pppoe_username === username);
@@ -1418,7 +1418,7 @@ router.get("/customers/online-status", async (req, res) => {
     // Match Hotspot sessions to billing customers
     for (const session of Array.isArray(hotspotActive) ? hotspotActive : []) {
       const username = session.user;
-      if (!username) continue;
+      if (!username) {continue;}
 
       // Try to find customer by hotspot username match in subscriptions or custom field
       const sub = allSubscriptions.find((s) => s.hotspot_username === username);
@@ -1533,7 +1533,7 @@ router.get("/usage/history", async (req, res) => {
 
     // If connection_id specified, get PPPoE sessions from MikroTik for real-time data
     let pppoeSessions = [];
-    let pppoeBandwidth = { total_in: 0, total_out: 0 };
+    const pppoeBandwidth = { total_in: 0, total_out: 0 };
 
     if (connection_id) {
       try {
@@ -1621,11 +1621,11 @@ router.get("/usage/history", async (req, res) => {
 
 // Helper: parse MikroTik bytes string to integer
 function parseBytes(bytesStr) {
-  if (!bytesStr) return 0;
+  if (!bytesStr) {return 0;}
   const str = String(bytesStr);
-  if (/^\d+$/.test(str)) return parseInt(str);
+  if (/^\d+$/.test(str)) {return parseInt(str);}
   const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
-  if (!match) return 0;
+  if (!match) {return 0;}
   const value = parseFloat(match[1]);
   const unit = (match[2] || "").toLowerCase().replace("ib", "");
   const multipliers = {
@@ -1758,13 +1758,13 @@ router.post("/customers/merge", async (req, res) => {
   try {
     const { source_id, target_id } = req.body;
     if (!source_id || !target_id)
-      return res
+      {return res
         .status(400)
-        .json({ error: "source_id and target_id required" });
+        .json({ error: "source_id and target_id required" });}
     if (source_id === target_id)
-      return res
+      {return res
         .status(400)
-        .json({ error: "Cannot merge a customer into itself" });
+        .json({ error: "Cannot merge a customer into itself" });}
 
     const currentDb = global.dbAvailable ? global.db : require("../db/memory");
 
@@ -1778,9 +1778,9 @@ router.post("/customers/merge", async (req, res) => {
       [target_id],
     );
     if (source.rows.length === 0)
-      return res.status(404).json({ error: "Source customer not found" });
+      {return res.status(404).json({ error: "Source customer not found" });}
     if (target.rows.length === 0)
-      return res.status(404).json({ error: "Target customer not found" });
+      {return res.status(404).json({ error: "Target customer not found" });}
 
     const results = {
       invoices: 0,
@@ -1906,7 +1906,7 @@ router.post("/customers/merge", async (req, res) => {
           });
           // Remove source wallet
           const srcIdx = walletStoreRef.wallets.indexOf(srcWallet);
-          if (srcIdx !== -1) walletStoreRef.wallets.splice(srcIdx, 1);
+          if (srcIdx !== -1) {walletStoreRef.wallets.splice(srcIdx, 1);}
         } else {
           srcWallet.customer_id = target_id;
           srcWallet.updated_at = new Date().toISOString();

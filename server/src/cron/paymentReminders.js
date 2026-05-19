@@ -5,6 +5,7 @@
 
 const repo = require("../db/billingRepository");
 const axios = require("axios");
+const notificationService = require("../services/notificationService");
 
 const API_URL = process.env.API_URL || "http://localhost:5173";
 
@@ -123,8 +124,8 @@ async function sendEmailReminder(customer, invoice, daysUntilDue, recipients) {
   try {
     const { sendEmail } = require("../services/email");
     const recipientList = recipients.split(",").map(r => r.trim()).filter(Boolean);
-    if (recipientList.length === 0 && customer.email) recipientList.push(customer.email);
-    if (!recipientList[0]) return;
+    if (recipientList.length === 0 && customer.email) {recipientList.push(customer.email);}
+    if (!recipientList[0]) {return;}
 
     const baseUrl = process.env.APP_URL || "http://localhost:5000";
     for (const to of recipientList) {
@@ -148,14 +149,20 @@ async function sendEmailReminder(customer, invoice, daysUntilDue, recipients) {
 
 async function sendSMSReminder(customer, invoice, daysUntilDue, recipients) {
   try {
-    // Use existing SMS service
     const message = `Payment Reminder: Invoice ${invoice.invoice_number} for ${invoice.total} is due in ${daysUntilDue} days. Please pay to avoid service interruption.`;
 
-    // Call SMS API
-    await axios.post(`${API_URL}/sms/send`, {
-      recipients: recipients.split(",").map((r) => r.trim()),
-      message,
-    });
+    const recipientList = recipients.split(",").map((r) => r.trim()).filter(Boolean);
+    if (recipientList.length === 0 && customer.phone) {
+      recipientList.push(customer.phone);
+    }
+
+    for (const phone of recipientList) {
+      await notificationService.triggerSMS("invoice_due_soon", {
+        customer: { ...customer, phone },
+        invoice,
+        custom_message: message,
+      });
+    }
 
     console.log(
       `[Cron] SMS reminder sent for invoice ${invoice.invoice_number}`,
