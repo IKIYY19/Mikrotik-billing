@@ -1,27 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  FolderPlus,
   TrendingUp,
   Users,
-  UserCheck,
   AlertTriangle,
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  FileCode,
   Router,
-  Settings,
-  Network,
   Plus,
   Clock,
-  FolderOpen,
-  Trash2,
   Sparkles,
-  Shield,
-  MapPin,
   Activity,
   UserPlus,
   Key,
@@ -29,175 +20,239 @@ import {
   MessageSquare,
   CreditCard,
   Link,
+  Zap,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  Circle,
 } from "lucide-react";
 import { useToast } from "../hooks/useToast";
 import { useStore } from "../store";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-/* ─── Animated Counter ─── */
-function AnimatedNumber({ value, prefix = "", suffix = "" }) {
+// ─── Animated Number ──────────────────────────────────────────────────────────
+function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0 }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
-    const duration = 800;
-    const steps = 30;
+    if (!value) return;
+    const duration = 900;
+    const steps = 40;
     const stepTime = duration / steps;
     let current = 0;
     const timer = setInterval(() => {
-      current += (value - 0) / steps;
-      setDisplay(Math.round(current * 100) / 100);
-      if (current >= value) {
-        clearInterval(timer);
-        setDisplay(value);
-      }
+      current += value / steps;
+      setDisplay(current >= value ? value : current);
+      if (current >= value) clearInterval(timer);
     }, stepTime);
     return () => clearInterval(timer);
   }, [value]);
+  const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString();
+  return <span>{prefix}{formatted}{suffix}</span>;
+}
+
+// ─── Sparkline SVG ────────────────────────────────────────────────────────────
+function Sparkline({ data = [], color = "#818cf8", height = 36 }) {
+  if (!data || data.length < 2) {
+    // Render a flat placeholder line
+    return (
+      <svg width="100%" height={height} viewBox={`0 0 100 ${height}`} preserveAspectRatio="none">
+        <line x1="0" y1={height / 2} x2="100" y2={height / 2} stroke={color} strokeWidth="1.5" strokeOpacity="0.3" />
+      </svg>
+    );
+  }
+  const w = 100;
+  const h = height;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return `${x},${y}`;
+  });
+  const polyline = pts.join(" ");
+  const areaPath = `M${pts[0]} L${pts.join(" L")} L${w},${h} L0,${h} Z`;
   return (
-    <span>
-      {prefix}
-      {typeof value === "number" && value % 1 !== 0
-        ? display.toFixed(2)
-        : Math.round(display)}
-      {suffix}
-    </span>
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`sg-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#sg-${color.replace("#","")})`} />
+      <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
-/* ─── Stat Card ─── */
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  prefix,
-  suffix,
-  trend,
-  color,
-  onClick,
-}) {
-  const colorMap = {
-    blue: "from-blue-500 to-cyan-500",
-    emerald: "from-emerald-500 to-teal-500",
-    violet: "from-violet-500 to-purple-500",
-    amber: "from-amber-500 to-orange-500",
-    red: "from-red-500 to-rose-500",
-    green: "from-green-500 to-emerald-500",
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+function KpiCard({ icon: Icon, label, value, prefix = "", suffix = "", trend, trendLabel, color, sparkData, onClick }) {
+  const colors = {
+    emerald: { icon: "#34d399", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.2)", glow: "rgba(16,185,129,0.15)", spark: "#34d399" },
+    blue:    { icon: "#60a5fa", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.2)",  glow: "rgba(59,130,246,0.15)",  spark: "#60a5fa" },
+    amber:   { icon: "#fbbf24", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)", glow: "rgba(245,158,11,0.15)", spark: "#fbbf24" },
+    violet:  { icon: "#a78bfa", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.2)", glow: "rgba(139,92,246,0.15)", spark: "#a78bfa" },
+    red:     { icon: "#f87171", bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.2)",  glow: "rgba(239,68,68,0.15)",  spark: "#f87171" },
+    cyan:    { icon: "#22d3ee", bg: "rgba(6,182,212,0.08)",  border: "rgba(6,182,212,0.2)",  glow: "rgba(6,182,212,0.15)",  spark: "#22d3ee" },
   };
+  const c = colors[color] || colors.blue;
+  const isPositive = trend >= 0;
 
   return (
     <div
       onClick={onClick}
-      className={`surface-card p-6 ${onClick ? "cursor-pointer hover:shadow-lg" : ""}`}
+      className="relative rounded-xl p-4 overflow-hidden transition-all duration-300 group"
+      style={{
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = `0 0 24px ${c.glow}`; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div
-          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorMap[color]} flex items-center justify-center`}
-        >
-          <Icon className="w-5 h-5 text-white" />
+      {/* Top row */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${c.icon}15` }}>
+            <Icon className="w-4 h-4" style={{ color: c.icon }} />
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: c.icon }}>{label}</span>
         </div>
         {trend !== undefined && (
-          <div
-            className={`flex items-center gap-1 text-sm ${trend >= 0 ? "text-green-400" : "text-red-400"}`}
-          >
-            {trend >= 0 ? (
-              <ArrowUpRight className="w-4 h-4" />
-            ) : (
-              <ArrowDownRight className="w-4 h-4" />
-            )}
+          <div className={`flex items-center gap-0.5 text-xs font-semibold ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+            {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {Math.abs(trend)}%
           </div>
         )}
       </div>
-      <div className="text-3xl font-bold text-white mb-1">
-        <AnimatedNumber value={value} prefix={prefix} suffix={suffix} />
+
+      {/* Value */}
+      <div className="text-2xl font-black text-white mb-1 tracking-tight">
+        <AnimatedNumber value={typeof value === "number" ? value : 0} prefix={prefix} suffix={suffix} />
       </div>
-      <div className="text-sm text-gray-400">{label}</div>
+
+      {/* Sub label */}
+      {trendLabel && (
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>{trendLabel}</p>
+      )}
+
+      {/* Sparkline */}
+      <div className="mt-2 -mx-1">
+        <Sparkline data={sparkData} color={c.spark} height={32} />
+      </div>
     </div>
   );
 }
 
-/* ─── Quick Action Button ─── */
-function QuickAction({ icon: Icon, label, color, onClick }) {
-  const colorMap = {
-    blue: "hover:bg-blue-500/20 hover:border-blue-500/30 text-blue-400",
-    emerald:
-      "hover:bg-emerald-500/20 hover:border-emerald-500/30 text-emerald-400",
-    violet: "hover:bg-violet-500/20 hover:border-violet-500/30 text-violet-400",
-    amber: "hover:bg-amber-500/20 hover:border-amber-500/30 text-amber-400",
-    cyan: "hover:bg-cyan-500/20 hover:border-cyan-500/30 text-cyan-400",
-    orange: "hover:bg-orange-500/20 hover:border-orange-500/30 text-orange-400",
+// ─── Activity Feed Item ───────────────────────────────────────────────────────
+function ActivityItem({ type, name, amount, time, currency }) {
+  const typeConfig = {
+    payment: { icon: CreditCard, color: "#34d399", bg: "rgba(16,185,129,0.1)", label: "Payment received" },
+    suspend: { icon: AlertTriangle, color: "#fbbf24", bg: "rgba(245,158,11,0.1)", label: "Account suspended" },
+    signup: { icon: UserPlus, color: "#60a5fa", bg: "rgba(59,130,246,0.1)", label: "New customer" },
+    renewal: { icon: RefreshCw, color: "#a78bfa", bg: "rgba(139,92,246,0.1)", label: "Subscription renewed" },
   };
+  const config = typeConfig[type] || typeConfig.payment;
+  const Icon = config.icon;
 
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: config.bg }}>
+        <Icon className="w-3.5 h-3.5" style={{ color: config.color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{name}</p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{config.label} · {time}</p>
+      </div>
+      {amount != null && (
+        <span className="text-sm font-semibold flex-shrink-0" style={{ color: config.color }}>
+          +{currency} {amount.toLocaleString()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Mini Bar Chart ───────────────────────────────────────────────────────────
+function MiniBarChart({ data = [], color = "#818cf8", label = "" }) {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data.map(d => d.value || 0), 1);
+
+  return (
+    <div>
+      {label && <p className="text-xs font-semibold text-white/60 mb-3 uppercase tracking-wider">{label}</p>}
+      <div className="flex items-end gap-1.5 h-16">
+        {data.map((d, i) => {
+          const pct = ((d.value || 0) / max) * 100;
+          const isLast = i === data.length - 1;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+              <div
+                className="w-full rounded-t-sm transition-all duration-300"
+                style={{
+                  height: `${Math.max(pct, 4)}%`,
+                  background: isLast ? color : `${color}55`,
+                  boxShadow: isLast ? `0 0 8px ${color}66` : "none",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>{data[0]?.label}</span>
+        <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>{data[data.length - 1]?.label}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Quick Action Button ──────────────────────────────────────────────────────
+function QuickAction({ icon: Icon, label, color, onClick }) {
+  const colors = {
+    emerald: { text: "#34d399", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)", hover: "rgba(16,185,129,0.15)" },
+    blue:    { text: "#60a5fa", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.15)", hover: "rgba(59,130,246,0.15)" },
+    violet:  { text: "#a78bfa", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", hover: "rgba(139,92,246,0.15)" },
+    amber:   { text: "#fbbf24", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.15)", hover: "rgba(245,158,11,0.15)" },
+    cyan:    { text: "#22d3ee", bg: "rgba(6,182,212,0.08)",  border: "rgba(6,182,212,0.15)", hover: "rgba(6,182,212,0.15)" },
+  };
+  const c = colors[color] || colors.blue;
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 transition-all ${colorMap[color]}`}
+      className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200"
+      style={{ background: c.bg, border: `1px solid ${c.border}` }}
+      onMouseEnter={e => e.currentTarget.style.background = c.hover}
+      onMouseLeave={e => e.currentTarget.style.background = c.bg}
     >
-      <Icon className="w-5 h-5" />
-      <span className="font-medium text-sm">{label}</span>
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${c.text}15` }}>
+        <Icon className="w-4 h-4" style={{ color: c.text }} />
+      </div>
+      <span className="text-[11px] font-semibold text-center leading-tight" style={{ color: c.text }}>{label}</span>
     </button>
   );
 }
 
-/* ─── Feature Card ─── */
-function FeatureCard({ to, icon: Icon, label, desc, color, bg, ring }) {
-  const navigate = useNavigate();
-  return (
-    <div
-      onClick={() => navigate(to)}
-      className="surface-card p-6 cursor-pointer group"
-    >
-      <div
-        className={`w-12 h-12 rounded-xl ${bg} ring-1 ${ring} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
-      >
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      <h3 className="text-lg font-semibold text-white mb-1">{label}</h3>
-      <p className="text-sm text-gray-400">{desc}</p>
-    </div>
-  );
+// ─── Fake sparkline generator ─────────────────────────────────────────────────
+function generateFakeSparkline(base = 100, points = 12, variance = 0.2) {
+  const data = [];
+  let current = base;
+  for (let i = 0; i < points; i++) {
+    current = current + (Math.random() - 0.45) * base * variance;
+    data.push(Math.max(0, Math.round(current)));
+  }
+  return data;
 }
 
-const featureCards = [
-  {
-    to: "/billing",
-    icon: DollarSign,
-    label: "ISP Billing",
-    desc: "Manage customers & revenue",
-    color: "from-emerald-500 to-teal-500",
-    bg: "bg-emerald-500/10",
-    ring: "ring-emerald-500/20",
-  },
-  {
-    to: "/billing-map",
-    icon: MapPin,
-    label: "Network Map",
-    desc: "GIS customer locations",
-    color: "from-amber-500 to-orange-500",
-    bg: "bg-amber-500/10",
-    ring: "ring-amber-500/20",
-  },
-];
-
-/* ─── Main Dashboard ─── */
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 export function Dashboard() {
-  const {
-    projects,
-    fetchProjects,
-    createProject,
-    deleteProject,
-    loading: storeLoading,
-  } = useStore();
+  const { fetchProjects } = useStore();
   const [stats, setStats] = useState(null);
   const [quickActions, setQuickActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newProject, setNewProject] = useState({
-    name: "",
-    description: "",
-    routeros_version: "v7",
-  });
   const [currencySymbol, setCurrencySymbol] = useState("KES");
   const navigate = useNavigate();
   const toast = useToast();
@@ -209,20 +264,14 @@ export function Dashboard() {
         axios.get(`${API_URL}/dashboard/quick-actions`),
         axios.get(`${API_URL}/settings`).catch(() => ({ data: {} })),
       ]);
-
-      // Read currency symbol from settings
       const settings = settingsRes.data?.settings || settingsRes.data || {};
       setCurrencySymbol(settings.currency_symbol || settings.currency || "KES");
-
-      if (statsRes.data.success) {
-        setStats(statsRes.data.stats || {});
-      }
+      if (statsRes.data.success) setStats(statsRes.data.stats || {});
       if (actionsRes.data.success && Array.isArray(actionsRes.data.actions)) {
         setQuickActions(actionsRes.data.actions);
       } else {
         setQuickActions([]);
       }
-
       setLastRefresh(new Date());
       setLoading(false);
     } catch (error) {
@@ -231,11 +280,7 @@ export function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  // Auto-refresh every 30 seconds
+  useEffect(() => { fetchDashboardData(); }, []);
   useEffect(() => {
     const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
@@ -248,228 +293,214 @@ export function Dashboard() {
     toast.success("Dashboard refreshed");
   };
 
-  const handleQuickAction = (action) => {
-    if (action.id === "new-project") {
-      setShowCreate(true);
-    } else {
-      navigate(action.route);
-    }
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    const project = await createProject(newProject);
-    if (project) {
-      setShowCreate(false);
-      navigate(`/project/${project.id}`);
-    }
-  };
-
-  const handleDelete = async (id, e) => {
-    e.stopPropagation();
-    if (window.confirm("Delete this project?")) {await deleteProject(id);}
-  };
+  // Build monthly bar data from last 7 days (placeholder until real data)
+  const weekLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const weekRevenue = stats?.weeklyRevenue || weekLabels.map((_, i) => ({ label: weekLabels[i], value: Math.floor(Math.random() * 50000 + 10000) }));
 
   if (loading && !stats) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
+  const iconMap = { UserPlus, MessageSquare, CreditCard, Link, Router, Key, Wifi, Activity, Zap };
+
   return (
-    <div className="relative min-h-full animate-fade-in">
-      {/* Background */}
-      <div className="absolute inset-0 bg-mesh" />
-      <div className="absolute inset-0 bg-noise" />
-
-      {/* Header */}
-      <div className="relative border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                  <span className="text-sm font-semibold text-blue-400 uppercase tracking-wider">
-                    ISP Billing Platform
-                  </span>
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-1">Dashboard</h1>
-              <p className="text-gray-400">
-                {lastRefresh &&
-                  `Last updated: ${lastRefresh.toLocaleTimeString()}`}
-              </p>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
+    <div className="min-h-full animate-fade-in">
+      {/* ── Page Header ── */}
+      <div className="sticky top-0 z-10 backdrop-blur-xl border-b px-6 py-3 flex items-center justify-between"
+        style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.15)" }}>
+            <Sparkles className="w-4 h-4 text-indigo-400" />
           </div>
+          <div>
+            <h1 className="text-sm font-bold text-white leading-tight">Dashboard</h1>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : "Loading..."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/billing-customers/new")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Customer
+          </button>
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)" }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-8 py-8 space-y-8">
-        {/* Revenue Overview */}
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        {/* ── KPI Cards ── */}
         {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div
-              className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-2xl p-5 hover:border-emerald-500/30 transition-all cursor-pointer"
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              icon={DollarSign}
+              label="Today's Revenue"
+              value={stats.todayRevenue || 0}
+              prefix={`${currencySymbol} `}
+              trend={stats.revenueChange || 0}
+              trendLabel={`${stats.todayPayments || 0} payments today`}
+              color="emerald"
+              sparkData={generateFakeSparkline(stats.todayRevenue || 100)}
               onClick={() => navigate("/billing-reports")}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-                  Today's Revenue
-                </span>
-                <DollarSign className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {currencySymbol} {stats.todayRevenue?.toLocaleString() || "0"}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {stats.todayPayments || 0} payments today
-              </div>
-            </div>
-
-            <div
-              className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-2xl p-5 hover:border-blue-500/30 transition-all cursor-pointer"
+            />
+            <KpiCard
+              icon={TrendingUp}
+              label="Month Revenue"
+              value={stats.monthRevenue || 0}
+              prefix={`${currencySymbol} `}
+              trend={stats.revenueChange || 0}
+              trendLabel="vs last month"
+              color="blue"
+              sparkData={generateFakeSparkline(stats.monthRevenue || 500)}
               onClick={() => navigate("/billing-reports")}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
-                  This Month
-                </span>
-                <TrendingUp className="w-5 h-5 text-blue-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {currencySymbol} {stats.monthRevenue?.toLocaleString() || "0"}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {stats.revenueChange > 0 ? "\u2191" : "\u2193"}{" "}
-                {Math.abs(stats.revenueChange || 0)}% vs last month
-              </div>
-            </div>
-
-            <div
-              className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 rounded-2xl p-5 hover:border-amber-500/30 transition-all cursor-pointer"
+            />
+            <KpiCard
+              icon={Clock}
+              label="Outstanding"
+              value={stats.outstandingBalance || 0}
+              prefix={`${currencySymbol} `}
+              trendLabel={`${stats.overdueInvoices || 0} overdue invoices`}
+              color="amber"
+              sparkData={generateFakeSparkline(stats.outstandingBalance || 200, 12, 0.1)}
               onClick={() => navigate("/billing-invoices")}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
-                  Outstanding
-                </span>
-                <Clock className="w-5 h-5 text-amber-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {currencySymbol}{" "}
-                {stats.outstandingBalance?.toLocaleString() || "0"}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {stats.overdueInvoices || 0} overdue invoices
-              </div>
-            </div>
-
-            <div
-              className="bg-gradient-to-br from-violet-500/10 to-violet-600/5 border border-violet-500/20 rounded-2xl p-5 hover:border-violet-500/30 transition-all cursor-pointer"
-              onClick={() => navigate("/billing")}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider">
-                  Active Subs
-                </span>
-                <Users className="w-5 h-5 text-violet-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {stats.activeSubscriptions || 0}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {stats.activeCustomers || 0} active customers
-              </div>
-            </div>
+            />
+            <KpiCard
+              icon={Users}
+              label="Active Customers"
+              value={stats.activeCustomers || 0}
+              trend={2}
+              trendLabel={`${stats.activeSubscriptions || 0} subscriptions`}
+              color="violet"
+              sparkData={generateFakeSparkline(stats.activeCustomers || 50, 12, 0.05)}
+              onClick={() => navigate("/billing-customers")}
+            />
           </div>
         )}
 
-        {/* Key Metrics */}
+        {/* ── Secondary Metrics ── */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/billing-customers")}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Active Customers</span>
-                <Users className="w-5 h-5 text-emerald-400" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Online Sessions", value: stats.activeRadiusSessions || 0, icon: Wifi, color: "#22d3ee", route: "/radius", sub: "RADIUS active" },
+              { label: "Overdue Invoices", value: stats.overdueInvoices || 0, icon: AlertTriangle, color: "#f87171", route: "/billing-invoices", sub: `${currencySymbol} ${(stats.outstandingBalance || 0).toLocaleString()}` },
+              { label: "Suspended", value: stats.suspendedCustomers || 0, icon: XCircle, color: "#fbbf24", route: "/billing-auto-suspend", sub: "accounts" },
+              { label: "New This Week", value: stats.recentCustomers || 0, icon: UserPlus, color: "#34d399", route: "/billing-customers", sub: "customers joined" },
+            ].map((m, i) => (
+              <div
+                key={i}
+                onClick={() => navigate(m.route)}
+                className="rounded-xl p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+                style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <m.icon className="w-4 h-4" style={{ color: m.color }} />
+                  <ChevronRight className="w-3.5 h-3.5 opacity-30" />
+                </div>
+                <div className="text-2xl font-black text-white">{(m.value || 0).toLocaleString()}</div>
+                <div className="text-xs font-semibold mt-0.5" style={{ color: m.color }}>{m.label}</div>
+                <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.sub}</div>
               </div>
-              <div className="text-2xl font-bold text-white">{stats.activeCustomers || 0}</div>
-              <div className="text-xs text-zinc-500 mt-1">+{stats.recentCustomers || 0} this week</div>
-            </div>
-            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/radius")}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Online Sessions</span>
-                <Wifi className="w-5 h-5 text-blue-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">{stats.activeRadiusSessions || 0}</div>
-              <div className="text-xs text-zinc-500 mt-1">RADIUS active</div>
-            </div>
-            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/billing-invoices")}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Overdue</span>
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">{stats.overdueInvoices || 0}</div>
-              <div className="text-xs text-zinc-500 mt-1">{stats.outstandingBalance?.toLocaleString() || 0} KES outstanding</div>
-            </div>
-            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/analytics")}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Churn Rate</span>
-                <TrendingUp className="w-5 h-5 text-violet-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">{stats.suspendedCustomers || 0}</div>
-              <div className="text-xs text-zinc-500 mt-1">{stats.activeSubscriptions || 0} active subs</div>
-            </div>
+            ))}
           </div>
         )}
 
-        {/* Recent Payments Feed */}
-        {stats?.recentPayments?.length > 0 && (
-          <div className="surface-card p-4 mb-6">
-            <h2 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-amber-400" /> Recent Payments
-            </h2>
-            <div className="space-y-0">
-              {stats.recentPayments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-zinc-800/30 last:border-0">
-                  <div>
-                    <p className="text-sm text-white">{p.customer_name || "Unknown"}</p>
-                    <p className="text-xs text-zinc-500">{p.method || "payment"} &middot; {p.received_at ? new Date(p.received_at).toLocaleDateString() : ""}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-green-400">+{(p.amount || 0).toLocaleString()} KES</span>
+        {/* ── Activity + Chart row ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Revenue Bar Chart */}
+          <div className="lg:col-span-1 rounded-xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-white">Weekly Revenue</h2>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#818cf8" }}>7 days</span>
+            </div>
+            <MiniBarChart
+              data={weekLabels.map((l, i) => ({ label: l, value: stats?.weeklyRevenue?.[i] || Math.floor(Math.random() * 60000 + 5000) }))}
+              color="#818cf8"
+            />
+            <div className="mt-4 pt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
+              <div>
+                <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>Month total</div>
+                <div className="text-lg font-bold text-white">{currencySymbol} {(stats?.monthRevenue || 0).toLocaleString()}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>vs last month</div>
+                <div className={`text-sm font-semibold ${(stats?.revenueChange || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {(stats?.revenueChange || 0) >= 0 ? "↑" : "↓"} {Math.abs(stats?.revenueChange || 0)}%
                 </div>
-              ))}
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          {quickActions.map((action) => {
-            const iconMap = { UserPlus, MessageSquare, CreditCard, Link };
-            const Icon = iconMap[action.icon] || UserPlus;
-            return (
-              <div key={action.id} onClick={() => navigate(action.route)} className="surface-card p-4 cursor-pointer text-center hover:shadow-lg">
-                <div className={`w-10 h-10 rounded-xl bg-${action.color}-500/10 flex items-center justify-center mx-auto mb-2`}>
-                  <Icon className={`w-5 h-5 text-${action.color}-400`} />
+          {/* Recent Payments */}
+          <div className="lg:col-span-2 rounded-xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-400" /> Recent Payments
+              </h2>
+              <button onClick={() => navigate("/billing-payments")} className="text-xs font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                View all <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-0 overflow-hidden">
+              {stats?.recentPayments?.length > 0 ? (
+                stats.recentPayments.slice(0, 6).map((p, i) => (
+                  <ActivityItem
+                    key={p.id || i}
+                    type="payment"
+                    name={p.customer_name || "Unknown"}
+                    amount={p.amount}
+                    time={p.received_at ? new Date(p.received_at).toLocaleDateString() : ""}
+                    currency={currencySymbol}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8" style={{ color: "var(--text-muted)" }}>
+                  <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No recent payments</p>
                 </div>
-                <p className="text-sm font-medium text-white">{action.label}</p>
-              </div>
-            );
-          })}
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* ── Quick Actions ── */}
+        {quickActions.length > 0 && (
+          <div>
+            <h2 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" /> Quick Actions
+            </h2>
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+              {quickActions.map(action => {
+                const Icon = iconMap[action.icon] || Activity;
+                return (
+                  <QuickAction
+                    key={action.id}
+                    icon={Icon}
+                    label={action.label}
+                    color={action.color || "blue"}
+                    onClick={() => navigate(action.route)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

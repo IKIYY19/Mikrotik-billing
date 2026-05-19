@@ -152,7 +152,7 @@ function App() {
             path="/*"
             element={
               <ProtectedRoute>
-                <div className="flex h-screen bg-background">
+                <div className="flex h-screen bg-background overflow-hidden">
                   {/* Mobile overlay */}
                   {mobileMenuOpen && (
                     <div
@@ -161,10 +161,10 @@ function App() {
                     />
                   )}
 
-                  {/* Sidebar - hidden on mobile by default, shown when toggled */}
+                  {/* Sidebar */}
                   <div
                     className={`
-                      fixed lg:static inset-y-0 left-0 z-30
+                      fixed lg:static inset-y-0 left-0 z-30 h-full
                       transform transition-transform duration-300
                       ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
                       lg:translate-x-0
