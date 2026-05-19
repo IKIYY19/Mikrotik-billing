@@ -53,6 +53,8 @@ router.get("/stats", async (req, res) => {
       activeSubsResult,
       topPlansResult,
       revenueByDayResult,
+      radacctResult,
+      recentPaymentsResult,
     ] = await Promise.allSettled([
       db.query("SELECT COUNT(*) FROM projects"),
       db.query("SELECT COUNT(*) FROM templates"),
@@ -99,6 +101,10 @@ router.get("/stats", async (req, res) => {
       ),
       db.query(
         "SELECT DATE(created_at) as date, SUM(amount) as total FROM invoices WHERE status = 'paid' AND created_at >= NOW() - INTERVAL '7 days' GROUP BY DATE(created_at) ORDER BY date DESC",
+      ),
+      db.query("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL"),
+      db.query(
+        "SELECT p.id, p.amount, p.method, p.received_at, c.name as customer_name FROM payments p LEFT JOIN customers c ON c.id = p.customer_id ORDER BY p.received_at DESC LIMIT 5"
       ),
     ]);
 
@@ -149,6 +155,11 @@ router.get("/stats", async (req, res) => {
       revenueByDayResult.status === "fulfilled"
         ? revenueByDayResult.value.rows
         : [];
+    stats.activeRadiusSessions = val(radacctResult);
+    stats.recentPayments =
+      recentPaymentsResult.status === "fulfilled"
+        ? recentPaymentsResult.value.rows
+        : [];
     stats.timestamp = new Date().toISOString();
 
     // Cache for 10 seconds
@@ -182,47 +193,34 @@ router.get("/quick-actions", async (req, res) => {
   const user = req.user;
   const actions = [
     {
-      id: "new-project",
-      label: "New Project",
-      icon: "FolderPlus",
-      route: "/?action=create-project",
-      color: "blue",
-    },
-    {
       id: "new-customer",
       label: "Add Customer",
       icon: "UserPlus",
       route: "/billing-customers?action=add",
       color: "emerald",
     },
+    {
+      id: "send-sms",
+      label: "Send SMS",
+      icon: "MessageSquare",
+      route: "/billing-messaging",
+      color: "blue",
+    },
+    {
+      id: "record-payment",
+      label: "Record Payment",
+      icon: "CreditCard",
+      route: "/billing-payments",
+      color: "amber",
+    },
+    {
+      id: "reconcile",
+      label: "Reconcile Routers",
+      icon: "Link",
+      route: "/billing-reconcile",
+      color: "violet",
+    },
   ];
-
-  if (user?.role === "admin") {
-    actions.push(
-      {
-        id: "integrations",
-        label: "Integrations",
-        icon: "Key",
-        route: "/integrations",
-        color: "violet",
-      },
-      {
-        id: "users",
-        label: "Manage Users",
-        icon: "Users",
-        route: "/users",
-        color: "orange",
-      },
-    );
-  }
-
-  actions.push({
-    id: "templates",
-    label: "Browse Templates",
-    icon: "FileCode",
-    route: "/templates",
-    color: "cyan",
-  });
 
   res.json({ success: true, actions });
 });

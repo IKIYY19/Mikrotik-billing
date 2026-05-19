@@ -229,7 +229,6 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-    fetchProjects();
   }, []);
 
   // Auto-refresh every 30 seconds
@@ -290,9 +289,9 @@ export function Dashboard() {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-sm font-semibold text-blue-400 uppercase tracking-wider">
-                  MikroTik Config Builder
-                </span>
+                  <span className="text-sm font-semibold text-blue-400 uppercase tracking-wider">
+                    ISP Billing Platform
+                  </span>
               </div>
               <h1 className="text-3xl font-bold text-white mb-1">Dashboard</h1>
               <p className="text-gray-400">
@@ -394,270 +393,79 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Secondary Stats Grid */}
+        {/* Key Metrics */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <StatCard
-              icon={FolderOpen}
-              label="Total Projects"
-              value={stats.totalProjects}
-              color="blue"
-              onClick={() => navigate("/")}
-            />
-            <StatCard
-              icon={Users}
-              label="Total Customers"
-              value={stats.totalCustomers}
-              color="emerald"
-              onClick={() => navigate("/billing-customers")}
-            />
-            <StatCard
-              icon={UserCheck}
-              label="Active Customers"
-              value={stats.activeCustomers}
-              color="green"
-              onClick={() => navigate("/billing")}
-            />
-            <StatCard
-              icon={DollarSign}
-              label="Total Revenue"
-              value={stats.totalRevenue}
-              prefix={currencySymbol}
-              color="amber"
-              onClick={() => navigate("/billing-reports")}
-            />
-            <StatCard
-              icon={FileCode}
-              label="Templates"
-              value={stats.totalTemplates}
-              color="violet"
-              onClick={null}
-            />
-            <StatCard
-              icon={Router}
-              label="Connected Devices"
-              value={stats.activeDevices}
-              color="cyan"
-              onClick={null}
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Overdue Invoices"
-              value={stats.overdueInvoices}
-              color="red"
-              onClick={() => navigate("/billing-invoices")}
-            />
-            <StatCard
-              icon={Activity}
-              label="Pending Revenue"
-              value={stats.pendingRevenue}
-              prefix={currencySymbol}
-              color="amber"
-              onClick={() => navigate("/billing-invoices")}
-            />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/billing-customers")}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Active Customers</span>
+                <Users className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-bold text-white">{stats.activeCustomers || 0}</div>
+              <div className="text-xs text-zinc-500 mt-1">+{stats.recentCustomers || 0} this week</div>
+            </div>
+            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/radius")}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Online Sessions</span>
+                <Wifi className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="text-2xl font-bold text-white">{stats.activeRadiusSessions || 0}</div>
+              <div className="text-xs text-zinc-500 mt-1">RADIUS active</div>
+            </div>
+            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/billing-invoices")}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Overdue</span>
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div className="text-2xl font-bold text-white">{stats.overdueInvoices || 0}</div>
+              <div className="text-xs text-zinc-500 mt-1">{stats.outstandingBalance?.toLocaleString() || 0} KES outstanding</div>
+            </div>
+            <div className="surface-card p-4 hover:shadow-lg cursor-pointer" onClick={() => navigate("/analytics")}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Churn Rate</span>
+                <TrendingUp className="w-5 h-5 text-violet-400" />
+              </div>
+              <div className="text-2xl font-bold text-white">{stats.suspendedCustomers || 0}</div>
+              <div className="text-xs text-zinc-500 mt-1">{stats.activeSubscriptions || 0} active subs</div>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Payments Feed */}
+        {stats?.recentPayments?.length > 0 && (
+          <div className="surface-card p-4 mb-6">
+            <h2 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-amber-400" /> Recent Payments
+            </h2>
+            <div className="space-y-0">
+              {stats.recentPayments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-zinc-800/30 last:border-0">
+                  <div>
+                    <p className="text-sm text-white">{p.customer_name || "Unknown"}</p>
+                    <p className="text-xs text-zinc-500">{p.method || "payment"} &middot; {p.received_at ? new Date(p.received_at).toLocaleDateString() : ""}</p>
+                  </div>
+                  <span className="text-sm font-semibold text-green-400">+{(p.amount || 0).toLocaleString()} KES</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Quick Actions */}
-        {quickActions.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold text-white mb-4">
-              Quick Actions
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {quickActions.map((action) => {
-                const iconMap = {
-                  FolderPlus,
-                  UserPlus,
-                  Key,
-                  Users,
-                  FileCode,
-                };
-                const Icon = iconMap[action.icon] || FolderPlus;
-                return (
-                  <QuickAction
-                    key={action.id}
-                    icon={Icon}
-                    label={action.label}
-                    color={action.color}
-                    onClick={() => handleQuickAction(action)}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Feature Cards */}
-        <div>
-          <h2 className="text-xl font-semibold text-white mb-4">Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featureCards.map((card) => (
-              <FeatureCard key={card.to} {...card} />
-            ))}
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {quickActions.map((action) => {
+            const iconMap = { UserPlus, MessageSquare, CreditCard, Link };
+            const Icon = iconMap[action.icon] || UserPlus;
+            return (
+              <div key={action.id} onClick={() => navigate(action.route)} className="surface-card p-4 cursor-pointer text-center hover:shadow-lg">
+                <div className={`w-10 h-10 rounded-xl bg-${action.color}-500/10 flex items-center justify-center mx-auto mb-2`}>
+                  <Icon className={`w-5 h-5 text-${action.color}-400`} />
+                </div>
+                <p className="text-sm font-medium text-white">{action.label}</p>
+              </div>
+            );
+          })}
         </div>
-
-        {/* Recent Projects */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">
-              Recent Projects
-            </h2>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              New Project
-            </button>
-          </div>
-
-          {storeLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="surface-card p-6 animate-pulse"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-white/10 rounded-xl" />
-                    <div className="w-8 h-4 bg-white/10 rounded" />
-                  </div>
-                  <div className="w-24 h-8 bg-white/10 rounded mb-2" />
-                  <div className="w-32 h-4 bg-white/10 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : projects.length === 0 ? (
-            <div className="surface-card p-12 text-center">
-              <FolderOpen className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">
-                No projects yet
-              </h3>
-              <p className="text-gray-400 mb-6">
-                Create your first project to get started
-              </p>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-              >
-                Create Project
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => navigate(`/project/${project.id}`)}
-                  className="surface-card p-6 cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-                      <FolderOpen className="w-5 h-5 text-white" />
-                    </div>
-                    <button
-                      onClick={(e) => handleDelete(project.id, e)}
-                      className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-1">
-                    {project.name}
-                  </h3>
-                  <p className="text-sm text-gray-400 mb-3 line-clamp-2">
-                    {project.description || "No description"}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Clock className="w-3 h-3" />
-                    {new Date(project.updated_at).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Create Project Modal */}
-        {showCreate && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-card border border-border rounded-2xl p-8 w-full max-w-md">
-              <h2 className="text-xl font-bold text-white mb-6">
-                Create New Project
-              </h2>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Project Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newProject.name}
-                    onChange={(e) =>
-                      setNewProject({ ...newProject, name: e.target.value })
-                    }
-                    className="surface-input"
-                    placeholder="My ISP Network"
-                    required
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={newProject.description}
-                    onChange={(e) =>
-                      setNewProject({
-                        ...newProject,
-                        description: e.target.value,
-                      })
-                    }
-                    className="surface-input"
-                    placeholder="Brief description of your project"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    RouterOS Version
-                  </label>
-                  <select
-                    value={newProject.routeros_version}
-                    onChange={(e) =>
-                      setNewProject({
-                        ...newProject,
-                        routeros_version: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="v7">RouterOS v7</option>
-                    <option value="v6">RouterOS v6</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreate(false)}
-                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                  >
-                    Create
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

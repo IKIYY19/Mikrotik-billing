@@ -385,6 +385,14 @@ module.exports = {
         return sum + (plan ? plan.price : 0);
       }, 0);
 
+    const recentPayments = [...billingStore.payments]
+      .sort((a, b) => new Date(b.received_at) - new Date(a.received_at))
+      .slice(0, 5)
+      .map(p => {
+        const customer = billingStore.customers.find(c => c.id === p.customer_id);
+        return { id: p.id, amount: p.amount, method: p.method, received_at: p.received_at, customer_name: customer?.name || "Unknown" };
+      });
+
     return {
       total_customers: totalCustomers,
       active_customers: activeCustomers,
@@ -399,6 +407,8 @@ module.exports = {
       mrr,
       arpu: activeCustomers > 0 ? mrr / activeCustomers : 0,
       tax_rate: 16,
+      active_radius_sessions: 0,
+      recent_payments: recentPayments,
     };
   },
 

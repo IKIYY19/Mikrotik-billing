@@ -957,6 +957,15 @@ const dashboard = {
     const mrr = parseFloat(activeSubs.rows[0].total);
     const activeCount = parseInt(activeCustomers.rows[0].count);
 
+    const [radacctResult, recentPaymentsResult] = await Promise.all([
+      db.query("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL").catch(() => ({ rows: [{ count: 0 }] })),
+      db.query(
+        `SELECT p.id, p.amount, p.method, p.received_at, c.name as customer_name
+         FROM payments p LEFT JOIN customers c ON c.id = p.customer_id
+         ORDER BY p.received_at DESC LIMIT 5`
+      ).catch(() => ({ rows: [] })),
+    ]);
+
     return {
       total_customers: parseInt(totalCustomers.rows[0].count),
       active_customers: activeCount,
@@ -971,6 +980,8 @@ const dashboard = {
       mrr: mrr,
       arpu: activeCount > 0 ? mrr / activeCount : 0,
       tax_rate: taxRate.rows.length > 0 ? parseFloat(taxRate.rows[0].rate) : 0,
+      active_radius_sessions: parseInt(radacctResult.rows[0]?.count || 0),
+      recent_payments: recentPaymentsResult.rows || [],
     };
   },
 };
