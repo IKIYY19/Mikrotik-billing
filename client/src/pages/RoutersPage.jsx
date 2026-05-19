@@ -179,7 +179,8 @@ export default function RoutersPage() {
 
   const getRouterStatus = (r) => {
     if (r.is_online) return { color: 'green', label: 'ONLINE', Icon: Wifi, dotClass: 'bg-green-500 shadow-lg shadow-green-500/30', badgeClass: 'bg-green-500/10 text-green-400' };
-    if (r.is_reporting) return { color: 'amber', label: 'REPORTING', Icon: Activity, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' };
+    if (r.is_reporting && r.linked_mikrotik_connection_id) return { color: 'amber', label: 'RADIUS', Icon: Shield, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' };
+    if (r.is_reporting) return { color: 'slate', label: 'HEARTBEAT', Icon: Activity, dotClass: 'bg-slate-500', badgeClass: 'bg-slate-500/10 text-slate-400' };
     return { color: 'red', label: 'OFFLINE', Icon: WifiOff, dotClass: 'bg-red-500', badgeClass: 'bg-red-500/10 text-red-400' };
   };
 

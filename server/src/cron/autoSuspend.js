@@ -7,6 +7,8 @@
  */
 const billingData = require("../services/billingData");
 const mikrotikProvisioning = require("../services/mikrotikProvisioning");
+const radiusPod = require("../services/radiusPod");
+const radiusSync = require("../services/radiusSync");
 const logger = require("../utils/logger");
 
 async function runAutoSuspend() {
@@ -17,7 +19,7 @@ async function runAutoSuspend() {
     const allInvoices = await billingData.listInvoices();
     const activeSubs = allSubscriptions.filter((s) => s.status === "active");
 
-    const results = { suspended: [], mikrotik_disabled: [], mikrotik_failed: [], skipped: [] };
+    const results = { suspended: [], mikrotik_disabled: [], mikrotik_failed: [], radius_disabled: [], pod_kicked: [], skipped: [] };
 
     for (const sub of activeSubs) {
       const overdueInvoices = allInvoices.filter(
@@ -36,7 +38,6 @@ async function runAutoSuspend() {
         ),
       );
 
-      // Suspend subscription
       await billingData.updateSubscription(sub.id, {
         status: "suspended",
         last_sync_status: "suspended",
@@ -49,46 +50,50 @@ async function runAutoSuspend() {
         days_overdue: daysOverdue,
       });
 
-      // Push to MikroTik — disable PPPoE secret
+      if (sub.pppoe_username) {
+        try {
+          await radiusSync.upsertRadiusUser({ ...sub, status: "suspended" });
+          results.radius_disabled.push({ subscription_id: sub.id, pppoe_username: sub.pppoe_username });
+        } catch (e) {
+          logger.error("[AutoSuspend] RADIUS disable failed:", { error: e.message });
+        }
+
+        try {
+          const podResult = await radiusPod.kickUser(sub.pppoe_username, sub);
+          if (podResult.success) {
+            results.pod_kicked.push({ subscription_id: sub.id, pppoe_username: sub.pppoe_username });
+          }
+        } catch (e) {
+          logger.error("[AutoSuspend] PoD failed:", { error: e.message });
+        }
+      }
+
       if (sub.mikrotik_connection_id && sub.pppoe_username) {
         try {
           const syncResult = await mikrotikProvisioning.suspendSubscriptionSecret(sub);
           if (syncResult?.success) {
-            results.mikrotik_disabled.push({
-              subscription_id: sub.id,
-              pppoe_username: sub.pppoe_username,
-            });
+            results.mikrotik_disabled.push({ subscription_id: sub.id, pppoe_username: sub.pppoe_username });
           } else {
-            results.mikrotik_failed.push({
-              subscription_id: sub.id,
-              error: syncResult?.error || "Unknown error",
-            });
+            results.mikrotik_failed.push({ subscription_id: sub.id, error: syncResult?.error || "Unknown error" });
           }
         } catch (e) {
-          results.mikrotik_failed.push({
-            subscription_id: sub.id,
-            error: e.message,
-          });
-          logger.error("[AutoSuspend] MikroTik suspend failed:", {
-            subscription_id: sub.id,
-            error: e.message,
-          });
+          results.mikrotik_failed.push({ subscription_id: sub.id, error: e.message });
+          logger.error("[AutoSuspend] MikroTik suspend failed:", { subscription_id: sub.id, error: e.message });
         }
       } else {
-        results.skipped.push({
-          subscription_id: sub.id,
-          reason: "No MikroTik connection or PPPoE username",
-        });
+        results.skipped.push({ subscription_id: sub.id, reason: "No MikroTik connection or PPPoE username" });
       }
 
       logger.info(
-        `[AutoSuspend] Suspended subscription ${sub.id} (${daysOverdue}d overdue)` +
+        `[AutoSuspend] Suspended ${sub.id} (${daysOverdue}d overdue)` +
           (sub.pppoe_username ? ` — PPPoE: ${sub.pppoe_username}` : " — no PPPoE"),
       );
     }
 
     logger.info("[AutoSuspend] Complete:", {
       suspended: results.suspended.length,
+      radius_disabled: results.radius_disabled.length,
+      pod_kicked: results.pod_kicked.length,
       mikrotik_disabled: results.mikrotik_disabled.length,
       mikrotik_failed: results.mikrotik_failed.length,
       skipped: results.skipped.length,

@@ -159,6 +159,14 @@ async function seed() {
       );
     }
     console.log(`✅ Seeded ${exampleTemplates.length} templates`);
+
+    console.log('Seeding default settings...');
+    await db.query(
+      `INSERT INTO settings (key, value) VALUES ('radius_provisioning_enabled', 'true')
+       ON CONFLICT (key) DO NOTHING`
+    ).catch(() => {});
+    console.log('✅ RADIUS provisioning auto-enabled');
+
     console.log('✅ Seed completed successfully');
   } catch (error) {
     console.error('Seed failed:', error);
