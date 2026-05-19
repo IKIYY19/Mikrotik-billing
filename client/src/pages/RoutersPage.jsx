@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Router, Copy, Check, Key, Terminal, Loader2, Shield, AlertCircle,
-  Link2, Plug, Wifi, WifiOff, Activity, Server, Trash2,
+  Link2, Plug, Wifi, WifiOff, Activity, Server, Trash2, X
 } from "lucide-react";
 import { useToastStore } from "../stores/toastStore";
 import { getToken } from "../lib/auth";
