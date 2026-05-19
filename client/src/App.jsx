@@ -29,6 +29,7 @@ import { CustomerPortal } from "./pages/billing/EnhancedCustomerPortal";
 import { ReviewsManagement } from "./pages/billing/ReviewsManagement";
 import { FinancialReports } from "./pages/billing/FinancialReports";
 import { WhatsAppPage } from "./pages/billing/WhatsAppPage";
+import MessagingPage from "./pages/billing/MessagingPage";
 import { MapView } from "./pages/billing/MapView";
 import { WalletPage } from "./pages/billing/WalletPage";
 import MergeCustomers from "./pages/MergeCustomers";
@@ -209,10 +210,8 @@ function App() {
                       element={<BillingPayments />}
                     />
                     <Route path="/billing-sms" element={<SMSPage />} />
-                    <Route
-                      path="/billing-whatsapp"
-                      element={<WhatsAppPage />}
-                    />
+                    <Route path="/billing-whatsapp" element={<WhatsAppPage />} />
+                    <Route path="/billing-messaging" element={<MessagingPage />} />
                     <Route path="/billing-map" element={<MapView />} />
                     <Route path="/billing-wallet" element={<WalletPage />} />
                     <Route

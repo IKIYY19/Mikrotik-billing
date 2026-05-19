@@ -356,7 +356,7 @@ router.post("/send", messagingLimiter, async (req, res) => {
 // ═══════════════════════════════════════
 router.post("/send-template", messagingLimiter, async (req, res) => {
   try {
-    const { template_id, to, variables } = req.body;
+    const { template_id, to, variables, provider } = req.body;
     if (!template_id || !to)
       return res.status(400).json({ error: "template_id and to required" });
 
@@ -364,23 +364,57 @@ router.post("/send-template", messagingLimiter, async (req, res) => {
     if (!message)
       return res.status(404).json({ error: "Template not found or inactive" });
 
-    const recipients = (Array.isArray(to) ? to : [to]).map((item) =>
-      AfricaTalkingService.formatPhone(item),
-    );
-    const at = await getATService();
-    const result = await at.sendSMS(recipients, message);
+    const recipients = Array.isArray(to) ? to : [to];
+    let result;
+    let usedProvider = provider || "africas_talking";
+
+    switch (usedProvider) {
+      case "smsleopard": {
+        const smsLeopard = await getSmsLeopardService();
+        result = await smsLeopard.sendSMS(recipients[0], message);
+        break;
+      }
+      case "bulksms_kenya": {
+        const bulkSms = await getBulkSmsKenyaService();
+        result = await bulkSms.sendSMS(recipients[0], message);
+        break;
+      }
+      case "nexmo": {
+        const nexmo = await getNexmoService();
+        result = await nexmo.sendSMS(recipients[0], message);
+        break;
+      }
+      case "twilio": {
+        const twilio = await getTwilioService();
+        result = await twilio.sendSMS(recipients[0], message);
+        break;
+      }
+      case "whatsapp":
+        result = await whatsapp.sendMessage(recipients[0], message);
+        break;
+      case "africas_talking":
+      default: {
+        const at = await getATService();
+        const formattedRecipients = recipients.map((item) =>
+          AfricaTalkingService.formatPhone(item),
+        );
+        result = await at.sendSMS(formattedRecipients, message);
+        break;
+      }
+    }
 
     await logMessage({
       template_id,
       to: recipients,
       message,
       status: result.success ? "sent" : "failed",
-      message_id: result.results?.[0]?.messageId || null,
-      cost: result.results?.[0]?.cost || 0,
-      is_sandbox: result.isSandbox,
+      provider: usedProvider,
+      message_id: result.id || result.results?.[0]?.messageId || null,
+      cost: result.cost || result.results?.[0]?.cost || 0,
+      is_sandbox: result.isSandbox || false,
     });
 
-    res.json({ ...result, template_id, message });
+    res.json({ ...result, template_id, message, provider: usedProvider });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
