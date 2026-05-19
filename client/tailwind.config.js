@@ -21,6 +21,8 @@ export default {
           900: "hsl(var(--zinc-900) / <alpha-value>)",
           950: "hsl(var(--zinc-950) / <alpha-value>)",
         },
+        white: "hsl(var(--tw-white) / <alpha-value>)",
+        black: "hsl(var(--tw-black) / <alpha-value>)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
