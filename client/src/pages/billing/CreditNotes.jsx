@@ -66,10 +66,14 @@ export default function CreditNotes() {
   const updateStatus = async (id, status) => {
     try {
       const token = getToken();
-      await axios.put(`${API}/billing/credit-notes/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+      if (status === "applied") {
+        await axios.post(`${API}/billing/credit-notes/${id}/apply`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      } else {
+        await axios.put(`${API}/billing/credit-notes/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+      }
       toast.success(`Credit note ${status}`);
       fetchNotes();
-    } catch (e) { toast.error("Failed to update"); }
+    } catch (e) { toast.error(e.response?.data?.error || "Failed to update"); }
   };
 
   const filtered = notes.filter(n => {
@@ -100,7 +104,7 @@ export default function CreditNotes() {
       </div>
 
       {showForm && (
-        <Card className="bg-zinc-900/60 border-zinc-800/50">
+      <Card className="surface-card">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5 text-zinc-400" />New Credit Note</CardTitle>
             <CardDescription>Issue a credit to a customer's account</CardDescription>

@@ -1204,6 +1204,44 @@ router.put("/credit-notes/:id", async (req, res) => {
   }
 });
 
+router.post("/credit-notes/:id/apply", async (req, res) => {
+  try {
+    if (!global.db) {
+      return res.status(500).json({ error: "Database not available" });
+    }
+    const creditNoteId = req.params.id;
+    const cnResult = await global.db.query("SELECT * FROM credit_notes WHERE id = $1", [creditNoteId]);
+    if (cnResult.rows.length === 0) {
+      return res.status(404).json({ error: "Credit note not found" });
+    }
+    const cn = cnResult.rows[0];
+    if (cn.status !== "approved") {
+      return res.status(400).json({ error: "Credit note must be approved before applying" });
+    }
+
+    if (cn.invoice_id) {
+      const invoiceResult = await global.db.query("SELECT * FROM invoices WHERE id = $1", [cn.invoice_id]);
+      if (invoiceResult.rows.length > 0) {
+        const inv = invoiceResult.rows[0];
+        const newPaid = parseFloat(inv.paid_amount || 0) + parseFloat(cn.amount);
+        const newStatus = newPaid >= parseFloat(inv.total) ? "paid" : "partial";
+        await global.db.query(
+          "UPDATE invoices SET paid_amount = $1, status = $2 WHERE id = $3",
+          [newPaid, newStatus, cn.invoice_id],
+        );
+      }
+    }
+
+    const result = await global.db.query(
+      "UPDATE credit_notes SET status = 'applied' WHERE id = $1 RETURNING *",
+      [creditNoteId],
+    );
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.put("/invoices/:id", async (req, res) => {
   try {
     const invoice = await billing.updateInvoice(req.params.id, req.body);
