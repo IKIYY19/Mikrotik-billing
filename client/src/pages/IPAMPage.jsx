@@ -420,7 +420,7 @@ function SubnetCard({
               onClick={(e) => {
                 e.stopPropagation();
                 if (confirm("Delete this subnet and all its IPs?"))
-                  onDelete(subnet.id);
+                  {onDelete(subnet.id);}
               }}
               className="p-1.5 rounded-lg hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 transition-colors"
               title="Delete Subnet"

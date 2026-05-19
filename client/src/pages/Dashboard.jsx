@@ -267,7 +267,7 @@ export function Dashboard() {
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (window.confirm("Delete this project?")) await deleteProject(id);
+    if (window.confirm("Delete this project?")) {await deleteProject(id);}
   };
 
   if (loading && !stats) {

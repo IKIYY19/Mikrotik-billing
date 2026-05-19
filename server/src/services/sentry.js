@@ -149,7 +149,7 @@ function captureMessage(message, context = {}) {
 
 // Set user context (call after authentication)
 function setUser(user) {
-  if (!user) return;
+  if (!user) {return;}
   
   Sentry.setUser({
     id: user.id,

@@ -7,7 +7,7 @@ function getDb() { return global.db || require("../db/memory"); }
 // GET /api/ipam/subnets — List all subnets
 router.get("/subnets", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json([]);
+    if (!global.dbAvailable) {return res.json([]);}
     const result = await getDb().query("SELECT * FROM ipam_subnets ORDER BY name");
     // Calculate usage for each subnet
     const subnets = await Promise.all(result.rows.map(async (s) => {
@@ -62,7 +62,7 @@ router.delete("/subnets/:id", async (req, res) => {
 // GET /api/ipam/subnets/:id/ips — List IPs in a subnet
 router.get("/subnets/:id/ips", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json([]);
+    if (!global.dbAvailable) {return res.json([]);}
     const result = await getDb().query(
       "SELECT * FROM ipam_ips WHERE subnet_id = $1 ORDER BY ip_address", [req.params.id]
     );
@@ -85,11 +85,11 @@ router.put("/ips/:id", async (req, res) => {
 // GET /api/ipam/stats
 router.get("/stats", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json({ subnets: 0, total_ips: 0, used_ips: 0, free_ips: 0 });
+    if (!global.dbAvailable) {return res.json({ subnets: 0, total_ips: 0, used_ips: 0, free_ips: 0 });}
     const subnets = await getDb().query("SELECT COUNT(*) as count FROM ipam_subnets");
     const ips = await getDb().query("SELECT status, COUNT(*) as count FROM ipam_ips GROUP BY status");
     const stats = { subnets: parseInt(subnets.rows[0].count), total_ips: 0, used_ips: 0, free_ips: 0, reserved_ips: 0 };
-    ips.rows.forEach(r => { stats.total_ips += parseInt(r.count); if (r.status === 'used') stats.used_ips += parseInt(r.count); if (r.status === 'free') stats.free_ips += parseInt(r.count); if (r.status === 'reserved') stats.reserved_ips += parseInt(r.count); });
+    ips.rows.forEach(r => { stats.total_ips += parseInt(r.count); if (r.status === 'used') {stats.used_ips += parseInt(r.count);} if (r.status === 'free') {stats.free_ips += parseInt(r.count);} if (r.status === 'reserved') {stats.reserved_ips += parseInt(r.count);} });
     res.json(stats);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

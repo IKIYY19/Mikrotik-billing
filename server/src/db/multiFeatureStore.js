@@ -145,7 +145,7 @@ const DEFAULT_GRACE_CONFIG = {
 // ─── Seed PG defaults ───
 let pgSeeded = false;
 async function seedPgDefaults(db) {
-  if (pgSeeded) return;
+  if (pgSeeded) {return;}
   try {
     // Seed branches
     const branchResult = await db.query("SELECT COUNT(*) as c FROM branches");
@@ -252,7 +252,7 @@ async function updateBranch(id, data) {
     const existing = await db.query("SELECT * FROM branches WHERE id = $1", [
       id,
     ]);
-    if (existing.rows.length === 0) return null;
+    if (existing.rows.length === 0) {return null;}
     const merged = { ...existing.rows[0], ...data, updated_at: pgNow() };
     const result = await db.query(
       `UPDATE branches SET name=$1, city=$2, address=$3, contact=$4, status=$5, lat=$6, lng=$7, updated_at=$8
@@ -272,7 +272,7 @@ async function updateBranch(id, data) {
     return result.rows[0];
   }
   const idx = _branches.findIndex((b) => b.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   _branches[idx] = { ..._branches[idx], ...data, updated_at: pgNow() };
   return _branches[idx];
 }
@@ -324,7 +324,7 @@ async function updateAgent(id, data) {
   const db = getDb();
   if (db) {
     const existing = await db.query("SELECT * FROM agents WHERE id = $1", [id]);
-    if (existing.rows.length === 0) return null;
+    if (existing.rows.length === 0) {return null;}
     const merged = { ...existing.rows[0], ...data, updated_at: pgNow() };
     const result = await db.query(
       `UPDATE agents SET name=$1, phone=$2, email=$3, branch_id=$4, commission_rate=$5, balance=$6, status=$7, updated_at=$8
@@ -344,7 +344,7 @@ async function updateAgent(id, data) {
     return result.rows[0];
   }
   const idx = _agents.findIndex((a) => a.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   _agents[idx] = { ..._agents[idx], ...data, updated_at: pgNow() };
   return _agents[idx];
 }
@@ -359,7 +359,7 @@ async function deleteAgent(id) {
     return result.rows[0] || null;
   }
   const idx = _agents.findIndex((a) => a.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   return _agents.splice(idx, 1)[0];
 }
 
@@ -443,7 +443,7 @@ async function updateGraceConfig(data) {
 
 // ─── Seed sample vouchers ───
 const seedVouchers = () => {
-  if (vouchers.length > 0) return;
+  if (vouchers.length > 0) {return;}
   const codes = [
     "VCH-A1B2C3",
     "VCH-D4E5F6",
@@ -476,7 +476,7 @@ seedVouchers();
 
 // ─── Seed network metrics ───
 const seedMetrics = () => {
-  if (deviceMetrics.length > 0) return;
+  if (deviceMetrics.length > 0) {return;}
   const now = Date.now();
   _branches.forEach((branch) => {
     for (let i = 0; i < 24; i++) {
@@ -499,7 +499,7 @@ seedMetrics();
 
 // ─── Seed PPPoE sessions ───
 const seedPPPoE = () => {
-  if (pppoeSessions.length > 0) return;
+  if (pppoeSessions.length > 0) {return;}
   const subs = require("./billingStore").store.subscriptions || [];
   subs
     .filter((s) => s.pppoe_username && s.status === "active")

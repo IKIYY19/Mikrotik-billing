@@ -167,19 +167,19 @@ export function MonitoringDashboard() {
   };
 
   const formatBytes = (bytes) => {
-    if (!bytes) return "0 B";
+    if (!bytes) {return "0 B";}
     const num = parseFloat(bytes);
-    if (num >= 1099511627776) return `${(num / 1099511627776).toFixed(1)} TB`;
-    if (num >= 1073741824) return `${(num / 1073741824).toFixed(1)} GB`;
-    if (num >= 1048576) return `${(num / 1048576).toFixed(1)} MB`;
-    if (num >= 1024) return `${(num / 1024).toFixed(1)} KB`;
+    if (num >= 1099511627776) {return `${(num / 1099511627776).toFixed(1)} TB`;}
+    if (num >= 1073741824) {return `${(num / 1073741824).toFixed(1)} GB`;}
+    if (num >= 1048576) {return `${(num / 1048576).toFixed(1)} MB`;}
+    if (num >= 1024) {return `${(num / 1024).toFixed(1)} KB`;}
     return `${num.toFixed(0)} B`;
   };
 
   const formatSpeed = (bps) => {
-    if (!bps) return "0 Mbps";
+    if (!bps) {return "0 Mbps";}
     const mbps = bps / 1048576;
-    if (mbps >= 1000) return `${(mbps / 1000).toFixed(1)} Gbps`;
+    if (mbps >= 1000) {return `${(mbps / 1000).toFixed(1)} Gbps`;}
     return `${mbps.toFixed(1)} Mbps`;
   };
 
@@ -187,8 +187,8 @@ export function MonitoringDashboard() {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (days > 0) {return `${days}d ${hours}h ${minutes}m`;}
+    if (hours > 0) {return `${hours}h ${minutes}m`;}
     return `${minutes}m`;
   };
 
@@ -206,23 +206,23 @@ export function MonitoringDashboard() {
   };
 
   const getUsagePercentage = (used, total) => {
-    if (!total || total === 0) return 0;
+    if (!total || total === 0) {return 0;}
     return Math.min((used / total) * 100, 100);
   };
 
   if (loading)
-    return (
+    {return (
       <div className="p-8 text-white">
         Loading real MikroTik monitoring data...
       </div>
-    );
+    );}
   if (!data)
-    return (
+    {return (
       <div className="p-8 text-white">
         No real MikroTik monitoring data available. Add a MikroTik API
         connection to begin monitoring.
       </div>
-    );
+    );}
 
   return (
     <div className="p-8">

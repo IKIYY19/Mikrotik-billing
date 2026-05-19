@@ -264,7 +264,7 @@ export function CustomerPortal() {
   };
 
   const handleChangePlan = async () => {
-    if (!confirmPlan) return;
+    if (!confirmPlan) {return;}
     setChangingPlan(true);
     try {
       await axios.post(`${API}/portal/${customerId}/change-plan`, {
@@ -368,7 +368,7 @@ export function CustomerPortal() {
   };
 
   const handlePayment = async () => {
-    if (!payAmount) return;
+    if (!payAmount) {return;}
     setPaying(true);
     try {
       await axios.post(`${API}/portal/${customerId}/pay`, {
@@ -506,8 +506,8 @@ export function CustomerPortal() {
   };
 
   if (loading)
-    return <div className="p-8 text-zinc-400">Loading portal...</div>;
-  if (!data) return <div className="p-8 text-white">Customer not found</div>;
+    {return <div className="p-8 text-zinc-400">Loading portal...</div>;}
+  if (!data) {return <div className="p-8 text-white">Customer not found</div>;}
 
   const quotaPercent = data.usage?.quota_used_percent
     ? parseInt(data.usage.quota_used_percent)
@@ -735,7 +735,7 @@ export function CustomerPortal() {
                     return diff > 0 ? diff : 0;
                   }
                   if (sub?.billing_cycle_days_remaining)
-                    return sub.billing_cycle_days_remaining;
+                    {return sub.billing_cycle_days_remaining;}
                   return "—";
                 })()}
                 icon={Calendar}
@@ -743,7 +743,7 @@ export function CustomerPortal() {
                 sub={(() => {
                   const sub = subscriptions[0] || data.subscription;
                   if (sub?.next_billing_date)
-                    return `Next: ${new Date(sub.next_billing_date).toLocaleDateString()}`;
+                    {return `Next: ${new Date(sub.next_billing_date).toLocaleDateString()}`;}
                   return "billing cycle";
                 })()}
               />

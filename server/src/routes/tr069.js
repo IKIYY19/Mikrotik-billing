@@ -25,7 +25,7 @@ router.get('/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM tr069_devices WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
     res.json(result.rows[0]);
   } catch (e) {
     logger.error('Failed to fetch TR-069 device', { error: e.message, id: req.params.id });
@@ -38,7 +38,7 @@ router.get('/serial/:serial', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM tr069_devices WHERE serial_number = $1', [req.params.serial]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
     res.json(result.rows[0]);
   } catch (e) {
     logger.error('Failed to fetch TR-069 device by serial', { error: e.message, serial: req.params.serial });
@@ -87,7 +87,7 @@ router.put('/:id', async (req, res) => {
       [manufacturer, model, firmware_version, connection_id, ip_address, status, parameters ? JSON.stringify(parameters) : null, req.params.id]
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
 
     logger.info('TR-069 device updated', { id: req.params.id });
     res.json(result.rows[0]);
@@ -111,7 +111,7 @@ router.post('/:id/inform', async (req, res) => {
       [parameters ? JSON.stringify(parameters) : null, firmware_version, req.params.id]
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
 
     logger.info('TR-069 device inform received', { id: req.params.id });
     res.json(result.rows[0]);
@@ -126,7 +126,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('DELETE FROM tr069_devices WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
 
     logger.info('TR-069 device deleted', { id: req.params.id });
     res.json({ success: true });
@@ -141,7 +141,7 @@ router.post('/:id/reboot', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM tr069_devices WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
 
     const device = result.rows[0];
     
@@ -161,7 +161,7 @@ router.post('/:id/factory-reset', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM tr069_devices WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Device not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Device not found' });}
 
     const device = result.rows[0];
     

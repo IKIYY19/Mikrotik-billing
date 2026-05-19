@@ -118,6 +118,8 @@ const provisioningMigrations = [
 
   // WireGuard public key
   `ALTER TABLE routers ADD COLUMN IF NOT EXISTS wireguard_public_key VARCHAR(64)`,
+  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS wireguard_tunnel_ip VARCHAR(45)`,
+  `ALTER TABLE routers ADD COLUMN IF NOT EXISTS wireguard_listen_port INTEGER DEFAULT 13231`,
 
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_routers_project_id ON routers(project_id)`,

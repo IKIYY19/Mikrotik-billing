@@ -85,7 +85,7 @@ function SecretForm({ show, onClose, editing, profiles, connections, onSubmit })
     }
   }, [editing, show]);
 
-  if (!show) return null;
+  if (!show) {return null;}
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -163,11 +163,11 @@ function ProfileForm({ show, onClose, editing, onSubmit }) {
   });
 
   useEffect(() => {
-    if (editing) setForm({ ...editing });
-    else setForm({ name: '', local_address: '', remote_address: '', rate_limit: '', only_one: 'yes', change_tcp_mss: 'yes', use_compression: 'no', use_encryption: 'yes', dns_server: '', wins_server: '', parent_queue: '' });
+    if (editing) {setForm({ ...editing });}
+    else {setForm({ name: '', local_address: '', remote_address: '', rate_limit: '', only_one: 'yes', change_tcp_mss: 'yes', use_compression: 'no', use_encryption: 'yes', dns_server: '', wins_server: '', parent_queue: '' });}
   }, [editing, show]);
 
-  if (!show) return null;
+  if (!show) {return null;}
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -256,7 +256,7 @@ export function PPPoEManagement() {
   };
 
   const handleDeleteSecret = async (name) => {
-    if (!confirm(`Delete PPPoE secret "${name}"?`)) return;
+    if (!confirm(`Delete PPPoE secret "${name}"?`)) {return;}
     try {
       await axios.delete(`${API}/pppoe/secrets/${encodeURIComponent(name)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();
@@ -280,7 +280,7 @@ export function PPPoEManagement() {
   };
 
   const handleDeleteProfile = async (name) => {
-    if (!confirm(`Delete profile "${name}"?`)) return;
+    if (!confirm(`Delete profile "${name}"?`)) {return;}
     try {
       await axios.delete(`${API}/pppoe/profiles/${encodeURIComponent(name)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();

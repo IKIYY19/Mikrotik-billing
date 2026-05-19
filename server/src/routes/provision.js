@@ -202,13 +202,58 @@ router.get("/provision/:token", async (req, res) => {
       ],
     );
 
+    let tunnelIp = routerData.wireguard_tunnel_ip;
+    const wgEndpoint = process.env.WIREGUARD_ENDPOINT || "";
+    const wgServerPubkey = process.env.WIREGUARD_SERVER_PUBKEY || "";
+
+    if (wgEndpoint && wgServerPubkey && (!tunnelIp || tunnelIp.trim() === "")) {
+      try {
+        const subnetStr = process.env.WIREGUARD_SUBNET || "10.254.0.0/24";
+        const ipResult = await getDb().query(
+          "SELECT wireguard_tunnel_ip FROM routers WHERE wireguard_tunnel_ip IS NOT NULL AND wireguard_tunnel_ip != ''",
+        );
+        const allocatedIps = new Set(
+          ipResult.rows
+            ? ipResult.rows.map((r) => r.wireguard_tunnel_ip ? r.wireguard_tunnel_ip.split("/")[0].trim() : "").filter(Boolean)
+            : []
+        );
+
+        const match = subnetStr.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
+        if (match) {
+          const prefix = match[1];
+          const subnetMask = match[3];
+          let allocated = null;
+          for (let i = 2; i <= 254; i++) {
+            const candidateIp = `${prefix}.${i}`;
+            if (!allocatedIps.has(candidateIp)) {
+              allocated = `${candidateIp}/${subnetMask}`;
+              break;
+            }
+          }
+          if (allocated) {
+            tunnelIp = allocated;
+            await getDb().query(
+              "UPDATE routers SET wireguard_tunnel_ip = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+              [tunnelIp, routerData.id],
+            );
+            logger.info(`Automatically allocated WireGuard IP ${tunnelIp} for router ${routerData.name}`);
+          }
+        }
+      } catch (err) {
+        logger.error("Error auto-allocating WireGuard IP:", err);
+      }
+    }
+
     // Generate the provisioning script
-    const script = provisionStore.generateProvisionScript(routerData, {
-      callbackBaseUrl: getServerBaseUrl(req),
-      wireguard_endpoint: process.env.WIREGUARD_ENDPOINT,
-      wireguard_server_pubkey: process.env.WIREGUARD_SERVER_PUBKEY,
-      wireguard_tunnel_ip: routerData.wireguard_tunnel_ip,
-    });
+    const script = provisionStore.generateProvisionScript(
+      { ...routerData, wireguard_tunnel_ip: tunnelIp },
+      {
+        callbackBaseUrl: getServerBaseUrl(req),
+        wireguard_endpoint: wgEndpoint,
+        wireguard_server_pubkey: wgServerPubkey,
+        wireguard_tunnel_ip: tunnelIp,
+      },
+    );
 
     // Cache the script for subsequent rapid requests (e.g., retries)
     setCachedScript(token, script);
@@ -269,7 +314,7 @@ router.get("/provision/callback/:token", async (req, res) => {
     if (wgPubKey && wgPubKey !== "unknown") {
       try {
         await getDb().query(
-          `UPDATE routers SET wireguard_pubkey = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          `UPDATE routers SET wireguard_public_key = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
           [wgPubKey, routerData.id],
         );
         logger.info("WireGuard public key stored", {
@@ -343,7 +388,7 @@ router.get("/provision/callback/:token", async (req, res) => {
       ],
     );
 
-    res.type("text/plain").send(`# OK: Router marked as provisioned`);
+    res.type("text/plain").send(`# OK: Router marked as provisioned. Billing activation: skipped`);
   } catch (error) {
     logger.error("Callback error:", {
       error: error.message,
@@ -1336,7 +1381,7 @@ router.get("/enroll/auto-complete/:token", async (req, res) => {
 
     if (!global.dbAvailable) {
       const store = provisionStore.extendStore();
-      let routerRecord = routerId
+      const routerRecord = routerId
         ? store.routers.find((r) => r.id === routerId)
         : null;
       if (!routerRecord) {
@@ -2233,10 +2278,10 @@ router.delete("/v1/:slug/routers/:id", async (req, res) => {
     const { slug, id } = req.params;
     const db = getDb();
     const tenant = await findTenantBySlugOrKey(slug, null);
-    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    if (!tenant) {return res.status(404).json({ error: "Tenant not found" });}
 
     const router = await db.query("SELECT id, linked_mikrotik_connection_id FROM routers WHERE id = $1 AND tenant_id = $2", [id, tenant.id]);
-    if (router.rows.length === 0) return res.status(404).json({ error: "Router not found" });
+    if (router.rows.length === 0) {return res.status(404).json({ error: "Router not found" });}
 
     // Delete associated mikrotik_connection if it exists
     if (router.rows[0].linked_mikrotik_connection_id) {
@@ -2273,7 +2318,7 @@ async function findRoutersByTenant(tenantId, slug) {
        ORDER BY r.updated_at DESC`,
       [tenantId],
     );
-    if (result.rows.length > 0) return result.rows;
+    if (result.rows.length > 0) {return result.rows;}
   } catch (e) {
     // tenant_id column might not exist, try without it
     try {
@@ -2287,7 +2332,7 @@ async function findRoutersByTenant(tenantId, slug) {
          WHERE r.linked_mikrotik_connection_id IS NOT NULL
          ORDER BY r.updated_at DESC`,
       );
-      if (result.rows.length > 0) return result.rows;
+      if (result.rows.length > 0) {return result.rows;}
     } catch (e2) {}
   }
   // Fallback: find by provision_logs token
@@ -2316,7 +2361,7 @@ router.post("/v1/:slug/watch/start", async (req, res) => {
   try {
     const { slug } = req.params;
     const tenant = await findTenantBySlugOrKey(slug, null);
-    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    if (!tenant) {return res.status(404).json({ error: "Tenant not found" });}
 
     const sessionId = uuidv4();
     watchSessions.set(sessionId, {

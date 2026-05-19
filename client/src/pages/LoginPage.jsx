@@ -79,7 +79,7 @@ export default function LoginPage() {
       s.src = "https://accounts.google.com/gsi/client";
       s.onload = init;
       document.head.appendChild(s);
-    } else init();
+    } else {init();}
   };
 
   const handleLogin = async (e) => {
@@ -112,7 +112,7 @@ export default function LoginPage() {
 
   const handle2FA = async (e) => {
     e.preventDefault();
-    if (twoFactorCode.length !== 6) return;
+    if (twoFactorCode.length !== 6) {return;}
     setLoading(true);
     try {
       const response = await axios.post(

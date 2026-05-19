@@ -10,12 +10,12 @@ import { useToast } from '../../hooks/useToast';
 const API = import.meta.env.VITE_API_URL || '/api';
 
 function formatTimeAgo(date) {
-  if (!date) return '—';
+  if (!date) {return '—';}
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) {return `${mins}m ago`;}
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) {return `${hrs}h ago`;}
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
@@ -224,7 +224,7 @@ function TicketDetailModal({ ticket, technicians, onClose, onRefresh, onListRefr
   const [isInternal, setIsInternal] = useState(false);
 
   const sendReply = async () => {
-    if (!reply.trim()) return;
+    if (!reply.trim()) {return;}
     try {
       await axios.post(`${API}/tickets/${ticket.id}/messages`, { message: reply, is_internal: isInternal });
       setReply('');
@@ -243,13 +243,13 @@ function TicketDetailModal({ ticket, technicians, onClose, onRefresh, onListRefr
   };
 
   const closeTicket = async () => {
-    if (!confirm('Are you sure you want to close this ticket?')) return;
+    if (!confirm('Are you sure you want to close this ticket?')) {return;}
     await axios.put(`${API}/tickets/${ticket.id}`, { status: 'closed' });
     onRefresh();
   };
 
   const deleteTicket = async () => {
-    if (!confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {return;}
     try {
       await axios.delete(`${API}/tickets/${ticket.id}`);
       onClose();

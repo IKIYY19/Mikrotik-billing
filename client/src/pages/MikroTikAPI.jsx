@@ -87,7 +87,7 @@ const emptyForm = {
 };
 
 function formatLastSeen(date) {
-  if (!date) return 'Never';
+  if (!date) {return 'Never';}
   const now = new Date();
   const then = new Date(date);
   const diffMs = now - then;
@@ -95,9 +95,9 @@ function formatLastSeen(date) {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffMins < 1) {return 'Just now';}
+  if (diffMins < 60) {return `${diffMins}m ago`;}
+  if (diffHours < 24) {return `${diffHours}h ago`;}
   return `${diffDays}d ago`;
 }
 
@@ -173,10 +173,10 @@ export function MikroTikAPI() {
 
   const remoteWarnings = useMemo(() => {
     const warnings = [];
-    if (!formData.ip_address) warnings.push('Router host/IP is missing.');
-    if (!formData.username || (!editingConnectionId && !formData.password)) warnings.push('Router login credentials are incomplete.');
-    if (connectionType === 'ssh' && formData.use_tunnel && !formData.tunnel_host) warnings.push('Jump-host mode needs a tunnel host.');
-    if (remoteProfile === 'jump-host') warnings.push('Current backend tunnel support is limited, so VPN is still safer for production remote linking.');
+    if (!formData.ip_address) {warnings.push('Router host/IP is missing.');}
+    if (!formData.username || (!editingConnectionId && !formData.password)) {warnings.push('Router login credentials are incomplete.');}
+    if (connectionType === 'ssh' && formData.use_tunnel && !formData.tunnel_host) {warnings.push('Jump-host mode needs a tunnel host.');}
+    if (remoteProfile === 'jump-host') {warnings.push('Current backend tunnel support is limited, so VPN is still safer for production remote linking.');}
     return warnings;
   }, [connectionType, editingConnectionId, formData, remoteProfile]);
 
@@ -186,8 +186,8 @@ export function MikroTikAPI() {
     try {
       const { data } = await axios.post(`${API}/mikrotik/test`, payload);
       setTestResult(data);
-      if (data.success) toast.success('Connection test passed', data.message || 'Router responded successfully');
-      else toast.error('Connection test failed', data.message || 'Router did not respond');
+      if (data.success) {toast.success('Connection test passed', data.message || 'Router responded successfully');}
+      else {toast.error('Connection test failed', data.message || 'Router did not respond');}
     } catch (error) {
       const result = { success: false, message: error.response?.data?.error || error.message };
       setTestResult(result);
@@ -230,8 +230,8 @@ export function MikroTikAPI() {
   };
 
   const inferRemoteProfile = (connection) => {
-    if (connection.connection_type === 'ssh' && connection.use_tunnel) return 'jump-host';
-    if (connection.connection_type === 'ssh') return 'direct-ssh';
+    if (connection.connection_type === 'ssh' && connection.use_tunnel) {return 'jump-host';}
+    if (connection.connection_type === 'ssh') {return 'direct-ssh';}
     if (connection.connection_type === 'api' && /^10\.|^172\.1[6-9]\.|^172\.2\d\.|^172\.3[0-1]\.|^192\.168\./.test(connection.ip_address || '')) {
       return 'vpn-api';
     }
@@ -273,11 +273,11 @@ export function MikroTikAPI() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this connection?')) return;
+    if (!confirm('Are you sure you want to delete this connection?')) {return;}
     try {
       await axios.delete(`${API}/mikrotik/${id}`);
       setConnections((current) => current.filter((connection) => connection.id !== id));
-      if (editingConnectionId === id) resetForm();
+      if (editingConnectionId === id) {resetForm();}
       toast.success('Connection deleted', 'The MikroTik connection has been removed');
     } catch (error) {
       toast.error('Failed to delete connection', error.response?.data?.error || error.message);
@@ -305,8 +305,8 @@ export function MikroTikAPI() {
 
   const toggleUserSelection = (userName) => {
     const next = new Set(selectedUsers);
-    if (next.has(userName)) next.delete(userName);
-    else next.add(userName);
+    if (next.has(userName)) {next.delete(userName);}
+    else {next.add(userName);}
     setSelectedUsers(next);
   };
 
@@ -331,8 +331,8 @@ export function MikroTikAPI() {
         billing_cycle: importBillingCycle,
       });
       setImportResult(data);
-      if (data.imported > 0) toast.success('Import finished', `Imported ${data.imported} router users into billing`);
-      else toast.warning('Nothing imported', 'Every selected user was skipped or failed');
+      if (data.imported > 0) {toast.success('Import finished', `Imported ${data.imported} router users into billing`);}
+      else {toast.warning('Nothing imported', 'Every selected user was skipped or failed');}
     } catch (error) {
       toast.error('Failed to import users', error.response?.data?.error || error.message);
     } finally {

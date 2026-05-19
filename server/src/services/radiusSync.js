@@ -62,7 +62,7 @@ async function ensureRadiusTables() {
 }
 
 async function ensurePlanRadiusGroup(plan) {
-  if (!plan || !plan.name) return;
+  if (!plan || !plan.name) {return;}
   const db = getDb();
   const groupName = plan.name.replace(/\s+/g, "_");
 
@@ -70,7 +70,7 @@ async function ensurePlanRadiusGroup(plan) {
     "SELECT id FROM radgroupcheck WHERE groupname = $1 LIMIT 1",
     [groupName]
   );
-  if (existing.rows.length > 0) return;
+  if (existing.rows.length > 0) {return;}
 
   if (plan.speed_up && plan.speed_down) {
     await db.query(

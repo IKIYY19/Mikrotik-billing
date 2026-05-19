@@ -32,9 +32,9 @@ router.post("/register", authLimiter, async (req, res) => {
     const db = getDb();
     const { email, password, name, role } = req.body;
     if (!email || !password || !name)
-      return res
+      {return res
         .status(400)
-        .json({ error: "email, password, and name required" });
+        .json({ error: "email, password, and name required" });}
 
     // Validate role if provided, default to 'staff'
     const userRole = role && VALID_ROLES.includes(role) ? role : "staff";
@@ -43,7 +43,7 @@ router.post("/register", authLimiter, async (req, res) => {
       email,
     ]);
     if (existing.rows.length > 0)
-      return res.status(409).json({ error: "Email already exists" });
+      {return res.status(409).json({ error: "Email already exists" });}
 
     const hash = await bcrypt.hash(password, 10);
     const tid = req.body.tenant_id || null;
@@ -91,7 +91,7 @@ router.post("/login", authLimiter, async (req, res) => {
     const db = getDb();
     const { email, password } = req.body;
     if (!email || !password)
-      return res.status(400).json({ error: "email and password required" });
+      {return res.status(400).json({ error: "email and password required" });}
 
     const user = await db.query("SELECT * FROM users WHERE email = $1", [
       email,
@@ -220,7 +220,7 @@ router.get("/me", async (req, res) => {
     const db = getDb();
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer "))
-      return res.status(401).json({ error: "No token" });
+      {return res.status(401).json({ error: "No token" });}
 
     const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
     const user = await db.query(
@@ -228,7 +228,7 @@ router.get("/me", async (req, res) => {
       [decoded.id],
     );
     if (user.rows.length === 0)
-      return res.status(404).json({ error: "User not found" });
+      {return res.status(404).json({ error: "User not found" });}
     res.json(user.rows[0]);
   } catch (e) {
     res.status(401).json({ error: "Invalid token" });
@@ -277,7 +277,7 @@ const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer "))
-      return res.status(401).json({ error: "Authentication required" });
+      {return res.status(401).json({ error: "Authentication required" });}
     const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
     req.user = decoded;
     next();
@@ -327,11 +327,11 @@ router.post("/2fa/enable", authenticate, async (req, res) => {
     );
     console.log("[2FA ENABLE] Code received:", code);
 
-    if (!secret) return res.status(400).json({ error: "Setup 2FA first" });
+    if (!secret) {return res.status(400).json({ error: "Setup 2FA first" });}
 
     const isValid = authenticator.verify({ token: code, secret });
     console.log("[2FA ENABLE] Verify result:", isValid);
-    if (!isValid) return res.status(400).json({ error: "Invalid code" });
+    if (!isValid) {return res.status(400).json({ error: "Invalid code" });}
 
     await db.query("UPDATE users SET two_factor_enabled = true WHERE id = $1", [
       req.user.id,
@@ -355,7 +355,7 @@ router.post("/2fa/disable", authenticate, async (req, res) => {
     const secret = result.rows[0]?.two_factor_secret;
 
     const isValid = authenticator.verify({ token: code, secret });
-    if (!isValid) return res.status(400).json({ error: "Invalid code" });
+    if (!isValid) {return res.status(400).json({ error: "Invalid code" });}
 
     await db.query(
       "UPDATE users SET two_factor_enabled = false, two_factor_secret = NULL WHERE id = $1",
@@ -387,11 +387,11 @@ router.post("/google", authLimiter, async (req, res) => {
   try {
     const { credential } = req.body;
     if (!credential)
-      return res.status(400).json({ error: "Missing credential" });
+      {return res.status(400).json({ error: "Missing credential" });}
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId)
-      return res.status(500).json({ error: "Google OAuth not configured" });
+      {return res.status(500).json({ error: "Google OAuth not configured" });}
 
     const client = new OAuth2Client(clientId);
     const ticket = await client.verifyIdToken({
@@ -402,7 +402,7 @@ router.post("/google", authLimiter, async (req, res) => {
     const { email, name, picture, sub: googleId } = payload;
 
     if (!email)
-      return res.status(400).json({ error: "Email not provided by Google" });
+      {return res.status(400).json({ error: "Email not provided by Google" });}
 
     const db = getDb();
     let user = await db.query("SELECT * FROM users WHERE email = $1", [email]);

@@ -77,14 +77,14 @@ router.post("/agents", (req, res) => {
 
 router.put("/agents/:id", (req, res) => {
   const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "Agent not found" });
+  if (idx === -1) {return res.status(404).json({ error: "Agent not found" });}
   multiStore.agents[idx] = { ...multiStore.agents[idx], ...req.body };
   res.json(multiStore.agents[idx]);
 });
 
 router.delete("/agents/:id", (req, res) => {
   const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "Agent not found" });
+  if (idx === -1) {return res.status(404).json({ error: "Agent not found" });}
   multiStore.agents.splice(idx, 1);
   res.json({ message: "Agent deleted" });
 });
@@ -95,15 +95,15 @@ router.delete("/agents/:id", (req, res) => {
 router.get("/vouchers", (req, res) => {
   const { status, agent_id } = req.query;
   let filtered = [...multiStore.vouchers];
-  if (status) filtered = filtered.filter((v) => v.status === status);
-  if (agent_id) filtered = filtered.filter((v) => v.sold_by === agent_id);
+  if (status) {filtered = filtered.filter((v) => v.status === status);}
+  if (agent_id) {filtered = filtered.filter((v) => v.sold_by === agent_id);}
   res.json(filtered);
 });
 
 router.post("/vouchers/generate", async (req, res) => {
   const { count, plan_id, agent_id } = req.body;
   const plan = await billingData.getPlanById(plan_id);
-  if (!plan) return res.status(404).json({ error: "Plan not found" });
+  if (!plan) {return res.status(404).json({ error: "Plan not found" });}
 
   const generated = [];
   for (let i = 0; i < (count || 1); i++) {
@@ -128,7 +128,7 @@ router.post("/vouchers/generate", async (req, res) => {
   // If agent specified, deduct from balance
   if (agent_id) {
     const agent = multiStore.agents.find((a) => a.id === agent_id);
-    if (agent) agent.balance -= generated.reduce((sum, v) => sum + v.price, 0);
+    if (agent) {agent.balance -= generated.reduce((sum, v) => sum + v.price, 0);}
   }
 
   res.json({ generated, total: generated.length });
@@ -141,9 +141,9 @@ router.post("/vouchers/redeem", async (req, res) => {
   );
 
   if (!voucher)
-    return res
+    {return res
       .status(404)
-      .json({ error: "Invalid or already redeemed voucher" });
+      .json({ error: "Invalid or already redeemed voucher" });}
 
   voucher.status = "redeemed";
   voucher.sold_to = customer_id || "";
@@ -212,11 +212,11 @@ router.get("/monitoring/dashboard", async (req, res) => {
 
     // Parse MikroTik bytes
     function parseBytes(bytesStr) {
-      if (!bytesStr) return 0;
+      if (!bytesStr) {return 0;}
       const str = String(bytesStr);
-      if (/^\d+$/.test(str)) return parseInt(str);
+      if (/^\d+$/.test(str)) {return parseInt(str);}
       const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
-      if (!match) return 0;
+      if (!match) {return 0;}
       const value = parseFloat(match[1]);
       const unit = (match[2] || "").toLowerCase().replace("ib", "");
       const multipliers = {
@@ -231,24 +231,24 @@ router.get("/monitoring/dashboard", async (req, res) => {
 
     // Parse MikroTik uptime
     function parseUptime(uptimeStr) {
-      if (!uptimeStr) return 0;
+      if (!uptimeStr) {return 0;}
       const str = String(uptimeStr);
       let totalSeconds = 0;
       const daysMatch = str.match(/(\d+)d/);
       const hoursMatch = str.match(/(\d+)h/);
       const minsMatch = str.match(/(\d+)m/);
       const secsMatch = str.match(/(\d+)s/);
-      if (daysMatch) totalSeconds += parseInt(daysMatch[1]) * 86400;
-      if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
-      if (minsMatch) totalSeconds += parseInt(minsMatch[1]) * 60;
-      if (secsMatch) totalSeconds += parseInt(secsMatch[1]);
+      if (daysMatch) {totalSeconds += parseInt(daysMatch[1]) * 86400;}
+      if (hoursMatch) {totalSeconds += parseInt(hoursMatch[1]) * 3600;}
+      if (minsMatch) {totalSeconds += parseInt(minsMatch[1]) * 60;}
+      if (secsMatch) {totalSeconds += parseInt(secsMatch[1]);}
       return totalSeconds;
     }
 
     function getMemoryUsage(resource) {
       const total = parseBytes(resource["total-memory"]);
       const free = parseBytes(resource["free-memory"]);
-      if (!total) return 0;
+      if (!total) {return 0;}
       return Math.max(0, Math.min(100, ((total - free) / total) * 100));
     }
 
@@ -264,7 +264,7 @@ router.get("/monitoring/dashboard", async (req, res) => {
         device.password = decryptPassword(device.password_encrypted);
       }
 
-      if (!device.password) continue;
+      if (!device.password) {continue;}
 
       try {
         const MikroNode = require("mikronode");
@@ -293,7 +293,7 @@ router.get("/monitoring/dashboard", async (req, res) => {
 
         for (const session of Array.isArray(pppoeActive) ? pppoeActive : []) {
           const username = session.name || session.username;
-          if (!username) continue;
+          if (!username) {continue;}
 
           const bytesIn = parseBytes(session["bytes-in"] || session.bytes_in);
           const bytesOut = parseBytes(
@@ -317,7 +317,7 @@ router.get("/monitoring/dashboard", async (req, res) => {
               const customer = billingStore.store.customers.find(
                 (c) => c.id === sub.customer_id,
               );
-              if (customer) customerName = customer.name;
+              if (customer) {customerName = customer.name;}
             }
           } catch (e) {}
 
@@ -496,7 +496,7 @@ router.post("/auto-suspend/run", async (req, res) => {
 // ═══════════════════════════════════════
 router.put("/customers/:id/branch", async (req, res) => {
   const customer = await billingData.getCustomerById(req.params.id);
-  if (!customer) return res.status(404).json({ error: "Customer not found" });
+  if (!customer) {return res.status(404).json({ error: "Customer not found" });}
   await billingData.updateCustomer(req.params.id, { branch_id: req.body.branch_id || null });
   res.json(customer);
 });
@@ -522,7 +522,7 @@ router.post("/setup", async (req, res) => {
     // Create service plans
     if (plans && plans.length > 0) {
       for (const plan of plans) {
-        if (!plan.name) continue;
+        if (!plan.name) {continue;}
         await billingData.createPlan({
           id: uuidv4(),
           name: plan.name,

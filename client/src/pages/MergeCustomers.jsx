@@ -51,7 +51,7 @@ export default function MergeCustomers() {
   };
 
   const filteredSourceCustomers = useMemo(() => {
-    if (!sourceSearch.trim()) return [];
+    if (!sourceSearch.trim()) {return [];}
     const q = sourceSearch.toLowerCase();
     return customers
       .filter(
@@ -65,7 +65,7 @@ export default function MergeCustomers() {
   }, [sourceSearch, customers, target]);
 
   const filteredTargetCustomers = useMemo(() => {
-    if (!targetSearch.trim()) return [];
+    if (!targetSearch.trim()) {return [];}
     const q = targetSearch.toLowerCase();
     return customers
       .filter(
@@ -104,15 +104,15 @@ export default function MergeCustomers() {
         tickets: data.tickets?.length || 0,
         wallet: data.wallet?.balance || 0,
       };
-      if (type === "source") setSourceStats(stats);
-      else setTargetStats(stats);
+      if (type === "source") {setSourceStats(stats);}
+      else {setTargetStats(stats);}
     } catch (e) {
       console.error("Failed to fetch stats:", e);
     }
   };
 
   const handleMerge = async () => {
-    if (!source || !target) return;
+    if (!source || !target) {return;}
     setMerging(true);
     setResult(null);
     try {
@@ -196,7 +196,7 @@ export default function MergeCustomers() {
                 onChange={(e) => {
                   setSourceSearch(e.target.value);
                   setSourceDropdownOpen(true);
-                  if (!e.target.value.trim()) setSource(null);
+                  if (!e.target.value.trim()) {setSource(null);}
                 }}
                 onFocus={() => setSourceDropdownOpen(true)}
                 onBlur={() => setTimeout(() => setSourceDropdownOpen(false), 200)}
@@ -301,7 +301,7 @@ export default function MergeCustomers() {
                 onChange={(e) => {
                   setTargetSearch(e.target.value);
                   setTargetDropdownOpen(true);
-                  if (!e.target.value.trim()) setTarget(null);
+                  if (!e.target.value.trim()) {setTarget(null);}
                 }}
                 onFocus={() => setTargetDropdownOpen(true)}
                 onBlur={() => setTimeout(() => setTargetDropdownOpen(false), 200)}

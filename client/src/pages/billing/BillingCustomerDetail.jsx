@@ -174,9 +174,9 @@ export function BillingCustomerDetail() {
     }
   };
 
-  if (loading) return <div className="p-8 text-white">Loading...</div>;
+  if (loading) {return <div className="p-8 text-white">Loading...</div>;}
   if (!customer)
-    return <div className="p-8 text-white">Customer not found</div>;
+    {return <div className="p-8 text-white">Customer not found</div>;}
 
   const totalBilled = customer.invoices?.reduce((s, i) => s + i.total, 0) || 0;
   const totalPaid = customer.payments?.reduce((s, p) => s + p.amount, 0) || 0;

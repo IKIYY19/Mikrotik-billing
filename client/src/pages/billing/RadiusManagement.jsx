@@ -44,19 +44,19 @@ function PasswordField({ value }) {
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
+  if (!bytes) {return '0 B';}
   const b = parseInt(bytes);
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1073741824) return `${(b / 1048576).toFixed(1)} MB`;
+  if (b < 1024) {return `${b} B`;}
+  if (b < 1048576) {return `${(b / 1024).toFixed(1)} KB`;}
+  if (b < 1073741824) {return `${(b / 1048576).toFixed(1)} MB`;}
   return `${(b / 1073741824).toFixed(2)} GB`;
 }
 
 function formatUptime(seconds) {
-  if (!seconds) return '—';
+  if (!seconds) {return '—';}
   const s = parseInt(seconds);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 60) {return `${s}s`;}
+  if (s < 3600) {return `${Math.floor(s / 60)}m`;}
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return `${h}h ${m}m`;
@@ -136,7 +136,7 @@ export function RadiusManagement() {
     } catch (e) { alert('Failed'); }
   };
   const handleNasDelete = async (id) => {
-    if (!confirm('Delete NAS client?')) return;
+    if (!confirm('Delete NAS client?')) {return;}
     await axios.delete(`${API}/radius/nas/${id}`);
     fetchData();
   };
@@ -149,7 +149,7 @@ export function RadiusManagement() {
     } catch (e) { alert('Failed'); }
   };
   const handleGroupDelete = async (name) => {
-    if (!confirm('Delete group?')) return;
+    if (!confirm('Delete group?')) {return;}
     await axios.delete(`${API}/radius/groups/${name}`);
     fetchData();
   };
@@ -162,7 +162,7 @@ export function RadiusManagement() {
     } catch (e) { alert('Failed'); }
   };
   const handleUserDelete = async (username) => {
-    if (!confirm(`Delete RADIUS user "${username}"?`)) return;
+    if (!confirm(`Delete RADIUS user "${username}"?`)) {return;}
     await axios.delete(`${API}/radius/users/${username}`);
     fetchData();
   };
@@ -632,9 +632,9 @@ function RadiusUserForm({ onClose, onSubmit, groups }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const attrs = [];
-    if (form.rate_limit) attrs.push({ attribute: 'Mikrotik-Rate-Limit', value: form.rate_limit, op: ':=' });
-    if (form.framed_ip) attrs.push({ attribute: 'Framed-IP-Address', value: form.framed_ip, op: '=' });
-    if (form.expiration) attrs.push({ attribute: 'Expiration', value: form.expiration, op: ':=' });
+    if (form.rate_limit) {attrs.push({ attribute: 'Mikrotik-Rate-Limit', value: form.rate_limit, op: ':=' });}
+    if (form.framed_ip) {attrs.push({ attribute: 'Framed-IP-Address', value: form.framed_ip, op: '=' });}
+    if (form.expiration) {attrs.push({ attribute: 'Expiration', value: form.expiration, op: ':=' });}
     onSubmit({ ...form, attributes: attrs });
   };
 

@@ -44,7 +44,7 @@ export function ProjectDetail() {
   const handleGenerate = async () => {
     await handleSave();
     const result = await generateScript();
-    if (result) navigate('/output');
+    if (result) {navigate('/output');}
   };
 
   const moduleComponents = {
@@ -62,7 +62,7 @@ export function ProjectDetail() {
 
   const ActiveModuleComponent = moduleComponents[activeModule];
 
-  if (!currentProject) return <div className="p-8 text-zinc-400">Loading...</div>;
+  if (!currentProject) {return <div className="p-8 text-zinc-400">Loading...</div>;}
 
   const configuredModules = MODULES.filter(m => modules[m.id] && Object.keys(modules[m.id]).length > 0).length;
 

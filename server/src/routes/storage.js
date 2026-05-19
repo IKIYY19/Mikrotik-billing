@@ -11,12 +11,12 @@ const router = express.Router();
 
 async function getIntegrationConfig(serviceName) {
   try {
-    if (!global.db) return null;
+    if (!global.db) {return null;}
     const result = await global.db.query(
       'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
       [serviceName]
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {

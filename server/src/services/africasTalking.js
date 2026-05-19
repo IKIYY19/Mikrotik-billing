@@ -190,7 +190,7 @@ class AfricaTalkingService {
    * Truncate message to fit in single SMS (160 chars)
    */
   static truncate(message, maxChars = 160) {
-    if (message.length <= maxChars) return message;
+    if (message.length <= maxChars) {return message;}
     return message.substring(0, maxChars - 3) + '...';
   }
 
@@ -199,9 +199,9 @@ class AfricaTalkingService {
    */
   static formatPhone(phone) {
     let cleaned = phone.replace(/\s/g, '').replace(/-/g, '');
-    if (cleaned.startsWith('0')) cleaned = '254' + cleaned.substring(1);
-    if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
-    if (!cleaned.startsWith('254')) cleaned = '254' + cleaned;
+    if (cleaned.startsWith('0')) {cleaned = '254' + cleaned.substring(1);}
+    if (cleaned.startsWith('+')) {cleaned = cleaned.substring(1);}
+    if (!cleaned.startsWith('254')) {cleaned = '254' + cleaned;}
     return '+' + cleaned;
   }
 }

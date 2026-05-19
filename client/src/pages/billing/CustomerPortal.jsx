@@ -31,7 +31,7 @@ export function CustomerPortal() {
   };
 
   const handlePay = async () => {
-    if (!payPhone || !payAmount) return;
+    if (!payPhone || !payAmount) {return;}
     setPaying(true);
     setPayResult(null);
 
@@ -61,8 +61,8 @@ export function CustomerPortal() {
     } catch (error) { console.error('Failed to create ticket:', error); toast.error('Failed to create ticket', error.response?.data?.error || error.message); }
   };
 
-  if (loading) return <div className="p-8 text-white">Loading...</div>;
-  if (!data) return <div className="p-8 text-white">Customer not found</div>;
+  if (loading) {return <div className="p-8 text-white">Loading...</div>;}
+  if (!data) {return <div className="p-8 text-white">Customer not found</div>;}
 
   const quotaPercent = data.usage?.quota_used_percent ? parseInt(data.usage.quota_used_percent) : 0;
   const isThrottled = data.subscription?.throttled;

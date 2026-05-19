@@ -45,6 +45,10 @@ module.exports = [
       // Error handling
       "no-throw-literal": "error",
       "no-return-assign": "error",
+      "no-empty": "warn",
+      
+      // Stylistic / Generation helpers
+      "no-useless-escape": "off",
       
       // Security
       "no-path-concat": "error",

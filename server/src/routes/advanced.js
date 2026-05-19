@@ -44,7 +44,7 @@ router.get("/wallet/:customerId", async (req, res) => {
 router.post("/wallet/:customerId/topup", async (req, res) => {
   const { amount, method = "mpesa", reference } = req.body;
   if (!amount || parseFloat(amount) <= 0)
-    return res.status(400).json({ error: "Invalid amount" });
+    {return res.status(400).json({ error: "Invalid amount" });}
 
   const result = await walletStore.topUp(
     req.params.customerId,
@@ -69,13 +69,13 @@ router.post("/wallet/:customerId/topup", async (req, res) => {
 router.post("/wallet/:customerId/set-rate", async (req, res) => {
   const { daily_rate } = req.body;
   if (!daily_rate || parseFloat(daily_rate) <= 0)
-    return res.status(400).json({ error: "Invalid rate" });
+    {return res.status(400).json({ error: "Invalid rate" });}
 
   const wallet = await walletStore.setDailyRate(
     req.params.customerId,
     parseFloat(daily_rate),
   );
-  if (!wallet) return res.status(404).json({ error: "Wallet not found" });
+  if (!wallet) {return res.status(404).json({ error: "Wallet not found" });}
 
   res.json(wallet);
 });
@@ -222,10 +222,10 @@ router.get("/map/data", async (req, res) => {
 
 router.put("/map/customer/:id", async (req, res) => {
   const customer = await billingData.getCustomerById(req.params.id);
-  if (!customer) return res.status(404).json({ error: "Customer not found" });
+  if (!customer) {return res.status(404).json({ error: "Customer not found" });}
 
-  if (req.body.lat !== undefined) customer.lat = req.body.lat;
-  if (req.body.lng !== undefined) customer.lng = req.body.lng;
+  if (req.body.lat !== undefined) {customer.lat = req.body.lat;}
+  if (req.body.lng !== undefined) {customer.lng = req.body.lng;}
 
   res.json(customer);
 });
@@ -240,7 +240,7 @@ router.get("/backup/schedules", async (req, res) => {
 
 router.get("/backup/schedules/:id", async (req, res) => {
   const schedule = await backupStore.getSchedule(req.params.id);
-  if (!schedule) return res.status(404).json({ error: "Schedule not found" });
+  if (!schedule) {return res.status(404).json({ error: "Schedule not found" });}
   res.json(schedule);
 });
 
@@ -251,13 +251,13 @@ router.post("/backup/schedules", async (req, res) => {
 
 router.put("/backup/schedules/:id", async (req, res) => {
   const schedule = await backupStore.updateSchedule(req.params.id, req.body);
-  if (!schedule) return res.status(404).json({ error: "Schedule not found" });
+  if (!schedule) {return res.status(404).json({ error: "Schedule not found" });}
   res.json(schedule);
 });
 
 router.delete("/backup/schedules/:id", async (req, res) => {
   const schedule = await backupStore.deleteSchedule(req.params.id);
-  if (!schedule) return res.status(404).json({ error: "Schedule not found" });
+  if (!schedule) {return res.status(404).json({ error: "Schedule not found" });}
   res.json({ message: "Schedule deleted" });
 });
 
@@ -281,7 +281,7 @@ router.get("/backup/backups", async (req, res) => {
 
 router.get("/backup/backups/:id", async (req, res) => {
   const content = await backupStore.getBackupContent(req.params.id);
-  if (!content) return res.status(404).json({ error: "Backup not found" });
+  if (!content) {return res.status(404).json({ error: "Backup not found" });}
   res.json(content);
 });
 
@@ -315,7 +315,7 @@ router.post("/backup/restore/:id", async (req, res) => {
   }
 
   const backup = await backupStore.getBackupContent(req.params.id);
-  if (!backup) return res.status(404).json({ error: "Backup not found" });
+  if (!backup) {return res.status(404).json({ error: "Backup not found" });}
 
   // TODO: Implement actual MikroTik API restore
   // For now, just return success

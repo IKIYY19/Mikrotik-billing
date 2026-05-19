@@ -13,12 +13,12 @@ const router = express.Router();
 
 async function getIntegrationConfig(serviceName) {
   try {
-    if (!global.db) return null;
+    if (!global.db) {return null;}
     const result = await global.db.query(
       'SELECT config_data, is_active FROM integrations WHERE service_name = $1 AND is_active = true LIMIT 1',
       [serviceName]
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     const decrypted = decryptObject(result.rows[0].config_data);
     return decrypted;
   } catch (error) {
@@ -65,18 +65,20 @@ router.post('/send', async (req, res) => {
     }
 
     let result;
-    let usedProvider = provider || 'mailgun';
+    const usedProvider = provider || 'mailgun';
 
     switch (usedProvider) {
-      case 'aws_ses':
+      case 'aws_ses': {
         const ses = await getAwsSesService();
         result = await ses.sendEmail(to, subject, html, text);
         break;
+      }
       case 'mailgun':
-      default:
+      default: {
         const mailgun = await getMailgunService();
         result = await mailgun.sendEmail(to, subject, html, text);
         break;
+      }
     }
 
     res.json(result);
@@ -97,18 +99,20 @@ router.post('/send-template', async (req, res) => {
     }
 
     let result;
-    let usedProvider = provider || 'mailgun';
+    const usedProvider = provider || 'mailgun';
 
     switch (usedProvider) {
-      case 'aws_ses':
+      case 'aws_ses': {
         const ses = await getAwsSesService();
         result = await ses.sendTemplate(to, templateName, variables);
         break;
+      }
       case 'mailgun':
-      default:
+      default: {
         const mailgun = await getMailgunService();
         result = await mailgun.sendTemplate(to, templateName, variables);
         break;
+      }
     }
 
     res.json(result);
@@ -127,14 +131,16 @@ router.get('/stats/:provider', async (req, res) => {
 
     let result;
     switch (provider) {
-      case 'aws_ses':
+      case 'aws_ses': {
         const ses = await getAwsSesService();
         result = await ses.getSendQuota();
         break;
-      case 'mailgun':
+      }
+      case 'mailgun': {
         const mailgun = await getMailgunService();
         result = await mailgun.getStats();
         break;
+      }
       default:
         return res.status(400).json({ error: 'Invalid provider' });
     }

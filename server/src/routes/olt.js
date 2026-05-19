@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const connection = await OLTService.getConnection(req.params.id);
-    if (!connection) return res.status(404).json({ error: 'Not found' });
+    if (!connection) {return res.status(404).json({ error: 'Not found' });}
     res.json(connection);
   } catch (e) {
     logger.error('Failed to get OLT connection', { error: e.message, id: req.params.id });
@@ -94,7 +94,7 @@ router.put('/:id', async (req, res) => {
       ...req.body,
     });
     
-    if (!connection) return res.status(404).json({ error: 'Not found' });
+    if (!connection) {return res.status(404).json({ error: 'Not found' });}
     logger.info('OLT connection updated', { id: req.params.id });
     res.json(connection);
   } catch (e) {
@@ -193,7 +193,7 @@ router.get('/:id/optical-power', async (req, res) => {
 router.post('/:id/command', commandRateLimit, async (req, res) => {
   try {
     const { command } = req.body;
-    if (!command) return res.status(400).json({ error: 'Command required' });
+    if (!command) {return res.status(400).json({ error: 'Command required' });}
 
     logger.info('Executing OLT command', { id: req.params.id, command });
     const result = await OLTService.executeCommand(req.params.id, command);

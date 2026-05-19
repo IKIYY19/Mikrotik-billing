@@ -60,7 +60,7 @@ async function updateOnlineStatus() {
 // Start the periodic update (run every minute)
 let updateInterval;
 function startOnlineStatusUpdater() {
-  if (updateInterval) return;
+  if (updateInterval) {return;}
   
   updateInterval = setInterval(updateOnlineStatus, 60000);
   logger.info('User online status updater started');

@@ -69,7 +69,7 @@ export const useStore = create((set, get) => ({
 
   updateProject: async (projectData) => {
     const { currentProject } = get();
-    if (!currentProject) return;
+    if (!currentProject) {return;}
     
     set({ loading: true });
     try {
@@ -109,7 +109,7 @@ export const useStore = create((set, get) => ({
 
   saveModules: async () => {
     const { currentProject, modules } = get();
-    if (!currentProject) return;
+    if (!currentProject) {return;}
 
     set({ loading: true });
     try {
@@ -208,7 +208,7 @@ export const useStore = create((set, get) => ({
       const { data } = await api.post('/mikrotik/push', {
         connection_id: connectionId,
         script,
-        dry_run,
+        dry_run: dryRun,
       });
       set({ loading: false });
       return data;

@@ -11,7 +11,7 @@ const logger = require('../utils/logger');
 async function getMikrotikConnection(id) {
   const db = global.db || require('../db/memory');
   const result = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [id]);
-  if (result.rows.length === 0) throw new Error('MikroTik connection not found');
+  if (result.rows.length === 0) {throw new Error('MikroTik connection not found');}
   return result.rows[0];
 }
 
@@ -124,7 +124,7 @@ router.get('/results', async (req, res) => {
 router.delete('/results/:id', async (req, res) => {
   try {
     const idx = speedTestResults.findIndex(r => r.id === parseInt(req.params.id));
-    if (idx === -1) return res.status(404).json({ error: 'Result not found' });
+    if (idx === -1) {return res.status(404).json({ error: 'Result not found' });}
     
     speedTestResults.splice(idx, 1);
     res.json({ success: true });

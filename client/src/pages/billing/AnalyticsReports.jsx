@@ -50,7 +50,7 @@ function MiniBarChart({ data, height = 120, color = 'bg-blue-500' }) {
 
 /* ─── Sparkline (Pure CSS) ─── */
 function Sparkline({ data, color = '#3b82f6', width = 80, height = 32 }) {
-  if (!data || data.length < 2) return null;
+  if (!data || data.length < 2) {return null;}
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const range = max - min || 1;
@@ -194,7 +194,7 @@ function RevenueTrendChart({ data }) {
 
 /* ─── Churn Analysis ─── */
 function ChurnAnalysis({ data }) {
-  if (!data) return <div className="glass rounded-2xl p-6 py-16 text-center text-zinc-500">Loading churn data...</div>;
+  if (!data) {return <div className="glass rounded-2xl p-6 py-16 text-center text-zinc-500">Loading churn data...</div>;}
 
   const churnReasons = data.reasons || [];
   const monthlyChurn = data.monthly || [];
@@ -263,7 +263,7 @@ function ChurnAnalysis({ data }) {
 
 /* ─── Customer Growth ─── */
 function CustomerGrowth({ data }) {
-  if (!data) return <div className="glass rounded-2xl p-6 py-16 text-center text-zinc-500">Loading growth data...</div>;
+  if (!data) {return <div className="glass rounded-2xl p-6 py-16 text-center text-zinc-500">Loading growth data...</div>;}
 
   const growthData = data.growth || [];
   const planDistribution = data.planDistribution || [];

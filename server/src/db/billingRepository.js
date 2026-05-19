@@ -10,8 +10,8 @@ const { v4: uuidv4 } = require("uuid");
 const customers = {
   async list({ page = 1, limit = 20, search = "", status = "" } = {}) {
     const offset = (page - 1) * limit;
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (search) {
@@ -52,7 +52,7 @@ const customers = {
     const customer = await db.query("SELECT * FROM customers WHERE id = $1", [
       id,
     ]);
-    if (customer.rows.length === 0) return null;
+    if (customer.rows.length === 0) {return null;}
     return customer.rows[0];
   },
 
@@ -78,13 +78,13 @@ const customers = {
       ],
     );
     if (userId)
-      await audit.log(userId, "create", "customer", id, null, result.rows[0]);
+      {await audit.log(userId, "create", "customer", id, null, result.rows[0]);}
     return result.rows[0];
   },
 
   async update(id, data, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const result = await db.query(
       `UPDATE customers SET name = COALESCE($1, name), email = COALESCE($2, email), phone = COALESCE($3, phone),
        address = COALESCE($4, address), city = COALESCE($5, city), country = COALESCE($6, country),
@@ -107,23 +107,23 @@ const customers = {
       ],
     );
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "update",
         "customer",
         id,
         existing,
         result.rows[0],
-      );
+      );}
     return result.rows[0];
   },
 
   async delete(id, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     await db.query("DELETE FROM customers WHERE id = $1", [id]);
     if (userId)
-      await audit.log(userId, "delete", "customer", id, existing, null);
+      {await audit.log(userId, "delete", "customer", id, existing, null);}
     return existing;
   },
 };
@@ -164,13 +164,13 @@ const plans = {
       ],
     );
     if (userId)
-      await audit.log(userId, "create", "plan", id, null, result.rows[0]);
+      {await audit.log(userId, "create", "plan", id, null, result.rows[0]);}
     return result.rows[0];
   },
 
   async update(id, data, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const result = await db.query(
       `UPDATE service_plans SET name = COALESCE($1, name), speed_up = COALESCE($2, speed_up),
        speed_down = COALESCE($3, speed_down), price = COALESCE($4, price), quota_gb = COALESCE($5, quota_gb),
@@ -189,17 +189,17 @@ const plans = {
       ],
     );
     if (userId)
-      await audit.log(userId, "update", "plan", id, existing, result.rows[0]);
+      {await audit.log(userId, "update", "plan", id, existing, result.rows[0]);}
     return result.rows[0];
   },
 
   async delete(id, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     await db.query("UPDATE service_plans SET is_active = false WHERE id = $1", [
       id,
     ]);
-    if (userId) await audit.log(userId, "delete", "plan", id, existing, null);
+    if (userId) {await audit.log(userId, "delete", "plan", id, existing, null);}
     return existing;
   },
 };
@@ -208,8 +208,8 @@ const plans = {
 const subscriptions = {
   async list({ page = 1, limit = 20, status = "" } = {}) {
     const offset = (page - 1) * limit;
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (status) {
@@ -295,20 +295,20 @@ const subscriptions = {
       ],
     );
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "create",
         "subscription",
         id,
         null,
         result.rows[0],
-      );
+      );}
     return result.rows[0];
   },
 
   async update(id, data, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const result = await db.query(
       `UPDATE subscriptions SET status = COALESCE($1, status), pppoe_username = COALESCE($2, pppoe_username),
        pppoe_password = COALESCE($3, pppoe_password), mac_address = COALESCE($4, mac_address),
@@ -344,34 +344,34 @@ const subscriptions = {
       ],
     );
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "update",
         "subscription",
         id,
         existing,
         result.rows[0],
-      );
+      );}
     return result.rows[0];
   },
 
   async toggleStatus(id, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const newStatus = existing.status === "active" ? "suspended" : "active";
     const result = await db.query(
       `UPDATE subscriptions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
       [newStatus, id],
     );
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "toggle_status",
         "subscription",
         id,
         { status: existing.status },
         { status: newStatus },
-      );
+      );}
     return result.rows[0];
   },
 
@@ -390,13 +390,13 @@ const subscriptions = {
 
   async delete(id, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const result = await db.query(
       "DELETE FROM subscriptions WHERE id = $1 RETURNING *",
       [id],
     );
     if (userId)
-      await audit.log(userId, "delete", "subscription", id, existing, null);
+      {await audit.log(userId, "delete", "subscription", id, existing, null);}
     return result.rows[0];
   },
 };
@@ -416,8 +416,8 @@ const invoices = {
 
   async list({ page = 1, limit = 20, status = "", customer_id = "" } = {}) {
     const offset = (page - 1) * limit;
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (status) {
@@ -490,27 +490,27 @@ const invoices = {
       ],
     );
     if (userId)
-      await audit.log(userId, "create", "invoice", id, null, result.rows[0]);
+      {await audit.log(userId, "create", "invoice", id, null, result.rows[0]);}
     return result.rows[0];
   },
 
   async update(id, data, userId = null) {
     const existing = await this.findById(id);
-    if (!existing) return null;
+    if (!existing) {return null;}
     const result = await db.query(
       `UPDATE invoices SET status = COALESCE($1, status), notes = COALESCE($2, notes),
        due_date = COALESCE($3, due_date), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *`,
       [data.status, data.notes, data.due_date, id],
     );
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "update",
         "invoice",
         id,
         existing,
         result.rows[0],
-      );
+      );}
     return result.rows[0];
   },
 
@@ -544,7 +544,7 @@ const invoices = {
         `SELECT id FROM invoices WHERE customer_id = $1 AND EXTRACT(MONTH FROM created_at) = $2 AND EXTRACT(YEAR FROM created_at) = $3`,
         [sub.customer_id, thisMonth + 1, thisYear],
       );
-      if (existing.rows.length > 0) continue;
+      if (existing.rows.length > 0) {continue;}
 
       const invoice = await this.create(
         {
@@ -598,8 +598,8 @@ const payments = {
 
   async list({ page = 1, limit = 20, customer_id = "" } = {}) {
     const offset = (page - 1) * limit;
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (customer_id) {
@@ -669,7 +669,7 @@ const payments = {
     }
 
     if (userId)
-      await audit.log(userId, "create", "payment", id, null, result.rows[0]);
+      {await audit.log(userId, "create", "payment", id, null, result.rows[0]);}
 
     // Trigger notification
     await notifications.trigger("payment_received", {
@@ -685,7 +685,7 @@ const payments = {
       "SELECT * FROM payments WHERE id = $1 LIMIT 1",
       [id],
     );
-    if (current.rows.length === 0) return null;
+    if (current.rows.length === 0) {return null;}
 
     const existing = current.rows[0];
     const result = await db.query(
@@ -773,14 +773,14 @@ const creditNotes = {
     }
 
     if (userId)
-      await audit.log(
+      {await audit.log(
         userId,
         "create",
         "credit_note",
         id,
         null,
         result.rows[0],
-      );
+      );}
     return result.rows[0];
   },
 
@@ -897,7 +897,7 @@ const notifications = {
     // In production, this would queue a job to send email/SMS
     // For now, just log it
     const template = await this.getTemplate(eventType, "email");
-    if (!template) return;
+    if (!template) {return;}
 
     // Render template with data
     let body = template.body;

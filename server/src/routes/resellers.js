@@ -8,9 +8,9 @@ const logger = require("../utils/logger");
 // Helper: decrypt password from DB
 function decryptPassword(encrypted) {
   try {
-    if (!encrypted || !encrypted.includes(":")) return encrypted;
+    if (!encrypted || !encrypted.includes(":")) {return encrypted;}
     const parts = encrypted.split(":");
-    if (parts.length !== 3) return encrypted;
+    if (parts.length !== 3) {return encrypted;}
     const crypto = require("crypto");
     const algorithm = "aes-256-gcm";
     const ENCRYPTION_KEY =
@@ -107,8 +107,8 @@ router.post("/captive-portals/push", async (req, res) => {
   try {
     const { connection_id, html, profile, portal_name } = req.body;
     if (!connection_id)
-      return res.status(400).json({ error: "Connection ID required" });
-    if (!html) return res.status(400).json({ error: "HTML content required" });
+      {return res.status(400).json({ error: "Connection ID required" });}
+    if (!html) {return res.status(400).json({ error: "HTML content required" });}
 
     // Fetch connection from DB
     const connResult = await db.query(
@@ -116,7 +116,7 @@ router.post("/captive-portals/push", async (req, res) => {
       [connection_id],
     );
     if (connResult.rows.length === 0)
-      return res.status(404).json({ error: "Connection not found" });
+      {return res.status(404).json({ error: "Connection not found" });}
 
     const conn = connResult.rows[0];
     const password = decryptPassword(conn.password_encrypted);
@@ -211,7 +211,7 @@ router.get("/:id", async (req, res) => {
       req.params.id,
     ]);
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Not found" });
+      {return res.status(404).json({ error: "Not found" });}
     res.json(result.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -280,7 +280,7 @@ router.put("/:id", [...resellerValidation.slice(0, -1)], async (req, res) => {
       ],
     );
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Not found" });
+      {return res.status(404).json({ error: "Not found" });}
     logger.info("Reseller updated", { id: req.params.id });
     res.json(result.rows[0]);
   } catch (e) {

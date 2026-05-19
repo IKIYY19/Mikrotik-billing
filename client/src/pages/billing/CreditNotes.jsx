@@ -44,7 +44,9 @@ export default function CreditNotes() {
       const token = getToken();
       const { data } = await axios.get(`${API}/billing/customers?limit=200`, { headers: { Authorization: `Bearer ${token}` } });
       setCustomers(data?.data || data || []);
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to fetch customers:", e);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -77,7 +79,7 @@ export default function CreditNotes() {
   };
 
   const filtered = notes.filter(n => {
-    if (!search) return true;
+    if (!search) {return true;}
     const s = search.toLowerCase();
     return (n.credit_note_number || "").toLowerCase().includes(s)
       || (n.customer_name || "").toLowerCase().includes(s)
@@ -88,7 +90,7 @@ export default function CreditNotes() {
     ? customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || (c.phone || "").includes(customerSearch))
     : [];
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;
+  if (loading) {return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;}
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

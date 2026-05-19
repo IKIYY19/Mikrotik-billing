@@ -51,8 +51,10 @@ export function WhatsAppPage() {
       const [settingRes] = await Promise.allSettled([
         axios.get(`${API}/sms/whatsapp/settings`),
       ]);
-      if (settingRes.status === "fulfilled") setSettings(settingRes.value.data);
-    } catch (e) {}
+      if (settingRes.status === "fulfilled") {setSettings(settingRes.value.data);}
+    } catch (e) {
+      console.warn("Failed to fetch settings:", e);
+    }
     fetchLogs();
     fetchTemplates();
     setLoading(false);
@@ -64,19 +66,23 @@ export function WhatsAppPage() {
       const all = data?.data || data || [];
       setLogs(all.filter(l => l.channel === "whatsapp" || l.channel === "whatsapp_inbound"));
       setInbound(all.filter(l => l.channel === "whatsapp_inbound"));
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Failed to fetch logs:", e);
+    }
   };
 
   const fetchTemplates = async () => {
     try {
       const { data } = await axios.get(`${API}/sms/templates`);
       setTemplates((data || []).filter(t => t.is_active));
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Failed to fetch templates:", e);
+    }
   };
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!sendTo) return;
+    if (!sendTo) {return;}
     setSending(true);
     setSendResult(null);
     try {
@@ -100,7 +106,7 @@ export function WhatsAppPage() {
   };
 
   const handleReply = async () => {
-    if (!replyTo || !replyMessage) return;
+    if (!replyTo || !replyMessage) {return;}
     setReplying(true);
     try {
       await axios.post(`${API}/sms/whatsapp/send`, {
@@ -117,7 +123,7 @@ export function WhatsAppPage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!templateName || !templateBody) return;
+    if (!templateName || !templateBody) {return;}
     try {
       await axios.put(`${API}/sms/templates/${editingTemplate}`, {
         name: templateName,
@@ -130,7 +136,12 @@ export function WhatsAppPage() {
   };
 
   const handleDeleteLog = async (id) => {
-    try { await axios.delete(`${API}/sms/logs/${id}`); fetchLogs(); } catch (e) {}
+    try {
+      await axios.delete(`${API}/sms/logs/${id}`);
+      fetchLogs();
+    } catch (e) {
+      console.warn("Failed to delete log:", e);
+    }
   };
 
   const copyToClipboard = (text) => {
@@ -140,7 +151,7 @@ export function WhatsAppPage() {
 
   const filteredLogs = logs.filter(l => {
     const f = logFilter.toLowerCase();
-    if (!f) return true;
+    if (!f) {return true;}
     const phone = Array.isArray(l.to) ? l.to.join(" ") : (l.to || l.from || "");
     return phone.toLowerCase().includes(f) || (l.message || "").toLowerCase().includes(f);
   });
@@ -156,7 +167,7 @@ export function WhatsAppPage() {
     { id: "logs", label: "History", icon: Clock },
   ];
 
-  if (loading) return <div className="p-8 text-zinc-400">Loading...</div>;
+  if (loading) {return <div className="p-8 text-zinc-400">Loading...</div>;}
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto">

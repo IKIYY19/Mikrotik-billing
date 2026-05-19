@@ -45,7 +45,7 @@ const IV_LENGTH = 16;
  * Encrypt text
  */
 function encrypt(text) {
-  if (!text) return null;
+  if (!text) {return null;}
   
   try {
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -63,7 +63,7 @@ function encrypt(text) {
  * Decrypt text
  */
 function decrypt(encryptedText) {
-  if (!encryptedText) return null;
+  if (!encryptedText) {return null;}
   
   try {
     const [ivHex, encrypted] = encryptedText.split(':');
@@ -82,7 +82,7 @@ function decrypt(encryptedText) {
  * Encrypt all values in an object
  */
 function encryptObject(obj) {
-  if (!obj) return {};
+  if (!obj) {return {};}
   
   const encrypted = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -99,7 +99,7 @@ function encryptObject(obj) {
  * Decrypt all values in an object
  */
 function decryptObject(obj) {
-  if (!obj) return {};
+  if (!obj) {return {};}
   
   const decrypted = {};
   for (const [key, value] of Object.entries(obj)) {

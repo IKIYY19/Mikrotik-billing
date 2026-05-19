@@ -185,8 +185,8 @@ class WhatsAppService {
 
   formatPhone(phone) {
     let cleaned = phone.replace(/\s/g, '').replace(/[-()]/g, '');
-    if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
-    if (cleaned.startsWith('0')) cleaned = '254' + cleaned.substring(1);
+    if (cleaned.startsWith('+')) {cleaned = cleaned.substring(1);}
+    if (cleaned.startsWith('0')) {cleaned = '254' + cleaned.substring(1);}
     return cleaned;
   }
 }

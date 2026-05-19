@@ -19,7 +19,7 @@ export function BrandingProvider({ children }) {
 
   const fetchBranding = useCallback(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token) return;
+    if (!token) {return;}
 
     axios
       .get(`${API}/tenants/current`, {

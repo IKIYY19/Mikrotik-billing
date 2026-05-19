@@ -75,7 +75,7 @@ export function GlobalSearch({ isOpen, onClose }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!isOpen) return;
+      if (!isOpen) {return;}
       
       if (e.key === 'Escape') {
         onClose();
@@ -102,7 +102,7 @@ export function GlobalSearch({ isOpen, onClose }) {
     setQuery('');
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm" onClick={onClose}>

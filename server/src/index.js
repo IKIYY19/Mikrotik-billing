@@ -95,9 +95,9 @@ function ensureCriticalProductionConfig() {
   }
 
   const missing = [];
-  if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
-  if (!process.env.ENCRYPTION_KEY) missing.push("ENCRYPTION_KEY");
-  if (!process.env.CORS_ORIGIN) missing.push("CORS_ORIGIN");
+  if (!process.env.JWT_SECRET) {missing.push("JWT_SECRET");}
+  if (!process.env.ENCRYPTION_KEY) {missing.push("ENCRYPTION_KEY");}
+  if (!process.env.CORS_ORIGIN) {missing.push("CORS_ORIGIN");}
 
   // DATABASE_URL is optional - if not provided, app will use in-memory storage
   // This allows deployments without a database (for testing/demo purposes)
@@ -384,7 +384,7 @@ const startServer = async () => {
       path.join(process.cwd(), "client", "dist"),
     ];
 
-    let frontendPath = possiblePaths.find((p) =>
+    const frontendPath = possiblePaths.find((p) =>
       fs.existsSync(path.join(p, "index.html")),
     );
 
@@ -529,6 +529,7 @@ const startServer = async () => {
       require("./routes/mikrotikAutomation"),
     );
     app.use("/api/devices", authenticate, require("./routes/devices"));
+    app.use("/api/provisioning-queue", authenticate, require("./routes/provisioningQueue"));
     app.use(
       "/api/payments",
       authenticate,

@@ -20,7 +20,7 @@ function getDb() {
 // ──────────────────────────────────────
 router.get("/", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json([]);
+    if (!global.dbAvailable) {return res.json([]);}
     const result = await getDb().query(
       "SELECT * FROM webhooks ORDER BY created_at DESC"
     );
@@ -110,7 +110,7 @@ router.put("/:id", async (req, res) => {
 // ──────────────────────────────────────
 router.delete("/:id", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json({ success: true });
+    if (!global.dbAvailable) {return res.json({ success: true });}
     await getDb().query("DELETE FROM webhooks WHERE id = $1", [req.params.id]);
     res.json({ success: true });
   } catch (e) {
@@ -171,7 +171,7 @@ module.exports = router;
 // ────────────────────────────────────────────────────────────
 module.exports.triggerWebhook = async (event, data) => {
   try {
-    if (!global.dbAvailable) return;
+    if (!global.dbAvailable) {return;}
     const result = await getDb().query(
       "SELECT * FROM webhooks WHERE enabled = true"
     );
@@ -180,7 +180,7 @@ module.exports.triggerWebhook = async (event, data) => {
       if (typeof events === "string") {
         try { events = JSON.parse(events); } catch { events = []; }
       }
-      if (!events.includes(event) && !events.includes("*")) continue;
+      if (!events.includes(event) && !events.includes("*")) {continue;}
 
       const payload = {
         event,

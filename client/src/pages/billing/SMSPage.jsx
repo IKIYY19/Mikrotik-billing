@@ -65,7 +65,7 @@ export function SMSPage() {
   };
 
   const handleSend = async () => {
-    if (!sendTo) return;
+    if (!sendTo) {return;}
     setSending(true);
     setSendResult(null);
 
@@ -85,7 +85,7 @@ export function SMSPage() {
       }
       setSendResult(result.data);
       fetchLogs();
-      if (result.data.balance) fetchBalance();
+      if (result.data.balance) {fetchBalance();}
     } catch (e) {
       setSendResult({ success: false, message: e.response?.data?.error || e.message });
     }
@@ -93,7 +93,7 @@ export function SMSPage() {
   };
 
   const handleSendBulk = async () => {
-    if (!bulkMessage) return;
+    if (!bulkMessage) {return;}
     setSendingBulk(true);
     setBulkResult(null);
 
@@ -123,7 +123,7 @@ export function SMSPage() {
   };
 
   const handleClearAllLogs = async () => {
-    if (!confirm('Are you sure you want to delete all SMS logs? This cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete all SMS logs? This cannot be undone.')) {return;}
     try {
       await axios.delete(`${API}/sms/logs`);
       toast.success('All logs cleared');

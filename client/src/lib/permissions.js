@@ -120,7 +120,7 @@ const DEFAULT_FEATURE_ACCESS = {
 };
 
 // Cached permissions from backend
-let cachedPermissions = null;
+const cachedPermissions = null;
 let cachedFeatureAccess = null;
 
 /**
@@ -151,8 +151,8 @@ export async function getPermissions() {
  * Check if user has a specific permission
  */
 export function hasPermission(user, permission) {
-  if (!user) return false;
-  if (user.role === ROLES.ADMIN) return true;
+  if (!user) {return false;}
+  if (user.role === ROLES.ADMIN) {return true;}
 
   const userPerms = DEFAULT_PERMISSIONS[user.role] || [];
   return userPerms.includes("*") || userPerms.includes(permission);
@@ -162,8 +162,8 @@ export function hasPermission(user, permission) {
  * Check if user can access a specific feature/page
  */
 export function canAccessFeature(user, feature) {
-  if (!user) return false;
-  if (user.role === ROLES.ADMIN) return true;
+  if (!user) {return false;}
+  if (user.role === ROLES.ADMIN) {return true;}
 
   // Use cached permissions if available, otherwise use defaults
   const features =
@@ -175,7 +175,7 @@ export function canAccessFeature(user, feature) {
  * Check if user has any of the specified roles
  */
 export function hasRole(user, ...roles) {
-  if (!user) return false;
+  if (!user) {return false;}
   return roles.includes(user.role);
 }
 
@@ -197,7 +197,7 @@ export function getRoleLevel(role) {
  * Check if user has higher or equal role level
  */
 export function hasRoleLevel(user, minRole) {
-  if (!user) return false;
+  if (!user) {return false;}
   return getRoleLevel(user.role) >= getRoleLevel(minRole);
 }
 

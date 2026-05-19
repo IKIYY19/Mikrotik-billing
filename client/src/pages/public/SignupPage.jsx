@@ -67,7 +67,7 @@ export function SignupPage() {
       window.google.accounts.id.prompt();
     };
 
-    if (window.google?.accounts?.id) init();
+    if (window.google?.accounts?.id) {init();}
     else {
       const s = document.createElement("script");
       s.src = "https://accounts.google.com/gsi/client";

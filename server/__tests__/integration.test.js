@@ -302,7 +302,7 @@ describe('Critical User Flow Integration Tests', () => {
 
           if ([201, 200].includes(subRes.statusCode)) {
             const invRes = await request(app)
-              .post('/api/billing/invoices/generate')
+              .post('/api/billing/invoices/generate-monthly')
               .set('Authorization', `Bearer ${token}`)
               .send({ customer_id: customerId });
             expect([200, 201, 400, 500]).toContain(invRes.statusCode);

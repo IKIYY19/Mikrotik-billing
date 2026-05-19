@@ -83,7 +83,7 @@ router.get("/logs", async (req, res) => {
 // DELETE /api/audit/logs/:id
 router.delete("/logs/:id", async (req, res) => {
   try {
-    if (!global.dbAvailable) return res.json({ success: true });
+    if (!global.dbAvailable) {return res.json({ success: true });}
     await getDb().query("DELETE FROM billing_audit_logs WHERE id = $1", [
       req.params.id,
     ]);

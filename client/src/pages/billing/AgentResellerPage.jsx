@@ -75,7 +75,7 @@ export function AgentResellerPage() {
   };
 
   const handleDeleteAgent = async (agentId) => {
-    if (!confirm('Are you sure you want to delete this agent?')) return;
+    if (!confirm('Are you sure you want to delete this agent?')) {return;}
     try {
       await axios.delete(`${API}/features/agents/${agentId}`);
       toast.success('Agent deleted successfully');

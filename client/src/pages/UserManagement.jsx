@@ -22,19 +22,19 @@ import { getToken } from "../lib/auth";
 const API = import.meta.env.VITE_API_URL || "/api";
 
 function getPasswordStrength(password) {
-  if (!password) return { score: 0, label: "", color: "" };
+  if (!password) {return { score: 0, label: "", color: "" };}
 
   let score = 0;
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[a-z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (password.length >= 8) {score++;}
+  if (password.length >= 12) {score++;}
+  if (/[A-Z]/.test(password)) {score++;}
+  if (/[a-z]/.test(password)) {score++;}
+  if (/[0-9]/.test(password)) {score++;}
+  if (/[^A-Za-z0-9]/.test(password)) {score++;}
 
-  if (score <= 2) return { score, label: "Weak", color: "#ef4444" };
-  if (score <= 3) return { score, label: "Fair", color: "#f59e0b" };
-  if (score <= 4) return { score, label: "Good", color: "#3b82f6" };
+  if (score <= 2) {return { score, label: "Weak", color: "#ef4444" };}
+  if (score <= 3) {return { score, label: "Fair", color: "#f59e0b" };}
+  if (score <= 4) {return { score, label: "Good", color: "#3b82f6" };}
   return { score, label: "Strong", color: "#22c55e" };
 }
 
@@ -663,9 +663,9 @@ export function UserManagement() {
     try {
       const token = getToken();
       const params = new URLSearchParams();
-      if (roleFilter) params.set("role", roleFilter);
-      if (statusFilter) params.set("status", statusFilter);
-      if (search) params.set("search", search);
+      if (roleFilter) {params.set("role", roleFilter);}
+      if (statusFilter) {params.set("status", statusFilter);}
+      if (search) {params.set("search", search);}
 
       const { data } = await axios.get(`${API}/users?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -712,7 +712,7 @@ export function UserManagement() {
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return "Never";
+    if (!dateStr) {return "Never";}
     return new Date(dateStr).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -723,7 +723,7 @@ export function UserManagement() {
   };
 
   const formatLastSeen = (dateStr) => {
-    if (!dateStr) return "Never";
+    if (!dateStr) {return "Never";}
     const now = new Date();
     const lastSeen = new Date(dateStr);
     const diffMs = now - lastSeen;
@@ -731,10 +731,10 @@ export function UserManagement() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) {return "Just now";}
+    if (diffMins < 60) {return `${diffMins}m ago`;}
+    if (diffHours < 24) {return `${diffHours}h ago`;}
+    if (diffDays < 7) {return `${diffDays}d ago`;}
     return formatDate(dateStr);
   };
 

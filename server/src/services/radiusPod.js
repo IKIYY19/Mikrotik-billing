@@ -14,8 +14,8 @@ function buildDisconnectPacket(username, nasIpAddress, secret) {
     const buf = Buffer.alloc(2 + value.length);
     buf.writeUInt8(type, 0);
     buf.writeUInt8(value.length + 2, 1);
-    if (Buffer.isBuffer(value)) value.copy(buf, 2);
-    else Buffer.from(String(value)).copy(buf, 2);
+    if (Buffer.isBuffer(value)) {value.copy(buf, 2);}
+    else {Buffer.from(String(value)).copy(buf, 2);}
     attrs.push(buf);
   }
 

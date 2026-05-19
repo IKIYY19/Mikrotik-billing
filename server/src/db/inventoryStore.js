@@ -131,7 +131,7 @@ seedInventory();
 // ─── Seed PG defaults ───
 let pgSeeded = false;
 async function seedPgDefaults(db) {
-  if (pgSeeded) return;
+  if (pgSeeded) {return;}
   try {
     const catResult = await db.query(
       "SELECT COUNT(*) as c FROM inventory_categories",
@@ -243,7 +243,7 @@ async function updateDevice(id, data) {
       "SELECT * FROM inventory_devices WHERE id = $1",
       [id],
     );
-    if (existing.rows.length === 0) return null;
+    if (existing.rows.length === 0) {return null;}
     const merged = { ...existing.rows[0], ...data, updated_at: pgNow() };
     const result = await db.query(
       `UPDATE inventory_devices SET name=$1, category_id=$2, brand=$3, model=$4, serial=$5, mac=$6, firmware=$7, ip_address=$8, status=$9, purchase_date=$10, purchase_cost=$11, warranty_expires=$12, location_id=$13, assigned_to=$14, assigned_customer=$15, notes=$16, specs=$17, maintenance_schedule=$18, last_maintenance=$19, tags=$20, updated_at=$21 WHERE id=$22 RETURNING *`,
@@ -275,7 +275,7 @@ async function updateDevice(id, data) {
     return result.rows[0];
   }
   const idx = inventoryStore.devices.findIndex((d) => d.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   inventoryStore.devices[idx] = {
     ...inventoryStore.devices[idx],
     ...data,
@@ -294,7 +294,7 @@ async function deleteDevice(id) {
     return result.rows[0] || null;
   }
   const idx = inventoryStore.devices.findIndex((d) => d.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   return inventoryStore.devices.splice(idx, 1)[0];
 }
 
@@ -318,7 +318,7 @@ async function assignDevice(deviceId, customerName, customerId) {
       "SELECT * FROM inventory_devices WHERE id = $1",
       [deviceId],
     );
-    if (deviceResult.rows.length === 0) return null;
+    if (deviceResult.rows.length === 0) {return null;}
     await db.query(
       "UPDATE inventory_devices SET assigned_to=$1, assigned_customer=$2, status='deployed', updated_at=$3 WHERE id=$4",
       [customerId || customerName, customerName, pgNow(), deviceId],
@@ -342,7 +342,7 @@ async function assignDevice(deviceId, customerName, customerId) {
     return updated.rows[0];
   }
   const device = inventoryStore.devices.find((d) => d.id === deviceId);
-  if (!device) return null;
+  if (!device) {return null;}
   device.assigned_to = customerId || customerName;
   device.assigned_customer = customerName;
   device.status = "deployed";
@@ -365,7 +365,7 @@ async function unassignDevice(deviceId) {
       "SELECT * FROM inventory_devices WHERE id = $1",
       [deviceId],
     );
-    if (deviceResult.rows.length === 0) return null;
+    if (deviceResult.rows.length === 0) {return null;}
     await db.query(
       "UPDATE inventory_devices SET assigned_to=NULL, assigned_customer=NULL, status='in-stock', updated_at=$1 WHERE id=$2",
       [pgNow(), deviceId],
@@ -377,7 +377,7 @@ async function unassignDevice(deviceId) {
     return updated.rows[0];
   }
   const device = inventoryStore.devices.find((d) => d.id === deviceId);
-  if (!device) return null;
+  if (!device) {return null;}
   device.assigned_to = null;
   device.assigned_customer = null;
   device.status = "in-stock";

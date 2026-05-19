@@ -65,10 +65,10 @@ function OnlineStatus({
     return () => clearInterval(interval);
   }, [customer?.id, selectedConnection]);
 
-  if (!selectedConnection) return null;
-  if (status === null) return <span className="text-xs text-zinc-600">—</span>;
+  if (!selectedConnection) {return null;}
+  if (status === null) {return <span className="text-xs text-zinc-600">—</span>;}
   if (status === "offline")
-    return <span className="text-xs text-zinc-600">Offline</span>;
+    {return <span className="text-xs text-zinc-600">Offline</span>;}
 
   return (
     <div className="flex items-center gap-2">
@@ -124,13 +124,13 @@ export function BillingCustomers() {
     const cn = settings?.company_name || "";
     const abbr = settings?.company_abbreviation || "";
     if (abbr)
-      return (
+      {return (
         abbr
           .trim()
           .substring(0, 6)
           .toUpperCase()
           .replace(/[^A-Z0-9]/g, "") || "CUST"
-      );
+      );}
     if (cn) {
       const words = cn.trim().split(/\s+/);
       const derived = words
@@ -138,7 +138,7 @@ export function BillingCustomers() {
         .join("")
         .toUpperCase()
         .substring(0, 4);
-      if (derived) return derived;
+      if (derived) {return derived;}
     }
     return "CUST";
   };
@@ -160,7 +160,7 @@ export function BillingCustomers() {
     fetchSettings();
   }, []);
   useEffect(() => {
-    if (selectedConnection) fetchOnlineStatus();
+    if (selectedConnection) {fetchOnlineStatus();}
   }, [selectedConnection]);
 
   const fetchCustomers = async () => {
@@ -261,9 +261,9 @@ export function BillingCustomers() {
 
   // Load Google Maps API once
   useEffect(() => {
-    if (!GMAPS_KEY) return;
-    if (window.google?.maps) return;
-    if (document.getElementById("gmaps-script")) return;
+    if (!GMAPS_KEY) {return;}
+    if (window.google?.maps) {return;}
+    if (document.getElementById("gmaps-script")) {return;}
     const script = document.createElement("script");
     script.id = "gmaps-script";
     script.src =
@@ -277,12 +277,12 @@ export function BillingCustomers() {
 
   // Init Google Map when picker shown
   useEffect(() => {
-    if (!showMapPicker || pickerMapRef.current) return;
-    if (!window.google?.maps) return;
+    if (!showMapPicker || pickerMapRef.current) {return;}
+    if (!window.google?.maps) {return;}
 
     requestAnimationFrame(() => {
       if (!mapPickerRef.current || mapPickerRef.current.offsetHeight === 0)
-        return;
+        {return;}
       const lat = parseFloat(form.lat) || -1.2921;
       const lng = parseFloat(form.lng) || 36.8219;
       const map = new window.google.maps.Map(mapPickerRef.current, {
@@ -387,7 +387,7 @@ export function BillingCustomers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this customer?")) return;
+    if (!confirm("Delete this customer?")) {return;}
     try {
       await axios.delete(`${API}/billing/customers/${id}`);
       toast.success("Customer deleted");

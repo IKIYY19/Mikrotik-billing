@@ -198,7 +198,7 @@ export function ResellerPortal() {
   };
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Delete reseller "${name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete reseller "${name}"? This cannot be undone.`)) {return;}
 
     try {
       const token = getToken();
@@ -206,8 +206,8 @@ export function ResellerPortal() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       addToast("success", "Reseller deleted", `${name} has been removed.`);
-      if (selectedReseller?.id === id) setSelectedReseller(null);
-      if (expandedReseller === id) setExpandedReseller(null);
+      if (selectedReseller?.id === id) {setSelectedReseller(null);}
+      if (expandedReseller === id) {setExpandedReseller(null);}
       await fetchResellers();
     } catch (e) {
       console.error("Failed to delete reseller:", e);
@@ -325,11 +325,11 @@ export function ResellerPortal() {
   const filtered = useMemo(() => {
     let list = resellers;
     if (search)
-      list = list.filter((r) =>
+      {list = list.filter((r) =>
         r.name?.toLowerCase().includes(search.toLowerCase()),
-      );
+      );}
     if (statusFilter !== "all")
-      list = list.filter((r) => r.status === statusFilter);
+      {list = list.filter((r) => r.status === statusFilter);}
     return list;
   }, [resellers, search, statusFilter]);
 
@@ -1294,7 +1294,7 @@ export function ResellerPortal() {
                     onClick={() => {
                       setDetailTab(tab.id);
                       if (tab.id === "customers" || tab.id === "vouchers")
-                        fetchResellerData(selectedReseller.id);
+                        {fetchResellerData(selectedReseller.id);}
                     }}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       detailTab === tab.id
@@ -1516,11 +1516,11 @@ function ExpandedRow({ reseller, onViewFull }) {
           },
         );
         if (!cancelled)
-          setCustomers(Array.isArray(data) ? data.slice(0, 5) : []);
+          {setCustomers(Array.isArray(data) ? data.slice(0, 5) : []);}
       } catch {
-        if (!cancelled) setCustomers([]);
+        if (!cancelled) {setCustomers([]);}
       }
-      if (!cancelled) setLoadingCust(false);
+      if (!cancelled) {setLoadingCust(false);}
     };
     fetchData();
     return () => {

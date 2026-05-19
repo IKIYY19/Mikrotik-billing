@@ -29,7 +29,7 @@ function parseTransactions(text) {
   // Parse each line as an SMS/notification message
   for (const line of lines) {
     const txn = parseSmsLine(line);
-    if (txn) transactions.push(txn);
+    if (txn) {transactions.push(txn);}
   }
 
   return transactions;
@@ -49,7 +49,7 @@ function parseCsvTransactions(lines) {
 
   for (let i = 1; i < lines.length; i++) {
     const vals = lines[i].split(/[,\t]/).map((v) => v.trim().replace(/^"|"$/g, ""));
-    if (vals.length < 2) continue;
+    if (vals.length < 2) {continue;}
 
     const txn = {
       phone: phoneIdx >= 0 ? cleanPhone(vals[phoneIdx]) : "",
@@ -62,7 +62,7 @@ function parseCsvTransactions(lines) {
     // If no amount column found, try to extract from raw line
     if (!txn.amount) {
       txn.amount = extractAmount(lines[i]);
-      if (!txn.amount) continue;
+      if (!txn.amount) {continue;}
     }
 
     transactions.push(txn);
@@ -73,7 +73,7 @@ function parseCsvTransactions(lines) {
 
 function parseSmsLine(line) {
   const amount = extractAmount(line);
-  if (!amount) return null;
+  if (!amount) {return null;}
 
   const phone = extractPhoneNumber(line);
   const name = extractName(line, phone, amount);
@@ -94,7 +94,7 @@ function extractAmount(text) {
 
   for (const re of patterns) {
     const m = text.match(re);
-    if (m) return parseFloat(m[1].replace(/,/g, "")).toFixed(2);
+    if (m) {return parseFloat(m[1].replace(/,/g, "")).toFixed(2);}
   }
 
   // Fallback: look for currency-like numbers
@@ -102,7 +102,7 @@ function extractAmount(text) {
   if (m) {
     for (const candidate of m) {
       const n = parseFloat(candidate.replace(/,/g, ""));
-      if (n >= 1 && n <= 500000) return n.toFixed(2);
+      if (n >= 1 && n <= 500000) {return n.toFixed(2);}
     }
   }
 
@@ -119,16 +119,16 @@ function extractPhoneNumber(text) {
 
   for (const re of patterns) {
     const m = text.match(re);
-    if (m) return cleanPhone(m[1]);
+    if (m) {return cleanPhone(m[1]);}
   }
   return "";
 }
 
 function cleanPhone(phone) {
-  if (!phone) return "";
+  if (!phone) {return "";}
   let cleaned = phone.replace(/[^0-9+]/g, "");
-  if (cleaned.startsWith("0")) cleaned = "254" + cleaned.slice(1);
-  if (cleaned.startsWith("+")) cleaned = cleaned.slice(1);
+  if (cleaned.startsWith("0")) {cleaned = "254" + cleaned.slice(1);}
+  if (cleaned.startsWith("+")) {cleaned = cleaned.slice(1);}
   return cleaned;
 }
 
@@ -140,23 +140,23 @@ function extractName(text, phone, amount) {
 
   // Pattern: "from PHONE NAME" or "from NAME PHONE"
   const fromPhoneName = text.match(/from\s+(?:254\d{9}|07\d{8}|01\d{8})\s+([A-Z\s]+?)(?:\s+on\s|\s+at\s|$)/i);
-  if (fromPhoneName) return fromPhoneName[1].trim();
+  if (fromPhoneName) {return fromPhoneName[1].trim();}
 
   // Pattern: "from NAME PHONE"
   const fromNamePhone = text.match(/from\s+([A-Z\s]+?)\s+(?:254\d{9}|07\d{8}|01\d{8})/i);
-  if (fromNamePhone) return fromNamePhone[1].trim();
+  if (fromNamePhone) {return fromNamePhone[1].trim();}
 
   // Pattern: "sent to NAME on"
   const sentTo = text.match(/sent\s+to\s+([A-Z\s]+?)(?:\s+on\s|\s+at\s|$)/i);
-  if (sentTo) return sentTo[1].trim();
+  if (sentTo) {return sentTo[1].trim();}
 
   // Pattern: "received from NAME"
   const receivedFrom = text.match(/(?:received\s+from|you\s+have\s+received.*?from)\s+([A-Z\s]+?)(?:\s+on\s|\s+at\s|$)/i);
-  if (receivedFrom) return receivedFrom[1].trim();
+  if (receivedFrom) {return receivedFrom[1].trim();}
 
   // Pattern: "to NAME" (till payments)
   const toName = text.match(/\bto\s+([A-Z][A-Z\s]{2,30}?)(?:\s+on\s|\s+at\s|$)/i);
-  if (toName) return toName[1].trim();
+  if (toName) {return toName[1].trim();}
 
   return "";
 }
@@ -269,7 +269,7 @@ function TransactionTable({ transactions, onRemove, showStatus, matchedIds }) {
 }
 
 function MatchedDetailTable({ matched }) {
-  if (!matched || matched.length === 0) return null;
+  if (!matched || matched.length === 0) {return null;}
 
   return (
     <div className="mt-4 overflow-x-auto">
@@ -329,7 +329,7 @@ export function MpesaReconcile() {
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {return;}
 
     setError(null);
     setResults(null);
@@ -356,7 +356,7 @@ export function MpesaReconcile() {
 
   // ── Reconcile ──
   const handleReconcile = async () => {
-    if (parsedTransactions.length === 0) return;
+    if (parsedTransactions.length === 0) {return;}
     setReconciling(true);
     setError(null);
     try {

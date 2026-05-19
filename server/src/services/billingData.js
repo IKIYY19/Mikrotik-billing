@@ -18,13 +18,13 @@ function getStore() {
 }
 
 function toNumber(value, fallback = 0) {
-  if (value === null || value === undefined || value === "") return fallback;
+  if (value === null || value === undefined || value === "") {return fallback;}
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeCustomer(customer) {
-  if (!customer) return null;
+  if (!customer) {return null;}
   return {
     ...customer,
     subscription_count: toNumber(customer.subscription_count, 0),
@@ -33,7 +33,7 @@ function normalizeCustomer(customer) {
 }
 
 function normalizePlan(plan) {
-  if (!plan) return null;
+  if (!plan) {return null;}
   return {
     ...plan,
     price: toNumber(plan.price, 0),
@@ -50,8 +50,8 @@ function normalizePlan(plan) {
 }
 
 function normalizeCustomerRef(row) {
-  if (!row?.customer_id && !row?.customer) return null;
-  if (row.customer) return normalizeCustomer(row.customer);
+  if (!row?.customer_id && !row?.customer) {return null;}
+  if (row.customer) {return normalizeCustomer(row.customer);}
   return normalizeCustomer({
     id: row.customer_id,
     name: row.customer_name || "",
@@ -64,8 +64,8 @@ function normalizeCustomerRef(row) {
 }
 
 function normalizePlanRef(row) {
-  if (!row?.plan_id && !row?.plan) return null;
-  if (row.plan) return normalizePlan(row.plan);
+  if (!row?.plan_id && !row?.plan) {return null;}
+  if (row.plan) {return normalizePlan(row.plan);}
   return normalizePlan({
     id: row.plan_id,
     name: row.plan_name || "",
@@ -78,8 +78,8 @@ function normalizePlanRef(row) {
 }
 
 function normalizeRouterRef(row) {
-  if (row?.mikrotik_connection) return row.mikrotik_connection;
-  if (row?.router) return row.router;
+  if (row?.mikrotik_connection) {return row.mikrotik_connection;}
+  if (row?.router) {return row.router;}
   if (row?.mikrotik_connection_id || row?.mikrotik_connection_name) {
     return {
       id: row.mikrotik_connection_id || null,
@@ -88,7 +88,7 @@ function normalizeRouterRef(row) {
       type: "mikrotik_connection",
     };
   }
-  if (!row?.router_id && !row?.router_name) return null;
+  if (!row?.router_id && !row?.router_name) {return null;}
   return {
     id: row.router_id || null,
     name: row.router_name || "",
@@ -97,7 +97,7 @@ function normalizeRouterRef(row) {
 }
 
 function normalizeSubscription(subscription) {
-  if (!subscription) return null;
+  if (!subscription) {return null;}
   return {
     ...subscription,
     auto_provision: subscription.auto_provision !== false,
@@ -113,7 +113,7 @@ function normalizeSubscription(subscription) {
 }
 
 function normalizeInvoice(invoice) {
-  if (!invoice) return null;
+  if (!invoice) {return null;}
   const paidAmount = toNumber(invoice.paid_amount, 0);
   const total = toNumber(invoice.total, 0);
   return {
@@ -132,7 +132,7 @@ function normalizeInvoice(invoice) {
 }
 
 function normalizePayment(payment) {
-  if (!payment) return null;
+  if (!payment) {return null;}
   const invoice = payment.invoice
     ? normalizeInvoice(payment.invoice)
     : payment.invoice_id
@@ -199,7 +199,7 @@ async function getCustomerById(id) {
 
 async function getCustomerDetail(id) {
   const customer = await getCustomerById(id);
-  if (!customer) return null;
+  if (!customer) {return null;}
 
   const [subscriptions, invoices, payments] = await Promise.all([
     listSubscriptions(),
@@ -227,8 +227,8 @@ async function getCompanyAbbreviation() {
       );
       for (const row of result.rows) {
         if (row.key === "company_abbreviation" && row.value)
-          abbreviation = row.value;
-        if (row.key === "company_name" && row.value) companyName = row.value;
+          {abbreviation = row.value;}
+        if (row.key === "company_name" && row.value) {companyName = row.value;}
       }
     }
 
@@ -251,7 +251,7 @@ async function getCompanyAbbreviation() {
         .join("")
         .toUpperCase()
         .substring(0, 4);
-      if (derived) return derived;
+      if (derived) {return derived;}
     }
   } catch (e) {
     // Silent fallback
@@ -642,7 +642,7 @@ async function findCustomerByPppoeUsername(username) {
        LIMIT 1`,
       [username],
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     const row = result.rows[0];
     return {
       customer: normalizeCustomer(row),
@@ -672,9 +672,9 @@ async function findCustomerByPppoeUsername(username) {
   const subscription = store.subscriptions.find(
     (s) => s.pppoe_username === username && s.status === "active",
   );
-  if (!subscription) return null;
+  if (!subscription) {return null;}
   const customer = store.customers.find((c) => c.id === subscription.customer_id);
-  if (!customer) return null;
+  if (!customer) {return null;}
   const plan = store.service_plans.find((p) => p.id === subscription.plan_id) || null;
   return {
     customer: normalizeCustomer(customer),

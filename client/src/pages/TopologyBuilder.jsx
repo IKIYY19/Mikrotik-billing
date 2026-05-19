@@ -91,7 +91,7 @@ export function TopologyBuilder() {
   const handleNodeMouseDown = (e, nodeId) => {
     e.stopPropagation();
     const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
+    if (!node) {return;}
 
     // Check if connecting mode (shift+click)
     if (e.shiftKey) {
@@ -282,7 +282,7 @@ export function TopologyBuilder() {
   const getConnectionPath = (conn) => {
     const fromNode = nodes.find(n => n.id === conn.from);
     const toNode = nodes.find(n => n.id === conn.to);
-    if (!fromNode || !toNode) return '';
+    if (!fromNode || !toNode) {return '';}
 
     const fromSide = toNode.x > fromNode.x ? 'right' : toNode.x < fromNode.x ? 'left' : toNode.y > fromNode.y ? 'bottom' : 'top';
     const toSide = fromNode.x > toNode.x ? 'right' : fromNode.x < toNode.x ? 'left' : fromNode.y > toNode.y ? 'bottom' : 'top';
@@ -416,7 +416,7 @@ export function TopologyBuilder() {
                 {(() => {
                   const fromNode = nodes.find(n => n.id === conn.from);
                   const toNode = nodes.find(n => n.id === conn.to);
-                  if (!fromNode || !toNode) return null;
+                  if (!fromNode || !toNode) {return null;}
                   const midX = (fromNode.x + toNode.x + 140) / 2;
                   const midY = (fromNode.y + toNode.y + 80) / 2;
                   return (
@@ -440,7 +440,7 @@ export function TopologyBuilder() {
             {/* Temp connection line while connecting */}
             {connectingFrom && (() => {
               const fromNode = nodes.find(n => n.id === connectingFrom);
-              if (!fromNode) return null;
+              if (!fromNode) {return null;}
               return (
                 <line
                   x1={fromNode.x + 70}
@@ -457,7 +457,7 @@ export function TopologyBuilder() {
             {/* Nodes */}
             {nodes.map((node) => {
               const typeData = NODE_TYPES.find(t => t.id === node.type);
-              if (!typeData) return null;
+              if (!typeData) {return null;}
               const isSelected = selectedNode === node.id;
               const isConnecting = connectingFrom === node.id;
 

@@ -74,10 +74,10 @@ function UserForm({ show, onClose, editing, profiles, connections, onSubmit }) {
     email: '', phone: '', limit_bytes_total: '', rate_limit: '', connection_id: '',
   });
   useEffect(() => {
-    if (editing) setForm({ ...editing });
-    else setForm({ name: '', password: '', profile: '', disabled: 'no', comment: '', email: '', phone: '', limit_bytes_total: '', rate_limit: '', connection_id: '' });
+    if (editing) {setForm({ ...editing });}
+    else {setForm({ name: '', password: '', profile: '', disabled: 'no', comment: '', email: '', phone: '', limit_bytes_total: '', rate_limit: '', connection_id: '' });}
   }, [editing, show]);
-  if (!show) return null;
+  if (!show) {return null;}
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="glass-strong rounded-2xl w-full max-w-lg animate-fade-in-scale" onClick={e => e.stopPropagation()}>
@@ -149,10 +149,10 @@ function ProfileForm({ show, onClose, editing, connections, onSubmit }) {
     transparent_proxy: 'no', advertising: '', dns_name: '',
   });
   useEffect(() => {
-    if (editing) setForm({ ...editing });
-    else setForm({ name: '', rate_limit: '', shared_users: '1', session_timeout: '', idle_timeout: '', keepalive_timeout: '', open_status_page: '', login_by: 'mac,http-chap,http-pap', logout_redirect: '', transparent_proxy: 'no', advertising: '', dns_name: '' });
+    if (editing) {setForm({ ...editing });}
+    else {setForm({ name: '', rate_limit: '', shared_users: '1', session_timeout: '', idle_timeout: '', keepalive_timeout: '', open_status_page: '', login_by: 'mac,http-chap,http-pap', logout_redirect: '', transparent_proxy: 'no', advertising: '', dns_name: '' });}
   }, [editing, show]);
-  if (!show) return null;
+  if (!show) {return null;}
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="glass-strong rounded-2xl w-full max-w-lg animate-fade-in-scale" onClick={e => e.stopPropagation()}>
@@ -202,10 +202,10 @@ function ProfileForm({ show, onClose, editing, connections, onSubmit }) {
 
 /* ─── Uptime formatter ─── */
 function formatUptime(seconds) {
-  if (!seconds) return '0s';
+  if (!seconds) {return '0s';}
   const s = parseInt(seconds);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  if (s < 60) {return `${s}s`;}
+  if (s < 3600) {return `${Math.floor(s / 60)}m ${s % 60}s`;}
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return `${h}h ${m}m`;
@@ -213,11 +213,11 @@ function formatUptime(seconds) {
 
 /* ─── Bytes formatter ─── */
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
+  if (!bytes) {return '0 B';}
   const b = parseInt(bytes);
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1073741824) return `${(b / 1048576).toFixed(1)} MB`;
+  if (b < 1024) {return `${b} B`;}
+  if (b < 1048576) {return `${(b / 1024).toFixed(1)} KB`;}
+  if (b < 1073741824) {return `${(b / 1048576).toFixed(1)} MB`;}
   return `${(b / 1073741824).toFixed(2)} GB`;
 }
 
@@ -263,7 +263,7 @@ export function HotspotManagement() {
   };
 
   const handleDeleteUser = async (name) => {
-    if (!confirm(`Delete hotspot user "${name}"?`)) return;
+    if (!confirm(`Delete hotspot user "${name}"?`)) {return;}
     try {
       await axios.delete(`${API}/hotspot/users/${encodeURIComponent(name)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();
@@ -292,7 +292,7 @@ export function HotspotManagement() {
   };
 
   const handleDeleteProfile = async (name) => {
-    if (!confirm(`Delete profile "${name}"?`)) return;
+    if (!confirm(`Delete profile "${name}"?`)) {return;}
     try {
       await axios.delete(`${API}/hotspot/profiles/${encodeURIComponent(name)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();

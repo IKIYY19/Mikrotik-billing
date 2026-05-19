@@ -48,7 +48,7 @@ export default function SetupWizard() {
   };
 
   const skipStep = () => {
-    if (step < 6) setStep(step + 1);
+    if (step < 6) {setStep(step + 1);}
   };
 
   return (

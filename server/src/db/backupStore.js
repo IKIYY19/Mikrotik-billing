@@ -19,7 +19,7 @@ function getDb() {
 
 // Seed sample schedules (in-memory only)
 const seedSchedules = () => {
-  if (backupStore.schedules.length > 0) return;
+  if (backupStore.schedules.length > 0) {return;}
   backupStore.schedules.push(
     {
       id: uuidv4(),
@@ -109,7 +109,7 @@ async function runBackup(scheduleId) {
       [scheduleId],
     );
     const schedule = schedResult.rows[0];
-    if (!schedule) return { success: false, message: "Schedule not found" };
+    if (!schedule) {return { success: false, message: "Schedule not found" };}
 
     try {
       // In production, this would connect to the MikroTik API
@@ -172,7 +172,7 @@ async function runBackup(scheduleId) {
 
   // In-memory fallback
   const schedule = backupStore.schedules.find((s) => s.id === scheduleId);
-  if (!schedule) return { success: false, message: "Schedule not found" };
+  if (!schedule) {return { success: false, message: "Schedule not found" };}
 
   try {
     // In production, this would connect to the MikroTik API
@@ -253,7 +253,7 @@ async function runAllBackups() {
   const results = { total: 0, success: 0, failed: 0, errors: [] };
 
   for (const schedule of backupStore.schedules) {
-    if (!schedule.enabled) continue;
+    if (!schedule.enabled) {continue;}
     results.total++;
 
     const result = await runBackup(schedule.id);
@@ -288,7 +288,7 @@ async function getBackups(scheduleId, limit = 50) {
   }
 
   let backups = backupStore.backups;
-  if (scheduleId) backups = backups.filter((b) => b.schedule_id === scheduleId);
+  if (scheduleId) {backups = backups.filter((b) => b.schedule_id === scheduleId);}
   return backups.slice(0, limit);
 }
 
@@ -325,7 +325,7 @@ async function updateSchedule(id, data) {
       "SELECT * FROM backup_schedules WHERE id = $1",
       [id],
     );
-    if (existing.rows.length === 0) return null;
+    if (existing.rows.length === 0) {return null;}
 
     const current = existing.rows[0];
     const merged = {
@@ -369,7 +369,7 @@ async function updateSchedule(id, data) {
   }
 
   const idx = backupStore.schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   backupStore.schedules[idx] = { ...backupStore.schedules[idx], ...data };
   return backupStore.schedules[idx];
 }
@@ -386,7 +386,7 @@ async function deleteSchedule(id) {
   }
 
   const idx = backupStore.schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
+  if (idx === -1) {return null;}
   return backupStore.schedules.splice(idx, 1)[0];
 }
 
@@ -398,7 +398,7 @@ async function getBackupContent(backupId) {
       "SELECT id, device_name, ip_address, config_content, created_at FROM backups WHERE id = $1",
       [backupId],
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     const b = result.rows[0];
     return {
       id: b.id,
@@ -410,7 +410,7 @@ async function getBackupContent(backupId) {
   }
 
   const backup = backupStore.backups.find((b) => b.id === backupId);
-  if (!backup) return null;
+  if (!backup) {return null;}
   return {
     id: backup.id,
     device_name: backup.device_name,

@@ -14,7 +14,7 @@ const rules = {
   },
 
   email: (value, fieldName = 'Email') => {
-    if (!value) return null; // Use required() for mandatory fields
+    if (!value) {return null;} // Use required() for mandatory fields
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) {
       return `${fieldName} must be a valid email address`;
@@ -23,7 +23,7 @@ const rules = {
   },
 
   phone: (value, fieldName = 'Phone') => {
-    if (!value) return null;
+    if (!value) {return null;}
     const phoneRegex = /^\+?[\d\s\-()]{7,15}$/;
     if (!phoneRegex.test(value)) {
       return `${fieldName} must be a valid phone number`;
@@ -32,7 +32,7 @@ const rules = {
   },
 
   minLength: (value, min, fieldName = 'This field') => {
-    if (!value) return null;
+    if (!value) {return null;}
     if (value.length < min) {
       return `${fieldName} must be at least ${min} characters`;
     }
@@ -40,7 +40,7 @@ const rules = {
   },
 
   maxLength: (value, max, fieldName = 'This field') => {
-    if (!value) return null;
+    if (!value) {return null;}
     if (value.length > max) {
       return `${fieldName} must be less than ${max} characters`;
     }
@@ -48,7 +48,7 @@ const rules = {
   },
 
   min: (value, min, fieldName = 'This field') => {
-    if (value === null || value === undefined) return null;
+    if (value === null || value === undefined) {return null;}
     if (Number(value) < min) {
       return `${fieldName} must be at least ${min}`;
     }
@@ -56,7 +56,7 @@ const rules = {
   },
 
   max: (value, max, fieldName = 'This field') => {
-    if (value === null || value === undefined) return null;
+    if (value === null || value === undefined) {return null;}
     if (Number(value) > max) {
       return `${fieldName} must be no more than ${max}`;
     }
@@ -64,7 +64,7 @@ const rules = {
   },
 
   numeric: (value, fieldName = 'This field') => {
-    if (!value) return null;
+    if (!value) {return null;}
     if (isNaN(Number(value))) {
       return `${fieldName} must be a number`;
     }
@@ -72,7 +72,7 @@ const rules = {
   },
 
   url: (value, fieldName = 'URL') => {
-    if (!value) return null;
+    if (!value) {return null;}
     try {
       new URL(value);
       return null;

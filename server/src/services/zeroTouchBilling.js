@@ -18,7 +18,7 @@ function getEncryptionKey() {
 }
 
 function encryptForMikrotik(text) {
-  if (text === null || text === undefined) return null;
+  if (text === null || text === undefined) {return null;}
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
   let encrypted = cipher.update(text, "utf8", "hex");

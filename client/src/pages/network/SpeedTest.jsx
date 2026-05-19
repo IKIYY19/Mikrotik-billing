@@ -83,7 +83,7 @@ export function SpeedTest() {
   };
 
   const deleteResult = async (id) => {
-    if (!confirm('Delete this test result?')) return;
+    if (!confirm('Delete this test result?')) {return;}
     try {
       await axios.delete(`${API}/speedtest/results/${id}`);
       await fetchHistory(selectedConnection);
@@ -93,7 +93,7 @@ export function SpeedTest() {
   };
 
   const formatSpeed = (mbps) => {
-    if (mbps >= 1000) return `${(mbps / 1000).toFixed(2)} Gbps`;
+    if (mbps >= 1000) {return `${(mbps / 1000).toFixed(2)} Gbps`;}
     return `${mbps.toFixed(2)} Mbps`;
   };
 

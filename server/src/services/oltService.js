@@ -163,7 +163,7 @@ class OLTService {
    */
   static async getConnection(id) {
     const result = await db.query('SELECT * FROM olt_connections WHERE id = $1', [id]);
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {return null;}
     return this.sanitizeConnection(result.rows[0]);
   }
 
@@ -180,7 +180,7 @@ class OLTService {
    */
   static async testConnection(id) {
     const conn = await this.getRawConnection(id);
-    if (!conn) return { success: false, error: 'Connection not found' };
+    if (!conn) {return { success: false, error: 'Connection not found' };}
 
     try {
       // Test SNMP connectivity
@@ -194,8 +194,8 @@ class OLTService {
         const oids = this.getOIDs(conn);
         const result = await new Promise((resolve, reject) => {
           session.get([oids.systemName, oids.systemDesc], (error, varbinds) => {
-            if (error) reject(error);
-            else resolve(varbinds);
+            if (error) {reject(error);}
+            else {resolve(varbinds);}
           });
         });
 
@@ -221,10 +221,10 @@ class OLTService {
    */
   static async getONUs(id) {
     const conn = await this.getRawConnection(id);
-    if (!conn) throw new Error('OLT connection not found');
+    if (!conn) {throw new Error('OLT connection not found');}
 
     try {
-      if (!snmp) throw new Error('SNMP library not available');
+      if (!snmp) {throw new Error('SNMP library not available');}
 
       const session = snmp.createSession(conn.ip_address, decrypt(conn.snmp_community_encrypted), {
         port: conn.snmp_port,
@@ -278,8 +278,8 @@ class OLTService {
     try {
       const result = await new Promise((resolve, reject) => {
         session.get([oids.opticalPower], (error, varbinds) => {
-          if (error) reject(error);
-          else resolve(varbinds);
+          if (error) {reject(error);}
+          else {resolve(varbinds);}
         });
       });
 
@@ -299,10 +299,10 @@ class OLTService {
    */
   static async getPONPorts(id) {
     const conn = await this.getRawConnection(id);
-    if (!conn) throw new Error('OLT connection not found');
+    if (!conn) {throw new Error('OLT connection not found');}
 
     try {
-      if (!snmp) throw new Error('SNMP library not available');
+      if (!snmp) {throw new Error('SNMP library not available');}
 
       const session = snmp.createSession(conn.ip_address, decrypt(conn.snmp_community_encrypted), {
         port: conn.snmp_port,
@@ -315,7 +315,7 @@ class OLTService {
       const ports = await new Promise((resolve, reject) => {
         const ports = [];
         session.subtree(oids.ponPorts, (error, varbinds) => {
-          if (error) reject(error);
+          if (error) {reject(error);}
           else {
             varbinds.forEach(vb => {
               ports.push({ oid: vb.oid, value: vb.value });
@@ -338,10 +338,10 @@ class OLTService {
    */
   static async getSystemInfo(id) {
     const conn = await this.getRawConnection(id);
-    if (!conn) throw new Error('OLT connection not found');
+    if (!conn) {throw new Error('OLT connection not found');}
 
     try {
-      if (!snmp) throw new Error('SNMP library not available');
+      if (!snmp) {throw new Error('SNMP library not available');}
 
       const session = snmp.createSession(conn.ip_address, decrypt(conn.snmp_community_encrypted), {
         port: conn.snmp_port,
@@ -353,8 +353,8 @@ class OLTService {
 
       const result = await new Promise((resolve, reject) => {
         session.get([oids.systemName, oids.systemDesc], (error, varbinds) => {
-          if (error) reject(error);
-          else resolve(varbinds);
+          if (error) {reject(error);}
+          else {resolve(varbinds);}
         });
       });
 
@@ -379,7 +379,7 @@ class OLTService {
    */
   static async executeCommand(id, command) {
     const conn = await this.getRawConnection(id);
-    if (!conn) throw new Error('OLT connection not found');
+    if (!conn) {throw new Error('OLT connection not found');}
 
     // Command sanitization - prevent injection attacks
     const dangerousPatterns = [
@@ -422,7 +422,7 @@ class OLTService {
     }
 
     try {
-      if (!telnet) throw new Error('Telnet library not available');
+      if (!telnet) {throw new Error('Telnet library not available');}
 
       const connection = new telnet();
 
@@ -453,7 +453,7 @@ class OLTService {
    */
   static async getStatistics(id) {
     const conn = await this.getRawConnection(id);
-    if (!conn) throw new Error('OLT connection not found');
+    if (!conn) {throw new Error('OLT connection not found');}
 
     try {
       const onus = await this.getONUs(id);
@@ -481,7 +481,7 @@ class OLTService {
   }
 
   static sanitizeConnection(conn) {
-    if (!conn) return null;
+    if (!conn) {return null;}
     const { password_encrypted, snmp_community_encrypted, ...safe } = conn;
     return safe;
   }

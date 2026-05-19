@@ -9,7 +9,7 @@ const API = import.meta.env.VITE_API_URL || '/api';
 
 /* ─── Sparkline SVG ─── */
 function Sparkline({ data, color = '#3b82f6', width = 200, height = 60 }) {
-  if (!data || data.length < 2) return null;
+  if (!data || data.length < 2) {return null;}
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const range = max - min || 1;
@@ -35,7 +35,7 @@ function Sparkline({ data, color = '#3b82f6', width = 200, height = 60 }) {
 
 /* ─── Bar Chart ─── */
 function BarChart({ data, height = 200, color = 'bg-blue-500' }) {
-  if (!data || data.length === 0) return <div className="text-center text-zinc-600 py-8">No data</div>;
+  if (!data || data.length === 0) {return <div className="text-center text-zinc-600 py-8">No data</div>;}
   const max = Math.max(...data.map(d => d.value), 1);
   return (
     <div className="flex items-end gap-1" style={{ height }}>
@@ -54,19 +54,19 @@ function BarChart({ data, height = 200, color = 'bg-blue-500' }) {
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
+  if (!bytes) {return '0 B';}
   const b = parseInt(bytes);
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1073741824) return `${(b / 1048576).toFixed(1)} MB`;
+  if (b < 1024) {return `${b} B`;}
+  if (b < 1048576) {return `${(b / 1024).toFixed(1)} KB`;}
+  if (b < 1073741824) {return `${(b / 1048576).toFixed(1)} MB`;}
   return `${(b / 1073741824).toFixed(2)} GB`;
 }
 
 function formatUptime(seconds) {
-  if (!seconds) return '0s';
+  if (!seconds) {return '0s';}
   const s = parseInt(seconds);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 60) {return `${s}s`;}
+  if (s < 3600) {return `${Math.floor(s / 60)}m`;}
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return `${h}h ${m}m`;
@@ -90,7 +90,7 @@ export function BandwidthGraphs() {
   }, []);
 
   useEffect(() => {
-    if (selectedConnection) fetchBandwidthData();
+    if (selectedConnection) {fetchBandwidthData();}
   }, [selectedConnection]);
 
   useEffect(() => {
@@ -130,8 +130,8 @@ export function BandwidthGraphs() {
   const fetchUsageHistory = async () => {
     try {
       const params = new URLSearchParams({ time_range: timeRange });
-      if (selectedConnection) params.append('connection_id', selectedConnection);
-      if (selectedCustomer) params.append('customer_id', selectedCustomer);
+      if (selectedConnection) {params.append('connection_id', selectedConnection);}
+      if (selectedCustomer) {params.append('customer_id', selectedCustomer);}
 
       const { data } = await axios.get(`${API}/billing/usage/history?${params.toString()}`).catch(() => ({ data: { data: [] } }));
 

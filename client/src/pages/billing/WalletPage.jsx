@@ -44,7 +44,7 @@ export function WalletPage() {
       });
       setTopupResult(data);
       fetchWallets();
-      if (selectedWallet?.customer_id === topupForm.customer_id) selectWallet(selectedWallet);
+      if (selectedWallet?.customer_id === topupForm.customer_id) {selectWallet(selectedWallet);}
     } catch (e) {
       setTopupResult({ error: e.response?.data?.error || e.message });
     }

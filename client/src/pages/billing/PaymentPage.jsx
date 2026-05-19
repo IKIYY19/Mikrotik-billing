@@ -38,7 +38,7 @@ export function PaymentPage() {
     try {
       const { data } = await axios.get(`${API}/payments/methods`);
       setMethods(data.methods.filter(m => m.enabled));
-      if (data.methods.length > 0) setSelectedMethod(data.methods[0].id);
+      if (data.methods.length > 0) {setSelectedMethod(data.methods[0].id);}
     } catch (e) {
       // Fallback methods if API not available
       setMethods([
@@ -52,7 +52,7 @@ export function PaymentPage() {
   };
 
   const initiateMpesa = async () => {
-    if (!phone || !amount) return;
+    if (!phone || !amount) {return;}
     setProcessing(true);
     setStkStatus(null);
 
@@ -66,7 +66,7 @@ export function PaymentPage() {
 
       if (data.success) {
         setStkStatus({ pending: true, checkoutRequestId: data.checkoutRequestId, message: data.message || 'STK Push sent' });
-        if (data.instructions) setStkStatus(prev => ({ ...prev, instructions: data.instructions }));
+        if (data.instructions) {setStkStatus(prev => ({ ...prev, instructions: data.instructions }));}
 
         // Start polling for status
         setPolling(true);

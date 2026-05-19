@@ -79,7 +79,7 @@ const COMMON_ENTITY_TYPES = [
 ];
 
 function formatTimestamp(ts) {
-  if (!ts) return "—";
+  if (!ts) {return "—";}
   const d = new Date(ts);
   return d.toLocaleString("en-GB", {
     day: "2-digit",
@@ -169,8 +169,8 @@ function JsonDiffView({ before, after }) {
 }
 
 function tryParse(val) {
-  if (!val) return null;
-  if (typeof val === "object") return val;
+  if (!val) {return null;}
+  if (typeof val === "object") {return val;}
   try {
     return JSON.parse(val);
   } catch {
@@ -195,9 +195,9 @@ export function AuditLogs() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (actionFilter) params.set("action", actionFilter);
-      if (entityTypeFilter) params.set("entity_type", entityTypeFilter);
-      if (searchText) params.set("search", searchText);
+      if (actionFilter) {params.set("action", actionFilter);}
+      if (entityTypeFilter) {params.set("entity_type", entityTypeFilter);}
+      if (searchText) {params.set("search", searchText);}
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(page * PAGE_SIZE));
 
@@ -222,7 +222,7 @@ export function AuditLogs() {
   }, [fetchLogs]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this audit log entry?")) return;
+    if (!window.confirm("Delete this audit log entry?")) {return;}
     try {
       await axios.delete(`${API}/audit/logs/${id}`);
       fetchLogs();

@@ -96,8 +96,8 @@ router.get("/devices", async (req, res) => {
     let devices;
 
     if (db) {
-      let where = [];
-      let params = [];
+      const where = [];
+      const params = [];
       let idx = 1;
       if (status) {
         where.push(`d.status = $${idx}`);
@@ -140,12 +140,12 @@ router.get("/devices", async (req, res) => {
     }
 
     devices = [...inv.inventoryStore.devices];
-    if (status) devices = devices.filter((d) => d.status === status);
+    if (status) {devices = devices.filter((d) => d.status === status);}
     if (category_id)
-      devices = devices.filter((d) => d.category_id === category_id);
-    if (brand) devices = devices.filter((d) => d.brand === brand);
+      {devices = devices.filter((d) => d.category_id === category_id);}
+    if (brand) {devices = devices.filter((d) => d.brand === brand);}
     if (location_id)
-      devices = devices.filter((d) => d.location_id === location_id);
+      {devices = devices.filter((d) => d.location_id === location_id);}
     if (search) {
       const s = search.toLowerCase();
       devices = devices.filter(
@@ -178,7 +178,7 @@ router.get("/devices", async (req, res) => {
 router.get("/devices/:id", async (req, res) => {
   try {
     const device = await inv.getDevice(req.params.id);
-    if (!device) return res.status(404).json({ error: "Device not found" });
+    if (!device) {return res.status(404).json({ error: "Device not found" });}
 
     const db = getDb();
     let cat, location, maintenanceLogs, assignmentHistory;
@@ -245,7 +245,7 @@ router.post("/devices", async (req, res) => {
 router.put("/devices/:id", async (req, res) => {
   try {
     const device = await inv.updateDevice(req.params.id, req.body);
-    if (!device) return res.status(404).json({ error: "Device not found" });
+    if (!device) {return res.status(404).json({ error: "Device not found" });}
     res.json(device);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -255,7 +255,7 @@ router.put("/devices/:id", async (req, res) => {
 router.delete("/devices/:id", async (req, res) => {
   try {
     const device = await inv.deleteDevice(req.params.id);
-    if (!device) return res.status(404).json({ error: "Device not found" });
+    if (!device) {return res.status(404).json({ error: "Device not found" });}
     res.json({ message: "Device deleted" });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -271,7 +271,7 @@ router.post("/devices/:id/assign", async (req, res) => {
       customer_name,
       customer_id,
     );
-    if (!device) return res.status(404).json({ error: "Device not found" });
+    if (!device) {return res.status(404).json({ error: "Device not found" });}
     res.json(device);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -281,7 +281,7 @@ router.post("/devices/:id/assign", async (req, res) => {
 router.post("/devices/:id/unassign", async (req, res) => {
   try {
     const device = await inv.unassignDevice(req.params.id);
-    if (!device) return res.status(404).json({ error: "Device not found" });
+    if (!device) {return res.status(404).json({ error: "Device not found" });}
     res.json(device);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -343,11 +343,11 @@ router.post("/alerts/:id/acknowledge", async (req, res) => {
         [req.params.id],
       );
       if (result.rows.length === 0)
-        return res.status(404).json({ error: "Alert not found" });
+        {return res.status(404).json({ error: "Alert not found" });}
       return res.json(result.rows[0]);
     }
     const alert = inv.inventoryStore.alerts.find((a) => a.id === req.params.id);
-    if (!alert) return res.status(404).json({ error: "Alert not found" });
+    if (!alert) {return res.status(404).json({ error: "Alert not found" });}
     alert.acknowledged = true;
     res.json(alert);
   } catch (e) {
@@ -360,7 +360,7 @@ router.post("/import", async (req, res) => {
   try {
     const { devices } = req.body;
     if (!Array.isArray(devices))
-      return res.status(400).json({ error: "devices array required" });
+      {return res.status(400).json({ error: "devices array required" });}
     const created = [];
     for (const d of devices) {
       created.push(await inv.createDevice(d));
@@ -379,7 +379,7 @@ router.get("/export", async (req, res) => {
 
     if (db) {
       let where = "";
-      let params = [];
+      const params = [];
       if (status) {
         where = "WHERE d.status = $1";
         params.push(status);
@@ -395,7 +395,7 @@ router.get("/export", async (req, res) => {
       devices = result.rows;
     } else {
       devices = [...inv.inventoryStore.devices];
-      if (status) devices = devices.filter((d) => d.status === status);
+      if (status) {devices = devices.filter((d) => d.status === status);}
     }
 
     const headers = [
@@ -464,11 +464,11 @@ router.post("/bulk/status", async (req, res) => {
   try {
     const { device_ids, status } = req.body;
     if (!Array.isArray(device_ids) || !status)
-      return res.status(400).json({ error: "device_ids and status required" });
+      {return res.status(400).json({ error: "device_ids and status required" });}
     const updated = [];
     for (const id of device_ids) {
       const device = await inv.updateDevice(id, { status });
-      if (device) updated.push(device);
+      if (device) {updated.push(device);}
     }
     res.json({ updated: updated.length, devices: updated });
   } catch (e) {
@@ -480,11 +480,11 @@ router.post("/bulk/location", async (req, res) => {
   try {
     const { device_ids, location_id } = req.body;
     if (!Array.isArray(device_ids))
-      return res.status(400).json({ error: "device_ids required" });
+      {return res.status(400).json({ error: "device_ids required" });}
     const updated = [];
     for (const id of device_ids) {
       const device = await inv.updateDevice(id, { location_id });
-      if (device) updated.push(device);
+      if (device) {updated.push(device);}
     }
     res.json({ updated: updated.length, devices: updated });
   } catch (e) {

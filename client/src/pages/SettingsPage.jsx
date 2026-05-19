@@ -81,7 +81,7 @@ function TwoFactorSetup() {
   };
 
   const handleEnable = async () => {
-    if (code.length !== 6) return;
+    if (code.length !== 6) {return;}
     setLoading(true);
     try {
       await axios.post(`${API}/auth/2fa/enable`, { code });
@@ -96,7 +96,7 @@ function TwoFactorSetup() {
   };
 
   const handleDisable = async () => {
-    if (code.length !== 6) return;
+    if (code.length !== 6) {return;}
     setLoading(true);
     try {
       await axios.post(`${API}/auth/2fa/disable`, { code });
@@ -109,7 +109,7 @@ function TwoFactorSetup() {
     setLoading(false);
   };
 
-  if (!status) return <div className="text-zinc-500 text-sm">Loading...</div>;
+  if (!status) {return <div className="text-zinc-500 text-sm">Loading...</div>;}
 
   if (status.enabled) {
     return (

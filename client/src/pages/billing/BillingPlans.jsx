@@ -34,7 +34,7 @@ export function BillingPlans() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this plan?')) return;
+    if (!confirm('Delete this plan?')) {return;}
     await axios.delete(`${API}/billing/plans/${id}`);
     fetchPlans();
   };

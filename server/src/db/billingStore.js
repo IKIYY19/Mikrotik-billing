@@ -18,7 +18,7 @@ const billingStore = {
 
 // Seed default service plans
 const seedPlans = () => {
-  if (billingStore.service_plans.length > 0) return;
+  if (billingStore.service_plans.length > 0) {return;}
   const planIds = {
     bronze: "plan-bronze-5m-fixed-uuid-000001",
     silver: "plan-silver-10m-fixed-uuid-000002",
@@ -109,7 +109,7 @@ function generateReceiptNumber() {
 
 // Utility: format date for display
 function formatDate(d) {
-  if (!d) return null;
+  if (!d) {return null;}
   return d instanceof Date ? d.toISOString().split("T")[0] : d;
 }
 
@@ -153,7 +153,7 @@ module.exports = {
 
   async updateCustomer(id, data) {
     const idx = billingStore.customers.findIndex((c) => c.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     billingStore.customers[idx] = {
       ...billingStore.customers[idx],
       ...data,
@@ -168,7 +168,7 @@ module.exports = {
 
   async deleteCustomer(id) {
     const idx = billingStore.customers.findIndex((c) => c.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     return billingStore.customers.splice(idx, 1)[0];
   },
 
@@ -191,7 +191,7 @@ module.exports = {
 
   async updatePlan(id, data) {
     const idx = billingStore.service_plans.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     billingStore.service_plans[idx] = {
       ...billingStore.service_plans[idx],
       ...data,
@@ -201,7 +201,7 @@ module.exports = {
 
   async deletePlan(id) {
     const idx = billingStore.service_plans.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     return billingStore.service_plans.splice(idx, 1)[0];
   },
 
@@ -234,7 +234,7 @@ module.exports = {
 
   async updateSubscription(id, data) {
     const idx = billingStore.subscriptions.findIndex((s) => s.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     billingStore.subscriptions[idx] = {
       ...billingStore.subscriptions[idx],
       ...data,
@@ -244,7 +244,7 @@ module.exports = {
 
   async toggleSubscriptionStatus(id) {
     const idx = billingStore.subscriptions.findIndex((s) => s.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     const sub = billingStore.subscriptions[idx];
     sub.status = sub.status === "active" ? "suspended" : "active";
     sub.updated_at = new Date().toISOString();
@@ -253,7 +253,7 @@ module.exports = {
 
   async deleteSubscription(id) {
     const idx = billingStore.subscriptions.findIndex((s) => s.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     return billingStore.subscriptions.splice(idx, 1)[0];
   },
 
@@ -280,7 +280,7 @@ module.exports = {
 
   async updateInvoice(id, data) {
     const idx = billingStore.invoices.findIndex((i) => i.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
     billingStore.invoices[idx] = { ...billingStore.invoices[idx], ...data };
     return billingStore.invoices[idx];
   },
@@ -315,7 +315,7 @@ module.exports = {
 
   async updatePayment(id, data) {
     const idx = billingStore.payments.findIndex((payment) => payment.id === id);
-    if (idx === -1) return null;
+    if (idx === -1) {return null;}
 
     billingStore.payments[idx] = {
       ...billingStore.payments[idx],
@@ -421,17 +421,17 @@ module.exports = {
 
     for (const sub of activeSubs) {
       const plan = billingStore.service_plans.find((p) => p.id === sub.plan_id);
-      if (!plan) continue;
+      if (!plan) {continue;}
 
       // Check if invoice already exists for this month
       const thisMonth = new Date().getMonth();
       const thisYear = new Date().getFullYear();
       const existing = billingStore.invoices.find((i) => {
-        if (i.customer_id !== sub.customer_id) return false;
+        if (i.customer_id !== sub.customer_id) {return false;}
         const d = new Date(i.created_at);
         return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
       });
-      if (existing) continue;
+      if (existing) {continue;}
 
       const invoice = await this.createInvoice({
         customer_id: sub.customer_id,

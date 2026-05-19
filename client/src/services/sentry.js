@@ -122,7 +122,7 @@ export function addBreadcrumb(message, category = 'default', level = 'info') {
 
 // Set user context (call after login)
 export function setUser(user) {
-  if (!user) return;
+  if (!user) {return;}
   
   Sentry.setUser({
     id: user.id,

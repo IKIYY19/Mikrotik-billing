@@ -15,6 +15,7 @@ import {
   Zap,
   Link2,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Wifi,
   AlertTriangle,
@@ -46,7 +47,7 @@ const getProvisionServerOrigin = () => {
       // fall through
     }
   }
-  if (window.location.port === "5173") return "http://localhost:5000";
+  if (window.location.port === "5173") {return "http://localhost:5000";}
   return window.location.origin;
 };
 
@@ -140,8 +141,8 @@ export function Devices() {
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {next.delete(id);}
+      else {next.add(id);}
       return next;
     });
   };
@@ -293,7 +294,7 @@ export function Devices() {
         "Delete this discovered router? This action cannot be undone.",
       )
     )
-      return;
+      {return;}
     try {
       await axios.delete(`${API_URL}/devices/discovered/${id}`);
       fetchDiscovered();
@@ -373,14 +374,14 @@ export function Devices() {
         "Regenerate token? The existing command will stop working.",
       )
     )
-      return;
+      {return;}
     await axios.post(`${API_URL}/devices/${id}/regenerate-token`);
     setShowCommand((c) => (c?.id === id ? null : c));
     fetchDevices();
   };
 
   const deleteDevice = async (id) => {
-    if (!window.confirm("Delete this device?")) return;
+    if (!window.confirm("Delete this device?")) {return;}
     await axios.delete(`${API_URL}/devices/${id}`);
     fetchDevices();
   };

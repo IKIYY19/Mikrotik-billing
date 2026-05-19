@@ -101,8 +101,8 @@ export function InventoryPage() {
   };
 
   const filtered = devices.filter(d => {
-    if (statusFilter !== 'all' && d.status !== statusFilter) return false;
-    if (categoryFilter !== 'all' && d.category_id !== categoryFilter) return false;
+    if (statusFilter !== 'all' && d.status !== statusFilter) {return false;}
+    if (categoryFilter !== 'all' && d.category_id !== categoryFilter) {return false;}
     if (search) {
       const s = search.toLowerCase();
       return d.name.toLowerCase().includes(s) || d.model.toLowerCase().includes(s) ||
@@ -124,14 +124,14 @@ export function InventoryPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (form.id) await axios.put(`${API}/inventory/devices/${form.id}`, form);
-    else await axios.post(`${API}/inventory/devices`, form);
+    if (form.id) {await axios.put(`${API}/inventory/devices/${form.id}`, form);}
+    else {await axios.post(`${API}/inventory/devices`, form);}
     setShowForm(false);
     fetchData();
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this device?')) return;
+    if (!confirm('Delete this device?')) {return;}
     await axios.delete(`${API}/inventory/devices/${id}`);
     fetchData();
   };

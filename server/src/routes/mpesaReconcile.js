@@ -31,14 +31,14 @@ async function findPendingInvoiceByAmount(amount) {
   }
 
   // In-memory fallback
-  if (!billingData) return null;
+  if (!billingData) {return null;}
   const invoices = await billingData.listInvoices();
   const customers = await billingData.listCustomers();
   const payments = await billingData.listPayments();
 
   // Find pending invoice where remaining = amount
   const match = invoices.find((inv) => {
-    if (inv.status !== "pending") return false;
+    if (inv.status !== "pending") {return false;}
     const paidSum = payments
       .filter((p) => p.invoice_id === inv.id)
       .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
@@ -99,7 +99,7 @@ router.post("/reconcile", async (req, res) => {
 
     for (const txn of transactions) {
       const amount = parseFloat(txn.amount);
-      if (!amount || amount <= 0) continue;
+      if (!amount || amount <= 0) {continue;}
       results.total_amount += amount;
 
       // Try match by exact remaining amount on pending invoices

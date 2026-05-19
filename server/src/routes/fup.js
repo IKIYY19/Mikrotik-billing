@@ -25,7 +25,7 @@ router.get('/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM fup_profiles WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'FUP profile not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'FUP profile not found' });}
     res.json(result.rows[0]);
   } catch (e) {
     logger.error('Failed to fetch FUP profile', { error: e.message, id: req.params.id });
@@ -71,7 +71,7 @@ router.put('/:id', async (req, res) => {
       [name, description, data_limit, data_limit_unit, reset_period, throttle_speed, priority, is_active, req.params.id, plan_id || null]
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'FUP profile not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'FUP profile not found' });}
 
     logger.info('FUP profile updated', { id: req.params.id });
     res.json(result.rows[0]);
@@ -86,7 +86,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('DELETE FROM fup_profiles WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'FUP profile not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'FUP profile not found' });}
 
     logger.info('FUP profile deleted', { id: req.params.id });
     res.json({ success: true });

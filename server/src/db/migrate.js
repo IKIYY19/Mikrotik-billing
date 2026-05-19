@@ -5,6 +5,7 @@ const { runIntegrationsMigration } = require("./integrationsMigration");
 const provisioningMigrations = require("./provisionMigrations");
 const unifiedMigrations = require("./unifiedMigrations");
 const tenantMigrations = require("./tenantMigrations");
+const provisioningQueueMigrations = require("./provisioningQueueMigrations");
 
 const coreMigrations = [
   // Users table (MUST be first - required for auth)
@@ -389,6 +390,12 @@ async function runMigrations() {
       await db.query(migration);
     }
     console.log("Provisioning migrations completed successfully");
+
+    // Run provisioning queue migrations
+    for (const migration of provisioningQueueMigrations) {
+      await db.query(migration);
+    }
+    console.log("Provisioning Queue migrations completed successfully");
 
     // Run unified migrations (inventory, wallet, backup, branches, agents, radius)
     for (const migration of unifiedMigrations) {

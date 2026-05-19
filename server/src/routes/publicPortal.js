@@ -114,7 +114,7 @@ router.post("/register", async (req, res) => {
 
     const billing = require("../services/billingData");
     const plan = billing.getPlanById(plan_id);
-    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    if (!plan) {return res.status(404).json({ error: "Plan not found" });}
 
     const bcrypt = require("bcryptjs");
     const pinHash = await bcrypt.hash(pin, 10);
@@ -157,7 +157,7 @@ router.post("/register", async (req, res) => {
       const store = getDb()._getStore ? getDb()._getStore() : {};
       if (store.customers) {
         const c = store.customers.find((c) => c.id === customer.id);
-        if (c) c.portal_pin_hash = pinHashStored;
+        if (c) {c.portal_pin_hash = pinHashStored;}
       }
     } else {
       try {
@@ -191,7 +191,7 @@ router.post("/confirm-payment", async (req, res) => {
   try {
     const { invoice_id, mpesa_code } = req.body;
     if (!invoice_id)
-      return res.status(400).json({ error: "Invoice ID required" });
+      {return res.status(400).json({ error: "Invoice ID required" });}
 
     const billing = require("../services/billingData");
 
@@ -202,7 +202,7 @@ router.post("/confirm-payment", async (req, res) => {
       payment_reference: mpesa_code || "self-service",
     });
 
-    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!invoice) {return res.status(404).json({ error: "Invoice not found" });}
 
     const sub = invoice.subscription_id
       ? await billing.getSubscriptionById(invoice.subscription_id)

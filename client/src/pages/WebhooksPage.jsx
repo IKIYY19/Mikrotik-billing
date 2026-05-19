@@ -152,7 +152,7 @@ export default function WebhooksPage() {
   };
 
   const handleDelete = async (webhook) => {
-    if (!confirm(`Delete webhook "${webhook.name || webhook.url}"?`)) return;
+    if (!confirm(`Delete webhook "${webhook.name || webhook.url}"?`)) {return;}
     try {
       await axios.delete(`${API}/webhooks/${webhook.id}`);
       setWebhooks((prev) => prev.filter((w) => w.id !== webhook.id));
@@ -198,12 +198,12 @@ export default function WebhooksPage() {
     if (typeof events === "string") {
       try { events = JSON.parse(events); } catch { events = []; }
     }
-    if (!Array.isArray(events)) return [];
+    if (!Array.isArray(events)) {return [];}
     return events;
   };
 
   const formatDate = (ts) => {
-    if (!ts) return "—";
+    if (!ts) {return "—";}
     return new Date(ts).toLocaleString("en-GB", {
       day: "2-digit",
       month: "short",

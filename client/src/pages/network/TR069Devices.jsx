@@ -83,7 +83,7 @@ export function TR069Devices() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this device?')) return;
+    if (!confirm('Delete this device?')) {return;}
     try {
       await axios.delete(`${API}/tr069/${id}`);
       fetchDevices();
@@ -93,7 +93,7 @@ export function TR069Devices() {
   };
 
   const handleReboot = async (id) => {
-    if (!confirm('Reboot this device?')) return;
+    if (!confirm('Reboot this device?')) {return;}
     try {
       await axios.post(`${API}/tr069/${id}/reboot`);
       alert('Reboot command sent successfully');
@@ -103,7 +103,7 @@ export function TR069Devices() {
   };
 
   const handleFactoryReset = async (id) => {
-    if (!confirm('Factory reset this device? This will restore all settings to default.')) return;
+    if (!confirm('Factory reset this device? This will restore all settings to default.')) {return;}
     try {
       await axios.post(`${API}/tr069/${id}/factory-reset`);
       alert('Factory reset command sent successfully');

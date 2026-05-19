@@ -67,8 +67,8 @@ class SMSLeopardService {
 
   formatPhone(phone) {
     let cleaned = phone.replace(/\s/g, '');
-    if (cleaned.startsWith('0')) cleaned = '254' + cleaned.substring(1);
-    if (!cleaned.startsWith('254')) cleaned = '254' + cleaned;
+    if (cleaned.startsWith('0')) {cleaned = '254' + cleaned.substring(1);}
+    if (!cleaned.startsWith('254')) {cleaned = '254' + cleaned;}
     return cleaned;
   }
 }

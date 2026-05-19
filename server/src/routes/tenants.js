@@ -26,7 +26,7 @@ router.put("/:id/api-key", async (req, res) => {
   try {
     const db = getDb();
     const { api_key } = req.body;
-    if (!api_key) return res.status(400).json({ error: "api_key required" });
+    if (!api_key) {return res.status(400).json({ error: "api_key required" });}
     await db.query(
       "UPDATE tenants SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb, updated_at = NOW() WHERE id = $2",
       [JSON.stringify({ api_key }), req.params.id],
@@ -37,7 +37,7 @@ router.put("/:id/api-key", async (req, res) => {
   }
 });
 const logosDir = path.join(__dirname, "..", "public", "logos");
-if (!fs.existsSync(logosDir)) fs.mkdirSync(logosDir, { recursive: true });
+if (!fs.existsSync(logosDir)) {fs.mkdirSync(logosDir, { recursive: true });}
 const logoUpload = multer({
   storage: multer.diskStorage({
     destination: logosDir,
@@ -142,9 +142,9 @@ router.post("/", requireSuperAdmin, async (req, res) => {
 router.post("/:id/logo", logoUpload.single("logo"), async (req, res) => {
   try {
     if (!req.file)
-      return res
+      {return res
         .status(400)
-        .json({ error: "No logo file uploaded. Use form field: logo" });
+        .json({ error: "No logo file uploaded. Use form field: logo" });}
     const db = getDb();
     const logoUrl = `/logos/${req.file.filename}`;
     await db.query(

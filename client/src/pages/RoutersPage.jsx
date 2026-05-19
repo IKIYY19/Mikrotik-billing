@@ -63,12 +63,12 @@ export default function RoutersPage() {
       }
     } catch (e) {
       const storedKey = localStorage.getItem("router_link_api_key");
-      if (storedKey && !apiKey) setApiKey(storedKey);
+      if (storedKey && !apiKey) {setApiKey(storedKey);}
     } finally { setLoading(false); }
   };
 
   const fetchRouters = async () => {
-    if (!tenantSlug) return;
+    if (!tenantSlug) {return;}
     setRoutersLoading(true);
     try {
       const { data } = await axios.get(`${API}/router/v1/${tenantSlug}/routers`);
@@ -79,7 +79,7 @@ export default function RoutersPage() {
   useEffect(() => { if (tenantSlug) { fetchRouters(); const i = setInterval(fetchRouters, 15000); return () => clearInterval(i); } }, [tenantSlug]);
 
   const deleteRouter = async (routerId, routerName) => {
-    if (!confirm(`Delete "${routerName}"? This removes the router and its API connection permanently.`)) return;
+    if (!confirm(`Delete "${routerName}"? This removes the router and its API connection permanently.`)) {return;}
     setDeleting(routerId);
     try {
       await axios.delete(`${API}/router/v1/${tenantSlug}/routers/${routerId}`);
@@ -107,7 +107,7 @@ export default function RoutersPage() {
   };
 
   const getVpnCommand = () => {
-    if (!vpnModal) return "";
+    if (!vpnModal) {return "";}
     const { slug } = vpnModal;
     const origin = window.location.origin;
     const token = getToken();
@@ -122,7 +122,7 @@ export default function RoutersPage() {
 
   // Watch session
   const startWatching = async () => {
-    if (!tenantSlug) return;
+    if (!tenantSlug) {return;}
     stopWatching();
     try {
       const { data } = await axios.post(`${API}/router/v1/${tenantSlug}/watch/start`);
@@ -141,7 +141,9 @@ export default function RoutersPage() {
             stopWatching();
             setConnectionStatus({ connected: false, status: "timeout", message: data.message });
           } else { setWatchRemaining(Math.max(0, 600 - (data.elapsed || 0))); }
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Poll status failed:", e);
+        }
       };
       poll();
       watchIntervalRef.current = setInterval(poll, 3000);
@@ -149,7 +151,7 @@ export default function RoutersPage() {
   };
   const stopWatching = () => { if (watchIntervalRef.current) { clearInterval(watchIntervalRef.current); watchIntervalRef.current = null; } };
 
-  useEffect(() => { if (tenantSlug && apiKey) startWatching(); }, [tenantSlug, apiKey]);
+  useEffect(() => { if (tenantSlug && apiKey) {startWatching();} }, [tenantSlug, apiKey]);
 
   const generateKey = async () => {
     setGenerating(true);
@@ -168,19 +170,19 @@ export default function RoutersPage() {
     const certFlag = appUrl.startsWith("https") ? " check-certificate=no" : "";
     const slugPath = tenantSlug ? `/v1/${tenantSlug}/install` : "/v1/scripts/install";
     let prefix = "";
-    if (mgmtUser && mgmtPass) prefix = `:global ztpMgmtUser "${mgmtUser}"; :global ztpMgmtPass "${mgmtPass}"; `;
+    if (mgmtUser && mgmtPass) {prefix = `:global ztpMgmtUser "${mgmtUser}"; :global ztpMgmtPass "${mgmtPass}"; `;}
     return `${prefix}/tool fetch url="${appUrl}/api/router${slugPath}" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;
+  if (loading) {return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;}
 
   const isLinked = connectionStatus?.connected && connectionStatus?.router?.has_connection;
   const isOnline = connectionStatus?.router?.is_online !== false;
 
   const getRouterStatus = (r) => {
-    if (r.is_online) return { color: 'green', label: 'ONLINE', Icon: Wifi, dotClass: 'bg-green-500 shadow-lg shadow-green-500/30', badgeClass: 'bg-green-500/10 text-green-400' };
-    if (r.is_reporting && r.linked_mikrotik_connection_id) return { color: 'amber', label: 'RADIUS', Icon: Shield, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' };
-    if (r.is_reporting) return { color: 'slate', label: 'HEARTBEAT', Icon: Activity, dotClass: 'bg-slate-500', badgeClass: 'bg-slate-500/10 text-slate-400' };
+    if (r.is_online) {return { color: 'green', label: 'ONLINE', Icon: Wifi, dotClass: 'bg-green-500 shadow-lg shadow-green-500/30', badgeClass: 'bg-green-500/10 text-green-400' };}
+    if (r.is_reporting && r.linked_mikrotik_connection_id) {return { color: 'amber', label: 'RADIUS', Icon: Shield, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' };}
+    if (r.is_reporting) {return { color: 'slate', label: 'HEARTBEAT', Icon: Activity, dotClass: 'bg-slate-500', badgeClass: 'bg-slate-500/10 text-slate-400' };}
     return { color: 'red', label: 'OFFLINE', Icon: WifiOff, dotClass: 'bg-red-500', badgeClass: 'bg-red-500/10 text-red-400' };
   };
 

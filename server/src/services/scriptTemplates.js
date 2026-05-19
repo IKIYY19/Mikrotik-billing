@@ -220,7 +220,7 @@ function reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag }) {
     ':put ""',
     ':put "[Setup] Run this to check health anytime:"',
     `:put "  /tool fetch url=${baseUrl}/api/router/v1/${slug}/health?model=$[/system routerboard get model]&serial=$[/system routerboard get serial-number] http-header-field=\\"Authorization: Bearer ${apiKey}\\" mode=${fetchMode} ${certFlag}\\""`,
-    ":put \"  Then check: :put \\$[/file get install.rsc contents]\\"\"",
+    ':put "  Then check: :put \\$[/file get install.rsc contents]\\""',
     "",
   ];
 }

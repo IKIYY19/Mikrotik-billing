@@ -47,6 +47,7 @@ const store = {
   settings: [],
   usage_records: [],
   audit_logs: [],
+  provisioning_queue: [],
 };
 
 // Seed example templates
@@ -338,7 +339,7 @@ module.exports = {
     // UPDATE projects
     if (lowerText.includes("update projects")) {
       const idx = store.projects.findIndex((p) => p.id === params[4]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const project = {
         ...store.projects[idx],
         name: params[0] || store.projects[idx].name,
@@ -354,7 +355,7 @@ module.exports = {
     // DELETE projects
     if (lowerText.includes("delete from projects")) {
       const idx = store.projects.findIndex((p) => p.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const deleted = store.projects.splice(idx, 1)[0];
       // Also delete associated modules
       store.project_modules = store.project_modules.filter(
@@ -428,70 +429,70 @@ module.exports = {
       const idx = store.routers.findIndex(
         (r) => r.id === params[params.length - 1],
       );
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const router = {
         ...store.routers[idx],
         updated_at: new Date().toISOString(),
       };
       // Handle various SET patterns
-      if (lowerText.includes("name =")) router.name = params[0];
-      if (lowerText.includes("identity =")) router.identity = params[1];
-      if (lowerText.includes("model =")) router.model = params[2];
-      if (lowerText.includes("mac_address =")) router.mac_address = params[3];
-      if (lowerText.includes("ip_address =")) router.ip_address = params[4];
+      if (lowerText.includes("name =")) {router.name = params[0];}
+      if (lowerText.includes("identity =")) {router.identity = params[1];}
+      if (lowerText.includes("model =")) {router.model = params[2];}
+      if (lowerText.includes("mac_address =")) {router.mac_address = params[3];}
+      if (lowerText.includes("ip_address =")) {router.ip_address = params[4];}
       if (lowerText.includes("wan_interface ="))
-        router.wan_interface = params[5];
+        {router.wan_interface = params[5];}
       if (lowerText.includes("lan_interface ="))
-        router.lan_interface = params[6];
-      if (lowerText.includes("lan_ports =")) router.lan_ports = params[7];
-      if (lowerText.includes("dns_servers =")) router.dns_servers = params[8];
-      if (lowerText.includes("ntp_servers =")) router.ntp_servers = params[9];
+        {router.lan_interface = params[6];}
+      if (lowerText.includes("lan_ports =")) {router.lan_ports = params[7];}
+      if (lowerText.includes("dns_servers =")) {router.dns_servers = params[8];}
+      if (lowerText.includes("ntp_servers =")) {router.ntp_servers = params[9];}
       if (lowerText.includes("radius_server ="))
-        router.radius_server = params[10];
+        {router.radius_server = params[10];}
       if (lowerText.includes("radius_secret ="))
-        router.radius_secret = params[11];
-      if (lowerText.includes("radius_port =")) router.radius_port = params[12];
+        {router.radius_secret = params[11];}
+      if (lowerText.includes("radius_port =")) {router.radius_port = params[12];}
       if (lowerText.includes("hotspot_enabled ="))
-        router.hotspot_enabled = params[13];
+        {router.hotspot_enabled = params[13];}
       if (lowerText.includes("pppoe_enabled ="))
-        router.pppoe_enabled = params[14];
+        {router.pppoe_enabled = params[14];}
       if (lowerText.includes("pppoe_interface ="))
-        router.pppoe_interface = params[15];
+        {router.pppoe_interface = params[15];}
       if (lowerText.includes("pppoe_service_name ="))
-        router.pppoe_service_name = params[16];
-      if (lowerText.includes("mgmt_port =")) router.mgmt_port = params[17];
+        {router.pppoe_service_name = params[16];}
+      if (lowerText.includes("mgmt_port =")) {router.mgmt_port = params[17];}
       if (lowerText.includes("mgmt_username ="))
-        router.mgmt_username = params[18];
+        {router.mgmt_username = params[18];}
       if (lowerText.includes("mgmt_password_encrypted ="))
-        router.mgmt_password_encrypted = params[19];
+        {router.mgmt_password_encrypted = params[19];}
       if (lowerText.includes("connection_type ="))
-        router.connection_type = params[20];
-      if (lowerText.includes("notes =")) router.notes = params[21];
+        {router.connection_type = params[20];}
+      if (lowerText.includes("notes =")) {router.notes = params[21];}
       if (lowerText.includes("provision_token ="))
-        router.provision_token = params[0];
+        {router.provision_token = params[0];}
       if (lowerText.includes("provision_status ="))
-        router.provision_status = params[0];
+        {router.provision_status = params[0];}
       if (lowerText.includes("linked_mikrotik_connection_id ="))
-        router.linked_mikrotik_connection_id = params[0];
+        {router.linked_mikrotik_connection_id = params[0];}
       if (lowerText.includes("billing_activated_at = case when"))
-        router.billing_activated_at = params[0]
+        {router.billing_activated_at = params[0]
           ? new Date().toISOString()
-          : router.billing_activated_at;
+          : router.billing_activated_at;}
       if (lowerText.includes("billing_activation_error ="))
-        router.billing_activation_error = params[1];
+        {router.billing_activation_error = params[1];}
       if (lowerText.includes("last_provisioned_at = current_timestamp"))
-        router.last_provisioned_at = new Date().toISOString();
+        {router.last_provisioned_at = new Date().toISOString();}
       if (
         lowerText.includes(
           "provision_attempts = coalesce(provision_attempts, 0) + 1",
         )
       )
-        router.provision_attempts = (router.provision_attempts || 0) + 1;
+        {router.provision_attempts = (router.provision_attempts || 0) + 1;}
       if (
         lowerText.includes("last_provisioned_at =") &&
         !lowerText.includes("current_timestamp")
       )
-        router.last_provisioned_at = params[0];
+        {router.last_provisioned_at = params[0];}
       store.routers[idx] = router;
       return { rows: [router] };
     }
@@ -499,7 +500,7 @@ module.exports = {
     // DELETE routers
     if (lowerText.includes("delete from routers")) {
       const idx = store.routers.findIndex((r) => r.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const deleted = store.routers.splice(idx, 1)[0];
       return { rows: [deleted] };
     }
@@ -574,7 +575,7 @@ module.exports = {
       const module = store.project_modules.find(
         (m) => m.project_id === params[2] && m.module_type === params[3],
       );
-      if (!module) return { rows: [] };
+      if (!module) {return { rows: [] };}
       module.config_data = params[0];
       module.generated_script = params[1] || module.generated_script;
       module.updated_at = new Date().toISOString();
@@ -599,7 +600,7 @@ module.exports = {
     // DELETE project_modules
     if (lowerText.includes("delete from project_modules")) {
       const idx = store.project_modules.findIndex((m) => m.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.project_modules.splice(idx, 1) };
     }
 
@@ -635,7 +636,7 @@ module.exports = {
     // UPDATE templates
     if (lowerText.includes("update templates")) {
       const idx = store.templates.findIndex((t) => t.id === params[5]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const template = {
         ...store.templates[idx],
         name: params[0] || store.templates[idx].name,
@@ -654,7 +655,7 @@ module.exports = {
     // DELETE templates
     if (lowerText.includes("delete from templates")) {
       const idx = store.templates.findIndex((t) => t.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.templates.splice(idx, 1) };
     }
 
@@ -731,7 +732,7 @@ module.exports = {
     if (lowerText.includes("update mikrotik_connections")) {
       const id = params[12];
       const conn = store.mikrotik_connections.find((c) => c.id === id);
-      if (!conn) return { rows: [] };
+      if (!conn) {return { rows: [] };}
       conn.name = params[0];
       conn.ip_address = params[1];
       conn.api_port = params[2];
@@ -774,7 +775,7 @@ module.exports = {
       const idx = store.mikrotik_connections.findIndex(
         (c) => c.id === params[0],
       );
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.mikrotik_connections.splice(idx, 1) };
     }
 
@@ -830,7 +831,7 @@ module.exports = {
     // UPDATE resellers
     if (lowerText.includes("update resellers")) {
       const idx = store.resellers.findIndex((r) => r.id === params[7]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const reseller = {
         ...store.resellers[idx],
         name: params[0] || store.resellers[idx].name,
@@ -857,11 +858,11 @@ module.exports = {
     // DELETE resellers
     if (lowerText.includes("delete from resellers")) {
       const idx = store.resellers.findIndex((r) => r.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const deleted = store.resellers.splice(idx, 1)[0];
       // Set reseller_id to null for associated customers
       store.customers.forEach((c) => {
-        if (c.reseller_id === params[0]) c.reseller_id = null;
+        if (c.reseller_id === params[0]) {c.reseller_id = null;}
       });
       return { rows: [deleted] };
     }
@@ -906,7 +907,7 @@ module.exports = {
       const idx = store.customers.findIndex(
         (c) => c.id === params[params.length - 1],
       );
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.customers[idx] = {
         ...store.customers[idx],
         ...params[0],
@@ -922,7 +923,7 @@ module.exports = {
     // DELETE customers
     if (lowerText.includes("delete from customers")) {
       const idx = store.customers.findIndex((c) => c.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.customers.splice(idx, 1) };
     }
 
@@ -957,7 +958,7 @@ module.exports = {
     // DELETE payments
     if (lowerText.includes("delete from payments")) {
       const idx = store.payments.findIndex((p) => p.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.payments.splice(idx, 1) };
     }
 
@@ -1006,7 +1007,7 @@ module.exports = {
       lowerText.includes("where id =")
     ) {
       const idx = store.olt_connections.findIndex((o) => o.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.olt_connections[idx] = {
         ...store.olt_connections[idx],
         name: params[1] || store.olt_connections[idx].name,
@@ -1037,7 +1038,7 @@ module.exports = {
     // DELETE olt_connections
     if (lowerText.includes("delete from olt_connections")) {
       const idx = store.olt_connections.findIndex((o) => o.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.olt_connections.splice(idx, 1) };
     }
 
@@ -1060,7 +1061,7 @@ module.exports = {
     // UPDATE integrations
     if (lowerText.includes("update integrations")) {
       const idx = store.integrations.findIndex((i) => i.id === params[2]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.integrations[idx] = {
         ...store.integrations[idx],
         config_data: params[0],
@@ -1107,7 +1108,7 @@ module.exports = {
     // DELETE hotspot_vouchers
     if (lowerText.includes("delete from hotspot_vouchers")) {
       const idx = store.hotspot_vouchers.findIndex((v) => v.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.hotspot_vouchers.splice(idx, 1) };
     }
 
@@ -1152,7 +1153,7 @@ module.exports = {
       lowerText.includes("where id =")
     ) {
       const idx = store.fup_profiles.findIndex((f) => f.id === params[8]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.fup_profiles[idx] = {
         ...store.fup_profiles[idx],
         name: params[0],
@@ -1171,7 +1172,7 @@ module.exports = {
     // DELETE fup_profiles
     if (lowerText.includes("delete from fup_profiles")) {
       const idx = store.fup_profiles.findIndex((f) => f.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.fup_profiles.splice(idx, 1) };
     }
 
@@ -1234,7 +1235,7 @@ module.exports = {
       lowerText.includes("where id =")
     ) {
       const idx = store.tr069_devices.findIndex((d) => d.id === params[7]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.tr069_devices[idx] = {
         ...store.tr069_devices[idx],
         manufacturer: params[0],
@@ -1252,13 +1253,23 @@ module.exports = {
     // DELETE tr069_devices
     if (lowerText.includes("delete from tr069_devices")) {
       const idx = store.tr069_devices.findIndex((d) => d.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.tr069_devices.splice(idx, 1) };
     }
 
     // ═══════════════════════════════════════
     // RADIUS TABLES
     // ═══════════════════════════════════════
+
+    // SELECT tickets
+    if (lowerText.includes("select") && lowerText.includes("from tickets")) {
+      return { rows: store.tickets };
+    }
+
+    // SELECT provisioning_queue
+    if (lowerText.includes("select") && lowerText.includes("from provisioning_queue")) {
+      return { rows: store.provisioning_queue };
+    }
 
     // SELECT nas
     if (lowerText.includes("select") && lowerText.includes("from nas")) {
@@ -1288,7 +1299,7 @@ module.exports = {
     // UPDATE nas
     if (lowerText.includes("update nas")) {
       const idx = store.nas.findIndex((n) => n.id === params[5]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.nas[idx] = {
         ...store.nas[idx],
         nasname: params[0] || store.nas[idx].nasname,
@@ -1304,7 +1315,7 @@ module.exports = {
     // DELETE nas
     if (lowerText.includes("delete from nas")) {
       const idx = store.nas.findIndex((n) => n.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.nas.splice(idx, 1);
       return { rows: [] };
     }
@@ -1661,7 +1672,7 @@ module.exports = {
     // DELETE ipam_subnets
     if (lowerText.includes("delete from ipam_subnets")) {
       const idx = store.ipam_subnets.findIndex((s) => s.id === params[0]);
-      if (idx !== -1) store.ipam_subnets.splice(idx, 1);
+      if (idx !== -1) {store.ipam_subnets.splice(idx, 1);}
       return { rows: [] };
     }
 
@@ -1704,7 +1715,7 @@ module.exports = {
             const aParts = a.ip_address.split(".").map(Number);
             const bParts = b.ip_address.split(".").map(Number);
             for (let i = 0; i < 4; i++) {
-              if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
+              if (aParts[i] !== bParts[i]) {return aParts[i] - bParts[i];}
             }
             return 0;
           });
@@ -1755,13 +1766,13 @@ module.exports = {
       lowerText.includes("where id")
     ) {
       const idx = store.ipam_ips.findIndex((i) => i.id === params[3]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       if (params[0] !== undefined && params[0] !== null)
-        store.ipam_ips[idx].status = params[0];
+        {store.ipam_ips[idx].status = params[0];}
       if (params[1] !== undefined && params[1] !== null)
-        store.ipam_ips[idx].description = params[1];
+        {store.ipam_ips[idx].description = params[1];}
       if (params[2] !== undefined && params[2] !== null)
-        store.ipam_ips[idx].assigned_to = params[2];
+        {store.ipam_ips[idx].assigned_to = params[2];}
       store.ipam_ips[idx].updated_at = new Date().toISOString();
       return { rows: [store.ipam_ips[idx]] };
     }
@@ -1825,12 +1836,12 @@ module.exports = {
       const idx = store.subscriptions.findIndex(
         (s) => s.id === params[params.length - 1],
       );
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       const sub = store.subscriptions[idx];
-      if (lowerText.includes("plan_id")) sub.plan_id = params[0];
-      if (lowerText.includes("status")) sub.status = params[0];
-      if (lowerText.includes("throttled")) sub.throttled = params[0];
-      if (lowerText.includes("throttle_reason")) sub.throttle_reason = params[0];
+      if (lowerText.includes("plan_id")) {sub.plan_id = params[0];}
+      if (lowerText.includes("status")) {sub.status = params[0];}
+      if (lowerText.includes("throttled")) {sub.throttled = params[0];}
+      if (lowerText.includes("throttle_reason")) {sub.throttle_reason = params[0];}
       sub.updated_at = new Date().toISOString();
       return { rows: [sub] };
     }
@@ -2032,7 +2043,7 @@ module.exports = {
     // UPDATE reviews
     if (lowerText.includes("update reviews")) {
       const idx = store.reviews.findIndex((r) => r.customer_id === params[3]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       store.reviews[idx].rating = params[0];
       store.reviews[idx].service_quality = params[1];
       store.reviews[idx].comment = params[2];

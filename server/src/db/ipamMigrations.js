@@ -24,7 +24,7 @@ const migrations = [
 
 async function run() {
   const db = global.db;
-  if (!db) return;
+  if (!db) {return;}
   for (const m of migrations) { try { await db.query(m); } catch(e) { console.error(e.message); } }
   console.log("IPAM migrations complete");
 }

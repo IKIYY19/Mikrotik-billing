@@ -76,26 +76,32 @@ export default function MessagingPage() {
     try {
       const { data } = await axios.get(`${API}/sms/templates`);
       setTemplates(data || []);
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Failed to fetch templates:", e);
+    }
   };
 
   const fetchLogs = async () => {
     try {
       const { data } = await axios.get(`${API}/sms/logs?page=${logsPage}&limit=100`);
       setLogs(data?.data || data || []);
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Failed to fetch logs:", e);
+    }
   };
 
   const fetchSettings = async () => {
     try {
       const { data } = await axios.get(`${API}/sms/settings`);
       setProviderSettings(data || {});
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Failed to fetch settings:", e);
+    }
   };
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!phone || !message) return toast.error("Phone and message required");
+    if (!phone || !message) {return toast.error("Phone and message required");}
     setSending(true);
     try {
       const endpoint = channel === "whatsapp"
@@ -114,7 +120,7 @@ export default function MessagingPage() {
   };
 
   const handleBulkSend = async () => {
-    if (!message) return toast.error("Message required");
+    if (!message) {return toast.error("Message required");}
     setSending(true);
     try {
       const { data } = await axios.post(`${API}/sms/send-bulk`, { message, filter: bulkFilter, provider });
@@ -126,7 +132,7 @@ export default function MessagingPage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!templateName || !templateBody) return;
+    if (!templateName || !templateBody) {return;}
     try {
       if (editingTemplate) {
         await axios.put(`${API}/sms/templates/${editingTemplate}`, { name: templateName, body: templateBody });
@@ -138,18 +144,29 @@ export default function MessagingPage() {
   };
 
   const handleDeleteLog = async (id) => {
-    try { await axios.delete(`${API}/sms/logs/${id}`); fetchLogs(); } catch (e) {}
+    try {
+      await axios.delete(`${API}/sms/logs/${id}`);
+      fetchLogs();
+    } catch (e) {
+      console.warn("Failed to delete log:", e);
+    }
   };
 
   const clearLogs = async () => {
-    if (!confirm("Delete ALL message logs?")) return;
-    try { await axios.delete(`${API}/sms/logs`); fetchLogs(); toast.success("Logs cleared"); } catch (e) {}
+    if (!confirm("Delete ALL message logs?")) {return;}
+    try {
+      await axios.delete(`${API}/sms/logs`);
+      fetchLogs();
+      toast.success("Logs cleared");
+    } catch (e) {
+      console.warn("Failed to clear logs:", e);
+    }
   };
 
   const filterLogs = (log) => {
-    if (channel === "whatsapp" && log.channel !== "whatsapp" && log.channel !== "whatsapp_inbound") return false;
-    if (channel === "sms" && log.channel === "whatsapp") return false;
-    if (!logFilter) return true;
+    if (channel === "whatsapp" && log.channel !== "whatsapp" && log.channel !== "whatsapp_inbound") {return false;}
+    if (channel === "sms" && log.channel === "whatsapp") {return false;}
+    if (!logFilter) {return true;}
     const f = logFilter.toLowerCase();
     return (log.to?.toLowerCase() || "").includes(f) || (log.message?.toLowerCase() || "").includes(f);
   };

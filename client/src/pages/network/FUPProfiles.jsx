@@ -77,7 +77,7 @@ export function FUPProfiles() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this FUP profile?')) return;
+    if (!confirm('Delete this FUP profile?')) {return;}
     try {
       await axios.delete(`${API}/fup/${id}`);
       fetchProfiles();

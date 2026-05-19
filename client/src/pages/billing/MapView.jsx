@@ -22,9 +22,9 @@ export function MapView() {
   }, []);
 
   useEffect(() => {
-    if (!GMAPS_KEY) return;
-    if (window.google?.maps) return;
-    if (document.getElementById("gmaps-script")) return;
+    if (!GMAPS_KEY) {return;}
+    if (window.google?.maps) {return;}
+    if (document.getElementById("gmaps-script")) {return;}
     const script = document.createElement("script");
     script.id = "gmaps-script";
     script.src =
@@ -37,7 +37,7 @@ export function MapView() {
   }, []);
 
   useEffect(() => {
-    if (data && window.google?.maps) initMap();
+    if (data && window.google?.maps) {initMap();}
   }, [data]);
 
   const fetchData = async () => {
@@ -51,7 +51,7 @@ export function MapView() {
   };
 
   const initMap = () => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current || mapInstanceRef.current) {return;}
     const map = new window.google.maps.Map(mapRef.current, {
       center: data.center || { lat: -1.2921, lng: 36.8219 },
       zoom: data.zoom || 10,
@@ -64,7 +64,7 @@ export function MapView() {
       const lat = e.latLng.lat();
       const lng = e.latLng.lng();
       setClickedCoords({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
-      if (clickMarkerRef.current) clickMarkerRef.current.setMap(null);
+      if (clickMarkerRef.current) {clickMarkerRef.current.setMap(null);}
       clickMarkerRef.current = new window.google.maps.Marker({
         map,
         position: { lat, lng },
@@ -83,7 +83,7 @@ export function MapView() {
   };
 
   const renderMarkers = () => {
-    if (!mapInstanceRef.current || !data) return;
+    if (!mapInstanceRef.current || !data) {return;}
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
@@ -94,7 +94,7 @@ export function MapView() {
         ? customers
         : customers.filter((c) => c.status === filter);
     const customersWithCoords = filteredCustomers.filter(
-      (c) => c.lat != null && c.lng != null,
+      (c) => c.lat !== null && c.lat !== undefined && c.lng !== null && c.lng !== undefined,
     );
 
     // Branch markers (blue circles)
@@ -178,7 +178,7 @@ export function MapView() {
     renderMarkers();
   }, [data, filter]);
 
-  if (loading) return <div className="p-8 text-white">Loading map...</div>;
+  if (loading) {return <div className="p-8 text-white">Loading map...</div>;}
 
   const stats = {
     total: data?.customers?.length || 0,
@@ -294,7 +294,7 @@ export function MapView() {
               <button
                 onClick={() => {
                   if (clickMarkerRef.current)
-                    clickMarkerRef.current.setMap(null);
+                    {clickMarkerRef.current.setMap(null);}
                   setClickedCoords(null);
                 }}
                 className="text-slate-400 hover:text-white"

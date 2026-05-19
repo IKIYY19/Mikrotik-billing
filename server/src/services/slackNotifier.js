@@ -7,7 +7,7 @@ function configure(url) {
 }
 
 async function notify(message, color = "#3b82f6") {
-  if (!webhookUrl) return false;
+  if (!webhookUrl) {return false;}
   try {
     await axios.post(webhookUrl, {
       attachments: [{

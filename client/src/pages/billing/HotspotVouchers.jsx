@@ -271,7 +271,7 @@ export function HotspotVouchers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this voucher?')) return;
+    if (!confirm('Delete this voucher?')) {return;}
     try {
       await axios.delete(`${API}/hotspot/vouchers/${id}`);
       fetchVouchers();
@@ -279,7 +279,7 @@ export function HotspotVouchers() {
   };
 
   const handlePrint = () => {
-    if (!vouchers || !Array.isArray(vouchers) || vouchers.length === 0) return;
+    if (!vouchers || !Array.isArray(vouchers) || vouchers.length === 0) {return;}
     
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`

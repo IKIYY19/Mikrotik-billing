@@ -244,14 +244,14 @@ export function CaptivePortalBuilder() {
   const deleteElement = (id) => {
     const newElements = elements.filter(el => el.id !== id);
     setElements(newElements);
-    if (selectedElement === id) setSelectedElement(null);
+    if (selectedElement === id) {setSelectedElement(null);}
     saveToHistory(newElements);
   };
 
   const moveElement = (id, dir) => {
     const idx = elements.findIndex(el => el.id === id);
     const newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= elements.length) return;
+    if (newIdx < 0 || newIdx >= elements.length) {return;}
     const newEls = [...elements];
     [newEls[idx], newEls[newIdx]] = [newEls[newIdx], newEls[idx]];
     setElements(newEls);
@@ -261,7 +261,7 @@ export function CaptivePortalBuilder() {
   const savePortal = async () => {
     if (!editing?.name && !editing) {
       const name = prompt('Portal name:', 'My HotSpot Portal');
-      if (!name) return;
+      if (!name) {return;}
       setEditing({ name });
     }
     setLoading(true);
@@ -300,7 +300,7 @@ export function CaptivePortalBuilder() {
 
   const computeGuides = useCallback((elId) => {
     const el = elements.find(e => e.id === elId);
-    if (!el) return { vertical: [], horizontal: [] };
+    if (!el) {return { vertical: [], horizontal: [] };}
     const vertical = [];
     const horizontal = [];
     const snapThreshold = 5;
@@ -308,7 +308,7 @@ export function CaptivePortalBuilder() {
     const elCenterY = el.y + 3; // approximate height
 
     elements.forEach(other => {
-      if (other.id === elId) return;
+      if (other.id === elId) {return;}
       const otherCenterX = other.x + (other.width || 0) / 2;
       const otherCenterY = other.y + 3;
       if (Math.abs(elCenterX - otherCenterX) < snapThreshold) {
@@ -323,16 +323,16 @@ export function CaptivePortalBuilder() {
     });
 
     // Snap to center
-    if (Math.abs(elCenterX - 50) < snapThreshold) vertical.push(50);
-    if (Math.abs(el.y - 50) < snapThreshold) horizontal.push(50);
+    if (Math.abs(elCenterX - 50) < snapThreshold) {vertical.push(50);}
+    if (Math.abs(el.y - 50) < snapThreshold) {horizontal.push(50);}
 
     return { vertical: [...new Set(vertical)], horizontal: [...new Set(horizontal)] };
   }, [elements]);
 
   const snapValue = useCallback((value, guides) => {
-    if (!snapToGrid || guides.length === 0) return value;
+    if (!snapToGrid || guides.length === 0) {return value;}
     for (const g of guides) {
-      if (Math.abs(value - g) < 5) return g;
+      if (Math.abs(value - g) < 5) {return g;}
     }
     return value;
   }, [snapToGrid]);
@@ -341,10 +341,10 @@ export function CaptivePortalBuilder() {
   const handleMouseDown = useCallback((e, elId) => {
     e.stopPropagation();
     const el = elements.find(el => el.id === elId);
-    if (!el) return;
+    if (!el) {return;}
     setSelectedElement(elId);
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {return;}
     const canvasWidth = 375;
     const canvasHeight = 667;
     const scaleX = canvasWidth / rect.width;
@@ -361,9 +361,9 @@ export function CaptivePortalBuilder() {
   }, [elements]);
 
   const handleMouseMove = useCallback((e) => {
-    if (!dragging) return;
+    if (!dragging) {return;}
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {return;}
     const canvasWidth = 375;
     const canvasHeight = 667;
     const scaleX = canvasWidth / rect.width;
@@ -404,16 +404,16 @@ export function CaptivePortalBuilder() {
   /* ─── Resize Handlers ─── */
   const handleResizeStart = useCallback((e, handle) => {
     e.stopPropagation();
-    if (!selectedElement) return;
+    if (!selectedElement) {return;}
     const el = elements.find(el => el.id === selectedElement);
-    if (!el) return;
+    if (!el) {return;}
     setResizing({ handle, startX: e.clientX, startY: e.clientY, startWidth: el.width || 20, startXPos: el.x });
   }, [selectedElement, elements]);
 
   const handleResizeMove = useCallback((e) => {
-    if (!resizing || !selectedElement) return;
+    if (!resizing || !selectedElement) {return;}
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {return;}
     const canvasWidth = 375;
     const scaleX = canvasWidth / rect.width;
     const deltaX = (e.clientX - resizing.startX) * scaleX;
@@ -475,7 +475,7 @@ export function CaptivePortalBuilder() {
   /* ─── Background Image Upload ─── */
   const handleBgImageUpload = useCallback((e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {return;}
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
@@ -729,7 +729,7 @@ export function CaptivePortalBuilder() {
 
   /* ─── Resize Handles Component ─── */
   const ResizeHandles = () => {
-    if (!selectedElement) return null;
+    if (!selectedElement) {return null;}
     const handleSize = 8;
     const handleStyle = (cursor) => ({
       position: 'absolute',
@@ -758,7 +758,7 @@ export function CaptivePortalBuilder() {
 
   /* ─── Alignment Guide Lines ─── */
   const GuideLines = () => {
-    if (guides.vertical.length === 0 && guides.horizontal.length === 0) return null;
+    if (guides.vertical.length === 0 && guides.horizontal.length === 0) {return null;}
     return (
       <>
         {guides.vertical.map((v, i) => (
@@ -855,7 +855,7 @@ export function CaptivePortalBuilder() {
       bgStyle = `background:${styles.bgColor};`;
     }
 
-    let elementsHTML = elements.map(el => {
+    const elementsHTML = elements.map(el => {
       const pos = `position:absolute;left:${el.x}%;top:${el.y}%;transform:translateX(-50%);${el.width ? `width:${el.width}%;` : ''}`;
       const st = Object.entries(el.style || {}).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v}`).join(';');
 
@@ -917,9 +917,9 @@ export function CaptivePortalBuilder() {
         case 'social-links': {
           const social = el.social || {};
           let icons = '';
-          if (social.facebook) icons += `<a href="${social.facebook}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Facebook</a> `;
-          if (social.twitter) icons += `<a href="${social.twitter}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Twitter</a> `;
-          if (social.instagram) icons += `<a href="${social.instagram}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Instagram</a> `;
+          if (social.facebook) {icons += `<a href="${social.facebook}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Facebook</a> `;}
+          if (social.twitter) {icons += `<a href="${social.twitter}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Twitter</a> `;}
+          if (social.instagram) {icons += `<a href="${social.instagram}" target="_blank" style="color:${el.style.iconColor || '#a1a1aa'};margin:0 8px;">Instagram</a> `;}
           return `<div style="${pos}text-align:center;">${icons}</div>`;
         }
         case 'social-login':

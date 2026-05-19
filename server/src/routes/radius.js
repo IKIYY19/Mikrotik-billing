@@ -4,7 +4,7 @@ const db = global.db || require("../db/memory");
 
 // Helper: get DB connection
 function getDb() {
-  if (global.dbAvailable) return global.db;
+  if (global.dbAvailable) {return global.db;}
   return require("../db/memory");
 }
 
@@ -54,7 +54,7 @@ router.put("/nas/:id", async (req, res) => {
       [nasname, shortname, secret, description, type, req.params.id],
     );
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "NAS not found" });
+      {return res.status(404).json({ error: "NAS not found" });}
     res.json(result.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -307,8 +307,8 @@ router.get("/accounting", async (req, res) => {
     const { page = 1, limit = 50, username = "", status = "" } = req.query;
     const offset = (page - 1) * limit;
 
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (username) {
@@ -492,8 +492,8 @@ router.get("/auth-log", async (req, res) => {
     const { page = 1, limit = 100, username = "" } = req.query;
     const offset = (page - 1) * limit;
 
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (username) {

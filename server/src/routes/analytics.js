@@ -141,25 +141,25 @@ router.get('/overview', async (req, res) => {
     const revenueSpark = new Array(days).fill(0);
     dailyRevenueRes.rows.forEach(row => {
       const idx = Math.floor((new Date(row.day) - new Date(now.getTime() - days * 24 * 60 * 60 * 1000)) / (24 * 60 * 60 * 1000));
-      if (idx >= 0 && idx < days) revenueSpark[idx] = parseFloat(row.total);
+      if (idx >= 0 && idx < days) {revenueSpark[idx] = parseFloat(row.total);}
     });
 
     // Generate insights
     const insights = [];
-    if (revenueTrend > 10) insights.push({ type: 'positive', text: `Revenue is up ${revenueTrend.toFixed(1)}% compared to the previous period. Great growth momentum!` });
-    else if (revenueTrend < -10) insights.push({ type: 'warning', text: `Revenue declined ${Math.abs(revenueTrend).toFixed(1)}% vs previous period. Consider reviewing pricing or retention strategies.` });
+    if (revenueTrend > 10) {insights.push({ type: 'positive', text: `Revenue is up ${revenueTrend.toFixed(1)}% compared to the previous period. Great growth momentum!` });}
+    else if (revenueTrend < -10) {insights.push({ type: 'warning', text: `Revenue declined ${Math.abs(revenueTrend).toFixed(1)}% vs previous period. Consider reviewing pricing or retention strategies.` });}
 
-    if (churnRate > 5) insights.push({ type: 'warning', text: `Churn rate is at ${churnRate.toFixed(1)}%. Focus on customer retention to reduce cancellations.` });
-    else if (churnRate === 0 && churned === 0) insights.push({ type: 'positive', text: 'Zero churn this period — excellent customer satisfaction!' });
+    if (churnRate > 5) {insights.push({ type: 'warning', text: `Churn rate is at ${churnRate.toFixed(1)}%. Focus on customer retention to reduce cancellations.` });}
+    else if (churnRate === 0 && churned === 0) {insights.push({ type: 'positive', text: 'Zero churn this period — excellent customer satisfaction!' });}
 
-    if (newCustomers > prevNewCustomers) insights.push({ type: 'positive', text: `Acquired ${newCustomers} new customers, up from ${prevNewCustomers} last period.` });
+    if (newCustomers > prevNewCustomers) {insights.push({ type: 'positive', text: `Acquired ${newCustomers} new customers, up from ${prevNewCustomers} last period.` });}
 
     if (ltv > 0 && arpu > 0) {
       const ltvCacRatio = ltv / arpu;
-      if (ltvCacRatio > 3) insights.push({ type: 'positive', text: `LTV:CAC ratio is healthy at ${ltvCacRatio.toFixed(1)}:1. Your business model is sustainable.` });
+      if (ltvCacRatio > 3) {insights.push({ type: 'positive', text: `LTV:CAC ratio is healthy at ${ltvCacRatio.toFixed(1)}:1. Your business model is sustainable.` });}
     }
 
-    if (insights.length === 0) insights.push({ type: 'info', text: 'Business is stable. Keep monitoring trends for optimization opportunities.' });
+    if (insights.length === 0) {insights.push({ type: 'info', text: 'Business is stable. Keep monitoring trends for optimization opportunities.' });}
 
     res.json({
       total_revenue: totalRevenue,
@@ -272,9 +272,9 @@ router.get('/churn', async (req, res) => {
       }).length;
       const other = churnedSubs.rows.length - highPrice - shortLifespan;
 
-      if (highPrice > 0) reasons.push({ reason: 'Too expensive', count: highPrice, percentage: Math.round((highPrice / churnedSubs.rows.length) * 100) });
-      if (shortLifespan > 0) reasons.push({ reason: 'Trial / Short usage', count: shortLifespan, percentage: Math.round((shortLifespan / churnedSubs.rows.length) * 100) });
-      if (other > 0) reasons.push({ reason: 'Other reasons', count: other, percentage: Math.round((other / churnedSubs.rows.length) * 100) });
+      if (highPrice > 0) {reasons.push({ reason: 'Too expensive', count: highPrice, percentage: Math.round((highPrice / churnedSubs.rows.length) * 100) });}
+      if (shortLifespan > 0) {reasons.push({ reason: 'Trial / Short usage', count: shortLifespan, percentage: Math.round((shortLifespan / churnedSubs.rows.length) * 100) });}
+      if (other > 0) {reasons.push({ reason: 'Other reasons', count: other, percentage: Math.round((other / churnedSubs.rows.length) * 100) });}
     }
 
     res.json({

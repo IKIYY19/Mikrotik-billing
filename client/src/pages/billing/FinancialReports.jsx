@@ -21,11 +21,11 @@ export function FinancialReports() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (activeTab === 'daily') fetchDaily();
-    if (activeTab === 'monthly') fetchMonthly();
-    if (activeTab === 'debtors') fetchDebtors();
-    if (activeTab === 'tax') fetchTax();
-    if (activeTab === 'commissions') fetchCommissions();
+    if (activeTab === 'daily') {fetchDaily();}
+    if (activeTab === 'monthly') {fetchMonthly();}
+    if (activeTab === 'debtors') {fetchDebtors();}
+    if (activeTab === 'tax') {fetchTax();}
+    if (activeTab === 'commissions') {fetchCommissions();}
   }, [activeTab]);
 
   const fetchDaily = async () => {
@@ -108,13 +108,13 @@ export function FinancialReports() {
         {(activeTab === 'monthly' || activeTab === 'tax') && (
           <div className="flex items-center gap-2">
             <label className="text-sm text-slate-400">Month:</label>
-            <select value={month} onChange={e => { setMonth(parseInt(e.target.value)); if (activeTab === 'monthly') fetchMonthly(); else fetchTax(); }}
+            <select value={month} onChange={e => { setMonth(parseInt(e.target.value)); if (activeTab === 'monthly') {fetchMonthly();} else {fetchTax();} }}
               className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm">
               {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
                 <option key={i} value={i}>{m}</option>
               ))}
             </select>
-            <select value={year} onChange={e => { setYear(parseInt(e.target.value)); if (activeTab === 'monthly') fetchMonthly(); else fetchTax(); }}
+            <select value={year} onChange={e => { setYear(parseInt(e.target.value)); if (activeTab === 'monthly') {fetchMonthly();} else {fetchTax();} }}
               className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm">
               {Array.from({ length: 20 }, (_, i) => 2020 + i).map(y => <option key={y} value={y}>{y}</option>)}
             </select>

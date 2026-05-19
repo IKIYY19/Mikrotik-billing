@@ -22,7 +22,7 @@ class MailgunService {
       formData.append('to', Array.isArray(to) ? to.join(',') : to);
       formData.append('subject', subject);
       formData.append('html', html);
-      if (text) formData.append('text', text);
+      if (text) {formData.append('text', text);}
 
       const response = await axios.post(`${this.baseUrl}/messages`, formData, {
         auth: {

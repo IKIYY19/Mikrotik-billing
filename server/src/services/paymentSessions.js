@@ -7,7 +7,7 @@ function useDatabase() {
 }
 
 function normalizeSession(session) {
-  if (!session) return null;
+  if (!session) {return null;}
   return {
     ...session,
     amount: session.amount === null || session.amount === undefined ? 0 : Number(session.amount),
@@ -72,7 +72,7 @@ async function savePending(session) {
 }
 
 async function findByCheckoutRequestId(checkoutRequestId) {
-  if (!checkoutRequestId) return null;
+  if (!checkoutRequestId) {return null;}
 
   if (useDatabase()) {
     const result = await global.db.query(
@@ -87,7 +87,7 @@ async function findByCheckoutRequestId(checkoutRequestId) {
 
 async function markCompleted(checkoutRequestId, updates = {}) {
   const current = await findByCheckoutRequestId(checkoutRequestId);
-  if (!current) return null;
+  if (!current) {return null;}
 
   if (useDatabase()) {
     const result = await global.db.query(
@@ -127,7 +127,7 @@ async function markCompleted(checkoutRequestId, updates = {}) {
 
 async function markFailed(checkoutRequestId, updates = {}) {
   const current = await findByCheckoutRequestId(checkoutRequestId);
-  if (!current) return null;
+  if (!current) {return null;}
 
   if (useDatabase()) {
     const result = await global.db.query(

@@ -87,7 +87,7 @@ export function Alerts() {
   };
 
   const formatTime = (date) => {
-    if (!date) return 'Never';
+    if (!date) {return 'Never';}
     const now = new Date();
     const then = new Date(date);
     const diffMs = now - then;
@@ -95,9 +95,9 @@ export function Alerts() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffMins < 1) {return 'Just now';}
+    if (diffMins < 60) {return `${diffMins}m ago`;}
+    if (diffHours < 24) {return `${diffHours}h ago`;}
     return `${diffDays}d ago`;
   };
 

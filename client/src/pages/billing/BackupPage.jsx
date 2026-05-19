@@ -127,7 +127,7 @@ export function BackupPage() {
   };
 
   const deleteSchedule = async (id) => {
-    if (!window.confirm("Delete this backup schedule?")) return;
+    if (!window.confirm("Delete this backup schedule?")) {return;}
     try {
       await axios.delete(`${API}/advanced/backup/schedules/${id}`);
       toast.success("Schedule deleted");
@@ -182,12 +182,12 @@ export function BackupPage() {
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) setUploadFile(file);
+    if (file) {setUploadFile(file);}
   };
 
   const executeUpload = async (e) => {
     e.preventDefault();
-    if (!uploadFile) return;
+    if (!uploadFile) {return;}
     setUploading(true);
     try {
       const formData = new FormData();

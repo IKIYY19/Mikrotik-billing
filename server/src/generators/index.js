@@ -99,9 +99,9 @@ class ScriptGenerator {
       case 'interfaces':
         if (config.vlans) {
           config.vlans.forEach((vlan, idx) => {
-            if (!vlan.name) errors.push(`VLAN ${idx}: name is required`);
-            if (!vlan['vlan-id']) errors.push(`VLAN ${idx}: vlan-id is required`);
-            if (!vlan.interface) errors.push(`VLAN ${idx}: interface is required`);
+            if (!vlan.name) {errors.push(`VLAN ${idx}: name is required`);}
+            if (!vlan['vlan-id']) {errors.push(`VLAN ${idx}: vlan-id is required`);}
+            if (!vlan.interface) {errors.push(`VLAN ${idx}: interface is required`);}
           });
         }
         break;
@@ -109,8 +109,8 @@ class ScriptGenerator {
       case 'ipconfig':
         if (config.addresses) {
           config.addresses.forEach((addr, idx) => {
-            if (!addr.address) errors.push(`Address ${idx}: address is required`);
-            if (!addr.interface) errors.push(`Address ${idx}: interface is required`);
+            if (!addr.address) {errors.push(`Address ${idx}: address is required`);}
+            if (!addr.interface) {errors.push(`Address ${idx}: interface is required`);}
           });
         }
         break;
@@ -118,8 +118,8 @@ class ScriptGenerator {
       case 'firewall':
         if (config.filter_rules) {
           config.filter_rules.forEach((rule, idx) => {
-            if (!rule.chain) errors.push(`Filter rule ${idx}: chain is required`);
-            if (!rule.action) errors.push(`Filter rule ${idx}: action is required`);
+            if (!rule.chain) {errors.push(`Filter rule ${idx}: chain is required`);}
+            if (!rule.action) {errors.push(`Filter rule ${idx}: action is required`);}
           });
         }
         break;

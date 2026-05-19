@@ -44,7 +44,7 @@ export function BillingInvoices() {
   };
 
   const generateMonthly = async () => {
-    if (!confirm('Generate invoices for all active subscriptions?')) return;
+    if (!confirm('Generate invoices for all active subscriptions?')) {return;}
     await axios.post(`${API}/billing/invoices/generate-monthly`);
     const { data } = await axios.get(`${API}/billing/invoices`); setInvoices(data);
   };
@@ -185,7 +185,7 @@ export function BillingInvoices() {
                   <Label htmlFor="plan">Plan (auto-fills price)</Label>
                   <select id="plan" onChange={e => {
                     const plan = plans.find(p => p.id === e.target.value);
-                    if (plan) setForm({...form, amount: plan.price.toString()});
+                    if (plan) {setForm({...form, amount: plan.price.toString()});}
                   }} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
                     <option value="">Select plan</option>
                     {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.price}/mo</option>)}

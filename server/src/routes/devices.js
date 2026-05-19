@@ -11,7 +11,7 @@ function getDb() {
 }
 
 function toSafeDevice(device) {
-  if (!device) return null;
+  if (!device) {return null;}
   const { mgmt_password_encrypted, radius_secret, ...safe } = device;
   return safe;
 }
@@ -485,6 +485,8 @@ router.post("/discovered/:id/approve", async (req, res) => {
       mgmt_password,
       connection_type,
       notes,
+      wireguard_tunnel_ip,
+      wireguard_listen_port,
     } = req.body || {};
 
     const routerId = uuidv4();
@@ -509,8 +511,9 @@ router.post("/discovered/:id/approve", async (req, res) => {
        wan_interface, lan_interface, lan_ports, provision_token, provision_status,
        dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
        hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
-       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes,
+       wireguard_tunnel_ip, wireguard_listen_port)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
        RETURNING *`,
       [
         routerId,
@@ -542,6 +545,8 @@ router.post("/discovered/:id/approve", async (req, res) => {
         connection_type || "api",
         notes ||
           `Approved from enrollment token ${discovered.enrollment_token}`,
+        wireguard_tunnel_ip || "",
+        wireguard_listen_port ? Number(wireguard_listen_port) : 13231,
       ],
     );
 
@@ -587,7 +592,7 @@ router.get("/:id", async (req, res) => {
       req.params.id,
     ]);
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Device not found" });
+      {return res.status(404).json({ error: "Device not found" });}
     res.json(toSafeDevice(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -614,7 +619,7 @@ router.get("/:id/script", async (req, res) => {
       req.params.id,
     ]);
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Device not found" });
+      {return res.status(404).json({ error: "Device not found" });}
     const baseUrl =
       process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get("host")}`;
     const script = provisionStore.generateProvisionScript(result.rows[0], {
@@ -656,6 +661,8 @@ router.post("/", async (req, res) => {
       mgmt_password,
       connection_type,
       notes,
+      wireguard_tunnel_ip,
+      wireguard_listen_port,
     } = req.body;
 
     const id = uuidv4();
@@ -669,8 +676,9 @@ router.post("/", async (req, res) => {
        wan_interface, lan_interface, lan_ports, provision_token, provision_status,
        dns_servers, ntp_servers, radius_server, radius_secret, radius_port,
        hotspot_enabled, pppoe_enabled, pppoe_interface, pppoe_service_name,
-       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+       mgmt_port, mgmt_username, mgmt_password_encrypted, connection_type, notes,
+       wireguard_tunnel_ip, wireguard_listen_port)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
        RETURNING *`,
       [
         id,
@@ -704,6 +712,8 @@ router.post("/", async (req, res) => {
         encryptedMgmtPassword,
         connection_type || "api",
         notes || "",
+        wireguard_tunnel_ip || "",
+        wireguard_listen_port ? Number(wireguard_listen_port) : 13231,
       ],
     );
 
@@ -739,6 +749,8 @@ router.put("/:id", async (req, res) => {
       mgmt_password,
       connection_type,
       notes,
+      wireguard_tunnel_ip,
+      wireguard_listen_port,
     } = req.body;
 
     const existing = await getDb().query(
@@ -746,7 +758,7 @@ router.put("/:id", async (req, res) => {
       [req.params.id],
     );
     if (existing.rows.length === 0)
-      return res.status(404).json({ error: "Device not found" });
+      {return res.status(404).json({ error: "Device not found" });}
 
     const r = existing.rows[0];
     const encryptedMgmtPassword = mgmt_password
@@ -766,8 +778,10 @@ router.put("/:id", async (req, res) => {
         mgmt_port = COALESCE($18, mgmt_port), mgmt_username = COALESCE($19, mgmt_username),
         mgmt_password_encrypted = COALESCE($20, mgmt_password_encrypted), connection_type = COALESCE($21, connection_type),
         notes = COALESCE($22, notes),
+        wireguard_tunnel_ip = COALESCE($23, wireguard_tunnel_ip),
+        wireguard_listen_port = COALESCE($24, wireguard_listen_port),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $23 RETURNING *`,
+       WHERE id = $25 RETURNING *`,
       [
         name || r.name,
         identity || r.identity,
@@ -793,6 +807,8 @@ router.put("/:id", async (req, res) => {
         encryptedMgmtPassword,
         connection_type || r.connection_type || "api",
         notes !== undefined ? notes : r.notes,
+        wireguard_tunnel_ip !== undefined ? wireguard_tunnel_ip : r.wireguard_tunnel_ip,
+        wireguard_listen_port !== undefined ? (wireguard_listen_port ? Number(wireguard_listen_port) : null) : r.wireguard_listen_port,
         req.params.id,
       ],
     );
@@ -817,7 +833,7 @@ router.post("/:id/regenerate-token", async (req, res) => {
       [token, "pending", req.params.id],
     );
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Device not found" });
+      {return res.status(404).json({ error: "Device not found" });}
     res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -851,7 +867,7 @@ router.delete("/:id", async (req, res) => {
       [req.params.id],
     );
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Device not found" });
+      {return res.status(404).json({ error: "Device not found" });}
     res.json({ message: "Device deleted" });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -8,8 +8,9 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-// Lazy db getter
+// Lazy db getter & proxy
 const getDb = () => global.dbAvailable ? global.db : require('../db/memory');
+const db = { query: (...args) => getDb().query(...args) };
 
 // Valid roles
 const VALID_ROLES = ['admin', 'staff', 'technician', 'reseller', 'customer', 'customer_care', 'sales_team'];

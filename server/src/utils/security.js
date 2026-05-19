@@ -12,7 +12,7 @@ function generateSecret(length = 64) {
 
 // Check if value looks like a default/placeholder
 function isDefaultSecret(value) {
-  if (!value) return true;
+  if (!value) {return true;}
   const defaults = [
     'change-this',
     'change-me',

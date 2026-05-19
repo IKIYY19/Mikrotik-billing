@@ -52,7 +52,7 @@ export function getToken() {
  */
 export function getUser() {
   const userStr = localStorage.getItem(USER_KEY);
-  if (!userStr) return null;
+  if (!userStr) {return null;}
   try {
     return JSON.parse(userStr);
   } catch {

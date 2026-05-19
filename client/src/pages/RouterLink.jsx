@@ -68,7 +68,7 @@ export default function RouterLink() {
   const watchIntervalRef = React.useRef(null);
 
   const startWatching = async () => {
-    if (!tenantSlug) return;
+    if (!tenantSlug) {return;}
     stopWatching();
 
     try {
@@ -118,7 +118,7 @@ export default function RouterLink() {
   }, []);
 
   useEffect(() => {
-    if (apiKey) setPolling(true);
+    if (apiKey) {setPolling(true);}
   }, [apiKey]);
 
   const fetchTenant = async () => {
@@ -233,7 +233,7 @@ export default function RouterLink() {
   };
 
   const fetchAllRouters = async () => {
-    if (!tenantSlug) return;
+    if (!tenantSlug) {return;}
     try {
       const { data } = await axios.get(`${API}/router/v1/${tenantSlug}/routers`);
       setAllRouters(data.routers || data.by_tenant_id || []);

@@ -18,7 +18,7 @@ function generateToken() {
 }
 
 function escapeRouterValue(value) {
-  if (value === null || value === undefined) return "";
+  if (value === null || value === undefined) {return "";}
   const str = String(value);
   return str
     .replace(/\\/g, "\\\\")
@@ -1162,7 +1162,7 @@ module.exports = {
     // DELETE routers
     if (lowerText.includes("delete from routers")) {
       const idx = store.routers.findIndex((r) => r.id === params[0]);
-      if (idx === -1) return { rows: [] };
+      if (idx === -1) {return { rows: [] };}
       return { rows: store.routers.splice(idx, 1) };
     }
 
@@ -1180,7 +1180,7 @@ module.exports = {
       );
       const router = store.routers.find((r) => r.id === idParam);
       console.log("[STORE] Found router:", !!router);
-      if (!router) return { rows: [] };
+      if (!router) {return { rows: [] };}
       router.provision_status = params[0];
       router.last_provisioned_at = new Date().toISOString();
       router.provision_attempts = (router.provision_attempts || 0) + 1;
@@ -1196,7 +1196,7 @@ module.exports = {
     ) {
       const idParam = params[params.length - 1];
       const router = store.routers.find((r) => r.id === idParam);
-      if (!router) return { rows: [] };
+      if (!router) {return { rows: [] };}
       router.provision_token = params[0];
       router.provision_status = "pending";
       router.updated_at = new Date().toISOString();
@@ -1207,7 +1207,7 @@ module.exports = {
     if (lowerText.includes("update routers")) {
       const idParam = params[params.length - 1];
       const router = store.routers.find((r) => r.id === idParam);
-      if (!router) return { rows: [] };
+      if (!router) {return { rows: [] };}
 
       // Map the SET fields from the devices route
       const fieldNames = [

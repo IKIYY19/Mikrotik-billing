@@ -47,7 +47,7 @@ export function OLTManagement() {
   const { toast } = useToast();
 
   useEffect(() => { fetchConnections(); }, []);
-  useEffect(() => { if (selectedOLT) loadOLTData(selectedOLT); }, [selectedOLT]);
+  useEffect(() => { if (selectedOLT) {loadOLTData(selectedOLT);} }, [selectedOLT]);
 
   const fetchConnections = async () => {
     setLoading(true);
@@ -75,9 +75,9 @@ export function OLTManagement() {
         axios.get(`${API}/olt/${oltId}/ports`, { headers }).catch(() => ({ data: null })),
       ]);
 
-      if (statsRes.data?.success) setOLTStats(statsRes.data);
-      if (onuRes.data?.success) setONUs(onuRes.data.onus || []);
-      if (portRes.data?.success) setPorts(portRes.data.ports || []);
+      if (statsRes.data?.success) {setOLTStats(statsRes.data);}
+      if (onuRes.data?.success) {setONUs(onuRes.data.onus || []);}
+      if (portRes.data?.success) {setPorts(portRes.data.ports || []);}
     } catch (e) {
       console.error('Failed to load OLT data:', e);
     }
@@ -107,14 +107,14 @@ export function OLTManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this OLT connection?')) return;
+    if (!confirm('Delete this OLT connection?')) {return;}
     try {
       const token = localStorage.getItem('token');
       await axios.delete(`${API}/olt/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       toast.success('OLT connection deleted');
-      if (selectedOLT === id) setSelectedOLT(null);
+      if (selectedOLT === id) {setSelectedOLT(null);}
       await fetchConnections();
     } catch (e) {
       toast.error('Failed to delete OLT connection');
@@ -140,7 +140,7 @@ export function OLTManagement() {
   };
 
   const handleExecuteCommand = async () => {
-    if (!selectedOLT || !command) return;
+    if (!selectedOLT || !command) {return;}
     try {
       const token = localStorage.getItem('token');
       const { data } = await axios.post(`${API}/olt/${selectedOLT}/command`, { command }, {

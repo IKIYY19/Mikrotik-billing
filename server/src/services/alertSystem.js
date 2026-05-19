@@ -41,7 +41,7 @@ class AlertSystem {
   }
 
   async sendPaymentReceived(customerId, amount, invoiceNumber, receiptNumber) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -49,7 +49,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const result = await this.telegram.sendPaymentConfirmation(
@@ -67,7 +67,7 @@ class AlertSystem {
   }
 
   async sendPaymentReminder(customerId, amount, dueDate, invoiceNumber) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -75,7 +75,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const result = await this.telegram.sendPaymentReminder(
@@ -93,7 +93,7 @@ class AlertSystem {
   }
 
   async sendOverdueNotice(customerId, amount, daysOverdue) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -101,7 +101,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const result = await this.telegram.sendOverdueNotice(
@@ -118,7 +118,7 @@ class AlertSystem {
   }
 
   async sendServiceAlert(customerId, alertType, message) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -126,7 +126,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const result = await this.telegram.sendServiceAlert(
@@ -142,7 +142,7 @@ class AlertSystem {
   }
 
   async sendServiceSuspension(customerId, planName) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -150,7 +150,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const message = `Your internet service (${planName}) has been suspended due to non-payment. Please make a payment to restore your service.`;
@@ -168,7 +168,7 @@ class AlertSystem {
   }
 
   async sendNewInvoice(customerId, invoiceNumber, amount, dueDate) {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const customer = await global.db.query(
@@ -176,7 +176,7 @@ class AlertSystem {
         [customerId]
       );
 
-      if (customer.rows.length === 0) return;
+      if (customer.rows.length === 0) {return;}
 
       const { name, telegram_chat_id } = customer.rows[0];
       const message = `📄 New Invoice: ${invoiceNumber}\n\nAmount: KES ${amount}\nDue Date: ${dueDate}\n\nPlease make payment before the due date to avoid service interruption.`;
@@ -193,7 +193,7 @@ class AlertSystem {
   }
 
   async sendBulkOverdueReminders() {
-    if (!this.enabled || !this.telegram) return;
+    if (!this.enabled || !this.telegram) {return;}
 
     try {
       const result = await global.db.query(`

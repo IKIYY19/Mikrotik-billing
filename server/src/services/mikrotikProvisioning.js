@@ -1,4 +1,5 @@
 const routerConnectionManager = require("./routerConnectionManager");
+const provisioningQueue = require("./provisioningQueue");
 
 const db = global.db || require("../db/memory");
 
@@ -55,7 +56,7 @@ async function findSecret(connectionId, username) {
   return secrets.find((secret) => secret.name === username) || null;
 }
 
-async function upsertSubscriptionSecret(subscription) {
+async function executeUpsertSecretDirectly(subscription) {
   if (!subscription.mikrotik_connection_id) {
     return {
       success: false,
@@ -137,7 +138,7 @@ async function disconnectActiveSession(connectionId, username) {
   return true;
 }
 
-async function suspendSubscriptionSecret(subscription) {
+async function executeSuspendSecretDirectly(subscription) {
   if (!subscription.mikrotik_connection_id || !subscription.pppoe_username) {
     return {
       success: false,
@@ -176,7 +177,7 @@ async function suspendSubscriptionSecret(subscription) {
   };
 }
 
-async function deleteSubscriptionSecret(subscription) {
+async function executeDeleteSecretDirectly(subscription) {
   if (!subscription.mikrotik_connection_id || !subscription.pppoe_username) {
     return {
       success: false,
@@ -215,6 +216,42 @@ async function deleteSubscriptionSecret(subscription) {
   };
 }
 
+async function upsertSubscriptionSecret(subscription) {
+  try {
+    return await executeUpsertSecretDirectly(subscription);
+  } catch (error) {
+    if (subscription.mikrotik_connection_id) {
+      await provisioningQueue.queueTask(subscription.mikrotik_connection_id, "upsert_secret", subscription, "pending", error.message);
+      return { success: true, status: "queued", action: "queued_upsert", message: "Router offline. Task queued for retry." };
+    }
+    throw error;
+  }
+}
+
+async function suspendSubscriptionSecret(subscription) {
+  try {
+    return await executeSuspendSecretDirectly(subscription);
+  } catch (error) {
+    if (subscription.mikrotik_connection_id) {
+      await provisioningQueue.queueTask(subscription.mikrotik_connection_id, "suspend_secret", subscription, "pending", error.message);
+      return { success: true, status: "queued", action: "queued_suspend", message: "Router offline. Task queued for retry." };
+    }
+    throw error;
+  }
+}
+
+async function deleteSubscriptionSecret(subscription) {
+  try {
+    return await executeDeleteSecretDirectly(subscription);
+  } catch (error) {
+    if (subscription.mikrotik_connection_id) {
+      await provisioningQueue.queueTask(subscription.mikrotik_connection_id, "delete_secret", subscription, "pending", error.message);
+      return { success: true, status: "queued", action: "queued_delete", message: "Router offline. Task queued for retry." };
+    }
+    throw error;
+  }
+}
+
 async function reconcileSubscription(subscription) {
   if (subscription.status === "active") {
     return upsertSubscriptionSecret(subscription);
@@ -233,4 +270,7 @@ module.exports = {
   suspendSubscriptionSecret,
   deleteSubscriptionSecret,
   reconcileSubscription,
+  executeUpsertSecretDirectly,
+  executeSuspendSecretDirectly,
+  executeDeleteSecretDirectly,
 };

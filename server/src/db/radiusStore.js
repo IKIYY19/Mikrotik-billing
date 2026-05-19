@@ -332,14 +332,14 @@ async function handleAccounting(data) {
 async function getTotalCustomerUsage(customerId) {
   const billingData = getBillingData();
   const customer = await billingData.getCustomerById(customerId);
-  if (!customer) return 0;
+  if (!customer) {return 0;}
 
   // Find active subscription
   const subscriptions = await billingData.listSubscriptions();
   const subscription = subscriptions.find(
     (s) => s.customer_id === customerId && s.status === "active",
   );
-  if (!subscription) return 0;
+  if (!subscription) {return 0;}
 
   // Calculate usage from current billing cycle start date
   const cycleStart =

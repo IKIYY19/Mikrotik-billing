@@ -138,7 +138,7 @@ export default function TenantSettingsPage() {
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {return;}
 
     // Preview
     const reader = new FileReader();

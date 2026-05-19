@@ -30,7 +30,7 @@ async function runAutoSuspend() {
           new Date(i.due_date) < new Date(),
       );
 
-      if (overdueInvoices.length === 0) continue;
+      if (overdueInvoices.length === 0) {continue;}
 
       const daysOverdue = Math.max(
         ...overdueInvoices.map((i) =>

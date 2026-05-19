@@ -16,7 +16,7 @@ const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 function tenantContext(req, res, next) {
   // Tenant already resolved (set by auth middleware)
-  if (req.tenantId !== undefined) return next();
+  if (req.tenantId !== undefined) {return next();}
 
   const user = req.user;
 

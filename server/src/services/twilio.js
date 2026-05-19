@@ -13,7 +13,7 @@ function getTwilioFactory() {
   try {
     // Lazy-load so missing optional dependency does not crash app startup or tests.
     // The service will still report a clear error when someone actually tries to use it.
-    // eslint-disable-next-line global-require
+     
     twilioFactory = require('twilio');
   } catch (error) {
     twilioFactory = false;

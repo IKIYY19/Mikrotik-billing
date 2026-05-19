@@ -15,8 +15,8 @@ function parseCSV(text) {
 
   for (const line of lines) {
     // Skip comments and headers
-    if (line.startsWith('#') || line.startsWith('--')) continue;
-    if (/^(username|User-Name|Cleartext|id,)/i.test(line.trim())) continue;
+    if (line.startsWith('#') || line.startsWith('--')) {continue;}
+    if (/^(username|User-Name|Cleartext|id,)/i.test(line.trim())) {continue;}
 
     // Split by comma, handling quoted values
     const cols = [];
@@ -35,7 +35,7 @@ function parseCSV(text) {
     }
     cols.push(current.trim());
 
-    if (cols.length < 2) continue;
+    if (cols.length < 2) {continue;}
 
     const user = {};
 
@@ -68,8 +68,8 @@ function parseCSV(text) {
       user.op = cols[2];
       user.password = cols[1].toLowerCase().includes('password') ? cols[3] : null;
       user.value = cols[3];
-      if (!user.password) user.password = cols[3];
-      if (cols.length >= 5) user.rate_limit = cols[4];
+      if (!user.password) {user.password = cols[3];}
+      if (cols.length >= 5) {user.rate_limit = cols[4];}
     }
 
     if (user.username) {
@@ -82,12 +82,12 @@ function parseCSV(text) {
 
 /* ─── Helpers ─── */
 function getAttributeIcon(attr) {
-  if (!attr) return <FileText className="w-3 h-3" />;
+  if (!attr) {return <FileText className="w-3 h-3" />;}
   const a = attr.toLowerCase();
-  if (a.includes('password') || a.includes('cleartext')) return <Eye className="w-3 h-3 text-violet-400" />;
-  if (a.includes('rate') || a.includes('limit')) return <Zap className="w-3 h-3 text-amber-400" />;
-  if (a.includes('ip') || a.includes('framed')) return <Copy className="w-3 h-3 text-blue-400" />;
-  if (a.includes('session') || a.includes('timeout')) return <Clock className="w-3 h-3 text-emerald-400" />;
+  if (a.includes('password') || a.includes('cleartext')) {return <Eye className="w-3 h-3 text-violet-400" />;}
+  if (a.includes('rate') || a.includes('limit')) {return <Zap className="w-3 h-3 text-amber-400" />;}
+  if (a.includes('ip') || a.includes('framed')) {return <Copy className="w-3 h-3 text-blue-400" />;}
+  if (a.includes('session') || a.includes('timeout')) {return <Clock className="w-3 h-3 text-emerald-400" />;}
   return <FileText className="w-3 h-3 text-zinc-400" />;
 }
 
@@ -139,7 +139,7 @@ export function RadiusImport() {
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
-    if (!f) return;
+    if (!f) {return;}
     setError('');
     const reader = new FileReader();
     reader.onload = (ev) => {

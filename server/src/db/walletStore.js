@@ -19,7 +19,7 @@ function getDb() {
 
 // Seed sample wallets (in-memory only)
 const seedWallets = () => {
-  if (walletStore.wallets.length > 0) return;
+  if (walletStore.wallets.length > 0) {return;}
   const billing = require("./billingStore");
 
   billing.store.customers.forEach((c) => {
@@ -324,10 +324,10 @@ async function runDailyDeductions() {
   const results = { deducted: [], suspended: [] };
 
   for (const wallet of walletStore.wallets) {
-    if (wallet.status !== "active" || wallet.daily_rate <= 0) continue;
+    if (wallet.status !== "active" || wallet.daily_rate <= 0) {continue;}
 
     // Skip if already deducted today
-    if (wallet.last_deduction === today) continue;
+    if (wallet.last_deduction === today) {continue;}
 
     if (wallet.balance >= wallet.daily_rate) {
       // Deduct daily rate
@@ -461,7 +461,7 @@ async function setDailyRate(customerId, rate) {
       [customerId],
     );
     const wallet = walletResult.rows[0];
-    if (!wallet) return null;
+    if (!wallet) {return null;}
 
     const parsedRate = parseFloat(rate);
     const updates = {
@@ -525,7 +525,7 @@ async function autoSetRatesFromPlans() {
       const plan = sub
         ? billing.store.service_plans.find((p) => p.id === sub.plan_id)
         : null;
-      if (!plan) continue;
+      if (!plan) {continue;}
 
       const dailyRate = plan.price / 30;
       const updates = { daily_rate: dailyRate };
@@ -568,7 +568,7 @@ async function autoSetRatesFromPlans() {
   }
 
   for (const wallet of walletStore.wallets) {
-    if (wallet.daily_rate > 0) continue;
+    if (wallet.daily_rate > 0) {continue;}
     const sub = billing.store.subscriptions.find(
       (s) => s.customer_id === wallet.customer_id,
     );

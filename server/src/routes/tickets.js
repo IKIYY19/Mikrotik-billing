@@ -38,8 +38,8 @@ router.post('/categories', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { status = '', priority = '', assignee = '', customer_id = '' } = req.query;
-    let where = [];
-    let params = [];
+    const where = [];
+    const params = [];
     let paramIdx = 1;
 
     if (status && status !== 'all') {
@@ -132,7 +132,7 @@ router.get('/:id', async (req, res) => {
        WHERE t.id = $1`,
       [req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Ticket not found' });}
     const ticket = result.rows[0];
 
     // Get messages
@@ -199,7 +199,7 @@ router.put('/:id', async (req, res) => {
        WHERE id = $6 RETURNING *`,
       [status, priority, assignee_id, category_id, subject, req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
+    if (result.rows.length === 0) {return res.status(404).json({ error: 'Ticket not found' });}
     res.json(result.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

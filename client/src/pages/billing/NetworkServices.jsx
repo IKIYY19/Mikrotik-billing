@@ -28,10 +28,10 @@ function StatCard({ title, value, icon: Icon, bg, ring, textColor, sub }) {
 function SimpleForm({ show, onClose, title, fields, onSubmit, editing }) {
   const [form, setForm] = useState({});
   useEffect(() => {
-    if (editing) setForm({ ...editing });
+    if (editing) {setForm({ ...editing });}
     else { const init = {}; fields.forEach(f => init[f.name] = f.default || ''); setForm(init); }
   }, [editing, show]);
-  if (!show) return null;
+  if (!show) {return null;}
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="glass-strong rounded-2xl w-full max-w-lg animate-fade-in-scale" onClick={e => e.stopPropagation()}>
@@ -121,7 +121,7 @@ export function NetworkServices() {
   };
 
   const handleQueueDelete = async (name) => {
-    if (!confirm(`Delete queue "${name}"?`)) return;
+    if (!confirm(`Delete queue "${name}"?`)) {return;}
     try {
       await axios.delete(`${API}/network/queues/${encodeURIComponent(name)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();
@@ -143,7 +143,7 @@ export function NetworkServices() {
   };
 
   const handleFirewallDelete = async (id) => {
-    if (!confirm('Delete this rule?')) return;
+    if (!confirm('Delete this rule?')) {return;}
     try {
       await axios.delete(`${API}/network/firewall/${encodeURIComponent(id)}${selectedConnection ? `?connection_id=${selectedConnection}` : ''}`);
       fetchData();
