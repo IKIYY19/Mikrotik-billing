@@ -40,7 +40,7 @@ export function withFeatureAccess(feature) {
     
     if (!canAccessFeature(user, feature)) {
       return (
-        <div className="flex items-center justify-center h-screen bg-[#0f1117]">
+        <div className="flex items-center justify-center h-screen bg-background">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-white mb-2">Access Denied</h2>
             <p className="text-zinc-400">You don't have permission to access this page.</p>

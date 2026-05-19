@@ -137,7 +137,7 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <div className="flex h-screen bg-[#0f1117]">
+              <div className="flex h-screen bg-background">
                 {/* Mobile overlay */}
                 {mobileMenuOpen && (
                   <div

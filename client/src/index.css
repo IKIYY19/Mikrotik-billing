@@ -564,68 +564,47 @@
     );
 }
 
-/* ─── Light Mode: Comprehensive overrides for dark-mode-first app ─── */
-/* Uses attribute-contains selectors to catch ALL utility classes       */
-/* without needing to know every shade number used across 40+ pages.    */
+/* ─── Light Mode ─── */
+.light {
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #e9ecef;
+    --bg-tertiary: #dee2e6;
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-card-hover: rgba(255, 255, 255, 1);
+    --bg-surface: rgba(248, 249, 250, 0.9);
 
-/* Force all muted text and white text to dark gray */
-.light [class*="text-zinc-"],
-.light [class*="text-gray-"],
-.light [class*="text-slate-"],
-.light [class*="text-neutral-"] {
-    color: #3f3f46 !important;
-}
-.light .text-white {
-    color: #18181b !important;
-}
+    --text-primary: #1a1a2e;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --text-dim: #a0aec0;
 
-/* Backgrounds - only non-hover, non-group variants */
-.light [class^="bg-zinc-"],
-.light [class*=" bg-zinc-"],
-.light [class^="bg-gray-"],
-.light [class*=" bg-gray-"],
-.light [class^="bg-slate-"],
-.light [class*=" bg-slate-"],
-.light [class^="bg-neutral-"],
-.light [class*=" bg-neutral-"],
-.light [class^="bg-white/"],
-.light [class*=" bg-white/"],
-.light [class^="bg-black/"],
-.light [class*=" bg-black/"] {
-    background-color: rgba(235, 231, 224, 0.85) !important;
-}
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --border-medium: rgba(0, 0, 0, 0.12);
+    --border-strong: rgba(0, 0, 0, 0.16);
+    --border-accent: rgba(79, 70, 229, 0.25);
 
-/* Force all dark borders to warm beige */
-.light [class^="border-zinc-"],
-.light [class*=" border-zinc-"],
-.light [class^="border-gray-"],
-.light [class*=" border-gray-"],
-.light [class^="border-slate-"],
-.light [class*=" border-slate-"],
-.light [class^="border-white/"],
-.light [class*=" border-white/"],
-.light [class^="border-black/"],
-.light [class*=" border-black/"] {
-    border-color: rgba(210, 205, 195, 0.6) !important;
-}
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+    --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.12);
 
-/* Hover text - dark on hover */
-.light [class*="hover:text-"]:hover {
-    color: #18181b !important;
-}
-/* Hover bg specifically - warm cream on hover */
-.light [class*="hover:bg-"]:hover {
-    background-color: rgba(220, 215, 205, 0.7) !important;
-}
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-blur: blur(16px) saturate(100%);
 
-/* Ring */
-.light [class*="ring-white/"] {
-    --tw-ring-color: rgba(210, 205, 195, 0.3) !important;
-}
-
-/* Sidebar special case */
-.light .bg-\[\#09090b\]\/95 {
-    background-color: rgba(245, 243, 239, 0.95) !important;
+    --sidebar-bg: rgba(248, 249, 250, 0.97);
+    --sidebar-border: rgba(0, 0, 0, 0.08);
+    --sidebar-item-active-bg: rgba(79, 70, 229, 0.08);
+    --sidebar-item-active-text: #4f46e5;
+    --sidebar-item-text: #64748b;
+    --sidebar-item-hover-text: #1e293b;
+    --sidebar-item-hover-bg: rgba(0, 0, 0, 0.04);
+    --sidebar-divider: rgba(0, 0, 0, 0.06);
+    --sidebar-section-label: #94a3b8;
+    --sidebar-user-bg: rgba(0, 0, 0, 0.03);
+    --sidebar-icon-color: #4f46e5;
+    --sidebar-active-glow: rgba(79, 70, 229, 0.1);
 }
 
 * {
@@ -2042,10 +2021,30 @@ pre {
 /* Modern Dark Mode Overrides */
 @media (prefers-color-scheme: light) {
     :root {
-        --bg-primary: #f8fafc;
-        --bg-secondary: #f1f5f9;
-        --text-primary: #1e293b;
-        --text-secondary: #475569;
-        --text-muted: #64748b;
+        --bg-primary: #f8f9fa;
+        --bg-secondary: #e9ecef;
+        --bg-tertiary: #dee2e6;
+        --bg-card: rgba(255, 255, 255, 0.9);
+        --bg-surface: rgba(248, 249, 250, 0.9);
+        --text-primary: #1a1a2e;
+        --text-secondary: #4a5568;
+        --text-muted: #718096;
+        --text-dim: #a0aec0;
+        --border-subtle: rgba(0, 0, 0, 0.08);
+        --border-medium: rgba(0, 0, 0, 0.12);
+        --glass-bg: rgba(255, 255, 255, 0.8);
+        --glass-border: rgba(0, 0, 0, 0.06);
+        --glass-blur: blur(16px) saturate(100%);
+        --sidebar-bg: rgba(248, 249, 250, 0.97);
+        --sidebar-border: rgba(0, 0, 0, 0.08);
+        --sidebar-item-active-bg: rgba(79, 70, 229, 0.08);
+        --sidebar-item-active-text: #4f46e5;
+        --sidebar-item-text: #64748b;
+        --sidebar-item-hover-text: #1e293b;
+        --sidebar-divider: rgba(0, 0, 0, 0.06);
+        --sidebar-section-label: #94a3b8;
+        --sidebar-user-bg: rgba(0, 0, 0, 0.03);
+        --sidebar-icon-color: #4f46e5;
+        --sidebar-active-glow: rgba(79, 70, 229, 0.1);
     }
 }
