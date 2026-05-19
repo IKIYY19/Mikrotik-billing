@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrandingProvider } from "./contexts/BrandingContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Menu } from "lucide-react";
@@ -8,67 +8,78 @@ import { Toast } from "./components/Toast";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { getToken } from "./lib/auth";
-import LoginPage from "./pages/LoginPage";
-import { Dashboard } from "./pages/Dashboard";
-import { ProjectDetail } from "./pages/ProjectDetail";
-import { ScriptOutput } from "./pages/ScriptOutput";
-import { BillingDashboard } from "./pages/billing/BillingDashboard";
-import { BillingCustomers } from "./pages/billing/BillingCustomers";
-import { BillingPlans } from "./pages/billing/BillingPlans";
-import { BillingSubscriptions } from "./pages/billing/BillingSubscriptions";
-import { BillingReconcile } from "./pages/billing/BillingReconcile";
-import { BillingInvoices } from "./pages/billing/BillingInvoices";
-import { BillingPayments } from "./pages/billing/BillingPayments";
-import { BillingCustomerDetail } from "./pages/billing/BillingCustomerDetail";
-import { PaymentPage } from "./pages/billing/PaymentPage";
-import { SMSPage } from "./pages/billing/SMSPage";
-import { MonitoringDashboard } from "./pages/billing/MonitoringDashboard";
-import { AgentResellerPage } from "./pages/billing/AgentResellerPage";
-import { AutoSuspendPage } from "./pages/billing/AutoSuspendPage";
-import { CustomerPortal } from "./pages/billing/EnhancedCustomerPortal";
-import { ReviewsManagement } from "./pages/billing/ReviewsManagement";
-import { FinancialReports } from "./pages/billing/FinancialReports";
-import { WhatsAppPage } from "./pages/billing/WhatsAppPage";
-import MessagingPage from "./pages/billing/MessagingPage";
-import { MapView } from "./pages/billing/MapView";
-import { WalletPage } from "./pages/billing/WalletPage";
-import MergeCustomers from "./pages/MergeCustomers";
-import { MpesaReconcile } from "./pages/MpesaReconcile";
-import { BackupPage } from "./pages/billing/BackupPage";
-import CreditNotes from "./pages/billing/CreditNotes";
-import { InventoryPage } from "./pages/billing/InventoryPage";
-import { AnalyticsReports } from "./pages/billing/AnalyticsReports";
-import { PPPoEManagement } from "./pages/billing/PPPoEManagement";
-import { HotspotManagement } from "./pages/billing/HotspotManagement";
-import { HotspotVouchers } from "./pages/billing/HotspotVouchers";
-import { NetworkServices } from "./pages/billing/NetworkServices";
-import { RadiusManagement } from "./pages/billing/RadiusManagement";
-import { RadiusImport } from "./pages/RadiusImport";
-import { TicketSystem } from "./pages/billing/TicketSystem";
-import { CaptivePortalBuilder } from "./pages/billing/CaptivePortalBuilder";
-import { BandwidthGraphs } from "./pages/billing/BandwidthGraphs";
-import { ResellerPortal } from "./pages/billing/ResellerPortal";
-import { OLTManagement } from "./pages/billing/OLTManagement";
-import SetupWizard from "./pages/SetupWizard";
-import { UserManagement } from "./pages/UserManagement";
-import IntegrationsSettings from "./pages/IntegrationsSettings";
-import { SettingsPage } from "./pages/SettingsPage";
-import RouterLink from "./pages/RouterLink";
-import RoutersPage from "./pages/RoutersPage";
-import TenantSettingsPage from "./pages/TenantSettingsPage";
-import { AuditLogs } from "./pages/AuditLogs";
-import WebhooksPage from "./pages/WebhooksPage";
-import { FUPProfiles } from "./pages/network/FUPProfiles";
-import { TR069Devices } from "./pages/network/TR069Devices";
-import { SpeedTest } from "./pages/network/SpeedTest";
-import IPAMPage from "./pages/IPAMPage";
-// import { Alerts } from './pages/network/Alerts';
-// import { Monitoring } from './pages/network/Monitoring';
-import { SignupPage } from "./pages/public/SignupPage";
-import { PlansPage } from "./pages/public/PlansPage";
-import { CheckoutPage } from "./pages/public/CheckoutPage";
-import { WelcomePage } from "./pages/public/WelcomePage";
-import CustomerPortalLogin from "./pages/CustomerPortalLogin";
+
+// Page Loader Spinner Component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-white">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-10 h-10 border-4 border-zinc-800 border-t-indigo-500 rounded-full animate-spin"></div>
+      <p className="text-zinc-400 text-sm font-medium">Loading...</p>
+    </div>
+  </div>
+);
+
+// Lazy Loaded Routes
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const SetupWizard = lazy(() => import("./pages/SetupWizard"));
+const CustomerPortalLogin = lazy(() => import("./pages/CustomerPortalLogin"));
+const MergeCustomers = lazy(() => import("./pages/MergeCustomers"));
+const MessagingPage = lazy(() => import("./pages/billing/MessagingPage"));
+const IntegrationsSettings = lazy(() => import("./pages/IntegrationsSettings"));
+const RoutersPage = lazy(() => import("./pages/RoutersPage"));
+const TenantSettingsPage = lazy(() => import("./pages/TenantSettingsPage"));
+const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
+const IPAMPage = lazy(() => import("./pages/IPAMPage"));
+
+const Dashboard = lazy(() => import("./pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail").then(m => ({ default: m.ProjectDetail })));
+const ScriptOutput = lazy(() => import("./pages/ScriptOutput").then(m => ({ default: m.ScriptOutput })));
+const BillingDashboard = lazy(() => import("./pages/billing/BillingDashboard").then(m => ({ default: m.BillingDashboard })));
+const BillingCustomers = lazy(() => import("./pages/billing/BillingCustomers").then(m => ({ default: m.BillingCustomers })));
+const BillingPlans = lazy(() => import("./pages/billing/BillingPlans").then(m => ({ default: m.BillingPlans })));
+const BillingSubscriptions = lazy(() => import("./pages/billing/BillingSubscriptions").then(m => ({ default: m.BillingSubscriptions })));
+const BillingReconcile = lazy(() => import("./pages/billing/BillingReconcile").then(m => ({ default: m.BillingReconcile })));
+const BillingInvoices = lazy(() => import("./pages/billing/BillingInvoices").then(m => ({ default: m.BillingInvoices })));
+const BillingPayments = lazy(() => import("./pages/billing/BillingPayments").then(m => ({ default: m.BillingPayments })));
+const BillingCustomerDetail = lazy(() => import("./pages/billing/BillingCustomerDetail").then(m => ({ default: m.BillingCustomerDetail })));
+const PaymentPage = lazy(() => import("./pages/billing/PaymentPage").then(m => ({ default: m.PaymentPage })));
+const SMSPage = lazy(() => import("./pages/billing/SMSPage").then(m => ({ default: m.SMSPage })));
+const MonitoringDashboard = lazy(() => import("./pages/billing/MonitoringDashboard").then(m => ({ default: m.MonitoringDashboard })));
+const AgentResellerPage = lazy(() => import("./pages/billing/AgentResellerPage").then(m => ({ default: m.AgentResellerPage })));
+const AutoSuspendPage = lazy(() => import("./pages/billing/AutoSuspendPage").then(m => ({ default: m.AutoSuspendPage })));
+const CustomerPortal = lazy(() => import("./pages/billing/EnhancedCustomerPortal").then(m => ({ default: m.CustomerPortal })));
+const ReviewsManagement = lazy(() => import("./pages/billing/ReviewsManagement").then(m => ({ default: m.ReviewsManagement })));
+const FinancialReports = lazy(() => import("./pages/billing/FinancialReports").then(m => ({ default: m.FinancialReports })));
+const WhatsAppPage = lazy(() => import("./pages/billing/WhatsAppPage").then(m => ({ default: m.WhatsAppPage })));
+const MapView = lazy(() => import("./pages/billing/MapView").then(m => ({ default: m.MapView })));
+const WalletPage = lazy(() => import("./pages/billing/WalletPage").then(m => ({ default: m.WalletPage })));
+const MpesaReconcile = lazy(() => import("./pages/MpesaReconcile").then(m => ({ default: m.MpesaReconcile })));
+const BackupPage = lazy(() => import("./pages/billing/BackupPage").then(m => ({ default: m.BackupPage })));
+const CreditNotes = lazy(() => import("./pages/billing/CreditNotes").then(m => ({ default: m.CreditNotes })));
+const InventoryPage = lazy(() => import("./pages/billing/InventoryPage").then(m => ({ default: m.InventoryPage })));
+const AnalyticsReports = lazy(() => import("./pages/billing/AnalyticsReports").then(m => ({ default: m.AnalyticsReports })));
+const PPPoEManagement = lazy(() => import("./pages/billing/PPPoEManagement").then(m => ({ default: m.PPPoEManagement })));
+const HotspotManagement = lazy(() => import("./pages/billing/HotspotManagement").then(m => ({ default: m.HotspotManagement })));
+const HotspotVouchers = lazy(() => import("./pages/billing/HotspotVouchers").then(m => ({ default: m.HotspotVouchers })));
+const NetworkServices = lazy(() => import("./pages/billing/NetworkServices").then(m => ({ default: m.NetworkServices })));
+const RadiusManagement = lazy(() => import("./pages/billing/RadiusManagement").then(m => ({ default: m.RadiusManagement })));
+const RadiusImport = lazy(() => import("./pages/RadiusImport").then(m => ({ default: m.RadiusImport })));
+const TicketSystem = lazy(() => import("./pages/billing/TicketSystem").then(m => ({ default: m.TicketSystem })));
+const CaptivePortalBuilder = lazy(() => import("./pages/billing/CaptivePortalBuilder").then(m => ({ default: m.CaptivePortalBuilder })));
+const BandwidthGraphs = lazy(() => import("./pages/billing/BandwidthGraphs").then(m => ({ default: m.BandwidthGraphs })));
+const ResellerPortal = lazy(() => import("./pages/billing/ResellerPortal").then(m => ({ default: m.ResellerPortal })));
+const OLTManagement = lazy(() => import("./pages/billing/OLTManagement").then(m => ({ default: m.OLTManagement })));
+const UserManagement = lazy(() => import("./pages/UserManagement").then(m => ({ default: m.UserManagement })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const AuditLogs = lazy(() => import("./pages/AuditLogs").then(m => ({ default: m.AuditLogs })));
+const FUPProfiles = lazy(() => import("./pages/network/FUPProfiles").then(m => ({ default: m.FUPProfiles })));
+const TR069Devices = lazy(() => import("./pages/network/TR069Devices").then(m => ({ default: m.TR069Devices })));
+const SpeedTest = lazy(() => import("./pages/network/SpeedTest").then(m => ({ default: m.SpeedTest })));
+
+const SignupPage = lazy(() => import("./pages/public/SignupPage").then(m => ({ default: m.SignupPage })));
+const PlansPage = lazy(() => import("./pages/public/PlansPage").then(m => ({ default: m.PlansPage })));
+const CheckoutPage = lazy(() => import("./pages/public/CheckoutPage").then(m => ({ default: m.CheckoutPage })));
+const WelcomePage = lazy(() => import("./pages/public/WelcomePage").then(m => ({ default: m.WelcomePage })));
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -77,7 +88,9 @@ function App() {
   // Heartbeat to keep user online status updated
   useEffect(() => {
     const token = getToken();
-    if (!token) return;
+    if (!token) {
+      return;
+    }
 
     const sendHeartbeat = async () => {
       try {
@@ -117,194 +130,198 @@ function App() {
 
   return (
     <BrandingProvider>
-      <Routes>
-        {/* Public route */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/setup" element={<SetupWizard />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Public route */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup" element={<SetupWizard />} />
 
-        {/* Customer portal - public (different UI) */}
-        <Route path="/portal/login" element={<CustomerPortalLogin />} />
-        <Route path="/portal/:customerId" element={<CustomerPortal />} />
-        <Route path="/pay/:invoiceId" element={<PaymentPage />} />
+          {/* Customer portal - public (different UI) */}
+          <Route path="/portal/login" element={<CustomerPortalLogin />} />
+          <Route path="/portal/:customerId" element={<CustomerPortal />} />
+          <Route path="/pay/:invoiceId" element={<PaymentPage />} />
 
-        {/* Self-provisioning portal */}
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/plans" element={<PlansPage />} />
-        <Route path="/checkout/:invoiceId" element={<CheckoutPage />} />
-        <Route path="/welcome" element={<WelcomePage />} />
+          {/* Self-provisioning portal */}
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/plans" element={<PlansPage />} />
+          <Route path="/checkout/:invoiceId" element={<CheckoutPage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
 
-        {/* Protected routes - require authentication */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <div className="flex h-screen bg-background">
-                {/* Mobile overlay */}
-                {mobileMenuOpen && (
+          {/* Protected routes - require authentication */}
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-background">
+                  {/* Mobile overlay */}
+                  {mobileMenuOpen && (
+                    <div
+                      className="fixed inset-0 bg-black/60 z-20 lg:hidden"
+                      onClick={() => setMobileMenuOpen(false)}
+                    />
+                  )}
+
+                  {/* Sidebar - hidden on mobile by default, shown when toggled */}
                   <div
-                    className="fixed inset-0 bg-black/60 z-20 lg:hidden"
-                    onClick={() => setMobileMenuOpen(false)}
-                  />
-                )}
-
-                {/* Sidebar - hidden on mobile by default, shown when toggled */}
-                <div
-                  className={`
-                    fixed lg:static inset-y-0 left-0 z-30
-                    transform transition-transform duration-300
-                    ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
-                    lg:translate-x-0
-                  `}
-                >
-                  <Sidebar
-                    onSearchOpen={() => setSearchOpen(true)}
-                    onCloseMobile={() => setMobileMenuOpen(false)}
-                  />
-                </div>
-
-                {/* Main content */}
-                <main className="flex-1 overflow-auto">
-                  {/* Mobile header bar */}
-                  <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800/50">
-                    <button
-                      onClick={() => setMobileMenuOpen(true)}
-                      className="text-zinc-400 p-3 -m-1"
-                    >
-                      <Menu className="w-5 h-5" />
-                    </button>
-                    <span className="text-sm font-semibold text-white">
-                      MTK Billing
-                    </span>
-                    <div className="w-5" /> {/* spacer */}
+                    className={`
+                      fixed lg:static inset-y-0 left-0 z-30
+                      transform transition-transform duration-300
+                      ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+                      lg:translate-x-0
+                    `}
+                  >
+                    <Sidebar
+                      onSearchOpen={() => setSearchOpen(true)}
+                      onCloseMobile={() => setMobileMenuOpen(false)}
+                    />
                   </div>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/project/:id" element={<ProjectDetail />} />
-                    <Route path="/output" element={<ScriptOutput />} />
 
-                    {/* Billing */}
-                    <Route path="/billing" element={<BillingDashboard />} />
-                    <Route
-                      path="/billing-customers"
-                      element={<BillingCustomers />}
-                    />
-                    <Route
-                      path="/billing-customers/:id"
-                      element={<BillingCustomerDetail />}
-                    />
-                    <Route path="/billing-plans" element={<BillingPlans />} />
-                    <Route
-                      path="/billing-subscriptions"
-                      element={<BillingSubscriptions />}
-                    />
-                    <Route
-                      path="/billing-reconcile"
-                      element={<BillingReconcile />}
-                    />
-                    <Route
-                      path="/billing-invoices"
-                      element={<BillingInvoices />}
-                    />
-                    <Route
-                      path="/billing-payments"
-                      element={<BillingPayments />}
-                    />
-                    <Route path="/billing-sms" element={<SMSPage />} />
-                    <Route path="/billing-whatsapp" element={<WhatsAppPage />} />
-                    <Route path="/billing-messaging" element={<MessagingPage />} />
-                    <Route path="/billing-map" element={<MapView />} />
-                    <Route path="/billing-wallet" element={<WalletPage />} />
-                    <Route
-                      path="/merge-customers"
-                      element={<MergeCustomers />}
-                    />
-                    <Route
-                      path="/mpesa-reconcile"
-                      element={
-                        <ProtectedRoute feature="mpesa-reconcile">
-                          <MpesaReconcile />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/billing-monitoring"
-                      element={<MonitoringDashboard />}
-                    />
-                    <Route
-                      path="/billing-agents"
-                      element={<AgentResellerPage />}
-                    />
-                    <Route
-                      path="/billing-auto-suspend"
-                      element={<AutoSuspendPage />}
-                    />
-                    <Route
-                      path="/billing-reviews"
-                      element={<ReviewsManagement />}
-                    />
-                    <Route
-                      path="/billing-reports"
-                      element={<FinancialReports />}
-                    />
-                    <Route path="/billing-backup" element={<BackupPage />} />
-                    <Route path="/credit-notes" element={<CreditNotes />} />
-                    <Route path="/inventory" element={<InventoryPage />} />
-                    <Route path="/analytics" element={<AnalyticsReports />} />
-                    <Route path="/pppoe" element={<PPPoEManagement />} />
-                    <Route path="/hotspot" element={<HotspotManagement />} />
-                    <Route
-                      path="/hotspot-vouchers"
-                      element={<HotspotVouchers />}
-                    />
-                    <Route
-                      path="/network-services"
-                      element={<NetworkServices />}
-                    />
-                    <Route path="/olt" element={<OLTManagement />} />
-                    <Route path="/fup" element={<FUPProfiles />} />
-                    <Route path="/tr069" element={<TR069Devices />} />
-                    <Route path="/speedtest" element={<SpeedTest />} />
-                    <Route path="/ipam" element={<IPAMPage />} />
-                    {/* <Route path="/alerts" element={<Alerts />} /> */}
-                    {/* <Route path="/monitoring" element={<Monitoring />} /> */}
-                    <Route path="/radius" element={<RadiusManagement />} />
-                    <Route path="/radius-import" element={<RadiusImport />} />
-                    <Route path="/tickets" element={<TicketSystem />} />
-                    <Route
-                      path="/captive-portal"
-                      element={<CaptivePortalBuilder />}
-                    />
-                    <Route path="/bandwidth" element={<BandwidthGraphs />} />
-                    <Route path="/resellers" element={<ResellerPortal />} />
-                    <Route
-                      path="/users"
-                      element={
-                        <ProtectedRoute feature="users">
-                          <UserManagement />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/integrations"
-                      element={<IntegrationsSettings />}
-                    />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/routers" element={<RoutersPage />} />
-                    <Route path="/router-link" element={<RoutersPage />} />
-                    <Route path="/tenant-branding" element={<TenantSettingsPage />} />
-                    <Route path="/audit-logs" element={<AuditLogs />} />
-                    <Route path="/webhooks" element={<WebhooksPage />} />
+                  {/* Main content */}
+                  <main className="flex-1 overflow-auto">
+                    {/* Mobile header bar */}
+                    <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800/50">
+                      <button
+                        onClick={() => setMobileMenuOpen(true)}
+                        className="text-zinc-400 p-3 -m-1"
+                      >
+                        <Menu className="w-5 h-5" />
+                      </button>
+                      <span className="text-sm font-semibold text-white">
+                        MTK Billing
+                      </span>
+                      <div className="w-5" /> {/* spacer */}
+                    </div>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/project/:id" element={<ProjectDetail />} />
+                        <Route path="/output" element={<ScriptOutput />} />
 
-                    {/* Fallback */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </main>
-                <Toast />
-              </div>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+                        {/* Billing */}
+                        <Route path="/billing" element={<BillingDashboard />} />
+                        <Route
+                          path="/billing-customers"
+                          element={<BillingCustomers />}
+                        />
+                        <Route
+                          path="/billing-customers/:id"
+                          element={<BillingCustomerDetail />}
+                        />
+                        <Route path="/billing-plans" element={<BillingPlans />} />
+                        <Route
+                          path="/billing-subscriptions"
+                          element={<BillingSubscriptions />}
+                        />
+                        <Route
+                          path="/billing-reconcile"
+                          element={<BillingReconcile />}
+                        />
+                        <Route
+                          path="/billing-invoices"
+                          element={<BillingInvoices />}
+                        />
+                        <Route
+                          path="/billing-payments"
+                          element={<BillingPayments />}
+                        />
+                        <Route path="/billing-sms" element={<SMSPage />} />
+                        <Route path="/billing-whatsapp" element={<WhatsAppPage />} />
+                        <Route path="/billing-messaging" element={<MessagingPage />} />
+                        <Route path="/billing-map" element={<MapView />} />
+                        <Route path="/billing-wallet" element={<WalletPage />} />
+                        <Route
+                          path="/merge-customers"
+                          element={<MergeCustomers />}
+                        />
+                        <Route
+                          path="/mpesa-reconcile"
+                          element={
+                            <ProtectedRoute feature="mpesa-reconcile">
+                              <MpesaReconcile />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/billing-monitoring"
+                          element={<MonitoringDashboard />}
+                        />
+                        <Route
+                          path="/billing-agents"
+                          element={<AgentResellerPage />}
+                        />
+                        <Route
+                          path="/billing-auto-suspend"
+                          element={<AutoSuspendPage />}
+                        />
+                        <Route
+                          path="/billing-reviews"
+                          element={<ReviewsManagement />}
+                        />
+                        <Route
+                          path="/billing-reports"
+                          element={<FinancialReports />}
+                        />
+                        <Route path="/billing-backup" element={<BackupPage />} />
+                        <Route path="/credit-notes" element={<CreditNotes />} />
+                        <Route path="/inventory" element={<InventoryPage />} />
+                        <Route path="/analytics" element={<AnalyticsReports />} />
+                        <Route path="/pppoe" element={<PPPoEManagement />} />
+                        <Route path="/hotspot" element={<HotspotManagement />} />
+                        <Route
+                          path="/hotspot-vouchers"
+                          element={<HotspotVouchers />}
+                        />
+                        <Route
+                          path="/network-services"
+                          element={<NetworkServices />}
+                        />
+                        <Route path="/olt" element={<OLTManagement />} />
+                        <Route path="/fup" element={<FUPProfiles />} />
+                        <Route path="/tr069" element={<TR069Devices />} />
+                        <Route path="/speedtest" element={<SpeedTest />} />
+                        <Route path="/ipam" element={<IPAMPage />} />
+                        {/* <Route path="/alerts" element={<Alerts />} /> */}
+                        {/* <Route path="/monitoring" element={<Monitoring />} /> */}
+                        <Route path="/radius" element={<RadiusManagement />} />
+                        <Route path="/radius-import" element={<RadiusImport />} />
+                        <Route path="/tickets" element={<TicketSystem />} />
+                        <Route
+                          path="/captive-portal"
+                          element={<CaptivePortalBuilder />}
+                        />
+                        <Route path="/bandwidth" element={<BandwidthGraphs />} />
+                        <Route path="/resellers" element={<ResellerPortal />} />
+                        <Route
+                          path="/users"
+                          element={
+                            <ProtectedRoute feature="users">
+                              <UserManagement />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/integrations"
+                          element={<IntegrationsSettings />}
+                        />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/routers" element={<RoutersPage />} />
+                        <Route path="/router-link" element={<RoutersPage />} />
+                        <Route path="/tenant-branding" element={<TenantSettingsPage />} />
+                        <Route path="/audit-logs" element={<AuditLogs />} />
+                        <Route path="/webhooks" element={<WebhooksPage />} />
+
+                        {/* Fallback */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </Suspense>
+                  </main>
+                  <Toast />
+                </div>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Suspense>
       <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </BrandingProvider>
   );

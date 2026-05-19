@@ -272,6 +272,7 @@ const billingMigrations = [
   `ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10,2)`,
   `ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reference VARCHAR(255)`,
   `CREATE INDEX IF NOT EXISTS idx_usage_customer ON usage_records(customer_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_usage_customer_recorded ON usage_records(customer_id, recorded_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_entity ON billing_audit_logs(entity_type, entity_id)`,
 
   // Hotspot Vouchers

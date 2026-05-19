@@ -26,39 +26,42 @@ function decryptPassword(encryptedPassword) {
   }
 }
 
-// Connect to MikroTik and get PPPoE active sessions
-async function getPPPoESessions(connection) {
+// Connect to MikroTik and get both active sessions and simple queues
+async function getRouterMetrics(connection) {
   try {
     const MikroNode = require('mikronode');
-    const mikrotik = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
+    const isSSL = connection.connection_type === 'api-ssl' || (connection.api_port && connection.api_port == 8729);
+    const mikrotik = new MikroNode(connection.ip_address, { 
+      port: connection.api_port || 8728,
+      ssl: isSSL
+    });
     const conn = await mikrotik.connect(connection.username, connection.password);
     const close = conn.closeOnDone(true);
-    const chan = conn.openChannel();
-    chan.write('/ppp/active/print');
-    const result = await chan.done;
+    
+    // Get active sessions
+    const chan1 = conn.openChannel();
+    chan1.write('/ppp/active/print');
+    const sessions = await chan1.done;
+    
+    // Get simple queues
+    const chan2 = conn.openChannel();
+    chan2.write('/queue/simple/print', { '.proplist': '.id,name,target,max-limit,bytes,packet,rate' });
+    const queues = await chan2.done;
+    
     close();
-    return Array.isArray(result) ? result : [];
+    return {
+      success: true,
+      sessions: Array.isArray(sessions) ? sessions : [],
+      queues: Array.isArray(queues) ? queues : []
+    };
   } catch (error) {
     console.warn(`[Metrics] MikroTik connection failed for ${connection.name} (${connection.ip_address}): ${error.message}`);
-    return [];
-  }
-}
-
-// Get simple queues for bandwidth data
-async function getQueues(connection) {
-  try {
-    const MikroNode = require('mikronode');
-    const mikrotik = new MikroNode(connection.ip_address, { port: connection.api_port || 8728 });
-    const conn = await mikrotik.connect(connection.username, connection.password);
-    const close = conn.closeOnDone(true);
-    const chan = conn.openChannel();
-    chan.write('/queue/simple/print', { '.proplist': '.id,name,target,max-limit,bytes,packet,rate' });
-    const result = await chan.done;
-    close();
-    return Array.isArray(result) ? result : [];
-  } catch (error) {
-    console.warn(`[Metrics] Failed to get queues from ${connection.name}: ${error.message}`);
-    return [];
+    return {
+      success: false,
+      sessions: [],
+      queues: [],
+      error: error.message
+    };
   }
 }
 
@@ -205,72 +208,104 @@ async function collectMetrics() {
   let totalRecords = 0;
   let errors = 0;
 
-  for (const connection of connections) {
-    // Decrypt password
-    const device = { ...connection };
-    if (device.password_encrypted) {
-      device.password = decryptPassword(device.password_encrypted);
-    }
+  // Poll all connections in parallel
+  const results = await Promise.allSettled(
+    connections.map(async (connection) => {
+      // Decrypt password
+      const device = { ...connection };
+      if (device.password_encrypted) {
+        device.password = decryptPassword(device.password_encrypted);
+      }
 
-    if (!device.password) {
-      console.warn(`[Metrics] Skipping ${device.name} - no password available`);
+      if (!device.password) {
+        console.warn(`[Metrics] Skipping ${device.name} - no password available`);
+        return { sessionsCount: 0, recordsCount: 0, success: false, isError: true };
+      }
+
+      // Fetch sessions and queues in a single connection
+      const data = await getRouterMetrics(device);
+      const sessionCount = data.sessions.length;
+
+      // Update router status based on success of connection
+      await updateRouterStatus(device.id, data.success ? 'online' : 'offline', {
+        activePPPoE: sessionCount,
+      });
+
+      if (!data.success) {
+        return { sessionsCount: 0, recordsCount: 0, success: false, isError: true };
+      }
+
+      let sessionsRecorded = 0;
+      let queuesRecorded = 0;
+
+      // Process each PPPoE session
+      for (const session of data.sessions) {
+        const username = session.name || session.username;
+        if (!username) {
+          continue;
+        }
+
+        // Find matching customer
+        const customer = await findCustomerByUsername(username);
+        if (!customer) {
+          continue;
+        }
+
+        const bytesIn = parseBytes(session['bytes-in'] || session.bytes_in);
+        const bytesOut = parseBytes(session['bytes-out'] || session.bytes_out);
+        const sessionTime = parseUptime(session.uptime || session['uptime']);
+        const sessionId = session['.id'] || session.id;
+
+        // Record usage
+        const record = await recordUsage(customer.id, bytesIn, bytesOut, sessionTime, sessionId);
+        if (record) {
+          sessionsRecorded++;
+        }
+      }
+
+      // Also record queue-based usage for customers with active queues
+      for (const queue of data.queues) {
+        const queueName = queue.name || '';
+        // Queue names often match PPPoE usernames
+        const customer = await findCustomerByUsername(queueName);
+        if (!customer) {
+          continue;
+        }
+
+        // Parse queue bytes (format: "in-bytes/out-bytes" or total)
+        const queueBytes = queue.bytes || '';
+        const byteParts = queueBytes.split('/');
+        const bytesIn = byteParts[0] ? parseBytes(byteParts[0]) : 0;
+        const bytesOut = byteParts[1] ? parseBytes(byteParts[1]) : 0;
+
+        // Only record if we haven't already recorded for this customer in this cycle
+        const existingRecord = await recordUsage(customer.id, bytesIn, bytesOut, 0, `queue-${queueName}`);
+        if (existingRecord) {
+          queuesRecorded++;
+        }
+      }
+
+      return {
+        sessionsCount: sessionCount,
+        recordsCount: sessionsRecorded + queuesRecorded,
+        success: true
+      };
+    })
+  );
+
+  // Aggregate results
+  for (const res of results) {
+    if (res.status === 'fulfilled') {
+      const val = res.value;
+      if (val.isError) {
+        errors++;
+      } else {
+        totalSessions += val.sessionsCount;
+        totalRecords += val.recordsCount;
+      }
+    } else {
       errors++;
-      continue;
-    }
-
-    // Get PPPoE active sessions
-    const sessions = await getPPPoESessions(device);
-    const sessionCount = sessions.length;
-
-    if (sessionCount > 0) {
-      console.log(`[Metrics] ${device.name}: ${sessionCount} active PPPoE sessions`);
-    }
-
-    // Update router status
-    await updateRouterStatus(device.id, sessionCount >= 0 ? 'online' : 'offline', {
-      activePPPoE: sessionCount,
-    });
-
-    // Get queue data for bandwidth
-    const queues = await getQueues(device);
-
-    // Process each PPPoE session
-    for (const session of sessions) {
-      const username = session.name || session.username;
-      if (!username) continue;
-
-      totalSessions++;
-
-      // Find matching customer
-      const customer = await findCustomerByUsername(username);
-      if (!customer) continue;
-
-      const bytesIn = parseBytes(session['bytes-in'] || session.bytes_in);
-      const bytesOut = parseBytes(session['bytes-out'] || session.bytes_out);
-      const sessionTime = parseUptime(session.uptime || session['uptime']);
-      const sessionId = session['.id'] || session.id;
-
-      // Record usage
-      const record = await recordUsage(customer.id, bytesIn, bytesOut, sessionTime, sessionId);
-      if (record) totalRecords++;
-    }
-
-    // Also record queue-based usage for customers with active queues
-    for (const queue of queues) {
-      const queueName = queue.name || '';
-      // Queue names often match PPPoE usernames
-      const customer = await findCustomerByUsername(queueName);
-      if (!customer) continue;
-
-      // Parse queue bytes (format: "in-bytes/out-bytes" or total)
-      const queueBytes = queue.bytes || '';
-      const byteParts = queueBytes.split('/');
-      const bytesIn = byteParts[0] ? parseBytes(byteParts[0]) : 0;
-      const bytesOut = byteParts[1] ? parseBytes(byteParts[1]) : 0;
-
-      // Only record if we haven't already recorded for this customer in this cycle
-      const existingRecord = await recordUsage(customer.id, bytesIn, bytesOut, 0, `queue-${queueName}`);
-      if (existingRecord) totalRecords++;
+      console.error('[Metrics] Error during parallel metrics collection task:', res.reason);
     }
   }
 
