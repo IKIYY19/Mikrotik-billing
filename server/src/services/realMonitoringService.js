@@ -11,12 +11,10 @@
  * the service returns explicit empty/error/degraded states instead of fake data.
  */
 
-const crypto = require("crypto");
-const MikroNode = require("mikronode");
 const logger = require("../utils/logger");
+const routerConnectionManager = require("./routerConnectionManager");
 
 const DEFAULT_API_PORT = 8728;
-const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_TOTAL_BANDWIDTH_BPS = 0;
 
 class RealMonitoringService {
@@ -37,37 +35,7 @@ class RealMonitoringService {
     );
   }
 
-  decryptPassword(encryptedPassword) {
-    if (!encryptedPassword) {
-      return null;
-    }
 
-    try {
-      const [ivHex, authTagHex, encrypted] =
-        String(encryptedPassword).split(":");
-      if (!ivHex || !authTagHex || !encrypted) {
-        return null;
-      }
-
-      const decipher = crypto.createDecipheriv(
-        "aes-256-gcm",
-        this.getEncryptionKey(),
-        Buffer.from(ivHex, "hex"),
-      );
-
-      decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
-
-      let decrypted = decipher.update(encrypted, "hex", "utf8");
-      decrypted += decipher.final("utf8");
-
-      return decrypted;
-    } catch (error) {
-      logger.warn("Failed to decrypt MikroTik password for monitoring", {
-        error: error.message,
-      });
-      return null;
-    }
-  }
 
   async listConnections() {
     const db = this.getDb();
@@ -122,62 +90,7 @@ class RealMonitoringService {
     return result.rows[0] || null;
   }
 
-  async withRouterSession(connection, handler) {
-    const password = this.decryptPassword(connection.password_encrypted);
 
-    if (!connection.ip_address) {
-      throw new Error("Router IP address is missing");
-    }
-
-    if (!connection.username || !password) {
-      throw new Error("Router monitoring credentials are missing");
-    }
-
-    if ((connection.connection_type || "api") !== "api") {
-      throw new Error(
-        "Real-time monitoring currently requires a RouterOS API connection",
-      );
-    }
-
-    const client = new MikroNode(connection.ip_address, {
-      port: Number(connection.api_port || DEFAULT_API_PORT),
-      timeout: DEFAULT_TIMEOUT_MS,
-    });
-
-    const session = await client.connect(connection.username, password);
-    const close = session.closeOnDone(true);
-
-    try {
-      return await handler(session);
-    } finally {
-      try {
-        close();
-      } catch (error) {
-        logger.debug("MikroTik monitoring session close ignored", {
-          error: error.message,
-        });
-      }
-    }
-  }
-
-  async runCommand(session, command, args = {}) {
-    const channel = session.openChannel();
-    channel.write(command, args);
-    const result = await channel.done;
-    return Array.isArray(result) ? result : [];
-  }
-
-  async runCommandSafe(session, command, args = {}, fallback = []) {
-    try {
-      return await this.runCommand(session, command, args);
-    } catch (error) {
-      logger.debug("Optional MikroTik monitoring command failed", {
-        command,
-        error: error.message,
-      });
-      return fallback;
-    }
-  }
 
   toNumber(value, fallback = 0) {
     if (value === undefined || value === null || value === "") {
@@ -289,11 +202,11 @@ class RealMonitoringService {
     const minutes = text.match(/(\d+)m/);
     const seconds = text.match(/(\d+)s/);
 
-    if (weeks) total += Number(weeks[1]) * 7 * 24 * 60 * 60;
-    if (days) total += Number(days[1]) * 24 * 60 * 60;
-    if (hours) total += Number(hours[1]) * 60 * 60;
-    if (minutes) total += Number(minutes[1]) * 60;
-    if (seconds) total += Number(seconds[1]);
+    if (weeks) {total += Number(weeks[1]) * 7 * 24 * 60 * 60;}
+    if (days) {total += Number(days[1]) * 24 * 60 * 60;}
+    if (hours) {total += Number(hours[1]) * 60 * 60;}
+    if (minutes) {total += Number(minutes[1]) * 60;}
+    if (seconds) {total += Number(seconds[1]);}
 
     return total;
   }
@@ -527,106 +440,98 @@ class RealMonitoringService {
     const timestamp = new Date().toISOString();
 
     try {
-      const snapshot = await this.withRouterSession(
+      const resources = await routerConnectionManager.print(
         connection,
-        async (session) => {
-          const resources = await this.runCommand(
-            session,
-            "/system/resource/print",
-          );
-          const interfacesRaw = await this.runCommand(
-            session,
-            "/interface/print",
-            {
-              ".proplist":
-                ".id,name,type,mtu,actual-mtu,mac-address,disabled,running,rx-byte,tx-byte,rx-packet,tx-packet,rx-drop,tx-drop,rx-error,tx-error,comment",
-            },
-          );
-
-          const pppoeRaw = await this.runCommandSafe(
-            session,
-            "/ppp/active/print",
-            {
-              ".proplist":
-                ".id,name,service,caller-id,address,uptime,encoding,bytes-in,bytes-out,packets-in,packets-out",
-            },
-          );
-
-          const hotspotRaw = await this.runCommandSafe(
-            session,
-            "/ip/hotspot/active/print",
-            {
-              ".proplist":
-                ".id,user,address,mac-address,uptime,bytes-in,bytes-out,login-by,server",
-            },
-          );
-
-          const queuesRaw = await this.runCommandSafe(
-            session,
-            "/queue/simple/print",
-            {
-              ".proplist":
-                ".id,name,target,max-limit,bytes,rate,disabled,comment",
-            },
-          );
-
-          const resource = this.normalizeSystemResource(resources[0] || {});
-          const interfaces = interfacesRaw.map((item) =>
-            this.normalizeInterface(item, connection.id, startedAt),
-          );
-          const pppoeSessions = pppoeRaw.map((item) =>
-            this.normalizePppoeSession(item),
-          );
-          const hotspotSessions = hotspotRaw.map((item) =>
-            this.normalizeHotspotSession(item),
-          );
-          const queues = queuesRaw.map((item) => this.normalizeQueue(item));
-          const customerUsage =
-            await this.getCustomerUsageBySessions(pppoeSessions);
-
-          const downloadSpeed = interfaces.reduce(
-            (sum, item) => sum + item.rxBps,
-            0,
-          );
-          const uploadSpeed = interfaces.reduce(
-            (sum, item) => sum + item.txBps,
-            0,
-          );
-          const usedBandwidth = downloadSpeed + uploadSpeed;
-
-          const totalBandwidth = Number(
-            process.env.MONITORING_TOTAL_BANDWIDTH_BPS ||
-              DEFAULT_TOTAL_BANDWIDTH_BPS,
-          );
-
-          return {
-            connection: {
-              id: connection.id,
-              name: connection.name,
-              ip_address: connection.ip_address,
-              api_port: connection.api_port || DEFAULT_API_PORT,
-            },
-            timestamp,
-            status: "online",
-            latencyMs: Date.now() - startedAt,
-            totalBandwidth,
-            usedBandwidth,
-            downloadSpeed,
-            uploadSpeed,
-            activeConnections: pppoeSessions.length + hotspotSessions.length,
-            activePppoe: pppoeSessions.length,
-            activeHotspot: hotspotSessions.length,
-            latency: Date.now() - startedAt,
-            packetLoss: null,
-            systemStatus: resource,
-            interfaces,
-            pppoeSessions,
-            hotspotSessions,
-            queues,
-            customerUsage,
-          };
-        },
+        "/system/resource"
       );
+      const interfacesRaw = await routerConnectionManager.print(
+        connection,
+        "/interface",
+        ".id,name,type,mtu,actual-mtu,mac-address,disabled,running,rx-byte,tx-byte,rx-packet,tx-packet,rx-drop,tx-drop,rx-error,tx-error,comment"
+      );
+
+      const pppoeRaw = await routerConnectionManager.executeCommandSafe(
+        connection,
+        "/ppp/active/print",
+        {
+          ".proplist":
+            ".id,name,service,caller-id,address,uptime,encoding,bytes-in,bytes-out,packets-in,packets-out",
+        }
+      );
+
+      const hotspotRaw = await routerConnectionManager.executeCommandSafe(
+        connection,
+        "/ip/hotspot/active/print",
+        {
+          ".proplist":
+            ".id,user,address,mac-address,uptime,bytes-in,bytes-out,login-by,server",
+        }
+      );
+
+      const queuesRaw = await routerConnectionManager.executeCommandSafe(
+        connection,
+        "/queue/simple/print",
+        {
+          ".proplist":
+            ".id,name,target,max-limit,bytes,rate,disabled,comment",
+        }
+      );
+
+      const resource = this.normalizeSystemResource(resources[0] || {});
+      const interfaces = interfacesRaw.map((item) =>
+        this.normalizeInterface(item, connection.id, startedAt),
+      );
+      const pppoeSessions = pppoeRaw.map((item) =>
+        this.normalizePppoeSession(item),
+      );
+      const hotspotSessions = hotspotRaw.map((item) =>
+        this.normalizeHotspotSession(item),
+      );
+      const queues = queuesRaw.map((item) => this.normalizeQueue(item));
+      const customerUsage =
+        await this.getCustomerUsageBySessions(pppoeSessions);
+
+      const downloadSpeed = interfaces.reduce(
+        (sum, item) => sum + item.rxBps,
+        0,
+      );
+      const uploadSpeed = interfaces.reduce(
+        (sum, item) => sum + item.txBps,
+        0,
+      );
+      const usedBandwidth = downloadSpeed + uploadSpeed;
+
+      const totalBandwidth = Number(
+        process.env.MONITORING_TOTAL_BANDWIDTH_BPS ||
+          DEFAULT_TOTAL_BANDWIDTH_BPS,
+      );
+
+      const snapshot = {
+        connection: {
+          id: connection.id,
+          name: connection.name,
+          ip_address: connection.ip_address,
+          api_port: connection.api_port || DEFAULT_API_PORT,
+        },
+        timestamp,
+        status: "online",
+        latencyMs: Date.now() - startedAt,
+        totalBandwidth,
+        usedBandwidth,
+        downloadSpeed,
+        uploadSpeed,
+        activeConnections: pppoeSessions.length + hotspotSessions.length,
+        activePppoe: pppoeSessions.length,
+        activeHotspot: hotspotSessions.length,
+        latency: Date.now() - startedAt,
+        packetLoss: null,
+        systemStatus: resource,
+        interfaces,
+        pppoeSessions,
+        hotspotSessions,
+        queues,
+        customerUsage,
+      };
 
       await this.updateConnectionStatus(connection.id, true);
       this.latestSnapshots.set(connection.id, snapshot);

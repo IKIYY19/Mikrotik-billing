@@ -1,4 +1,4 @@
-const MikroNode = require("mikronode");
+const routerConnectionManager = require("./routerConnectionManager");
 
 const db = global.db || require("../db/memory");
 
@@ -6,35 +6,8 @@ function getDb() {
   return global.db || db;
 }
 
-function getEncryptionConfig() {
-  return {
-    algorithm: "aes-256-gcm",
-    key: Buffer.from(
-      (
-        process.env.ENCRYPTION_KEY || "default-key-change-in-production-32"
-      ).slice(0, 32),
-    ),
-  };
-}
-
-function decryptPassword(passwordEncrypted) {
-  if (!passwordEncrypted) {
-    throw new Error("Router password is missing");
-  }
-
-  const { algorithm, key } = getEncryptionConfig();
-  const [ivHex, authTagHex, encrypted] = passwordEncrypted.split(":");
-  const iv = Buffer.from(ivHex, "hex");
-  const authTag = Buffer.from(authTagHex, "hex");
-  const decipher = require("crypto").createDecipheriv(algorithm, key, iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
-}
-
 async function getConnectionById(connectionId) {
-  if (!connectionId) return null;
+  if (!connectionId) {return null;}
 
   const result = await getDb().query(
     "SELECT * FROM mikrotik_connections WHERE id = $1",
@@ -47,46 +20,16 @@ async function getConnectionById(connectionId) {
   const connection = result.rows[0];
   return {
     ...connection,
-    password: decryptPassword(connection.password_encrypted),
+    password: routerConnectionManager.decryptPassword(connection.password_encrypted),
   };
 }
 
-async function withConnection(connectionId, handler) {
-  const connection = await getConnectionById(connectionId);
-  if (!connection) {
-    throw new Error("MikroTik connection not found");
-  }
-
-  const isSSL = connection.connection_type === 'api-ssl' || (connection.api_port && connection.api_port == 8729);
-  const client = new MikroNode(connection.ip_address, {
-    port: connection.api_port || 8728,
-    ssl: isSSL,
-  });
-  const session = await client.connect(
-    connection.username,
-    connection.password,
-  );
-  const close = session.closeOnDone(true);
-
-  try {
-    return await handler(session, connection);
-  } finally {
-    close();
-  }
-}
-
 async function execute(connectionId, command, args = {}) {
-  return withConnection(connectionId, async (session) => {
-    const channel = session.openChannel();
-    channel.write(command, args);
-    return channel.done;
-  });
+  return routerConnectionManager.executeCommand(connectionId, command, args);
 }
 
 async function print(connectionId, path, properties = null) {
-  const args = properties ? { ".proplist": properties } : {};
-  const result = await execute(connectionId, `${path}/print`, args);
-  return Array.isArray(result) ? result : [];
+  return routerConnectionManager.print(connectionId, path, properties);
 }
 
 function buildRateLimit(plan) {

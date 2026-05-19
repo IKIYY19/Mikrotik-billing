@@ -1,41 +1,23 @@
 const express = require('express');
 const router = express.Router();
 
+const routerConnectionManager = require('../services/routerConnectionManager');
+
 // Helper: get MikroTik connection
 async function getMikrotikConnection(connectionId) {
   const db = global.db || require('../db/memory');
-  const crypto = require('crypto');
-  const algorithm = 'aes-256-gcm';
-  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
-
   const result = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [connectionId]);
-  if (result.rows.length === 0) throw new Error('Connection not found');
+  if (result.rows.length === 0) {throw new Error('Connection not found');}
 
   const device = result.rows[0];
-  const [ivHex, authTagHex, encrypted] = device.password_encrypted.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  device.password = decrypted;
-
+  device.password = routerConnectionManager.decryptPassword(device.password_encrypted);
   return device;
 }
 
 // Helper: execute MikroTik command
 async function executeCommand(device, command, args = {}) {
   try {
-    const MikroNode = require('mikronode');
-    const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
-    const connection = await mikrotik.connect(device.username, device.password);
-    const close = connection.closeOnDone(true);
-    const chan = connection.openChannel();
-    chan.write(command, args);
-    const result = await chan.done;
-    close();
-    return result;
+    return await routerConnectionManager.executeCommand(device, command, args);
   } catch (error) {
     throw new Error(`MikroTik API error: ${error.message}`);
   }
@@ -44,15 +26,9 @@ async function executeCommand(device, command, args = {}) {
 // Helper: get all from MikroTik path
 async function getFromMikrotik(device, path) {
   try {
-    const MikroNode = require('mikronode');
-    const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
-    const connection = await mikrotik.connect(device.username, device.password);
-    const close = connection.closeOnDone(true);
-    const chan = connection.openChannel();
-    chan.write(path + '/print', { '.proplist': '.id,name,comment,disabled' });
-    const result = await chan.done;
-    close();
-    return result;
+    return await routerConnectionManager.executeCommand(device, path + '/print', { 
+      '.proplist': '.id,name,comment,disabled' 
+    });
   } catch (error) {
     console.error(`MikroTik get error: ${error.message}`);
     return [];
@@ -67,7 +43,7 @@ async function getFromMikrotik(device, path) {
 router.get('/pppoe/secrets', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ppp/secret');
@@ -79,13 +55,13 @@ router.get('/pppoe/secrets', async (req, res) => {
 router.post('/pppoe/secrets', async (req, res) => {
   try {
     const { connection_id, name, password, service, profile, rate_limit, comment } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name, password, service: service || 'pppoe' };
-    if (profile) args.profile = profile;
-    if (rate_limit) args['rate-limit'] = rate_limit;
-    if (comment) args.comment = comment;
+    if (profile) {args.profile = profile;}
+    if (rate_limit) {args['rate-limit'] = rate_limit;}
+    if (comment) {args.comment = comment;}
 
     await executeCommand(device, '/ppp/secret/add', args);
     res.json({ success: true, message: 'PPPoE secret created' });
@@ -97,7 +73,7 @@ router.delete('/pppoe/secrets/:name', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ppp/secret/remove', { 'numbers': name });
@@ -110,7 +86,7 @@ router.post('/pppoe/secrets/:name/toggle', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     // Find the secret to get current disabled status
@@ -127,7 +103,7 @@ router.post('/pppoe/secrets/:name/toggle', async (req, res) => {
 router.get('/pppoe/profiles', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ppp/profile');
@@ -139,14 +115,14 @@ router.get('/pppoe/profiles', async (req, res) => {
 router.post('/pppoe/profiles', async (req, res) => {
   try {
     const { connection_id, name, local_address, remote_address, rate_limit, dns_server } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name };
-    if (local_address) args['local-address'] = local_address;
-    if (remote_address) args['remote-address'] = remote_address;
-    if (rate_limit) args['rate-limit'] = rate_limit;
-    if (dns_server) args['dns-server'] = dns_server;
+    if (local_address) {args['local-address'] = local_address;}
+    if (remote_address) {args['remote-address'] = remote_address;}
+    if (rate_limit) {args['rate-limit'] = rate_limit;}
+    if (dns_server) {args['dns-server'] = dns_server;}
 
     await executeCommand(device, '/ppp/profile/add', args);
     res.json({ success: true, message: 'PPPoE profile created' });
@@ -158,7 +134,7 @@ router.delete('/pppoe/profiles/:name', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ppp/profile/remove', { 'numbers': name });
@@ -170,7 +146,7 @@ router.delete('/pppoe/profiles/:name', async (req, res) => {
 router.get('/pppoe/active', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ppp/active');
@@ -183,7 +159,7 @@ router.post('/pppoe/active/:name/kick', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ppp/active/remove', { 'numbers': name });
@@ -199,7 +175,7 @@ router.post('/pppoe/active/:name/kick', async (req, res) => {
 router.get('/hotspot/users', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/hotspot/user');
@@ -211,15 +187,15 @@ router.get('/hotspot/users', async (req, res) => {
 router.post('/hotspot/users', async (req, res) => {
   try {
     const { connection_id, name, password, profile, disabled, comment, limit_bytes_total, rate_limit } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name, password };
-    if (profile) args.profile = profile;
-    if (disabled) args.disabled = disabled;
-    if (comment) args.comment = comment;
-    if (limit_bytes_total) args['limit-bytes-total'] = limit_bytes_total;
-    if (rate_limit) args['rate-limit'] = rate_limit;
+    if (profile) {args.profile = profile;}
+    if (disabled) {args.disabled = disabled;}
+    if (comment) {args.comment = comment;}
+    if (limit_bytes_total) {args['limit-bytes-total'] = limit_bytes_total;}
+    if (rate_limit) {args['rate-limit'] = rate_limit;}
 
     await executeCommand(device, '/ip/hotspot/user/add', args);
     res.json({ success: true, message: 'Hotspot user created' });
@@ -231,7 +207,7 @@ router.delete('/hotspot/users/:name', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ip/hotspot/user/remove', { 'numbers': name });
@@ -244,7 +220,7 @@ router.post('/hotspot/users/:name/toggle', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const users = await getFromMikrotik(device, '/ip/hotspot/user');
@@ -260,7 +236,7 @@ router.post('/hotspot/users/:name/toggle', async (req, res) => {
 router.get('/hotspot/profiles', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/hotspot/profile');
@@ -272,16 +248,16 @@ router.get('/hotspot/profiles', async (req, res) => {
 router.post('/hotspot/profiles', async (req, res) => {
   try {
     const { connection_id, name, rate_limit, shared_users, session_timeout, idle_timeout, login_by, advertising } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name };
-    if (rate_limit) args['rate-limit'] = rate_limit;
-    if (shared_users) args['shared-users'] = shared_users;
-    if (session_timeout) args['session-timeout'] = session_timeout;
-    if (idle_timeout) args['idle-timeout'] = idle_timeout;
-    if (login_by) args['login-by'] = login_by;
-    if (advertising) args.advertising = advertising;
+    if (rate_limit) {args['rate-limit'] = rate_limit;}
+    if (shared_users) {args['shared-users'] = shared_users;}
+    if (session_timeout) {args['session-timeout'] = session_timeout;}
+    if (idle_timeout) {args['idle-timeout'] = idle_timeout;}
+    if (login_by) {args['login-by'] = login_by;}
+    if (advertising) {args.advertising = advertising;}
 
     await executeCommand(device, '/ip/hotspot/profile/add', args);
     res.json({ success: true });
@@ -293,7 +269,7 @@ router.delete('/hotspot/profiles/:name', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { name } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ip/hotspot/profile/remove', { 'numbers': name });
@@ -305,7 +281,7 @@ router.delete('/hotspot/profiles/:name', async (req, res) => {
 router.get('/hotspot/active', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/hotspot/active');
@@ -318,7 +294,7 @@ router.post('/hotspot/active/:address/kick', async (req, res) => {
   try {
     const { connection_id } = req.query;
     const { address } = req.params;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ip/hotspot/active/remove', { 'numbers': address });
@@ -359,9 +335,9 @@ router.post('/vouchers', async (req, res) => {
       const device = await getMikrotikConnection(connection_id);
       for (const v of vouchers) {
         const args = { name: v.username, password: v.password };
-        if (v.profile) args.profile = v.profile;
-        if (v.rate_limit) args['rate-limit'] = v.rate_limit;
-        if (v.comment) args.comment = v.comment;
+        if (v.profile) {args.profile = v.profile;}
+        if (v.rate_limit) {args['rate-limit'] = v.rate_limit;}
+        if (v.comment) {args.comment = v.comment;}
         try { await executeCommand(device, '/ip/hotspot/user/add', args); } catch (e) { console.error(`Failed to create user ${v.username}:`, e.message); }
       }
     }
@@ -391,7 +367,7 @@ router.delete('/vouchers/:id', async (req, res) => {
 router.get('/network/queues', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/queue/simple');
@@ -403,15 +379,15 @@ router.get('/network/queues', async (req, res) => {
 router.post('/network/queues', async (req, res) => {
   try {
     const { connection_id, name, target, max_limit, priority, parent, comment } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name };
-    if (target) args.target = target;
-    if (max_limit) args['max-limit'] = max_limit;
-    if (priority) args.priority = priority;
-    if (parent) args.parent = parent;
-    if (comment) args.comment = comment;
+    if (target) {args.target = target;}
+    if (max_limit) {args['max-limit'] = max_limit;}
+    if (priority) {args.priority = priority;}
+    if (parent) {args.parent = parent;}
+    if (comment) {args.comment = comment;}
 
     await executeCommand(device, '/queue/simple/add', args);
     res.json({ success: true });
@@ -422,7 +398,7 @@ router.post('/network/queues', async (req, res) => {
 router.delete('/network/queues/:name', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/queue/simple/remove', { 'numbers': req.params.name });
@@ -434,7 +410,7 @@ router.delete('/network/queues/:name', async (req, res) => {
 router.post('/network/queues/:name/toggle', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const queues = await getFromMikrotik(device, '/queue/simple');
@@ -450,7 +426,7 @@ router.post('/network/queues/:name/toggle', async (req, res) => {
 router.get('/network/dhcp-leases', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/dhcp-server/lease');
@@ -462,7 +438,7 @@ router.get('/network/dhcp-leases', async (req, res) => {
 router.get('/network/dhcp-networks', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/dhcp-server/network');
@@ -474,7 +450,7 @@ router.get('/network/dhcp-networks', async (req, res) => {
 router.get('/network/dhcp-servers', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/dhcp-server');
@@ -486,17 +462,10 @@ router.get('/network/dhcp-servers', async (req, res) => {
 router.get('/network/dns', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json(null);
+    if (!connection_id) {return res.json(null);}
 
     const device = await getMikrotikConnection(connection_id);
-    const MikroNode = require('mikronode');
-    const mikrotik = new MikroNode(device.ip_address, { port: device.api_port || 8728 });
-    const connection = await mikrotik.connect(device.username, device.password);
-    const close = connection.closeOnDone(true);
-    const chan = connection.openChannel();
-    chan.write('/ip/dns/print');
-    const result = await chan.done;
-    close();
+    const result = await routerConnectionManager.print(device, '/ip/dns');
     res.json(Array.isArray(result) && result.length > 0 ? result[0] : null);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -505,7 +474,7 @@ router.get('/network/dns', async (req, res) => {
 router.get('/network/firewall', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.json([]);
+    if (!connection_id) {return res.json([]);}
 
     const device = await getMikrotikConnection(connection_id);
     const result = await getFromMikrotik(device, '/ip/firewall/filter');
@@ -517,15 +486,15 @@ router.get('/network/firewall', async (req, res) => {
 router.post('/network/firewall', async (req, res) => {
   try {
     const { connection_id, chain, action, src_address, dst_address, protocol, dst_port, comment } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { chain: chain || 'forward', action };
-    if (src_address) args['src-address'] = src_address;
-    if (dst_address) args['dst-address'] = dst_address;
-    if (protocol) args.protocol = protocol;
-    if (dst_port) args['dst-port'] = dst_port;
-    if (comment) args.comment = comment;
+    if (src_address) {args['src-address'] = src_address;}
+    if (dst_address) {args['dst-address'] = dst_address;}
+    if (protocol) {args.protocol = protocol;}
+    if (dst_port) {args['dst-port'] = dst_port;}
+    if (comment) {args.comment = comment;}
 
     await executeCommand(device, '/ip/firewall/filter/add', args);
     res.json({ success: true });
@@ -536,7 +505,7 @@ router.post('/network/firewall', async (req, res) => {
 router.delete('/network/firewall/:id', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     await executeCommand(device, '/ip/firewall/filter/remove', { 'numbers': req.params.id });
@@ -548,7 +517,7 @@ router.delete('/network/firewall/:id', async (req, res) => {
 router.post('/network/firewall/:id/toggle', async (req, res) => {
   try {
     const { connection_id } = req.query;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const rules = await getFromMikrotik(device, '/ip/firewall/filter');
@@ -568,14 +537,14 @@ router.post('/network/firewall/:id/toggle', async (req, res) => {
 router.post('/network/wireguard/interface', async (req, res) => {
   try {
     const { connection_id, name, 'private-key': privateKey, 'listen-port': listenPort, mtu } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
-    if (!name) return res.status(400).json({ error: 'Interface name is required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
+    if (!name) {return res.status(400).json({ error: 'Interface name is required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { name };
-    if (privateKey) args['private-key'] = privateKey;
-    if (listenPort) args['listen-port'] = listenPort;
-    if (mtu) args.mtu = mtu;
+    if (privateKey) {args['private-key'] = privateKey;}
+    if (listenPort) {args['listen-port'] = listenPort;}
+    if (mtu) {args.mtu = mtu;}
 
     await executeCommand(device, '/interface wireguard add', args);
     res.json({ success: true, message: 'WireGuard interface created' });
@@ -586,14 +555,14 @@ router.post('/network/wireguard/interface', async (req, res) => {
 router.post('/network/wireguard/peer', async (req, res) => {
   try {
     const { connection_id, interface: interfaceName, 'public-key': publicKey, 'allowed-address': allowedAddress, endpoint } = req.body;
-    if (!connection_id) return res.status(400).json({ error: 'Connection ID required' });
-    if (!publicKey) return res.status(400).json({ error: 'Public key is required' });
+    if (!connection_id) {return res.status(400).json({ error: 'Connection ID required' });}
+    if (!publicKey) {return res.status(400).json({ error: 'Public key is required' });}
 
     const device = await getMikrotikConnection(connection_id);
     const args = { 'public-key': publicKey };
-    if (interfaceName) args.interface = interfaceName;
-    if (allowedAddress) args['allowed-address'] = allowedAddress;
-    if (endpoint) args.endpoint = endpoint;
+    if (interfaceName) {args.interface = interfaceName;}
+    if (allowedAddress) {args['allowed-address'] = allowedAddress;}
+    if (endpoint) {args.endpoint = endpoint;}
 
     await executeCommand(device, '/interface wireguard peers add', args);
     res.json({ success: true, message: 'WireGuard peer added' });

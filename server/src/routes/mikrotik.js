@@ -30,7 +30,7 @@ function decrypt(encryptedText) {
 }
 
 function toSafeConnection(connection) {
-  if (!connection) return null;
+  if (!connection) {return null;}
   return {
     id: connection.id,
     name: connection.name,
@@ -187,15 +187,16 @@ router.post('/test', async (req, res) => {
       }
     } else {
       // Test API connection
-      const MikroNode = require('mikronode');
-      const isSSL = connection_type === "api-ssl" || (api_port && api_port == 8729);
-      const device = new MikroNode(ip_address, { port: api_port || 8728, ssl: isSSL });
-
+      const routerConnectionManager = require('../services/routerConnectionManager');
       try {
-        const conn = await device.connect(username, password);
-        const close = conn.closeOnDone(true);
+        await routerConnectionManager.testConnection({
+          ip_address,
+          api_port,
+          connection_type,
+          username,
+          password
+        });
         res.json({ success: true, message: 'API connection successful' });
-        close();
       } catch (error) {
         res.json({ success: false, message: error.message });
       }
@@ -217,7 +218,6 @@ router.post('/push', async (req, res) => {
     }
 
     const device = conn.rows[0];
-    const password = decrypt(device.password_encrypted);
 
     if (dry_run) {
       return res.json({ 
@@ -228,24 +228,12 @@ router.post('/push', async (req, res) => {
       });
     }
 
-    // Execute script
-    const MikroNode = require('mikronode');
-    const isSSL = device.connection_type === "api-ssl" || (device.api_port && device.api_port == 8729);
-    const mikrotik = new MikroNode(device.ip_address, { port: device.api_port, ssl: isSSL });
-
+    const routerConnectionManager = require('../services/routerConnectionManager');
     try {
-      const connection = await mikrotik.connect(device.username, password);
-      const close = connection.closeOnDone(true);
-      
-      const chan = connection.openChannel();
-      chan.write('/system/script/add', {
+      const result = await routerConnectionManager.executeCommand(device, '/system/script/add', {
         name: `config-builder-${Date.now()}`,
         source: script,
       });
-      
-      const result = await chan.done;
-      close();
-      
       res.json({ success: true, message: 'Script pushed successfully', result });
     } catch (error) {
       res.json({ success: false, message: error.message });
@@ -386,36 +374,10 @@ router.post('/alerts/:id/resolve', async (req, res) => {
 router.get('/:id/ppp-secrets', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const connectionResult = await db.query(
-      'SELECT id, name, ip_address, api_port, username, password_encrypted FROM mikrotik_connections WHERE id = $1',
-      [id]
-    );
-    
-    if (connectionResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Connection not found' });
-    }
-    
-    const connection = connectionResult.rows[0];
-    
-    // Decrypt password
-    const [ivHex, authTagHex, encrypted] = connection.password_encrypted.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
-    decipher.setAuthTag(authTag);
-    let password = decipher.update(encrypted, 'hex', 'utf8');
-    password += decipher.final('utf8');
-    
-    const MikroNode = require('mikronode');
-    const isSSL = connection.connection_type === "api-ssl" || (connection.api_port && connection.api_port == 8729);
-    const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728, ssl: isSSL });
-    const conn = await device.connect(connection.username, password);
+    const routerConnectionManager = require('../services/routerConnectionManager');
     
     // Fetch PPP secrets
-    const secrets = await conn.write('/ppp/secret/print');
-    
-    conn.close();
+    const secrets = await routerConnectionManager.print(id, '/ppp/secret');
     
     // Format the response
     const users = secrets.map(secret => ({
@@ -440,36 +402,10 @@ router.get('/:id/ppp-secrets', async (req, res) => {
 router.get('/:id/hotspot-users', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const connectionResult = await db.query(
-      'SELECT id, name, ip_address, api_port, username, password_encrypted FROM mikrotik_connections WHERE id = $1',
-      [id]
-    );
-    
-    if (connectionResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Connection not found' });
-    }
-    
-    const connection = connectionResult.rows[0];
-    
-    // Decrypt password
-    const [ivHex, authTagHex, encrypted] = connection.password_encrypted.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
-    decipher.setAuthTag(authTag);
-    let password = decipher.update(encrypted, 'hex', 'utf8');
-    password += decipher.final('utf8');
-    
-    const MikroNode = require('mikronode');
-    const isSSL = connection.connection_type === "api-ssl" || (connection.api_port && connection.api_port == 8729);
-    const device = new MikroNode(connection.ip_address, { port: connection.api_port || 8728, ssl: isSSL });
-    const conn = await device.connect(connection.username, password);
+    const routerConnectionManager = require('../services/routerConnectionManager');
     
     // Fetch Hotspot users
-    const users = await conn.write('/ip/hotspot/user/print');
-    
-    conn.close();
+    const users = await routerConnectionManager.print(id, '/ip/hotspot/user');
     
     // Format the response
     const hotspotUsers = users.map(user => ({

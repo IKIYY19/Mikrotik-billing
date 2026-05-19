@@ -30,25 +30,7 @@ class RouterConnectivityService {
   }
 
   // Get database connection
-  decryptPassword(encrypted) {
-    try {
-      if (!encrypted || encrypted.indexOf(":") === -1) return encrypted || "";
-      const parts = encrypted.split(":");
-      if (parts.length !== 3) return encrypted;
-      const crypto = require("crypto");
-      const key = Buffer.from(
-        (process.env.ENCRYPTION_KEY || "default-key-change-in-production-32").slice(0, 32)
-      );
-      const iv = Buffer.from(parts[0], "hex");
-      const tag = Buffer.from(parts[1], "hex");
-      const data = Buffer.from(parts[2], "hex");
-      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-      decipher.setAuthTag(tag);
-      return decipher.update(data, "hex", "utf8") + decipher.final("utf8");
-    } catch (e) {
-      return encrypted || "";
-    }
-  }
+
 
   getDb() {
     return global.dbAvailable ? global.db : require("../db/memory");
@@ -88,7 +70,7 @@ class RouterConnectivityService {
     logger.info("Stopping router connectivity service");
     this.isRunning = false;
 
-    for (const [connectionId, interval] of this.intervals) {
+    for (const [, interval] of this.intervals) {
       clearInterval(interval);
     }
     this.intervals.clear();
@@ -269,31 +251,20 @@ class RouterConnectivityService {
   // Test MikroTik API connection
   async testAPIConnection(connection) {
     try {
-      const MikroNode = require("mikronode");
-      const crypto = require("crypto");
-
-      const password = this.decryptPassword(connection.password_encrypted);
-
+      const routerConnectionManager = require("./routerConnectionManager");
       logger.info("Attempting MikroTik API connection", {
         connectionId: connection.id,
         ip: connection.ip_address,
-        port: connection.api_port || 8728,
         username: connection.username,
       });
 
-      const device = new MikroNode(connection.ip_address, {
-        port: connection.api_port || 8728,
-      });
-      const conn = await device.connect(connection.username, password);
-      conn.close();
-
+      await routerConnectionManager.testConnection(connection);
       logger.info("API connection successful", { connectionId: connection.id });
       return true;
     } catch (error) {
       logger.error("API connection test failed", {
         connectionId: connection.id,
         error: error.message,
-        stack: error.stack,
       });
       return false;
     }
@@ -302,41 +273,20 @@ class RouterConnectivityService {
   // Test MikroTik SSH connection
   async testSSHConnection(connection) {
     try {
-      const { NodeSSH } = require("node-ssh");
-      const crypto = require("crypto");
-
-      logger.info("Testing SSH connection", {
-        connectionId: connection.id,
-        ip: connection.ip_address,
-      });
-      const password = this.decryptPassword(connection.password_encrypted);
+      const routerConnectionManager = require("./routerConnectionManager");
       logger.info("Attempting SSH connection", {
         connectionId: connection.id,
         ip: connection.ip_address,
-        port: connection.ssh_port || 22,
         username: connection.username,
       });
 
-      const ssh = new NodeSSH();
-      await ssh.connect({
-        host: connection.ip_address,
-        port: connection.ssh_port || 22,
-        username: connection.username,
-        password: password,
-        readyTimeout: 10000,
-      });
-
-      // Execute a simple command to verify connection
-      await ssh.execCommand("/system resource print");
-      ssh.dispose();
-
+      await routerConnectionManager.testSSHConnection(connection);
       logger.info("SSH connection successful", { connectionId: connection.id });
       return true;
     } catch (error) {
       logger.error("SSH connection test failed", {
         connectionId: connection.id,
         error: error.message,
-        stack: error.stack,
       });
       return false;
     }

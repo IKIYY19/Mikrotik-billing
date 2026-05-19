@@ -7,48 +7,19 @@
 const db = global.db || require('../db/memory');
 const { v4: uuidv4 } = require('uuid');
 
-// Crypto setup for decrypting MikroTik passwords
-function decryptPassword(encryptedPassword) {
-  try {
-    const crypto = require('crypto');
-    const algorithm = 'aes-256-gcm';
-    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32';
-    const [ivHex, authTagHex, encrypted] = encryptedPassword.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (e) {
-    return null;
-  }
-}
-
 // Connect to MikroTik and get both active sessions and simple queues
 async function getRouterMetrics(connection) {
   try {
-    const MikroNode = require('mikronode');
-    const isSSL = connection.connection_type === 'api-ssl' || (connection.api_port && connection.api_port == 8729);
-    const mikrotik = new MikroNode(connection.ip_address, { 
-      port: connection.api_port || 8728,
-      ssl: isSSL
-    });
-    const conn = await mikrotik.connect(connection.username, connection.password);
-    const close = conn.closeOnDone(true);
+    const routerConnectionManager = require('../services/routerConnectionManager');
     
     // Get active sessions
-    const chan1 = conn.openChannel();
-    chan1.write('/ppp/active/print');
-    const sessions = await chan1.done;
+    const sessions = await routerConnectionManager.print(connection, '/ppp/active');
     
     // Get simple queues
-    const chan2 = conn.openChannel();
-    chan2.write('/queue/simple/print', { '.proplist': '.id,name,target,max-limit,bytes,packet,rate' });
-    const queues = await chan2.done;
+    const queues = await routerConnectionManager.executeCommand(connection, '/queue/simple/print', {
+      '.proplist': '.id,name,target,max-limit,bytes,packet,rate'
+    });
     
-    close();
     return {
       success: true,
       sessions: Array.isArray(sessions) ? sessions : [],
@@ -67,13 +38,13 @@ async function getRouterMetrics(connection) {
 
 // Parse MikroTik bytes string (e.g., "1.5GiB" or "123456") to integer
 function parseBytes(bytesStr) {
-  if (!bytesStr) return 0;
+  if (!bytesStr) {return 0;}
   const str = String(bytesStr);
   // If it's already a number
-  if (/^\d+$/.test(str)) return parseInt(str);
+  if (/^\d+$/.test(str)) {return parseInt(str);}
   // Parse MikroTik format like "1.5GiB", "500MiB", "100KiB"
   const match = str.match(/^([\d.]+)\s*([KMGTP]i?B)?$/i);
-  if (!match) return 0;
+  if (!match) {return 0;}
   const value = parseFloat(match[1]);
   const unit = (match[2] || '').toLowerCase().replace('ib', '');
   const multipliers = { '': 1, k: 1024, m: 1048576, g: 1073741824, t: 1099511627776, p: 1125899906842624 };
@@ -82,17 +53,17 @@ function parseBytes(bytesStr) {
 
 // Parse MikroTik uptime string (e.g., "2d3h4m5s") to seconds
 function parseUptime(uptimeStr) {
-  if (!uptimeStr) return 0;
+  if (!uptimeStr) {return 0;}
   const str = String(uptimeStr);
   let totalSeconds = 0;
   const daysMatch = str.match(/(\d+)d/);
   const hoursMatch = str.match(/(\d+)h/);
   const minsMatch = str.match(/(\d+)m/);
   const secsMatch = str.match(/(\d+)s/);
-  if (daysMatch) totalSeconds += parseInt(daysMatch[1]) * 86400;
-  if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
-  if (minsMatch) totalSeconds += parseInt(minsMatch[1]) * 60;
-  if (secsMatch) totalSeconds += parseInt(secsMatch[1]);
+  if (daysMatch) {totalSeconds += parseInt(daysMatch[1]) * 86400;}
+  if (hoursMatch) {totalSeconds += parseInt(hoursMatch[1]) * 3600;}
+  if (minsMatch) {totalSeconds += parseInt(minsMatch[1]) * 60;}
+  if (secsMatch) {totalSeconds += parseInt(secsMatch[1]);}
   return totalSeconds;
 }
 
@@ -113,38 +84,60 @@ async function findCustomerByUsername(username) {
     // In-memory fallback
     const billingStore = require('../db/billingStore');
     const sub = billingStore.store.subscriptions.find(s => s.pppoe_username === username && s.status === 'active');
-    if (!sub) return null;
+    if (!sub) {return null;}
     const customer = billingStore.store.customers.find(c => c.id === sub.customer_id);
     const plan = billingStore.store.service_plans.find(p => p.id === sub.plan_id);
     return customer ? { ...customer, subscription_id: sub.id, plan_id: sub.plan_id, plan_name: plan?.name } : null;
   }
 }
 
-// Record bandwidth usage to database
-async function recordUsage(customerId, bytesIn, bytesOut, sessionTime, sessionId) {
-  try {
-    if (global.dbAvailable && db) {
-      const id = uuidv4();
-      await db.query(
-        `INSERT INTO usage_records (id, customer_id, session_id, bytes_in, bytes_out, session_time)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, customerId, sessionId || null, bytesIn, bytesOut, sessionTime]
-      );
-      return { id, customer_id: customerId, recorded_at: new Date().toISOString() };
-    } else {
-      // In-memory fallback
-      const billingStore = require('../db/billingStore');
-      return await billingStore.recordUsage({
-        customer_id: customerId,
-        bytes_in: bytesIn,
-        bytes_out: bytesOut,
-        session_time: sessionTime,
-      });
+// Bulk record bandwidth usage to database
+async function recordUsageBatch(records) {
+  if (!records || records.length === 0) {return 0;}
+  let totalInserted = 0;
+  
+  // Chunk records to prevent exceeding PostgreSQL parameter limit (65535)
+  const chunkSize = 1000;
+  for (let i = 0; i < records.length; i += chunkSize) {
+    const chunk = records.slice(i, i + chunkSize);
+    try {
+      if (global.dbAvailable && db) {
+        const values = [];
+        const placeholders = [];
+        let index = 1;
+        
+        for (const rec of chunk) {
+          const id = uuidv4();
+          placeholders.push(`($${index}, $${index + 1}, $${index + 2}, $${index + 3}, $${index + 4}, $${index + 5})`);
+          values.push(id, rec.customerId, rec.sessionId || null, rec.bytesIn, rec.bytesOut, rec.sessionTime);
+          index += 6;
+        }
+        
+        const queryText = `
+          INSERT INTO usage_records (id, customer_id, session_id, bytes_in, bytes_out, session_time)
+          VALUES ${placeholders.join(', ')}
+        `;
+        
+        await db.query(queryText, values);
+        totalInserted += chunk.length;
+      } else {
+        // In-memory fallback
+        const billingStore = require('../db/billingStore');
+        for (const rec of chunk) {
+          await billingStore.recordUsage({
+            customer_id: rec.customerId,
+            bytes_in: rec.bytesIn,
+            bytes_out: rec.bytesOut,
+            session_time: rec.sessionTime,
+          });
+          totalInserted++;
+        }
+      }
+    } catch (e) {
+      console.error(`[Metrics] Failed to write chunk of ${chunk.length} usage records:`, e.message);
     }
-  } catch (e) {
-    console.error(`[Metrics] Failed to record usage for customer ${customerId}:`, e.message);
-    return null;
   }
+  return totalInserted;
 }
 
 // Store router online status
@@ -213,13 +206,14 @@ async function collectMetrics() {
     connections.map(async (connection) => {
       // Decrypt password
       const device = { ...connection };
+      const routerConnectionManager = require('../services/routerConnectionManager');
       if (device.password_encrypted) {
-        device.password = decryptPassword(device.password_encrypted);
+        device.password = routerConnectionManager.decryptPassword(device.password_encrypted);
       }
 
       if (!device.password) {
         console.warn(`[Metrics] Skipping ${device.name} - no password available`);
-        return { sessionsCount: 0, recordsCount: 0, success: false, isError: true };
+        return { sessionsCount: 0, records: [], success: false, isError: true };
       }
 
       // Fetch sessions and queues in a single connection
@@ -232,11 +226,10 @@ async function collectMetrics() {
       });
 
       if (!data.success) {
-        return { sessionsCount: 0, recordsCount: 0, success: false, isError: true };
+        return { sessionsCount: 0, records: [], success: false, isError: true };
       }
 
-      let sessionsRecorded = 0;
-      let queuesRecorded = 0;
+      const recordsToInsert = [];
 
       // Process each PPPoE session
       for (const session of data.sessions) {
@@ -256,11 +249,13 @@ async function collectMetrics() {
         const sessionTime = parseUptime(session.uptime || session['uptime']);
         const sessionId = session['.id'] || session.id;
 
-        // Record usage
-        const record = await recordUsage(customer.id, bytesIn, bytesOut, sessionTime, sessionId);
-        if (record) {
-          sessionsRecorded++;
-        }
+        recordsToInsert.push({
+          customerId: customer.id,
+          bytesIn,
+          bytesOut,
+          sessionTime,
+          sessionId
+        });
       }
 
       // Also record queue-based usage for customers with active queues
@@ -279,21 +274,28 @@ async function collectMetrics() {
         const bytesOut = byteParts[1] ? parseBytes(byteParts[1]) : 0;
 
         // Only record if we haven't already recorded for this customer in this cycle
-        const existingRecord = await recordUsage(customer.id, bytesIn, bytesOut, 0, `queue-${queueName}`);
-        if (existingRecord) {
-          queuesRecorded++;
+        const exists = recordsToInsert.some(r => r.customerId === customer.id);
+        if (!exists) {
+          recordsToInsert.push({
+            customerId: customer.id,
+            bytesIn,
+            bytesOut,
+            sessionTime: 0,
+            sessionId: `queue-${queueName}`
+          });
         }
       }
 
       return {
         sessionsCount: sessionCount,
-        recordsCount: sessionsRecorded + queuesRecorded,
+        records: recordsToInsert,
         success: true
       };
     })
   );
 
-  // Aggregate results
+  // Aggregate results and collect all records for bulk insertion
+  let allRecords = [];
   for (const res of results) {
     if (res.status === 'fulfilled') {
       const val = res.value;
@@ -301,12 +303,19 @@ async function collectMetrics() {
         errors++;
       } else {
         totalSessions += val.sessionsCount;
-        totalRecords += val.recordsCount;
+        if (val.records && val.records.length > 0) {
+          allRecords = allRecords.concat(val.records);
+        }
       }
     } else {
       errors++;
       console.error('[Metrics] Error during parallel metrics collection task:', res.reason);
     }
+  }
+
+  // Bulk insert all collected records in chunks
+  if (allRecords.length > 0) {
+    totalRecords = await recordUsageBatch(allRecords);
   }
 
   const duration = Date.now() - startTime;
