@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Gauge, Plus, Edit, Trash2, Save, X, AlertCircle,
-  CheckCircle, Clock, Zap, Activity
+  CheckCircle, Clock, Zap, Activity, Package
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export function FUPProfiles() {
   const [profiles, setProfiles] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -22,10 +23,12 @@ export function FUPProfiles() {
     throttle_speed: '',
     priority: 100,
     is_active: true,
+    plan_id: '',
   });
 
   useEffect(() => {
     fetchProfiles();
+    axios.get(`${API}/billing/plans`).then(r => setPlans(r.data)).catch(() => {});
   }, []);
 
   const fetchProfiles = async () => {
@@ -215,6 +218,19 @@ export function FUPProfiles() {
                 className="modern-input"
                 placeholder="e.g., 1M/1M, 512K/512K"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Link to Plan</label>
+              <select
+                value={form.plan_id}
+                onChange={e => setForm({ ...form, plan_id: e.target.value })}
+                className="modern-input"
+              >
+                <option value="">All plans (global)</option>
+                {plans.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} — {p.speed_up}/{p.speed_down} @ {p.price}/mo</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1.5">Priority</label>

@@ -233,6 +233,28 @@ async function reconcileRadiusUser(subscription) {
   return { success: true, status: "synced", action: "already_disabled" };
 }
 
+async function updateThrottle(username, rateLimit) {
+  await ensureRadiusTables();
+  const db = getDb();
+  const existing = await db.query(
+    "SELECT id FROM radreply WHERE username = $1 AND attribute = 'Mikrotik-Rate-Limit'",
+    [username]
+  );
+  if (existing.rows.length > 0) {
+    await db.query(
+      "UPDATE radreply SET value = $1 WHERE username = $2 AND attribute = 'Mikrotik-Rate-Limit'",
+      [rateLimit, username]
+    );
+  } else {
+    await db.query(
+      "INSERT INTO radreply (username, attribute, op, value) VALUES ($1, 'Mikrotik-Rate-Limit', '=', $2)",
+      [username, rateLimit]
+    );
+  }
+  logger.info(`[FUP] Throttle updated: ${username} → ${rateLimit}`);
+  return { success: true };
+}
+
 async function isRadiusEnabled() {
   try {
     const db = getDb();
@@ -253,5 +275,6 @@ module.exports = {
   suspendRadiusUser: upsertRadiusUser,
   deleteRadiusUser,
   reconcileRadiusUser,
+  updateThrottle,
   isRadiusEnabled,
 };
