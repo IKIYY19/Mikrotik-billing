@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mikrotik_config_builder
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    ports:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./radius/radius_schema.sql:/docker-entrypoint-initdb.d/radius_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mikrotik-net
+
+  radius:
+    build:
+      context: ./radius
+      dockerfile: Dockerfile.radius
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - RADIUS_DB_NAME=radius_db
+      - RUN_RADIUS_MIGRATIONS=true
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./radius/clients.conf:/etc/freeradius/3.0/clients.conf
+      - ./radius/mods-available/sql:/etc/freeradius/3.0/mods-available/sql
+      - ./radius/radiusd.conf:/etc/freeradius/3.0/radiusd.conf
+      - radius_logs:/var/log/freeradius
+    restart: unless-stopped
+    networks:
+      - mikrotik-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.render
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}
+    environment:
+      - SERVICE_FQDN_MIKROTIK_APP=5000
+      - NODE_ENV=production
+      - PORT=5000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=mikrotik_config_builder
+      - DB_USER=postgres
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-to-64-chars}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-this-to-exactly-32-chars}
+      - APP_URL=${COOLIFY_FQDN:-https://mikrotik-billing.example.com}
+      - CORS_ORIGIN=${COOLIFY_FQDN:-https://mikrotik-billing.example.com}
+      - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:-admin@example.com}
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-changeme123}
+      - RADIUS_ENABLED=true
+      - RADIUS_HOST=radius
+      - RADIUS_PORT=1812
+      - RADIUS_SECRET=${RADIUS_SECRET:-testing123}
+      - ENABLE_ROUTER_CONNECTIVITY=true
+      - AT_API_KEY=${AT_API_KEY:-}
+      - AT_USERNAME=${AT_USERNAME:-sandbox}
+      - AT_SENDER_ID=${AT_SENDER_ID:-MyISP}
+      - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY:-}
+      - MPESA_CONSUMER_SECRET=${MPESA_CONSUMER_SECRET:-}
+      - MPESA_SHORTCODE=${MPESA_SHORTCODE:-174379}
+      - MPESA_PASSKEY=${MPESA_PASSKEY:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+    ports:
+      - "5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      radius:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - mikrotik-net
+
+volumes:
+  pgdata:
+  radius_logs:
+
+networks:
+  mikrotik-net:
+    driver: bridge
