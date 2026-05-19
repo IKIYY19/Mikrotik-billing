@@ -636,6 +636,19 @@
     --sidebar-active-glow: rgba(79, 70, 229, 0.1);
 }
 
+/* ─── Eye Comfort / Blue Light Filter ─── */
+.eye-filter::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999999;
+    background: rgba(255, 180, 100, 0.06);
+    mix-blend-mode: multiply;
+    backdrop-filter: sepia(0.25) hue-rotate(-15deg) brightness(0.92);
+    -webkit-backdrop-filter: sepia(0.25) hue-rotate(-15deg) brightness(0.92);
+}
+
 * {
     margin: 0;
     padding: 0;

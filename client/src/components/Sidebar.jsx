@@ -45,6 +45,8 @@ import {
   Moon,
   Upload,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
@@ -234,7 +236,7 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
   const [user, setUser] = useState(null);
   const branding = useBranding();
   const navigate = useNavigate();
-  const { mode, setMode } = useTheme();
+  const { mode, setMode, eyeFilter, setEyeFilter } = useTheme();
 
   useEffect(() => {
     try {
@@ -500,6 +502,18 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
           ) : (
             <Moon className="w-4 h-4" />
           )}
+        </button>
+        <button
+          onClick={() => setEyeFilter(!eyeFilter)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all"
+          style={{
+            color: eyeFilter ? "#fbbf24" : "var(--sidebar-item-text, #a1a1aa)",
+            background: eyeFilter ? "rgba(251, 191, 36, 0.1)" : "transparent",
+          }}
+          title={eyeFilter ? "Disable Eye Comfort" : "Enable Eye Comfort (Blue Light Filter)"}
+        >
+          {eyeFilter ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          <span>Eye Comfort</span>
         </button>
         <button
           onClick={handleLogout}

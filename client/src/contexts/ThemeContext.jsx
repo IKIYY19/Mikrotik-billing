@@ -47,6 +47,10 @@ export function ThemeProvider({ children }) {
     const saved = localStorage.getItem("mode");
     return saved || "dark";
   });
+  const [eyeFilter, setEyeFilter] = useState(() => {
+    const saved = localStorage.getItem("eyeFilter");
+    return saved === "true";
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -59,8 +63,17 @@ export function ThemeProvider({ children }) {
     localStorage.setItem("mode", mode);
   }, [mode]);
 
+  useEffect(() => {
+    if (eyeFilter) {
+      document.documentElement.classList.add("eye-filter");
+    } else {
+      document.documentElement.classList.remove("eye-filter");
+    }
+    localStorage.setItem("eyeFilter", String(eyeFilter));
+  }, [eyeFilter]);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, themes }}>
+    <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, eyeFilter, setEyeFilter, themes }}>
       {children}
     </ThemeContext.Provider>
   );
