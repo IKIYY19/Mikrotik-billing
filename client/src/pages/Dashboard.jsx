@@ -25,6 +25,10 @@ import {
   Activity,
   UserPlus,
   Key,
+  Wifi,
+  MessageSquare,
+  CreditCard,
+  Link,
 } from "lucide-react";
 import { useToast } from "../hooks/useToast";
 import { useStore } from "../store";
