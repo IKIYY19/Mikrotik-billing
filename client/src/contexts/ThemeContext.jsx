@@ -51,6 +51,10 @@ export function ThemeProvider({ children }) {
     const saved = localStorage.getItem("eyeFilter");
     return saved === "true";
   });
+  const [eyeIntensity, setEyeIntensity] = useState(() => {
+    const saved = localStorage.getItem("eyeIntensity");
+    return saved ? parseInt(saved) : 60;
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -66,14 +70,17 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     if (eyeFilter) {
       document.documentElement.classList.add("eye-filter");
+      document.documentElement.style.setProperty("--eye-intensity", eyeIntensity / 100);
     } else {
       document.documentElement.classList.remove("eye-filter");
+      document.documentElement.style.setProperty("--eye-intensity", "0");
     }
     localStorage.setItem("eyeFilter", String(eyeFilter));
-  }, [eyeFilter]);
+    localStorage.setItem("eyeIntensity", String(eyeIntensity));
+  }, [eyeFilter, eyeIntensity]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, eyeFilter, setEyeFilter, themes }}>
+    <ThemeContext.Provider value={{ theme, setTheme, mode, setMode, eyeFilter, setEyeFilter, eyeIntensity, setEyeIntensity, themes }}>
       {children}
     </ThemeContext.Provider>
   );

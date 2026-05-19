@@ -236,7 +236,7 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
   const [user, setUser] = useState(null);
   const branding = useBranding();
   const navigate = useNavigate();
-  const { mode, setMode, eyeFilter, setEyeFilter } = useTheme();
+  const { mode, setMode, eyeFilter, setEyeFilter, eyeIntensity, setEyeIntensity } = useTheme();
 
   useEffect(() => {
     try {
@@ -505,16 +505,41 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
         </button>
         <button
           onClick={() => setEyeFilter(!eyeFilter)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all"
+          className="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all w-full"
           style={{
             color: eyeFilter ? "#fbbf24" : "var(--sidebar-item-text, #a1a1aa)",
             background: eyeFilter ? "rgba(251, 191, 36, 0.1)" : "transparent",
           }}
-          title={eyeFilter ? "Disable Eye Comfort" : "Enable Eye Comfort (Blue Light Filter)"}
+          title={eyeFilter ? "Eye Comfort ON" : "Eye Comfort OFF"}
         >
-          {eyeFilter ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          <span>Eye Comfort</span>
+          <span className="flex items-center gap-2">
+            {eyeFilter ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            Eye Comfort
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${eyeFilter ? "bg-amber-500/20 text-amber-400" : "bg-zinc-500/10 text-zinc-500"}`}>
+            {eyeFilter ? "ON" : "OFF"}
+          </span>
         </button>
+        {eyeFilter && (
+          <div className="px-3 pb-1">
+            <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
+              <span>Warmth</span>
+              <span>{eyeIntensity}%</span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="100"
+              value={eyeIntensity}
+              onChange={e => setEyeIntensity(parseInt(e.target.value))}
+              className="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer"
+              style={{
+                accentColor: "#fbbf24",
+                background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${eyeIntensity}%, #3f3f46 ${eyeIntensity}%, #3f3f46 100%)`,
+              }}
+            />
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-all"
