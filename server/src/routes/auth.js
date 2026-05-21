@@ -11,6 +11,7 @@ const logger = require("../utils/logger");
 const { authLimiter } = require("../middleware/rateLimiter");
 const { audit } = require("../utils/audit");
 const { OAuth2Client } = require("google-auth-library");
+const ldapAuth = require("../services/ldapAuth");
 
 // Valid RBAC roles
 const VALID_ROLES = [
@@ -97,12 +98,44 @@ router.post("/login", authLimiter, async (req, res) => {
       email,
     ]);
     if (user.rows.length === 0) {
+      const ldapUser = await ldapAuth.authenticateUser(email, password);
+      if (ldapUser) {
+        const defaultTenant = await db.query("SELECT id FROM tenants ORDER BY created_at ASC LIMIT 1").catch(() => ({ rows: [] }));
+        const tenantId = defaultTenant.rows[0]?.id || null;
+        const newId = uuidv4();
+        const hash = await bcrypt.hash(password, 10);
+        await db.query(
+          `INSERT INTO users (id, email, password_hash, name, role, tenant_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+           ON CONFLICT (email) DO UPDATE SET name = $4, role = $5`,
+          [newId, email, hash, ldapUser.name || email, ldapUser.role, tenantId]
+        );
+        const newUser = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+
+        const ldapToken = jwt.sign(
+          { id: newUser.rows[0].id, email: newUser.rows[0].email, role: newUser.rows[0].role, tenant_id: tenantId },
+          JWT_SECRET, { expiresIn: JWT_EXPIRES },
+        );
+        logger.info("LDAP user logged in", { email, role: newUser.rows[0].role, ip: req.ip });
+        return res.json({ token: ldapToken, user: { id: newUser.rows[0].id, email, name: newUser.rows[0].name, role: newUser.rows[0].role }, ldap: true });
+      }
+
       logger.warn("Login failed - user not found", { email, ip: req.ip });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const valid = await bcrypt.compare(password, user.rows[0].password_hash);
     if (!valid) {
+      const ldapUser = await ldapAuth.authenticateUser(email, password);
+      if (ldapUser) {
+        const token = jwt.sign(
+          { id: user.rows[0].id, email: user.rows[0].email, role: user.rows[0].role, tenant_id: user.rows[0].tenant_id },
+          JWT_SECRET, { expiresIn: JWT_EXPIRES },
+        );
+        logger.info("LDAP fallback login", { email, role: user.rows[0].role, ip: req.ip });
+        return res.json({ token, user: { id: user.rows[0].id, email, name: user.rows[0].name, role: user.rows[0].role }, ldap: true });
+      }
+
       logger.warn("Login failed - invalid password", {
         email,
         userId: user.rows[0].id,

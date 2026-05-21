@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Copy,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import {
   ROLES,
@@ -203,6 +204,8 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [testingLdap, setTestingLdap] = useState(false);
+  const [ldapTestResult, setLdapTestResult] = useState(null);
   const [settings, setSettings] = useState({
     // General
     company_name: "",
@@ -325,6 +328,19 @@ export function SettingsPage() {
       }
     } catch (error) {
       console.error("Failed to fetch notification settings:", error);
+    }
+  };
+
+  const testLdap = async () => {
+    setTestingLdap(true);
+    setLdapTestResult(null);
+    try {
+      const { data } = await axios.post(`${API}/settings/ldap/test`);
+      setLdapTestResult(data);
+    } catch (e) {
+      setLdapTestResult({ success: false, message: e.response?.data?.error || "Connection test failed" });
+    } finally {
+      setTestingLdap(false);
     }
   };
 
@@ -761,390 +777,63 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* White Label Branding */}
+          {/* LDAP / Active Directory */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Palette className="w-5 h-5" /> White Label Branding
+                <Shield className="w-5 h-5" /> LDAP / Active Directory
               </CardTitle>
               <CardDescription>
-                Customize the platform colors and branding to match your ISP
-                identity.
+                Staff login via Windows Active Directory or OpenLDAP server. Configure to enable domain authentication.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="branding-title">Platform Title</Label>
-                  <Input
-                    id="branding-title"
-                    value={settings.branding_title}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        branding_title: e.target.value,
-                      })
-                    }
-                    placeholder="MyISP Billing"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Overrides company name in sidebar and titles
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="primary-color">Primary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="primary-color"
-                      type="color"
-                      value={settings.primary_color}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          primary_color: e.target.value,
-                        })
-                      }
-                      className="w-12 h-10 p-1 cursor-pointer"
-                    />
-                    <Input
-                      value={settings.primary_color}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          primary_color: e.target.value,
-                        })
-                      }
-                      placeholder="#3b82f6"
-                      className="flex-1 font-mono text-sm"
-                    />
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Used for buttons, sidebar icon, active links
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="secondary-color">Secondary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="secondary-color"
-                      type="color"
-                      value={settings.secondary_color}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          secondary_color: e.target.value,
-                        })
-                      }
-                      className="w-12 h-10 p-1 cursor-pointer"
-                    />
-                    <Input
-                      value={settings.secondary_color}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          secondary_color: e.target.value,
-                        })
-                      }
-                      placeholder="#1e293b"
-                      className="flex-1 font-mono text-sm"
-                    />
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Used for sidebar and card backgrounds
-                  </p>
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setSettings({
-                        ...settings,
-                        primary_color: "#3b82f6",
-                        secondary_color: "#1e293b",
-                        branding_title: "",
-                      })
-                    }
-                    className="text-xs"
-                  >
-                    <RotateCcw className="w-3 h-3 mr-1" /> Reset to Defaults
-                  </Button>
-                </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ldap-enabled" className="cursor-pointer">Enable LDAP Authentication</Label>
+                <Switch id="ldap-enabled" checked={settings.ldap_enabled === "true"} onCheckedChange={(v) => setSettings({...settings, ldap_enabled: String(v)})} />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Slack Notifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Webhook className="w-5 h-5" /> Slack Notifications
-              </CardTitle>
-              <CardDescription>
-                Send real-time notifications to a Slack channel for key billing
-                events.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div>
-                <Label htmlFor="slack-webhook">Slack Webhook URL</Label>
-                <Input
-                  id="slack-webhook"
-                  value={settings.slack_webhook_url || ""}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      slack_webhook_url: e.target.value,
-                    })
-                  }
-                  placeholder="https://hooks.slack.com/services/..."
-                />
-                <p className="text-xs text-zinc-500 mt-1">
-                  Send notifications to a Slack channel. Create a webhook at
-                  Slack App Directory.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Portal Links */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ExternalLink className="w-5 h-5" /> Customer Portal Links
-              </CardTitle>
-              <CardDescription>
-                Share these links with your customers for self-service and
-                signup.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  {
-                    label: "Sign Up",
-                    path: "/signup",
-                    desc: "New customers register and choose a plan",
-                  },
-                  {
-                    label: "Portal Login",
-                    path: "/portal/login",
-                    desc: "Existing customers log in with phone + PIN",
-                  },
-                ].map((link) => {
-                  const fullUrl = window.location.origin + link.path;
-                  return (
-                    <div
-                      key={link.path}
-                      className="p-3 bg-zinc-800/30 rounded-lg"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-white">
-                          {link.label}
-                        </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(fullUrl);
-                            useToastStore
-                              .getState()
-                              .addToast("success", "Copied!", fullUrl);
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                        >
-                          <Copy className="w-3 h-3" /> Copy
-                        </button>
-                      </div>
-                      <a
-                        href={fullUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-zinc-400 hover:text-zinc-300 font-mono truncate block"
-                      >
-                        {fullUrl}
-                      </a>
-                      <p className="text-xs text-zinc-500 mt-1">{link.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Formatting */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" /> Date & Currency Formatting
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <select
-                    id="timezone"
-                    value={settings.timezone}
-                    onChange={(e) =>
-                      setSettings({ ...settings, timezone: e.target.value })
-                    }
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {timezones.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="currency">Currency</Label>
-                  <select
-                    id="currency"
-                    value={settings.currency}
-                    onChange={(e) => {
-                      const currency = currencies.find(
-                        (c) => c.code === e.target.value,
-                      );
-                      setSettings({
-                        ...settings,
-                        currency: e.target.value,
-                        currency_symbol: currency?.symbol || e.target.value,
-                      });
-                    }}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {currencies.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name} ({c.symbol})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="date-format">Date Format</Label>
-                  <select
-                    id="date-format"
-                    value={settings.date_format}
-                    onChange={(e) =>
-                      setSettings({ ...settings, date_format: e.target.value })
-                    }
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {dateFormats.map((df) => (
-                      <option key={df} value={df}>
-                        {df}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Theme Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="w-5 h-5" /> Appearance
-              </CardTitle>
-              <CardDescription>
-                Customize the look and feel of your application.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Color Theme */}
-              <div>
-                <Label className="text-base font-semibold mb-3 block">
-                  Color Theme
-                </Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {themes.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTheme(t.id)}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        theme === t.id
-                          ? "border-primary bg-primary/10"
-                          : "border-zinc-700 hover:border-zinc-600"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-white mb-1">
-                        {t.name}
-                      </div>
-                      <div className="text-xs text-zinc-400">
-                        {t.description}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Light/Dark Mode */}
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  {mode === "dark" ? (
-                    <Moon className="w-5 h-5" />
-                  ) : (
-                    <Sun className="w-5 h-5" />
-                  )}
+              {settings.ldap_enabled === "true" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <div className="font-medium text-white">Dark Mode</div>
-                    <div className="text-sm text-zinc-400">
-                      Toggle between light and dark theme
-                    </div>
+                    <Label>LDAP Server URL</Label>
+                    <Input value={settings.ldap_url || ""} onChange={e => setSettings({...settings, ldap_url: e.target.value})} placeholder="ldap://dc.company.local:389" />
+                  </div>
+                  <div>
+                    <Label>Base DN</Label>
+                    <Input value={settings.ldap_base_dn || ""} onChange={e => setSettings({...settings, ldap_base_dn: e.target.value})} placeholder="DC=company,DC=local" />
+                  </div>
+                  <div>
+                    <Label>Bind DN (optional)</Label>
+                    <Input value={settings.ldap_bind_dn || ""} onChange={e => setSettings({...settings, ldap_bind_dn: e.target.value})} placeholder="CN=svc-ldap,CN=Users,DC=company,DC=local" />
+                  </div>
+                  <div>
+                    <Label>Bind Password</Label>
+                    <Input type="password" value={settings.ldap_bind_password || ""} onChange={e => setSettings({...settings, ldap_bind_password: e.target.value})} placeholder="Service account password" />
+                  </div>
+                  <div>
+                    <Label>User Filter</Label>
+                    <Input value={settings.ldap_filter || ""} onChange={e => setSettings({...settings, ldap_filter: e.target.value})} placeholder="(sAMAccountName={{username}})" />
+                  </div>
+                  <div>
+                    <Label>Default Role</Label>
+                    <select value={settings.ldap_default_role || "staff"} onChange={e => setSettings({...settings, ldap_default_role: e.target.value})} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                      <option value="technician">Technician</option>
+                    </select>
                   </div>
                 </div>
-                <Switch
-                  checked={mode === "dark"}
-                  onCheckedChange={(checked) =>
-                    setMode(checked ? "dark" : "light")
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Remote Access VPN */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wifi className="w-5 h-5" /> Remote Access VPN
-              </CardTitle>
-              <CardDescription>
-                SSTP VPN server that routers will connect to for remote Winbox
-                access. Leave blank to disable.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="vpn-server">SSTP Server Address</Label>
-                <Input
-                  id="vpn-server"
-                  type="text"
-                  value={settings.vpn_server_address || ""}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      vpn_server_address: e.target.value,
-                    })
-                  }
-                  placeholder="vpn.yourcompany.com"
-                />
-              </div>
-              <div>
-                <Label htmlFor="vpn-port">SSTP Server Port</Label>
-                <Input
-                  id="vpn-port"
-                  type="number"
-                  value={settings.vpn_server_port || "443"}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      vpn_server_port: e.target.value,
-                    })
-                  }
-                  placeholder="443"
-                />
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={testLdap} disabled={testingLdap} className="gap-1 text-sm">
+                  {testingLdap ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  {testingLdap ? "Testing..." : "Test Connection"}
+                </Button>
+                {ldapTestResult && (
+                  <span className={`text-xs self-center ${ldapTestResult.success ? "text-green-400" : "text-red-400"}`}>
+                    {ldapTestResult.message}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>

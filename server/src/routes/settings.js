@@ -628,6 +628,16 @@ router.put("/notifications", async (req, res) => {
   }
 });
 
+router.post("/ldap/test", async (req, res) => {
+  try {
+    const ldapAuth = require("../services/ldapAuth");
+    const result = await ldapAuth.testConnection(true);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Export the stores for use in other modules
 module.exports = router;
 module.exports.paymentGatewayStore = paymentGatewayStore;
