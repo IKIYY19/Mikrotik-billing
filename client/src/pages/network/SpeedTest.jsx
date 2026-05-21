@@ -57,10 +57,12 @@ export function SpeedTest() {
     setProgress(0);
     setResults(null);
 
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setProgress(prev => Math.min(prev + 10, 90));
-    }, 500);
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const pct = Math.min(Math.round((elapsed / (duration + 5)) * 100), 95);
+      setProgress(pct);
+    }, 200);
 
     try {
       const { data } = await axios.post(`${API}/speedtest/run`, {
@@ -77,7 +79,7 @@ export function SpeedTest() {
     } catch (e) {
       alert(`Speed test failed: ${e.response?.data?.error || e.message}`);
     } finally {
-      clearInterval(progressInterval);
+      clearInterval(interval);
       setRunning(false);
     }
   };
@@ -204,9 +206,12 @@ export function SpeedTest() {
       </div>
 
       {/* Results */}
-      {results && (
+          {results && (
         <div className="relative glass rounded-2xl p-6 mb-6">
           <h3 className="text-base font-semibold text-white mb-4">Test Results</h3>
+          {results.note && (
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-300">{results.note}</div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-zinc-800/50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-zinc-400 mb-2">
