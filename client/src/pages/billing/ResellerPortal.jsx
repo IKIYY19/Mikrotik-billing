@@ -124,6 +124,7 @@ export function ResellerPortal() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState("");
+  const [revenueTrend, setRevenueTrend] = useState([]);
 
   // ── Expand / Detail State ──
   const [expandedReseller, setExpandedReseller] = useState(null);
@@ -138,6 +139,7 @@ export function ResellerPortal() {
   // ── Fetch ──
   useEffect(() => {
     fetchResellers();
+    fetchRevenueTrend();
   }, []);
 
   const fetchResellers = async () => {
@@ -155,6 +157,19 @@ export function ResellerPortal() {
       setResellers([]);
     }
     setLoading(false);
+  };
+
+  const fetchRevenueTrend = async () => {
+    try {
+      const token = getToken();
+      const { data } = await axios.get(`${API}/analytics/revenue-trend?period=1y`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      setRevenueTrend(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Failed to fetch revenue trend:", e);
+      setRevenueTrend([]);
+    }
   };
 
   // ── CRUD ──
@@ -333,14 +348,20 @@ export function ResellerPortal() {
     return list;
   }, [resellers, search, statusFilter]);
 
-  // ── Mock monthly revenue data for chart ──
+  // ── Monthly revenue data from API ──
   const monthlyData = useMemo(() => {
+    if (revenueTrend && revenueTrend.length > 0) {
+      return revenueTrend.map((item) => ({
+        month: item.label,
+        revenue: item.revenue || 0,
+      }));
+    }
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
+    return months.map((m) => ({
       month: m,
-      revenue: Math.round((totalRevenue * (0.3 + Math.random() * 0.7)) / 6),
+      revenue: 0,
     }));
-  }, [totalRevenue]);
+  }, [revenueTrend]);
 
   // ── Activity log (derived from resellers) ──
   const activityLog = useMemo(() => {
@@ -501,7 +522,7 @@ export function ResellerPortal() {
                 Revenue Overview
               </h3>
             </div>
-            {totalRevenue > 0 ? (
+            {monthlyData.some(d => d.revenue > 0) || totalRevenue > 0 ? (
               <BarChart
                 data={monthlyData}
                 labelKey="month"

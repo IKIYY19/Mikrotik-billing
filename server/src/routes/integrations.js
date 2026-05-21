@@ -67,7 +67,7 @@ router.put('/:id', async (req, res) => {
        SET config_data = $1, is_active = COALESCE($2, is_active), updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
        RETURNING *`,
-      [JSON.stringify(encryptedConfig), is_active, id]
+      [JSON.stringify(encryptedConfig), is_active === undefined ? null : is_active, id]
     );
 
     if (result.rows.length === 0) {
@@ -164,12 +164,16 @@ router.post('/:id/test', async (req, res) => {
     }
 
     // Update last test status
-    await db.query(
-      `UPDATE integrations 
-       SET last_tested = CURRENT_TIMESTAMP, last_test_status = $1, last_test_message = $2
-       WHERE id = $3`,
-      [testResult.success ? 'success' : 'error', testResult.message, id]
-    );
+    try {
+      await db.query(
+        `UPDATE integrations 
+         SET last_tested = CURRENT_TIMESTAMP, last_test_status = $1, last_test_message = $2
+         WHERE id = $3`,
+        [testResult.success ? 'success' : 'failed', testResult.message, id]
+      );
+    } catch (dbError) {
+      console.error('Failed to update integration test status in database:', dbError);
+    }
 
     res.json({
       success: testResult.success,
@@ -190,18 +194,31 @@ async function testAfricasTalking(config) {
       return { success: false, message: 'API key is required' };
     }
 
-    const response = await fetch('https://api.sandbox.africastalking.com/version1/message', {
+    const username = config.username || 'sandbox';
+    const isSandbox = username === 'sandbox';
+    const baseUrl = isSandbox 
+      ? 'https://api.sandbox.africastalking.com' 
+      : 'https://api.africastalking.com';
+
+    const response = await fetch(`${baseUrl}/version1/user?username=${username}`, {
       method: 'GET',
       headers: {
-        'ApiKey': config.api_key,
+        'apikey': config.api_key,
         'Accept': 'application/json',
       },
     });
 
     if (response.ok) {
-      return { success: true, message: 'Africa\'s Talking connected successfully' };
+      const data = await response.json().catch(() => ({}));
+      const balance = data.UserData?.balance || '0.00';
+      return { 
+        success: true, 
+        message: `Africa's Talking connected successfully. Account balance: ${balance}` 
+      };
     }
-    return { success: false, message: 'Invalid API key or service unavailable' };
+    const errData = await response.json().catch(() => ({}));
+    const errMsg = errData.errorMessage || 'Invalid API key or username';
+    return { success: false, message: errMsg };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -214,7 +231,9 @@ async function testMpesa(config) {
     }
 
     const auth = Buffer.from(`${config.consumer_key}:${config.consumer_secret}`).toString('base64');
-    const response = await fetch(`https://${config.environment || 'sandbox'}.api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials`, {
+    const environment = config.environment || 'sandbox';
+    const baseUrl = environment === 'live' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+    const response = await fetch(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${auth}`,
@@ -236,7 +255,11 @@ async function testWhatsApp(config) {
       return { success: false, message: 'Access token is required' };
     }
 
-    const response = await fetch('https://graph.facebook.com/v17.0/me/accounts', {
+    const targetUrl = config.phone_number_id 
+      ? `https://graph.facebook.com/v17.0/${config.phone_number_id}`
+      : 'https://graph.facebook.com/v17.0/me';
+
+    const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${config.access_token}`,
@@ -246,7 +269,9 @@ async function testWhatsApp(config) {
     if (response.ok) {
       return { success: true, message: 'WhatsApp Business API connected successfully' };
     }
-    return { success: false, message: 'Invalid access token' };
+    const errorData = await response.json().catch(() => ({}));
+    const errMsg = errorData.error?.message || 'Invalid access token or phone number ID';
+    return { success: false, message: errMsg };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -258,7 +283,7 @@ async function testSendGrid(config) {
       return { success: false, message: 'API key is required' };
     }
 
-    const response = await fetch('https://api.sendgrid.com/v3/user/settings/enforced_tls', {
+    const response = await fetch('https://api.sendgrid.com/v3/scopes', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${config.api_key}`,
@@ -421,7 +446,20 @@ async function testSmsLeopard(config) {
     if (!config.api_key) {
       return { success: false, message: 'API key is required' };
     }
-    return { success: true, message: 'SMSLeopard configuration saved (API key validated)' };
+    // SMSLeopard balance check
+    const response = await fetch('https://api.smsleopard.com/v1/sms/balance', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${config.api_key}:`).toString('base64')}`,
+      },
+    });
+    if (response.ok || response.status === 401) {
+      // 401 = credentials recognized by server, just wrong key
+      return response.ok
+        ? { success: true, message: 'SMSLeopard connected successfully' }
+        : { success: false, message: 'Invalid API key — authentication failed' };
+    }
+    return { success: true, message: 'SMSLeopard configuration saved (API key present)' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -432,7 +470,15 @@ async function testBulkSmsKenya(config) {
     if (!config.username || !config.api_key) {
       return { success: false, message: 'Username and API key are required' };
     }
-    return { success: true, message: 'BulkSMS Kenya configuration saved' };
+    // BulkSMS Kenya balance endpoint
+    const url = `https://api.bulksmskenya.co.ke/v1/balance?username=${encodeURIComponent(config.username)}&api_key=${encodeURIComponent(config.api_key)}`;
+    const response = await fetch(url, { method: 'GET' });
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const balance = data.balance || data.credits || 'N/A';
+      return { success: true, message: `BulkSMS Kenya connected. Balance: ${balance}` };
+    }
+    return { success: false, message: 'Invalid username or API key' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -443,7 +489,17 @@ async function testNexmo(config) {
     if (!config.api_key || !config.api_secret) {
       return { success: false, message: 'API key and secret are required' };
     }
-    return { success: true, message: 'Nexmo configuration saved' };
+    // Vonage account info endpoint
+    const response = await fetch(`https://rest.nexmo.com/account/get-balance?api_key=${config.api_key}&api_secret=${config.api_secret}`, {
+      method: 'GET',
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const balance = data.value != null ? `${data.value.toFixed(2)} EUR` : 'N/A';
+      return { success: true, message: `Vonage (Nexmo) connected. Balance: ${balance}` };
+    }
+    const errData = await response.json().catch(() => ({}));
+    return { success: false, message: errData['error-code-label'] || 'Invalid API key or secret' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -454,7 +510,20 @@ async function testMailgun(config) {
     if (!config.api_key || !config.domain) {
       return { success: false, message: 'API key and domain are required' };
     }
-    return { success: true, message: 'Mailgun configuration saved' };
+    // Use the Mailgun domain info endpoint
+    const region = config.api_key.startsWith('key-') ? '' : ''; // EU uses api.eu.mailgun.net
+    const baseUrl = 'https://api.mailgun.net';
+    const auth = Buffer.from(`api:${config.api_key}`).toString('base64');
+    const response = await fetch(`${baseUrl}/v3/domains/${config.domain}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Basic ${auth}` },
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { success: true, message: `Mailgun connected. Domain: ${data.domain?.name || config.domain} (${data.domain?.state || 'active'})` };
+    }
+    const errData = await response.json().catch(() => ({}));
+    return { success: false, message: errData.message || 'Invalid API key or domain' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -465,7 +534,15 @@ async function testAwsSes(config) {
     if (!config.access_key_id || !config.secret_access_key) {
       return { success: false, message: 'Access key ID and secret access key are required' };
     }
-    return { success: true, message: 'AWS SES configuration saved' };
+    // AWS doesn't support unauthenticated calls — validate field formats
+    const region = config.region || 'us-east-1';
+    if (!config.access_key_id.match(/^[A-Z0-9]{20}$/)) {
+      return { success: false, message: 'Invalid AWS Access Key ID format (should be 20 uppercase alphanumeric characters)' };
+    }
+    if (config.secret_access_key.length < 40) {
+      return { success: false, message: 'AWS Secret Access Key appears too short (should be 40+ characters)' };
+    }
+    return { success: true, message: `AWS SES configuration saved for region ${region}. Credentials will be validated on first send.` };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }
@@ -476,7 +553,22 @@ async function testMailchimp(config) {
     if (!config.api_key) {
       return { success: false, message: 'API key is required' };
     }
-    return { success: true, message: 'Mailchimp configuration saved' };
+    // Mailchimp API key format: <key>-<datacenter>
+    const dcMatch = config.api_key.match(/-([a-z0-9]+)$/);
+    if (!dcMatch) {
+      return { success: false, message: 'Invalid Mailchimp API key format. Should end with -us1, -eu1, etc.' };
+    }
+    const dc = dcMatch[1];
+    const response = await fetch(`https://${dc}.api.mailchimp.com/3.0/ping`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`any:${config.api_key}`).toString('base64')}`,
+      },
+    });
+    if (response.ok) {
+      return { success: true, message: `Mailchimp connected successfully (datacenter: ${dc})` };
+    }
+    return { success: false, message: 'Invalid API key — authentication failed' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
   }

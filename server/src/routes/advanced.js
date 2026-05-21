@@ -314,12 +314,104 @@ router.post("/backup/restore/:id", async (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const backup = await backupStore.getBackupContent(req.params.id);
-  if (!backup) {return res.status(404).json({ error: "Backup not found" });}
+  try {
+    const backup = await backupStore.getBackupContent(req.params.id);
+    if (!backup) {
+      return res.status(404).json({ error: "Backup not found" });
+    }
 
-  // TODO: Implement actual MikroTik API restore
-  // For now, just return success
-  res.json({ message: "Restore initiated", backup_id: req.params.id });
+    const scriptText = backup.content || "";
+    
+    // Import deployer to validate script
+    const mikrotikDeployer = require("../services/mikrotikDeployer");
+    const validation = mikrotikDeployer.validateScript(scriptText);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: "Script validation failed due to safety checks", 
+        errors: validation.errors 
+      });
+    }
+
+    const port = Number(target_port) || 8728;
+    let result = { success: false, error: "Unsupported port or protocol" };
+
+    if (port === 22 || port === 2222) {
+      // SSH protocol
+      const mikrotikSSH = require("../services/mikrotikSSH");
+      const connection = await mikrotikSSH.createConnection({
+        host: target_ip,
+        port,
+        username: target_username,
+        password: target_password,
+      });
+      try {
+        result = await mikrotikSSH.executeScript(connection.id, scriptText);
+      } finally {
+        await mikrotikSSH.removeConnection(connection.id).catch(() => {});
+      }
+    } else if (port === 80 || port === 443 || port === 8080) {
+      // REST API protocol
+      const mikrotikRest = require("../services/mikrotikRest");
+      const connection = mikrotikRest.createConnection({
+        host: target_ip,
+        port,
+        username: target_username,
+        password: target_password,
+        useSSL: port === 443,
+      });
+      try {
+        result = await mikrotikRest.executeScript(connection.id, scriptText);
+      } finally {
+        mikrotikRest.removeConnection(connection.id);
+      }
+    } else if (port === 8728 || port === 8729) {
+      // RouterOS API protocol
+      const routerConnectionManager = require("../services/routerConnectionManager");
+      const device = {
+        ip_address: target_ip,
+        api_port: port,
+        username: target_username,
+        password: target_password,
+        connection_type: port === 8729 ? "api-ssl" : "api",
+      };
+      
+      const scriptName = `restore_${Date.now()}`;
+      try {
+        await routerConnectionManager.executeCommand(device, "/system/script/add", {
+          name: scriptName,
+          source: scriptText,
+        });
+        
+        await routerConnectionManager.executeCommand(device, "/system/script/run", {
+          number: scriptName,
+        });
+        
+        result = { success: true };
+      } catch (err) {
+        result = { success: false, error: err.message };
+      } finally {
+        await routerConnectionManager.executeCommand(device, "/system/script/remove", {
+          numbers: scriptName,
+        }).catch(() => {});
+      }
+    }
+
+    if (result.success) {
+      return res.json({ 
+        message: "Backup script restored successfully", 
+        backup_id: req.params.id,
+        details: result
+      });
+    } else {
+      return res.status(500).json({ 
+        error: result.error || "Failed to execute restore script", 
+        details: result 
+      });
+    }
+  } catch (error) {
+    console.error("Backup restoration error:", error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

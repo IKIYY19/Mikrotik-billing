@@ -79,6 +79,18 @@ describe('Encryption Utility', () => {
       expect(decrypted.count).toBe(42);
     });
 
+    test('should not attempt to decrypt strings with colons that are not in encrypted format (e.g. URLs)', () => {
+      const obj = {
+        webhookUrl: 'https://discord.com/api/webhooks/12345/abcde',
+        hostPort: '192.168.1.1:8080',
+        normalText: 'hello:world',
+      };
+      const decrypted = encryption.decryptObject(obj);
+      expect(decrypted.webhookUrl).toBe('https://discord.com/api/webhooks/12345/abcde');
+      expect(decrypted.hostPort).toBe('192.168.1.1:8080');
+      expect(decrypted.normalText).toBe('hello:world');
+    });
+
     test('should handle empty object', () => {
       expect(encryption.encryptObject({})).toEqual({});
       expect(encryption.decryptObject({})).toEqual({});

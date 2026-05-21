@@ -47,8 +47,8 @@ function validateSecrets() {
     if (isProduction) {
       warnings.push('⚠️  CRITICAL: ENCRYPTION_KEY is using a default value in production!');
     } else {
-      process.env.ENCRYPTION_KEY = generateSecret(32);
-      console.log('🔑 Auto-generated secure ENCRYPTION_KEY');
+      process.env.ENCRYPTION_KEY = 'dev-encryption-key-32-bytes-long!!';
+      console.log('🔑 Using stable development ENCRYPTION_KEY');
     }
   }
 

@@ -15,9 +15,9 @@ if (!ENCRYPTION_KEY) {
     throw new Error('ENCRYPTION_KEY environment variable is required in production and test environments');
   }
 
-  ENCRYPTION_KEY = generateSecret(32).slice(0, 32);
+  ENCRYPTION_KEY = 'dev-encryption-key-32-bytes-long!!';
   process.env.ENCRYPTION_KEY = ENCRYPTION_KEY;
-  console.warn('ENCRYPTION_KEY not set; generated an ephemeral key for non-production runtime');
+  console.warn('ENCRYPTION_KEY not set; using stable development key');
 }
 
 if (isProductionEnv && isDefaultSecret(ENCRYPTION_KEY)) {
@@ -103,7 +103,7 @@ function decryptObject(obj) {
   
   const decrypted = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value && typeof value === 'string' && value.includes(':')) {
+    if (value && typeof value === 'string' && /^[a-fA-F0-9]{32}:[a-fA-F0-9]+$/.test(value)) {
       decrypted[key] = decrypt(value);
     } else {
       decrypted[key] = value;

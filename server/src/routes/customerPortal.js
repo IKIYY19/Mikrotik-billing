@@ -13,6 +13,8 @@ const MpesaService = require("../services/mpesa");
 const notificationService = require("../services/notificationService");
 const logger = require("../utils/logger");
 const db = global.dbAvailable ? global.db : require("../db/memory");
+const radiusSync = require("../services/radiusSync");
+const mikrotikProvisioning = require("../services/mikrotikProvisioning");
 
 const MIN_PASSWORD_LENGTH = 8;
 const isNonEmptyString = (value) =>
@@ -991,8 +993,52 @@ router.post("/:customerId/change-password", async (req, res) => {
       [new_password, customer.id],
     );
 
-    // TODO: Push to MikroTik router if customer has PPP/Hotspot account
-    // This would require integrating with the MikroTik API to update the secret
+    // Retrieve active subscriptions for this customer
+    const subsResult = await db.query(
+      "SELECT id FROM subscriptions WHERE customer_id = $1 AND status = 'active'",
+      [customer.id]
+    );
+
+    for (const subRow of subsResult.rows) {
+      // Update pppoe_password to match the new password in DB
+      await db.query(
+        "UPDATE subscriptions SET pppoe_password = $1, updated_at = NOW() WHERE id = $2",
+        [new_password, subRow.id]
+      );
+
+      // Fetch the fully populated/expanded subscription details
+      const sub = await billingData.getSubscriptionById(subRow.id);
+      if (sub) {
+        const subCustomer = sub.customer || (await billingData.getCustomerById(sub.customer_id));
+        const subPlan = sub.plan || (await billingData.getPlanById(sub.plan_id));
+        const expandedSub = { ...sub, customer: subCustomer, plan: subPlan, pppoe_password: new_password };
+
+        // Sync changes to RADIUS (via radiusSync.reconcileRadiusUser)
+        const radiusEnabled = await radiusSync.isRadiusEnabled();
+        if (radiusEnabled) {
+          try {
+            await radiusSync.reconcileRadiusUser(expandedSub);
+          } catch (radiusError) {
+            logger.error("RADIUS sync error during customer password update:", { 
+              subscriptionId: sub.id, 
+              error: radiusError.message 
+            });
+          }
+        }
+
+        // Sync changes to MikroTik (via mikrotikProvisioning.reconcileSubscription)
+        if (expandedSub.mikrotik_connection_id && expandedSub.auto_provision !== false) {
+          try {
+            await mikrotikProvisioning.reconcileSubscription(expandedSub);
+          } catch (mtError) {
+            logger.error("MikroTik sync error during customer password update:", {
+              subscriptionId: sub.id,
+              error: mtError.message
+            });
+          }
+        }
+      }
+    }
 
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) {

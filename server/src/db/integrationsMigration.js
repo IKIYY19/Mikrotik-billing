@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS integrations (
   category VARCHAR(50) DEFAULT 'sms',
   config_data JSONB DEFAULT '{}'::jsonb,
   is_active BOOLEAN DEFAULT false,
+  last_tested TIMESTAMP,
+  last_test_status VARCHAR(50),
+  last_test_message TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -16,6 +19,10 @@ ALTER TABLE integrations DROP CONSTRAINT IF EXISTS valid_category;
 ALTER TABLE integrations ADD CONSTRAINT valid_category
   CHECK (category IN ('sms', 'payment', 'messaging', 'email', 'storage', 'monitoring', 'communication'));
 
+ALTER TABLE integrations ADD COLUMN IF NOT EXISTS last_tested TIMESTAMP;
+ALTER TABLE integrations ADD COLUMN IF NOT EXISTS last_test_status VARCHAR(50);
+ALTER TABLE integrations ADD COLUMN IF NOT EXISTS last_test_message TEXT;
+
 INSERT INTO integrations (service_name, display_name, category, config_data) VALUES
   ('africas_talking', 'Africa''s Talking', 'sms', '{"username": "sandbox", "api_key": "", "sender_id": "MyISP"}'),
   ('mpesa', 'M-Pesa', 'payment', '{"consumer_key": "", "consumer_secret": "", "shortcode": "174379", "passkey": "", "environment": "sandbox"}'),
@@ -23,6 +30,8 @@ INSERT INTO integrations (service_name, display_name, category, config_data) VAL
   ('sendgrid', 'SendGrid', 'email', '{"api_key": "", "from_email": "", "from_name": ""}'),
   ('twilio', 'Twilio SMS', 'sms', '{"account_sid": "", "auth_token": "", "phone_number": ""}'),
   ('stripe', 'Stripe', 'payment', '{"secret_key": "", "publishable_key": "", "webhook_secret": "", "currency": "usd"}'),
+  ('paypal', 'PayPal', 'payment', '{"client_id": "", "client_secret": "", "environment": "sandbox", "webhook_id": ""}'),
+  ('flutterwave', 'Flutterwave', 'payment', '{"secret_key": "", "public_key": "", "encryption_key": "", "environment": "sandbox"}'),
   ('slack', 'Slack Notifications', 'monitoring', '{"webhook_url": "", "channel": "#alerts"}'),
   ('discord', 'Discord Webhook', 'monitoring', '{"webhook_url": ""}'),
   ('smsleopard', 'SMSLeopard', 'sms', '{"api_key": "", "sender_id": ""}'),

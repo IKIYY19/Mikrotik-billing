@@ -300,10 +300,147 @@ const seedIntegrations = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
+    {
+      id: uuidv4(),
+      service_name: "smsleopard",
+      display_name: "SMSLeopard",
+      category: "sms",
+      config_data: { api_key: "", sender_id: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "bulksms_kenya",
+      display_name: "BulkSMS Kenya",
+      category: "sms",
+      config_data: { username: "", api_key: "", sender_id: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "nexmo",
+      display_name: "Nexmo (Vonage)",
+      category: "sms",
+      config_data: { api_key: "", api_secret: "", sender_id: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "mailgun",
+      display_name: "Mailgun",
+      category: "email",
+      config_data: { api_key: "", domain: "", from_email: "", from_name: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "aws_ses",
+      display_name: "AWS SES",
+      category: "email",
+      config_data: { access_key_id: "", secret_access_key: "", region: "us-east-1", from_email: "", from_name: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "mailchimp",
+      display_name: "Mailchimp",
+      category: "email",
+      config_data: { api_key: "", list_id: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "telegram",
+      display_name: "Telegram Bot",
+      category: "communication",
+      config_data: { bot_token: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uuidv4(),
+      service_name: "google_cloud_storage",
+      display_name: "Google Cloud Storage",
+      category: "storage",
+      config_data: { project_id: "", key_filename: "", bucket_name: "" },
+      is_active: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
   ];
 };
 
 seedIntegrations();
+
+// Helper to parse SQL SET clause and return an object of updates mapped to parameter values
+function parseSetClause(sql, params) {
+  const setPart = sql.match(/set\s+([\s\S]+?)\s+where/i);
+  if (!setPart) return {};
+  // Split by comma but not inside parentheses (e.g. COALESCE(a, b))
+  const clauses = setPart[1].split(/,(?![^(]*\))/);
+  const updates = {};
+  
+  clauses.forEach(clause => {
+    const parts = clause.split("=");
+    if (parts.length !== 2) return;
+    const col = parts[0].trim().replace(/^['"`\s]+|['"`\s]+$/g, '').toLowerCase();
+    const valStr = parts[1].trim();
+    
+    // Check if the value contains a placeholder like $1, $2, etc.
+    const placeholderMatch = valStr.match(/\$(\d+)/);
+    if (placeholderMatch) {
+      const idx = parseInt(placeholderMatch[1], 10) - 1;
+      if (idx >= 0 && idx < params.length) {
+        const val = params[idx];
+        const isCoalesce = valStr.toLowerCase().includes("coalesce");
+        if (isCoalesce && (val === null || val === undefined)) {
+          // Skip setting this field if it is a coalesce and the parameter is null/undefined
+        } else {
+          updates[col] = val;
+        }
+      }
+    } else if (valStr.toLowerCase() === "now()" || valStr.toLowerCase() === "current_timestamp") {
+      updates[col] = new Date().toISOString();
+    } else if (valStr.toLowerCase() === "null") {
+      updates[col] = null;
+    } else if (valStr.toLowerCase() === "true") {
+      updates[col] = true;
+    } else if (valStr.toLowerCase() === "false") {
+      updates[col] = false;
+    } else {
+      let lit = valStr;
+      if ((lit.startsWith("'") && lit.endsWith("'")) || (lit.startsWith('"') && lit.endsWith('"'))) {
+        lit = lit.substring(1, lit.length - 1);
+      }
+      updates[col] = lit;
+    }
+  });
+  return updates;
+}
+
+// Helper to find the ID parameter index from SQL text and return its value
+function findIdParam(sql, params) {
+  const whereMatch = sql.match(/where\s+id\s*=\s*\$(\d+)/i);
+  if (whereMatch) {
+    const idx = parseInt(whereMatch[1], 10) - 1;
+    return params[idx];
+  }
+  // Fallback to last param if not found
+  return params[params.length - 1];
+}
 
 module.exports = {
   query: async (text, params) => {
@@ -904,16 +1041,23 @@ module.exports = {
       lowerText.includes("update customers") &&
       lowerText.includes("where id =")
     ) {
-      const idx = store.customers.findIndex(
-        (c) => c.id === params[params.length - 1],
-      );
+      const id = findIdParam(text, params);
+      const idx = store.customers.findIndex((c) => c.id === id);
       if (idx === -1) {return { rows: [] };}
+      
+      let updates = {};
+      if (params[0] && typeof params[0] === 'object' && !Array.isArray(params[0])) {
+        updates = params[0];
+      } else {
+        updates = parseSetClause(text, params);
+      }
+      
       store.customers[idx] = {
         ...store.customers[idx],
-        ...params[0],
+        ...updates,
         fup_profile_id:
-          params[0].fup_profile_id !== undefined
-            ? params[0].fup_profile_id
+          updates.fup_profile_id !== undefined
+            ? updates.fup_profile_id
             : store.customers[idx].fup_profile_id,
         updated_at: new Date().toISOString(),
       };
@@ -1047,12 +1191,32 @@ module.exports = {
       lowerText.includes("select") &&
       lowerText.includes("from integrations")
     ) {
+      const parseConfig = (integration) => {
+        if (!integration) return integration;
+        let config = integration.config_data;
+        if (typeof config === 'string') {
+          try {
+            config = JSON.parse(config);
+          } catch (e) {
+            // ignore
+          }
+        }
+        return { ...integration, config_data: config };
+      };
+
       if (lowerText.includes("where id =")) {
         const integration = store.integrations.find((i) => i.id === params[0]);
-        return { rows: integration ? [integration] : [] };
+        return { rows: integration ? [parseConfig(integration)] : [] };
+      }
+      if (lowerText.includes("where service_name =")) {
+        let results = store.integrations.filter((i) => i.service_name === params[0]);
+        if (lowerText.includes("is_active = true")) {
+          results = results.filter((i) => i.is_active === true);
+        }
+        return { rows: results.map(parseConfig) };
       }
       return {
-        rows: store.integrations.sort((a, b) =>
+        rows: store.integrations.map(parseConfig).sort((a, b) =>
           a.category.localeCompare(b.category),
         ),
       };
@@ -1060,18 +1224,37 @@ module.exports = {
 
     // UPDATE integrations
     if (lowerText.includes("update integrations")) {
-      const idx = store.integrations.findIndex((i) => i.id === params[2]);
+      const id = findIdParam(text, params);
+      const idx = store.integrations.findIndex((i) => i.id === id);
       if (idx === -1) {return { rows: [] };}
-      store.integrations[idx] = {
+      
+      const updates = parseSetClause(text, params);
+      
+      const updatedRow = {
         ...store.integrations[idx],
-        config_data: params[0],
-        is_active:
-          params[1] !== undefined
-            ? params[1]
-            : store.integrations[idx].is_active,
         updated_at: new Date().toISOString(),
       };
-      return { rows: [store.integrations[idx]] };
+      
+      if (updates.config_data !== undefined) {
+        updatedRow.config_data = typeof updates.config_data === 'string'
+          ? JSON.parse(updates.config_data)
+          : updates.config_data;
+      }
+      if (updates.is_active !== undefined) {
+        updatedRow.is_active = updates.is_active !== null ? updates.is_active : store.integrations[idx].is_active;
+      }
+      if (updates.last_tested !== undefined) {
+        updatedRow.last_tested = updates.last_tested;
+      }
+      if (updates.last_test_status !== undefined) {
+        updatedRow.last_test_status = updates.last_test_status;
+      }
+      if (updates.last_test_message !== undefined) {
+        updatedRow.last_test_message = updates.last_test_message;
+      }
+      
+      store.integrations[idx] = updatedRow;
+      return { rows: [updatedRow] };
     }
 
     // SELECT hotspot_vouchers
@@ -1833,16 +2016,24 @@ module.exports = {
 
     // UPDATE subscriptions
     if (lowerText.includes("update subscriptions")) {
-      const idx = store.subscriptions.findIndex(
-        (s) => s.id === params[params.length - 1],
-      );
+      const id = findIdParam(text, params);
+      const idx = store.subscriptions.findIndex((s) => s.id === id);
       if (idx === -1) {return { rows: [] };}
-      const sub = store.subscriptions[idx];
-      if (lowerText.includes("plan_id")) {sub.plan_id = params[0];}
-      if (lowerText.includes("status")) {sub.status = params[0];}
-      if (lowerText.includes("throttled")) {sub.throttled = params[0];}
-      if (lowerText.includes("throttle_reason")) {sub.throttle_reason = params[0];}
-      sub.updated_at = new Date().toISOString();
+      
+      let updates = {};
+      if (params[0] && typeof params[0] === 'object' && !Array.isArray(params[0])) {
+        updates = params[0];
+      } else {
+        updates = parseSetClause(text, params);
+      }
+      
+      const sub = {
+        ...store.subscriptions[idx],
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+      
+      store.subscriptions[idx] = sub;
       return { rows: [sub] };
     }
 
