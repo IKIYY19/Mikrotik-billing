@@ -65,7 +65,7 @@ const NetworkServices = lazy(() => import("./pages/billing/NetworkServices").the
 const RadiusManagement = lazy(() => import("./pages/billing/RadiusManagement").then(m => ({ default: m.RadiusManagement })));
 const RadiusImport = lazy(() => import("./pages/RadiusImport").then(m => ({ default: m.RadiusImport })));
 const TicketSystem = lazy(() => import("./pages/billing/TicketSystem").then(m => ({ default: m.TicketSystem })));
-const CaptivePortalBuilder = lazy(() => import("./pages/billing/CaptivePortalBuilder").then(m => ({ default: m.CaptivePortalBuilder })));
+const CaptivePortalBuilder = lazy(() => import("./pages/billing/CaptivePortalBuilder"));
 const BandwidthGraphs = lazy(() => import("./pages/billing/BandwidthGraphs").then(m => ({ default: m.BandwidthGraphs })));
 const ResellerPortal = lazy(() => import("./pages/billing/ResellerPortal").then(m => ({ default: m.ResellerPortal })));
 const OLTManagement = lazy(() => import("./pages/billing/OLTManagement").then(m => ({ default: m.OLTManagement })));
