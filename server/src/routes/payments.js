@@ -15,6 +15,7 @@ const { paymentLimiter } = require('../middleware/rateLimiter');
 const notificationService = require('../services/notificationService');
 const { decryptObject } = require('../utils/encryption');
 const alertSystem = require('../services/alertSystem');
+const autoProvision = require('../services/autoProvision');
 
 const router = express.Router();
 const isProductionEnv = process.env.NODE_ENV === 'production';
@@ -169,6 +170,8 @@ async function finalizeSessionPayment(session, mpesaReceipt, phone) {
       console.error('SMS error:', error.message);
     });
   }
+
+  autoProvision.autoProvisionOnPayment(payment).catch(err => console.error('Auto-provision error:', err.message));
   
   // Send Telegram alert
   if (invoice?.invoice_number) {
@@ -221,6 +224,8 @@ router.post('/', async (req, res) => {
         console.error('SMS error:', error.message);
       });
     }
+
+    autoProvision.autoProvisionOnPayment(payment).catch(err => console.error('Auto-provision error:', err.message));
 
     res.status(201).json(payment);
   } catch (e) {
@@ -645,6 +650,8 @@ router.post('/mpesa/callback', async (req, res) => {
             console.error('SMS error:', error.message);
           });
         }
+
+        autoProvision.autoProvisionOnPayment(payment).catch(err => console.error('Auto-provision error:', err.message));
       }
     } else if (pending) {
       await paymentSessions.markFailed(checkoutRequestId, {
