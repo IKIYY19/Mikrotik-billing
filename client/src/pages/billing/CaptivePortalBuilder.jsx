@@ -64,12 +64,18 @@ const HOTSPOT_TEMPLATES = [
   },
 ];
 
-function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, primaryColor, phoneNumber, showTerms }) {
+function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, primaryColor, phoneNumber, showTerms, packages }) {
   const tpl = HOTSPOT_TEMPLATES.find(t => t.id === templateId) || HOTSPOT_TEMPLATES[2];
   const { bg, accent, card, text } = tpl.colors;
   const accent2 = primaryColor || accent;
   const company = companyName || "My WiFi";
   const welcome = welcomeText || "Welcome to our HotSpot";
+  const pkgList = (packages && packages.length > 0) ? packages : [
+    { name: "1 Hour", price: "50", duration: "1h" },
+    { name: "1 Day", price: "100", duration: "1d" },
+    { name: "1 Week", price: "500", duration: "7d" },
+  ];
+  const hasPackages = pkgList.length > 0;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -98,6 +104,26 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 20px;
       padding: 32px 24px;
+    }
+    .packages {
+      display: grid; grid-template-columns: repeat(${Math.min(pkgList.length, 3)}, 1fr);
+      gap: 8px; margin-bottom: 20px;
+    }
+    .pkg-card {
+      background: rgba(255,255,255,0.03);
+      border: 2px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 12px 8px;
+      text-align: center; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pkg-card:hover { border-color: ${accent2}55; background: rgba(255,255,255,0.06); }
+    .pkg-card.selected { border-color: ${accent2}; background: ${accent2}18; }
+    .pkg-name { font-size: 13px; font-weight: 600; color: ${text}; margin-bottom: 4px; }
+    .pkg-price { font-size: 18px; font-weight: 700; color: ${accent2}; }
+    .pkg-price span { font-size: 11px; font-weight: 400; opacity: 0.7; }
+    .pkg-divider {
+      grid-column: 1 / -1; height: 1px;
+      background: rgba(255,255,255,0.06); margin: 4px 0;
     }
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; color: ${text}; font-size: 13px; font-weight: 500; margin-bottom: 6px; opacity: 0.8; }
@@ -128,13 +154,7 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
     .footer a { color: ${accent2}; text-decoration: none; }
     .status { text-align: center; margin-top: 12px; font-size: 13px; color: #ef4444; display: none; }
     .status.show { display: block; }
-    .promo {
-      background: linear-gradient(135deg, ${accent2}22, ${accent2}08);
-      border: 1px solid ${accent2}33;
-      border-radius: 12px; padding: 12px 16px;
-      margin-bottom: 20px; text-align: center;
-    }
-    .promo p { color: ${text}; font-size: 13px; opacity: 0.9; }
+    .selected-pkg { text-align: center; margin-bottom: 12px; font-size: 12px; color: ${text}; opacity: 0.6; }
     @media (max-width: 480px) {
       .card { padding: 24px 16px; }
       .logo-text { font-size: 24px; }
@@ -142,6 +162,14 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
   </style>
   <script src="/md5.js"></script>
   <script>
+    var selectedPackage = null;
+    function selectPackage(el, name, price) {
+      document.querySelectorAll('.pkg-card').forEach(function(c) { c.classList.remove('selected'); });
+      el.classList.add('selected');
+      selectedPackage = { name: name, price: price };
+      var label = document.getElementById('sel-pkg-label');
+      if (label) { label.textContent = 'Selected: ' + name + ' — KES ' + price; label.style.display = 'block'; }
+    }
     function doLogin() {
       const u = document.getElementById('username').value;
       const p = document.getElementById('password').value;
@@ -159,7 +187,10 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
       document.getElementById('connect').textContent = 'Connecting...';
       const chal = '${Math.random().toString(36).substring(2, 10)}';
       const pass = hexMD5('\\0' + p + chal);
-      const url = 'http://' + location.hostname + '/login?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(pass) + '&dst=' + encodeURIComponent(location.href);
+      var url = 'http://' + location.hostname + '/login?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(pass) + '&dst=' + encodeURIComponent(location.href);
+      if (selectedPackage) {
+        url += '&mac-format=1&mac-cookie-timeout=' + encodeURIComponent(selectedPackage.name) + '&comment=' + encodeURIComponent(selectedPackage.name + '|' + selectedPackage.price);
+      }
       const req = new XMLHttpRequest();
       req.open('GET', url, true);
       req.onload = function() {
@@ -187,7 +218,17 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
     </div>
     <p class="welcome">${welcome}</p>
     <div class="card">
-      <div class="promo"><p>🔓 Free WiFi • ${company}</p></div>
+      ${hasPackages ? `
+      <div class="packages">
+        ${pkgList.map((pkg, i) => `
+        <div class="pkg-card${i === 0 ? ' selected' : ''}" onclick="selectPackage(this, '${pkg.name}', '${pkg.price}')">
+          <div class="pkg-name">${pkg.name}</div>
+          <div class="pkg-price">KES ${pkg.price}<span>/${pkg.duration || ''}</span></div>
+        </div>
+        `).join('')}
+      </div>
+      <p id="sel-pkg-label" class="selected-pkg" style="display:block">Selected: ${pkgList[0].name} — KES ${pkgList[0].price}</p>
+      ` : ''}
       <form onsubmit="event.preventDefault(); doLogin();">
         <div class="form-group">
           <label>Phone Number or Username</label>
@@ -228,6 +269,13 @@ export default function CaptivePortalBuilder() {
   const [pushing, setPushing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [savedPortals, setSavedPortals] = useState([]);
+  const [packages, setPackages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("portal_packages") || "null") || [
+      { name: "1 Hour", price: "50", duration: "1h" },
+      { name: "1 Day", price: "100", duration: "1d" },
+      { name: "1 Week", price: "500", duration: "7d" },
+    ]; } catch(e) { return []; }
+  });
 
   useEffect(() => {
     axios.get(`${API}/mikrotik`).then(r => setConnections(r.data)).catch(() => {});
@@ -240,7 +288,7 @@ export default function CaptivePortalBuilder() {
 
   const getHtml = () => generatePortalHTML({
     templateId: selectedTemplate,
-    companyName, welcomeText, logoUrl, primaryColor, phoneNumber, showTerms,
+    companyName, welcomeText, logoUrl, primaryColor, phoneNumber, showTerms, packages,
   });
 
   const handlePush = async () => {
@@ -371,7 +419,41 @@ export default function CaptivePortalBuilder() {
                   <Input value={phoneNumber} onChange={e => { setPhoneNumber(e.target.value); saveSetting("portal_phone", e.target.value); }} placeholder="0712 345 678" />
                 </div>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-zinc-400">
+              <div className="border-t border-zinc-800/50 pt-4">
+                <Label className="text-sm font-medium text-white mb-3 block">Hotspot Packages</Label>
+                <p className="text-xs text-zinc-500 mb-3">Pricing plans shown before login. First package pre-selected.</p>
+                {packages.map((pkg, i) => (
+                  <div key={i} className="grid grid-cols-3 gap-2 mb-2">
+                    <Input value={pkg.name} onChange={e => {
+                      const next = [...packages]; next[i].name = e.target.value;
+                      setPackages(next); localStorage.setItem("portal_packages", JSON.stringify(next));
+                    }} placeholder="e.g. 1 Hour" className="text-xs" />
+                    <Input value={pkg.price} onChange={e => {
+                      const next = [...packages]; next[i].price = e.target.value;
+                      setPackages(next); localStorage.setItem("portal_packages", JSON.stringify(next));
+                    }} placeholder="KES" className="text-xs" type="number" />
+                    <Input value={pkg.duration} onChange={e => {
+                      const next = [...packages]; next[i].duration = e.target.value;
+                      setPackages(next); localStorage.setItem("portal_packages", JSON.stringify(next));
+                    }} placeholder="e.g. 1h" className="text-xs" />
+                  </div>
+                ))}
+                <div className="flex gap-2 mt-1">
+                  {packages.length < 4 && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const next = [...packages, { name: "", price: "", duration: "" }];
+                      setPackages(next); localStorage.setItem("portal_packages", JSON.stringify(next));
+                    }} className="text-xs">+ Add Package</Button>
+                  )}
+                  {packages.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const next = packages.slice(0, -1);
+                      setPackages(next); localStorage.setItem("portal_packages", JSON.stringify(next));
+                    }} className="text-xs text-red-400">Remove Last</Button>
+                  )}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-zinc-400 mt-3">
                 <input type="checkbox" checked={showTerms} onChange={e => setShowTerms(e.target.checked)} className="rounded" />
                 Show terms checkbox
               </label>
