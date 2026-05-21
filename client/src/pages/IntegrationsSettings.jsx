@@ -241,6 +241,7 @@ export default function IntegrationsSettings() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [dirtyIds, setDirtyIds] = useState(new Set()); // track which integrations have unsaved changes
   
   const toast = useToast();
 
@@ -270,6 +271,8 @@ export default function IntegrationsSettings() {
       
       setIntegrations(prev => prev.map(i => i.id === integration.id ? data.integration : i));
       setEditingId(null);
+      // Clear dirty flag for this integration
+      setDirtyIds(prev => { const next = new Set(prev); next.delete(integration.id); return next; });
       toast.success(`${integration.display_name} saved successfully`);
     } catch (error) {
       console.error('Save error:', error);
@@ -313,6 +316,8 @@ export default function IntegrationsSettings() {
         ? { ...i, config_data: { ...i.config_data, [key]: value } }
         : i
     ));
+    // Mark this integration as dirty (has unsaved changes)
+    setDirtyIds(prev => new Set([...prev, integration.id]));
   };
 
   const toggleActive = async (integration) => {
@@ -339,7 +344,12 @@ export default function IntegrationsSettings() {
   };
 
   const toggleExpand = (id) => {
-    setExpandedId(prev => prev === id ? null : id);
+    setExpandedId(prev => {
+      if (prev === id) return null; // collapse
+      // Clear search so typing in config fields doesn't filter the list
+      setSearchQuery('');
+      return id;
+    });
   };
 
   const isSensitiveKey = (key) => {
@@ -631,15 +641,18 @@ export default function IntegrationsSettings() {
             })}
           </div>
 
-          {/* Search box */}
+          {/* Search box - locked while a card is expanded to prevent accidental filtering */}
           <div className="relative flex-grow lg:max-w-xs">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search integration services..."
+              placeholder={expandedId ? 'Close card to search...' : 'Search integration services...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl text-white placeholder-gray-500 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              onChange={(e) => { if (!expandedId) setSearchQuery(e.target.value); }}
+              readOnly={!!expandedId}
+              className={`w-full pl-10 pr-4 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl text-white placeholder-gray-500 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                expandedId ? 'opacity-40 cursor-not-allowed' : ''
+              }`}
             />
           </div>
         </div>
@@ -793,15 +806,11 @@ export default function IntegrationsSettings() {
                         Test Connection
                       </button>
 
-                      {/* Save Settings Button */}
+                      {/* Save Settings Button - enabled whenever the card has been edited */}
                       <button
                         onClick={() => handleSave(integration)}
-                        disabled={saving || !isEditing}
-                        className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                          isEditing 
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15' 
-                            : 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed'
-                        }`}
+                        disabled={saving}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {saving ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
