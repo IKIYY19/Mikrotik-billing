@@ -186,28 +186,9 @@ router.get("/monitoring/dashboard", async (req, res) => {
       console.warn("[Monitoring] Could not fetch connections:", e.message);
     }
 
-    // Decrypt password helper
+    const { decrypt } = require("../utils/encryption");
     function decryptPassword(encryptedPassword) {
-      try {
-        const crypto = require("crypto");
-        const algorithm = "aes-256-gcm";
-        const ENCRYPTION_KEY =
-          process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
-        const [ivHex, authTagHex, encrypted] = encryptedPassword.split(":");
-        const iv = Buffer.from(ivHex, "hex");
-        const authTag = Buffer.from(authTagHex, "hex");
-        const decipher = crypto.createDecipheriv(
-          algorithm,
-          Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
-          iv,
-        );
-        decipher.setAuthTag(authTag);
-        let decrypted = decipher.update(encrypted, "hex", "utf8");
-        decrypted += decipher.final("utf8");
-        return decrypted;
-      } catch (e) {
-        return null;
-      }
+      return decrypt(encryptedPassword);
     }
 
     // Parse MikroTik bytes

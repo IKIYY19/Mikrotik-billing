@@ -1,24 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const logger = require("../utils/logger");
-const crypto = require("crypto");
-
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
+const { decrypt } = require("../utils/encryption");
 
 function decryptPassword(encrypted) {
-  if (!encrypted) return null;
-  try {
-    const parts = encrypted.split(":");
-    if (parts.length !== 3) return encrypted;
-    const iv = Buffer.from(parts[0], "hex");
-    const tag = Buffer.from(parts[1], "hex");
-    const data = Buffer.from(parts[2], "hex");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(data, null, "utf8") + decipher.final("utf8");
-  } catch (e) {
-    return null;
-  }
+  return decrypt(encrypted);
 }
 
 function getDb() {

@@ -4,27 +4,10 @@ const db = global.dbAvailable ? global.db : require("../db/memory");
 const { v4: uuidv4 } = require("uuid");
 const { resellerValidation } = require("../middleware/validation");
 const logger = require("../utils/logger");
+const { decrypt } = require("../utils/encryption");
 
-// Helper: decrypt password from DB
 function decryptPassword(encrypted) {
-  try {
-    if (!encrypted || !encrypted.includes(":")) {return encrypted;}
-    const parts = encrypted.split(":");
-    if (parts.length !== 3) {return encrypted;}
-    const crypto = require("crypto");
-    const algorithm = "aes-256-gcm";
-    const ENCRYPTION_KEY =
-      process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
-    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const iv = Buffer.from(parts[0], "hex");
-    const tag = Buffer.from(parts[1], "hex");
-    const encryptedData = Buffer.from(parts[2], "hex");
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(encryptedData) + decipher.final("utf-8");
-  } catch (_) {
-    return encrypted; // plaintext in dev mode
-  }
+  return decrypt(encrypted) || encrypted;
 }
 
 // Helper: host portal HTML on our server and return URL

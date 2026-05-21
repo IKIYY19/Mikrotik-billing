@@ -10,7 +10,11 @@ const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../middleware/auth");
 const db = global.dbAvailable ? global.db : require("../db/memory");
 
-const CUSTOMER_JWT_SECRET = JWT_SECRET + "_customer";
+const crypto = require("crypto");
+const CUSTOMER_JWT_SECRET = crypto
+  .createHmac("sha256", JWT_SECRET)
+  .update("customer-portal-auth")
+  .digest("hex");
 const CUSTOMER_JWT_EXPIRES = "24h";
 const notificationService = require("../services/notificationService");
 

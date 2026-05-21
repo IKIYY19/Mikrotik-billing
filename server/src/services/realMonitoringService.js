@@ -28,13 +28,8 @@ class RealMonitoringService {
   }
 
   getEncryptionKey() {
-    return Buffer.from(
-      (
-        process.env.ENCRYPTION_KEY || "default-key-change-in-production-32"
-      ).slice(0, 32),
-    );
+    return require("../utils/encryption").getEncryptionKey();
   }
-
 
 
   async listConnections() {

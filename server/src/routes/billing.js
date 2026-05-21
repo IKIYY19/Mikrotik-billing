@@ -1328,30 +1328,18 @@ router.get("/customers/online-status", async (req, res) => {
 
     // Get MikroTik connection
     const db = global.db || require("../db/memory");
-    const crypto = require("crypto");
-    const algorithm = "aes-256-gcm";
-    const ENCRYPTION_KEY =
-      process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
+    const { decrypt } = require("../utils/encryption");
 
     const connResult = await db.query(
       "SELECT * FROM mikrotik_connections WHERE id = $1",
       [connection_id],
     );
     if (connResult.rows.length === 0)
-      {return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });}
+      return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
 
     const device = connResult.rows[0];
-    const [ivHex, authTagHex, encrypted] = device.password_encrypted.split(":");
-    const iv = Buffer.from(ivHex, "hex");
-    const authTag = Buffer.from(authTagHex, "hex");
-    const decipher = crypto.createDecipheriv(
-      algorithm,
-      Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
-      iv,
-    );
-    decipher.setAuthTag(authTag);
-    let password = decipher.update(encrypted, "hex", "utf8");
-    password += decipher.final("utf8");
+    let password = decrypt(device.password_encrypted) || "";
+
 
     // Fetch active PPPoE and Hotspot sessions
     const MikroNode = require("mikronode");

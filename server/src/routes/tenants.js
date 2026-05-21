@@ -48,7 +48,7 @@ const logoUpload = multer({
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    const allowed = ["image/png", "image/jpeg", "image/webp"];
     cb(null, allowed.includes(file.mimetype));
   },
 });

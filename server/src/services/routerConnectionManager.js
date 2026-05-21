@@ -14,28 +14,7 @@ class RouterConnectionManager {
 
   // Decrypt encrypted password
   decryptPassword(encrypted) {
-    try {
-      if (!encrypted || encrypted.indexOf(":") === -1) {
-        return encrypted || "";
-      }
-      const parts = encrypted.split(":");
-      if (parts.length !== 3) {
-        return encrypted;
-      }
-      const crypto = require("crypto");
-      const key = Buffer.from(
-        (process.env.ENCRYPTION_KEY || "default-key-change-in-production-32").slice(0, 32)
-      );
-      const iv = Buffer.from(parts[0], "hex");
-      const tag = Buffer.from(parts[1], "hex");
-      const data = Buffer.from(parts[2], "hex");
-      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-      decipher.setAuthTag(tag);
-      return decipher.update(data, "hex", "utf8") + decipher.final("utf8");
-    } catch (e) {
-      logger.warn("Password decryption failed", { error: e.message });
-      return encrypted || "";
-    }
+    return require("../utils/encryption").decrypt(encrypted) || encrypted || "";
   }
 
   // Fetch router details from the database
