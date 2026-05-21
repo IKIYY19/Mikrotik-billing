@@ -413,12 +413,14 @@ const billingMigrations = [
     company VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
+    password_hash VARCHAR(255),
     commission_rate DECIMAL(5,2) DEFAULT 10.00,
     credit_limit DECIMAL(10,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+  `ALTER TABLE resellers ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS reseller_id UUID REFERENCES resellers(id) ON DELETE SET NULL`,
 
   // Captive Portals

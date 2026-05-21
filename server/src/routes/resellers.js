@@ -298,4 +298,93 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════
+// AGENT / RESELLER LOGIN
+// ═══════════════════════════════════════
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+    const result = await db.query(
+      "SELECT * FROM resellers WHERE email = $1 AND status = 'active'",
+      [email],
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    const agent = result.rows[0];
+    const valid = agent.password_hash
+      ? await require("bcryptjs").compare(password, agent.password_hash)
+      : false;
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    const jwt = require("jsonwebtoken");
+    const token = jwt.sign(
+      { id: agent.id, email: agent.email, role: "reseller", name: agent.name },
+      process.env.JWT_SECRET || "default-secret",
+      { expiresIn: "7d" },
+    );
+    res.json({ token, agent: { id: agent.id, name: agent.name, company: agent.company, email: agent.email, phone: agent.phone, commission_rate: agent.commission_rate } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put("/:id/password", async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 4) {
+      return res.status(400).json({ error: "Password must be at least 4 characters" });
+    }
+    const bcrypt = require("bcryptjs");
+    const hash = await bcrypt.hash(password, 10);
+    await db.query("UPDATE resellers SET password_hash = $1 WHERE id = $2", [hash, req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/bulk/plan-change", async (req, res) => {
+  try {
+    const { customer_ids, plan_id } = req.body;
+    if (!Array.isArray(customer_ids) || !customer_ids.length || !plan_id) {
+      return res.status(400).json({ error: "customer_ids array and plan_id required" });
+    }
+    const results = [];
+    for (const cid of customer_ids) {
+      try {
+        const subs = await db.query("SELECT id FROM subscriptions WHERE customer_id = $1 AND status = 'active'", [cid]);
+        for (const s of subs.rows) {
+          await db.query("UPDATE subscriptions SET plan_id = $1 WHERE id = $2", [plan_id, s.id]);
+        }
+        results.push({ customer_id: cid, updated: subs.rows.length });
+      } catch (e) { results.push({ customer_id: cid, error: e.message }); }
+    }
+    res.json({ success: true, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post("/bulk/suspend", async (req, res) => {
+  try {
+    const { customer_ids, action } = req.body;
+    if (!Array.isArray(customer_ids) || !customer_ids.length || !action) {
+      return res.status(400).json({ error: "customer_ids array and action (suspend|activate) required" });
+    }
+    const newStatus = action === "activate" ? "active" : "suspended";
+    const results = [];
+    for (const cid of customer_ids) {
+      try {
+        await db.query("UPDATE customers SET status = $1 WHERE id = $2", [newStatus, cid]);
+        await db.query("UPDATE subscriptions SET status = $1 WHERE customer_id = $2", [newStatus, cid]);
+        results.push({ customer_id: cid, status: newStatus });
+      } catch (e) { results.push({ customer_id: cid, error: e.message }); }
+    }
+    res.json({ success: true, action, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

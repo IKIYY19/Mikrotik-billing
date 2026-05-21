@@ -109,6 +109,9 @@ export function BillingCustomers() {
   const [selectedConnection, setSelectedConnection] = useState("");
   const [onlineData, setOnlineData] = useState({});
   const [onlineLoading, setOnlineLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectAll, setSelectAll] = useState(false);
+  const [bulkPlanId, setBulkPlanId] = useState("");
   const [fupProfiles, setFupProfiles] = useState([]);
   const [servicePlans, setServicePlans] = useState([]);
   const [settings, setSettings] = useState({});
@@ -422,6 +425,53 @@ export function BillingCustomers() {
     setShowForm(true);
   };
 
+  const toggleSelect = (id) => {
+    const next = new Set(selectedIds);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleBulkPlanChange = async () => {
+    if (!bulkPlanId || selectedIds.size === 0) return;
+    if (!confirm(`Change plan for ${selectedIds.size} customer(s)?`)) return;
+    try {
+      const { data } = await axios.post(`${API}/resellers/bulk/plan-change`, {
+        customer_ids: [...selectedIds],
+        plan_id: bulkPlanId,
+      });
+      const updated = data.results.filter(r => !r.error).length;
+      toast.success(`Plan updated for ${updated} customer(s)`);
+      setSelectedIds(new Set());
+      setSelectAll(false);
+      setBulkPlanId("");
+      fetchCustomers();
+    } catch (e) { toast.error("Bulk plan change failed"); }
+  };
+
+  const handleBulkSuspend = async (action) => {
+    if (selectedIds.size === 0) return;
+    const label = action === "suspend" ? "suspend" : "activate";
+    if (!confirm(`${label.charAt(0).toUpperCase() + label.slice(1)} ${selectedIds.size} customer(s)?`)) return;
+    try {
+      await axios.post(`${API}/resellers/bulk/suspend`, {
+        customer_ids: [...selectedIds],
+        action,
+      });
+      toast.success(`${selectedIds.size} customer(s) ${label}d`);
+      setSelectedIds(new Set());
+      setSelectAll(false);
+      fetchCustomers();
+    } catch (e) { toast.error(`Bulk ${label} failed`); }
+  };
+
+  useEffect(() => {
+    if (selectAll) {
+      setSelectedIds(new Set(filtered.map(c => c.id)));
+    } else if (selectedIds.size > 0) {
+      setSelectedIds(new Set());
+    }
+  }, [selectAll]);
+
   const filtered = customers.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -485,6 +535,58 @@ export function BillingCustomers() {
         </div>
       </div>
 
+      {/* Bulk Actions */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSelectAll(!selectAll)}
+          className="gap-1"
+        >
+          {selectAll ? "Deselect All" : "Select All"}
+        </Button>
+        {selectedIds.size > 0 && (
+          <>
+            <span className="text-sm text-zinc-400">{selectedIds.size} selected</span>
+            <select
+              value={bulkPlanId}
+              onChange={e => setBulkPlanId(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            >
+              <option value="">Change plan...</option>
+              {servicePlans.map(p => (
+                <option key={p.id} value={p.id}>{p.name} - {p.price}/mo</option>
+              ))}
+            </select>
+            <Button
+              variant="default"
+              size="sm"
+              disabled={!bulkPlanId}
+              onClick={handleBulkPlanChange}
+              className="gap-1 bg-blue-600 hover:bg-blue-500"
+            >
+              <Zap className="w-3.5 h-3.5" /> Apply Plan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkSuspend("suspend")}
+              className="gap-1 text-amber-400"
+            >
+              Suspend Selected
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkSuspend("activate")}
+              className="gap-1 text-green-400"
+            >
+              Activate Selected
+            </Button>
+          </>
+        )}
+      </div>
+
       {/* Search */}
       <div className="relative mb-6">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
@@ -518,6 +620,12 @@ export function BillingCustomers() {
               <CardHeader className="border-b border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                      className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-blue-500 cursor-pointer"
+                    />
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold ${
                         onlineData[c.id]
