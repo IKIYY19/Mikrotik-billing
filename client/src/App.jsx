@@ -55,7 +55,7 @@ const MapView = lazy(() => import("./pages/billing/MapView").then(m => ({ defaul
 const WalletPage = lazy(() => import("./pages/billing/WalletPage").then(m => ({ default: m.WalletPage })));
 const MpesaReconcile = lazy(() => import("./pages/MpesaReconcile").then(m => ({ default: m.MpesaReconcile })));
 const BackupPage = lazy(() => import("./pages/billing/BackupPage").then(m => ({ default: m.BackupPage })));
-const CreditNotes = lazy(() => import("./pages/billing/CreditNotes").then(m => ({ default: m.CreditNotes })));
+const CreditNotes = lazy(() => import("./pages/billing/CreditNotes"));
 const InventoryPage = lazy(() => import("./pages/billing/InventoryPage").then(m => ({ default: m.InventoryPage })));
 const AnalyticsReports = lazy(() => import("./pages/billing/AnalyticsReports").then(m => ({ default: m.AnalyticsReports })));
 const PPPoEManagement = lazy(() => import("./pages/billing/PPPoEManagement").then(m => ({ default: m.PPPoEManagement })));
