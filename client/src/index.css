@@ -276,6 +276,24 @@
     --sidebar-active-glow: rgba(100, 116, 139, 0.2);
 }
 
+[data-theme="rose"] {
+    --gradient-primary: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    --gradient-secondary: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+    --accent-blue: #f43f5e;
+    --accent-blue-light: #fb7185;
+    --accent-violet: #e11d48;
+    --accent-violet-light: #f43f5e;
+    --border-accent: rgba(244, 63, 94, 0.3);
+    --shadow-glow: 0 0 20px rgba(244, 63, 94, 0.3);
+    --glass-border: rgba(244, 63, 94, 0.2);
+    --primary: 350 89% 60%;
+    --accent: 350 89% 60%;
+    --ring: 350 89% 60%;
+    --sidebar-item-active-bg: rgba(244, 63, 94, 0.1);
+    --sidebar-item-active-text: #fb7185;
+    --sidebar-active-glow: rgba(244, 63, 94, 0.2);
+}
+
 /* ─── Theme: Techy (Terminal / Cyberpunk) ─── */
 [data-theme="techy"] {
     --bg-primary: #050505;

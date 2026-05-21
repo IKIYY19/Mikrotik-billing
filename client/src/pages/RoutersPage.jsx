@@ -174,6 +174,12 @@ export default function RoutersPage() {
     return `${prefix}/tool fetch url="${appUrl}/api/router${slugPath}" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
   };
 
+  const buildSimpleCommand = () => {
+    const mode = appUrl.startsWith("https") ? "https" : "http";
+    const certFlag = appUrl.startsWith("https") ? " check-certificate=no" : "";
+    return `/tool fetch url="${appUrl}/api/router/v1/${tenantSlug}/install" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
+  };
+
   if (loading) {return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;}
 
   const isLinked = connectionStatus?.connected && connectionStatus?.router?.has_connection;
@@ -347,9 +353,26 @@ export default function RoutersPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <input type="text" value={appUrl} onChange={(e) => { setAppUrl(e.target.value); localStorage.setItem("router_link_app_url", e.target.value); }} placeholder="https://your-server.com" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                {mgmtUser && mgmtPass && <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2"><Shield className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" /><p className="text-xs text-amber-300">Credentials included. Router auto-links for full management.</p></div>}
-                <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-sm text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildCommand()}</pre>
-                <Button onClick={() => { navigator.clipboard.writeText(buildCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy to Clipboard"}</Button>
+                {!mgmtUser && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs text-blue-300 font-medium">Auto-detection mode</p>
+                      <p className="text-xs text-blue-400/70 mt-0.5">Router will auto-detect WAN, MAC, and model. RADIUS auth works immediately. Add credentials for live monitoring & graphs.</p>
+                    </div>
+                  </div>
+                )}
+                {mgmtUser && mgmtPass && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
+                    <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs text-amber-300 font-medium">Credentials included</p>
+                      <p className="text-xs text-amber-400/70 mt-0.5">Full device management — live monitoring, graphs, and Winbox API access will work automatically.</p>
+                    </div>
+                  </div>
+                )}
+                <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-sm text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildSimpleCommand()}</pre>
+                <Button onClick={() => { navigator.clipboard.writeText(mgmtUser && mgmtPass ? buildCommand() : buildSimpleCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy to Clipboard"}</Button>
               </CardContent>
             </Card>
           )}
