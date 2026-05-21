@@ -1,0 +1,74 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "search": "Buscar",
+    "loading": "Cargando...",
+    "status": "Estado",
+    "active": "Activo",
+    "suspended": "Suspendido",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "settings": "Configuración",
+    "success": "Éxito",
+    "error": "Error"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "billing": "Facturación",
+    "customers": "Clientes",
+    "plans": "Planes",
+    "subscriptions": "Suscripciones",
+    "invoices": "Facturas",
+    "payments": "Pagos",
+    "messaging": "Mensajería",
+    "network": "Red",
+    "routers": "Routers",
+    "monitoring": "Monitoreo",
+    "reports": "Informes",
+    "sign_out": "Cerrar sesión"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "active_customers": "Clientes Activos",
+    "online_sessions": "Sesiones",
+    "recent_payments": "Pagos recientes"
+  },
+  "customers": {
+    "title": "Clientes",
+    "add": "Agregar",
+    "name": "Nombre",
+    "email": "Email",
+    "phone": "Teléfono"
+  },
+  "messaging": {
+    "title": "Mensajería",
+    "sms": "SMS",
+    "whatsapp": "WhatsApp"
+  },
+  "router": {
+    "title": "Routers",
+    "online": "En línea",
+    "offline": "Desconectado"
+  },
+  "portal": {
+    "title": "Portal Cautivo",
+    "templates": "Plantillas"
+  },
+  "settings": {
+    "language": "Idioma",
+    "currency": "Moneda"
+  },
+  "language": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "sw": "Kiswahili",
+    "ar": "العربية"
+  }
+}

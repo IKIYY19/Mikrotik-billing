@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 import { BrandingProvider } from "./contexts/BrandingContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Menu } from "lucide-react";
@@ -84,6 +85,12 @@ const WelcomePage = lazy(() => import("./pages/public/WelcomePage").then(m => ({
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { i18n } = useTranslation();
+
+  useEffect(() => {
+    document.documentElement.dir = i18n.language === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = i18n.language;
+  }, [i18n.language]);
 
   // Heartbeat to keep user online status updated
   useEffect(() => {

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useBranding } from "../contexts/BrandingContext";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../contexts/ThemeContext";
 import {
   LayoutDashboard,
   Network,
@@ -49,10 +51,10 @@ import {
   EyeOff,
   Zap,
   BarChart2,
+  Globe,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
-import { useTheme } from "../contexts/ThemeContext";
 import { canAccessFeature, ROLES } from "../lib/permissions";
 
 const API = import.meta.env.VITE_API_URL || "/api";
@@ -253,6 +255,8 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
   const branding = useBranding();
   const navigate = useNavigate();
   const { mode, setMode, eyeFilter, setEyeFilter, eyeIntensity, setEyeIntensity } = useTheme();
+  const { t, i18n } = useTranslation();
+  const [showLang, setShowLang] = useState(false);
 
   useEffect(() => {
     try {
@@ -414,6 +418,27 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
                 background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${eyeIntensity}%, #3f3f46 ${eyeIntensity}%, #3f3f46 100%)`,
               }}
             />
+          </div>
+        )}
+
+        {/* Language Selector */}
+        <button
+          onClick={() => setShowLang(!showLang)}
+          className="flex-1 flex items-center justify-center gap-1.5 p-1.5 rounded-lg text-xs transition-all"
+          style={{ color: "var(--sidebar-item-text, #a1a1aa)", background: "transparent" }}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span className="text-[10px]">{i18n.language?.toUpperCase() || "EN"}</span>
+        </button>
+        {showLang && (
+          <div className="px-2 pb-1 space-y-0.5">
+            {["en","fr","es","sw","ar"].map(l => (
+              <button key={l} onClick={() => { i18n.changeLanguage(l); setShowLang(false); }}
+                className={`w-full text-left px-2 py-1 rounded text-[10px] transition-all ${i18n.language === l ? "text-amber-400 bg-amber-500/10" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                {t(`language.${l}`)}
+              </button>
+            ))}
           </div>
         )}
 

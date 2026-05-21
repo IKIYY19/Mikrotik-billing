@@ -1,0 +1,109 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "refresh": "Actualiser",
+    "loading": "Chargement...",
+    "no_data": "Aucune donnée",
+    "actions": "Actions",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "suspended": "Suspendu",
+    "enable": "Activer",
+    "disable": "Désactiver",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre",
+    "close": "Fermer",
+    "copy": "Copier",
+    "copied": "Copié!",
+    "export": "Exporter",
+    "settings": "Paramètres",
+    "yes": "Oui",
+    "no": "Non",
+    "success": "Succès",
+    "error": "Erreur",
+    "warning": "Attention"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "billing": "Facturation",
+    "customers": "Clients",
+    "plans": "Forfaits",
+    "subscriptions": "Abonnements",
+    "invoices": "Factures",
+    "payments": "Paiements",
+    "messaging": "Messages",
+    "network": "Réseau",
+    "routers": "Routeurs",
+    "monitoring": "Surveillance",
+    "reports": "Rapports",
+    "sign_out": "Déconnexion",
+    "eye_comfort": "Confort Visuel"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "active_customers": "Clients Actifs",
+    "online_sessions": "Sessions",
+    "overdue": "En retard",
+    "recent_payments": "Paiements récents",
+    "quick_actions": "Actions rapides",
+    "at_risk_customers": "Clients à risque"
+  },
+  "customers": {
+    "title": "Clients",
+    "add": "Ajouter",
+    "name": "Nom",
+    "email": "Email",
+    "phone": "Téléphone",
+    "city": "Ville",
+    "country": "Pays",
+    "select_all": "Tout sélectionner"
+  },
+  "payments": {
+    "title": "Paiements",
+    "amount": "Montant",
+    "method": "Méthode",
+    "date": "Date"
+  },
+  "messaging": {
+    "title": "Messages",
+    "compose": "Composer",
+    "sms": "SMS",
+    "whatsapp": "WhatsApp",
+    "send": "Envoyer"
+  },
+  "radius": {
+    "title": "Gestion RADIUS",
+    "users": "Utilisateurs"
+  },
+  "router": {
+    "title": "Routeurs",
+    "online": "En ligne",
+    "offline": "Hors ligne"
+  },
+  "portal": {
+    "title": "Portail Captif",
+    "templates": "Modèles",
+    "preview": "Aperçu",
+    "company_name": "Entreprise"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "currency": "Devise"
+  },
+  "language": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "sw": "Kiswahili",
+    "ar": "العربية"
+  }
+}

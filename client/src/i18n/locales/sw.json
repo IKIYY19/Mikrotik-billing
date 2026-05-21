@@ -1,0 +1,62 @@
+{
+  "common": {
+    "save": "Hifadhi",
+    "cancel": "Ghairi",
+    "delete": "Futa",
+    "edit": "Hariri",
+    "create": "Unda",
+    "search": "Tafuta",
+    "loading": "Inapakia...",
+    "status": "Hali",
+    "active": "Inafanya kazi",
+    "suspended": "Imesimamishwa",
+    "success": "Imefanikiwa",
+    "error": "Hitilafu"
+  },
+  "nav": {
+    "dashboard": "Dashibodi",
+    "billing": "Malipo",
+    "customers": "Wateja",
+    "plans": "Mipango",
+    "subscriptions": "Usajili",
+    "invoices": "Ankara",
+    "payments": "Malipo",
+    "messaging": "Ujumbe",
+    "network": "Mtandao",
+    "routers": "Ruta",
+    "monitoring": "Ufuatiliaji",
+    "reports": "Ripoti",
+    "sign_out": "Ondoka"
+  },
+  "dashboard": {
+    "title": "Dashibodi",
+    "active_customers": "Wateja Wanaofanya kazi"
+  },
+  "customers": {
+    "title": "Wateja",
+    "add": "Ongeza Mteja",
+    "name": "Jina",
+    "email": "Barua pepe",
+    "phone": "Simu"
+  },
+  "messaging": {
+    "title": "Ujumbe",
+    "sms": "SMS",
+    "whatsapp": "WhatsApp"
+  },
+  "router": {
+    "title": "Ruta",
+    "online": "Mtandaoni",
+    "offline": "Nje ya mtandao"
+  },
+  "settings": {
+    "language": "Lugha"
+  },
+  "language": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "sw": "Kiswahili",
+    "ar": "العربية"
+  }
+}
