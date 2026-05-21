@@ -188,19 +188,46 @@ function firewallLines() {
   ];
 }
 
-function reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag }) {
+function reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag, hasVpn }) {
   const reportUrl = `${baseUrl}/api/router/v1/${slug}/report?model=$model&serial=$serial&version=$version&mac=$mac`;
   const syncUrl = `${baseUrl}/api/router/v1/${slug}/sync`;
 
-  return [
+  const lines = [
     "# ── Report back ──",
     ':put "[Setup] Reporting to server..."',
     ":local model; :do { :set model [/system routerboard get model] } on-error={}",
     ":local serial; :do { :set serial [/system routerboard get serial-number] } on-error={}",
     ":local version; :do { :set version [/system package get [find name=routeros] version] } on-error={}",
     ":local mac; :do { :set mac [/interface ethernet get [find default-name=$wanPort] mac-address] } on-error={:do { :set mac [/interface ethernet get ([find]->0) mac-address] } on-error={} }",
+  ];
+
+  if (hasVpn) {
+    lines.push(
+      ":local vpnIp \"\"",
+      ":do {",
+      '  :local sstpAddr [/ip address get [find interface="sstp-isp"] address]',
+      '  :local slashPos [:find $sstpAddr "/"]',
+      "  :if ([:len $slashPos] > 0) do={",
+      "    :set vpnIp [:pick $sstpAddr 0 $slashPos]",
+      "  } else={",
+      "    :set vpnIp $sstpAddr",
+      "  }",
+      "} on-error={}",
+    );
+  }
+
+  lines.push(
     `:local reportUrl "${reportUrl}"`,
-    ":local mgmtUser $ztpMgmtUser; :local mgmtPass $ztpMgmtPass",
+    ":local mgmtUser $ztpMgmtUser; :local mgmtPass $ztpMgmtPass"
+  );
+
+  if (hasVpn) {
+    lines.push(
+      ':if ([:len $vpnIp] > 0) do={ :do { :set reportUrl ($reportUrl . "&vpn_ip=" . $vpnIp) } on-error={} }'
+    );
+  }
+
+  lines.push(
     ':if ([:len $mgmtUser] > 0) do={ :do { :set reportUrl ($reportUrl . "&mgmt_user=" . [$ztpUrlEncode $mgmtUser]) } on-error={} }',
     ':if ([:len $mgmtPass] > 0) do={ :do { :set reportUrl ($reportUrl . "&mgmt_pass=" . [$ztpUrlEncode $mgmtPass]) } on-error={} }',
     `:do { /tool fetch url=$reportUrl http-header-field="Authorization: Bearer ${apiKey}" mode=${fetchMode} ${certFlag} output=none } on-error={}`,
@@ -216,13 +243,24 @@ function reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag }) {
     ':put ("  Router Identity: " . [/system identity get name])',
     ':put ("  RouterOS Version: " . [/system package get [find name=routeros] version])',
     ':put ("  WAN: " . $wanPort)',
-    ':if ([:len $mgmtUser] > 0) do={ :put ("  API User: " . $mgmtUser) }',
+    ':if ([:len $mgmtUser] > 0) do={ :put ("  API User: " . $mgmtUser) }'
+  );
+
+  if (hasVpn) {
+    lines.push(
+      ':if ([:len $vpnIp] > 0) do={ :put ("  VPN Tunnel IP: " . $vpnIp) }'
+    );
+  }
+
+  lines.push(
     ':put ""',
     ':put "[Setup] Run this to check health anytime:"',
     `:put "  /tool fetch url=${baseUrl}/api/router/v1/${slug}/health?model=$[/system routerboard get model]&serial=$[/system routerboard get serial-number] http-header-field=\\"Authorization: Bearer ${apiKey}\\" mode=${fetchMode} ${certFlag}\\""`,
     ':put "  Then check: :put \\$[/file get install.rsc contents]\\""',
     "",
-  ];
+  );
+
+  return lines;
 }
 
 function buildInstallScript(config) {
@@ -235,6 +273,10 @@ function buildInstallScript(config) {
     routerIdentity,
     fetchMode,
     certFlag,
+    vpnServerAddress,
+    vpnServerPort,
+    vpnUsername,
+    vpnPassword,
   } = config;
 
   const lines = [];
@@ -270,8 +312,39 @@ function buildInstallScript(config) {
   lines.push(...firewallLines());
   lines.push("");
 
+  // VPN Client setup
+  if (vpnServerAddress) {
+    const host = esc(vpnServerAddress);
+    const user = esc(vpnUsername);
+    const pass = esc(vpnPassword);
+    const port = vpnServerPort || "443";
+    const mode = fetchMode === "https" ? "https" : "http";
+    const enableCert = mode === "https" ? "verify-server-certificate=no" : "";
+
+    lines.push("# ── SSTP VPN Client (Auto Link) ──");
+    lines.push(":do {");
+    lines.push('  /interface sstp-client remove [find name="sstp-isp"]');
+    lines.push("} on-error={}");
+    lines.push("");
+    lines.push(":do {");
+    lines.push("  /interface sstp-client add \\");
+    lines.push(`    name="sstp-isp" \\`);
+    lines.push(`    connect-to=${host}:${port} \\`);
+    lines.push(`    user="${user}" \\`);
+    lines.push(`    password="${pass}" \\`);
+    lines.push("    profile=default-encryption \\");
+    lines.push(`    ${enableCert} \\`);
+    lines.push('    comment="ISP Remote Access" \\');
+    lines.push("    disabled=no");
+    lines.push(`} on-error={ :put "[VPN] SSTP client add failed" }`);
+    lines.push("");
+    lines.push(`:put "[VPN] Connecting to ${host}:${port} as ${user}..."`);
+    lines.push(":delay 5s");
+    lines.push("");
+  }
+
   // Reporting
-  lines.push(...reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag }));
+  lines.push(...reportingLines({ baseUrl, apiKey, slug, fetchMode, certFlag, hasVpn: !!vpnServerAddress }));
   lines.push("");
 
   lines.push(":put \"==================== SETUP COMPLETED ====================\"");

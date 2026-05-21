@@ -371,8 +371,8 @@ export default function RoutersPage() {
                     </div>
                   </div>
                 )}
-                <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-sm text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildSimpleCommand()}</pre>
-                <Button onClick={() => { navigator.clipboard.writeText(mgmtUser && mgmtPass ? buildCommand() : buildSimpleCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy to Clipboard"}</Button>
+                <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-sm text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildCommand()}</pre>
+                <Button onClick={() => { navigator.clipboard.writeText(buildCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy to Clipboard"}</Button>
               </CardContent>
             </Card>
           )}

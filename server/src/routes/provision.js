@@ -2021,6 +2021,13 @@ router.get("/v1/:slug/install", async (req, res) => {
     const radiusSecret = process.env.RADIUS_SECRET || (apiKey || slug).substring(0, 16);
     const routerIdentity = req.query.identity || tenant.name || slug;
 
+    const db = getDb();
+    const settingsRes = await db.query("SELECT value FROM settings WHERE key = $1", ["vpn_server_address"]).catch(() => ({ rows: [] }));
+    const vpnServerAddress = settingsRes.rows[0]?.value || process.env.VPN_SERVER_ADDRESS || req.query.vpn_address || "";
+    const vpnServerPort = process.env.VPN_SERVER_PORT || req.query.vpn_port || "443";
+    const vpnUsername = req.query.vpn_user || tenant.settings?.vpn_username || `isp-${slug}`;
+    const vpnPassword = req.query.vpn_pass || tenant.settings?.vpn_password || apiKey.substring(0, 16);
+
     const scriptTemplates = require("../services/scriptTemplates");
     const script = scriptTemplates.buildInstallScript({
       baseUrl,
@@ -2031,6 +2038,10 @@ router.get("/v1/:slug/install", async (req, res) => {
       routerIdentity,
       fetchMode,
       certFlag,
+      vpnServerAddress,
+      vpnServerPort,
+      vpnUsername,
+      vpnPassword,
     });
 
     res.type("text/plain").send(script);
@@ -2142,7 +2153,7 @@ router.get("/v1/:slug/report", async (req, res) => {
     const { slug } = req.params;
     const authHeader = req.headers.authorization;
     const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : "";
-    const { model, serial, version, mac, mgmt_user, mgmt_pass, mgmt_port } = req.query;
+    const { model, serial, version, mac, mgmt_user, mgmt_pass, mgmt_port, vpn_ip } = req.query;
     const db = getDb();
 
     const tenant = await findTenantBySlugOrKey(slug, apiKey);
@@ -2151,7 +2162,7 @@ router.get("/v1/:slug/report", async (req, res) => {
     }
 
     let routerId = null;
-    const routerIp = getClientIp(req);
+    const routerIp = (vpn_ip && vpn_ip.trim() !== '') ? vpn_ip.trim() : getClientIp(req);
     const routerIdentifier = mac || `ip-${routerIp.replace(/[.:]/g, "-")}`;
 
     try {
@@ -2542,7 +2553,7 @@ router.get("/v1/report", async (req, res) => {
       return res.status(401).json({ error: "Missing token" });
     }
     const apiKey = authHeader.split(" ")[1];
-    const { model, serial, version, mac, wg_pubkey, mgmt_user, mgmt_pass, mgmt_port } = req.query;
+    const { model, serial, version, mac, wg_pubkey, mgmt_user, mgmt_pass, mgmt_port, vpn_ip } = req.query;
     const db = getDb();
 
     let tenant;
@@ -2561,7 +2572,7 @@ router.get("/v1/report", async (req, res) => {
       try {
         let projectId = null;
         try { const pr = await db.query("SELECT id FROM projects ORDER BY created_at ASC LIMIT 1"); projectId = pr.rows[0]?.id || null; } catch (e) {}
-        const routerIp = getClientIp(req);
+        const routerIp = (vpn_ip && vpn_ip.trim() !== '') ? vpn_ip.trim() : getClientIp(req);
         const routerIdentifier = mac || `ip-${routerIp.replace(/[.:]/g, "-")}`;
         let existingRouter = null;
         if (mac) {
