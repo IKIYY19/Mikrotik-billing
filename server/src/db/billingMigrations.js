@@ -635,6 +635,17 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at)`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS mac_address VARCHAR(50)`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS mac_binding_enabled BOOLEAN DEFAULT false`,
+  `CREATE TABLE IF NOT EXISTS towers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    lat DECIMAL(10,8) NOT NULL,
+    lng DECIMAL(11,8) NOT NULL,
+    height INTEGER,
+    coverage_radius INTEGER DEFAULT 5000,
+    customer_count INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 // Seed data

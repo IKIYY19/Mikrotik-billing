@@ -195,14 +195,30 @@ router.get("/map/data", async (req, res) => {
       );
     }
 
+    // Towers (infrastructure)
+    let towers = [];
+    try {
+      const towerResult = await db.query(
+        "SELECT * FROM towers ORDER BY name"
+      );
+      towers = towerResult.rows.map(t => ({
+        id: t.id, name: t.name, type: "tower",
+        lat: parseFloat(t.lat), lng: parseFloat(t.lng),
+        height: t.height, coverage_radius: t.coverage_radius || 5000,
+        customer_count: t.customer_count || 0,
+      }));
+    } catch(e) { towers = []; }
+
     // Calculate center point from all locations
     const allLats = [
       ...branches.map((b) => b.lat),
       ...customers.map((c) => c.lat),
+      ...towers.map((t) => t.lat),
     ];
     const allLngs = [
       ...branches.map((b) => b.lng),
       ...customers.map((c) => c.lng),
+      ...towers.map((t) => t.lng),
     ];
     const centerLat =
       allLats.length > 0
@@ -213,7 +229,7 @@ router.get("/map/data", async (req, res) => {
         ? allLngs.reduce((a, b) => a + b, 0) / allLngs.length
         : 36.8219;
 
-    res.json({ branches, customers, center: [centerLat, centerLng], zoom: 10 });
+    res.json({ branches, customers, towers, center: [centerLat, centerLng], zoom: 10 });
   } catch (e) {
     console.error("Map data error:", e);
     res.status(500).json({ error: e.message });
