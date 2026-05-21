@@ -338,4 +338,17 @@ router.get('/customer-growth', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════
+// CHURN PREDICTION
+// ═══════════════════════════════════════
+router.get('/churn-report', async (req, res) => {
+  try {
+    const churnPrediction = require('../services/churnPrediction');
+    const report = await churnPrediction.getChurnReport();
+    res.json(report);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

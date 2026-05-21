@@ -251,6 +251,7 @@ export function Dashboard() {
   const { fetchProjects } = useStore();
   const [stats, setStats] = useState(null);
   const [quickActions, setQuickActions] = useState([]);
+  const [churnData, setChurnData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [currencySymbol, setCurrencySymbol] = useState("KES");
@@ -259,10 +260,11 @@ export function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, actionsRes, settingsRes] = await Promise.all([
+      const [statsRes, actionsRes, settingsRes, churnRes] = await Promise.all([
         axios.get(`${API_URL}/dashboard/stats`),
         axios.get(`${API_URL}/dashboard/quick-actions`),
         axios.get(`${API_URL}/settings`).catch(() => ({ data: {} })),
+        axios.get(`${API_URL}/analytics/churn-report`).catch(() => ({ data: null })),
       ]);
       const settings = settingsRes.data?.settings || settingsRes.data || {};
       setCurrencySymbol(settings.currency_symbol || settings.currency || "KES");
@@ -272,6 +274,7 @@ export function Dashboard() {
       } else {
         setQuickActions([]);
       }
+      if (churnRes.data?.high_risk) setChurnData(churnRes.data);
       setLastRefresh(new Date());
       setLoading(false);
     } catch (error) {
@@ -478,6 +481,38 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Churn Prediction ── */}
+        {churnData && churnData.high_risk?.length > 0 && (
+          <div className="glass rounded-2xl p-4">
+            <h2 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" /> At-Risk Customers ({churnData.high_risk.length})
+            </h2>
+            <div className="space-y-2">
+              {churnData.high_risk.slice(0, 5).map(c => (
+                <div key={c.customer_id} className="flex items-center justify-between p-2 rounded-lg" style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.1)" }}>
+                  <div>
+                    <p className="text-sm text-white font-medium">{c.name}</p>
+                    <p className="text-xs text-zinc-500">
+                      {c.factors?.[0]?.detail || "Churn risk detected"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{
+                        width: `${c.score}%`,
+                        background: c.score >= 70 ? "#ef4444" : c.score >= 40 ? "#f59e0b" : "#10b981"
+                      }} />
+                    </div>
+                    <span className="text-xs font-bold" style={{ color: c.score >= 70 ? "#ef4444" : c.score >= 40 ? "#f59e0b" : "#10b981" }}>
+                      {c.score}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Quick Actions ── */}
         {quickActions.length > 0 && (
