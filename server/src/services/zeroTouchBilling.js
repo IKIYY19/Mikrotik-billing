@@ -13,7 +13,6 @@ const { encrypt, getEncryptionKey } = require("../utils/encryption");
 function encryptForMikrotik(text) {
   return encrypt(text);
 }
-}
 
 async function getRouterById(routerId) {
   const result = await getDb().query("SELECT * FROM routers WHERE id = $1", [
