@@ -101,6 +101,9 @@
     "bulk_plan_change": "Change Plan",
     "bulk_suspend": "Suspend Selected",
     "bulk_activate": "Activate Selected",
+    "bulk_actions": "Bulk Actions",
+    "select_plan": "Select plan",
+    "apply_plan": "Apply Plan",
     "delete_confirm": "Delete this customer?"
   },
   "payments": {
