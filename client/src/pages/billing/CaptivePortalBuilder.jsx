@@ -4,6 +4,7 @@ import {
   Eye, Save, Download, Upload, RefreshCw, Check, Copy, Globe,
   Wifi, Coffee, Zap, ShoppingBag, Hotel, Building2, Plane,
   Smartphone, Monitor, Palette, Image, Settings, ChevronLeft, ChevronRight,
+  Sun, Moon, Cloud, Heart, Sparkles, Waves, Flame, Leaf, Stars,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { Button } from "../../components/ui/button";
@@ -15,58 +16,94 @@ const API = import.meta.env.VITE_API_URL || "/api";
 
 const HOTSPOT_TEMPLATES = [
   {
+    id: "neon",
+    name: "Neon Night",
+    icon: Zap,
+    description: "Electric cyberpunk with glowing neon accents",
+    colors: { bg: "#0a0a14", bg2: "#111122", accent: "#00ff88", card: "rgba(13,13,28,0.9)", text: "#e0ffe0", border: "rgba(0,255,136,0.15)", inputBg: "rgba(0,255,136,0.05)", glow: "0 0 30px rgba(0,255,136,0.15)" },
+  },
+  {
+    id: "sunset",
+    name: "Sunset Bliss",
+    icon: Sun,
+    description: "Warm golden hour gradients with dreamy vibes",
+    colors: { bg: "#1a0f0a", bg2: "#2d1810", accent: "#ff8c42", card: "rgba(26,15,10,0.92)", text: "#ffe8d5", border: "rgba(255,140,66,0.15)", inputBg: "rgba(255,140,66,0.05)", glow: "0 0 30px rgba(255,140,66,0.12)" },
+  },
+  {
+    id: "ocean",
+    name: "Deep Ocean",
+    icon: Waves,
+    description: "Serene underwater blues with wave-like gradients",
+    colors: { bg: "#061224", bg2: "#0a1a38", accent: "#38bdf8", card: "rgba(6,18,36,0.9)", text: "#e0f2fe", border: "rgba(56,189,248,0.12)", inputBg: "rgba(56,189,248,0.04)", glow: "0 0 40px rgba(56,189,248,0.1)" },
+  },
+  {
+    id: "forest",
+    name: "Enchanted Forest",
+    icon: Leaf,
+    description: "Mystical emerald greens with natural warmth",
+    colors: { bg: "#0a1410", bg2: "#121e16", accent: "#4ade80", card: "rgba(10,20,16,0.92)", text: "#dcfce7", border: "rgba(74,222,128,0.12)", inputBg: "rgba(74,222,128,0.05)", glow: "0 0 30px rgba(74,222,128,0.1)" },
+  },
+  {
+    id: "midnight",
+    name: "Midnight Luxe",
+    icon: Moon,
+    description: "Sophisticated dark luxury with gold highlights",
+    colors: { bg: "#0c0c14", bg2: "#1a1224", accent: "#c9a84c", card: "rgba(12,12,20,0.93)", text: "#fef3c7", border: "rgba(201,168,76,0.15)", inputBg: "rgba(201,168,76,0.05)", glow: "0 0 25px rgba(201,168,76,0.12)" },
+  },
+  {
+    id: "rose",
+    name: "Rose Gold",
+    icon: Heart,
+    description: "Romantic blush tones with soft pink highlights",
+    colors: { bg: "#1a0e18", bg2: "#2a1528", accent: "#f472b6", card: "rgba(26,14,24,0.9)", text: "#fce7f3", border: "rgba(244,114,182,0.15)", inputBg: "rgba(244,114,182,0.05)", glow: "0 0 30px rgba(244,114,182,0.1)" },
+  },
+  {
+    id: "aurora",
+    name: "Aurora Skies",
+    icon: Sparkles,
+    description: "Magical northern lights with iridescent colors",
+    colors: { bg: "#0f0a1a", bg2: "#1a0f2e", accent: "#a78bfa", card: "rgba(15,10,26,0.9)", text: "#ede9fe", border: "rgba(167,139,250,0.15)", inputBg: "rgba(167,139,250,0.05)", glow: "0 0 35px rgba(167,139,250,0.15)" },
+  },
+  {
+    id: "ember",
+    name: "Ember Glow",
+    icon: Flame,
+    description: "Warm fireplace ambiance with rich orange tones",
+    colors: { bg: "#1a1008", bg2: "#2d180c", accent: "#fb923c", card: "rgba(26,16,8,0.9)", text: "#ffedd5", border: "rgba(251,146,60,0.15)", inputBg: "rgba(251,146,60,0.05)", glow: "0 0 30px rgba(251,146,60,0.12)" },
+  },
+  {
+    id: "mint",
+    name: "Fresh Mint",
+    icon: Leaf,
+    description: "Clean, refreshing mint with crisp white accents",
+    colors: { bg: "#0a1a14", bg2: "#0f241a", accent: "#34d399", card: "rgba(10,26,20,0.9)", text: "#d1fae5", border: "rgba(52,211,153,0.12)", inputBg: "rgba(52,211,153,0.04)", glow: "0 0 25px rgba(52,211,153,0.1)" },
+  },
+  {
+    id: "cosmic",
+    name: "Cosmic Void",
+    icon: Stars,
+    description: "Deep space purples with stellar violet highlights",
+    colors: { bg: "#0d0a1a", bg2: "#1a0f2e", accent: "#c084fc", card: "rgba(13,10,26,0.92)", text: "#f3e8ff", border: "rgba(192,132,252,0.15)", inputBg: "rgba(192,132,252,0.05)", glow: "0 0 35px rgba(192,132,252,0.15)" },
+  },
+  {
+    id: "cloud",
+    name: "Cloud Nine",
+    icon: Cloud,
+    description: "Soft, airy whites with subtle blue accents",
+    colors: { bg: "#0f172a", bg2: "#1e293b", accent: "#60a5fa", card: "rgba(15,23,42,0.9)", text: "#e0e7ff", border: "rgba(96,165,250,0.12)", inputBg: "rgba(96,165,250,0.04)", glow: "0 0 25px rgba(96,165,250,0.1)" },
+  },
+  {
     id: "cafe",
-    name: "Café & Restaurant",
+    name: "Café Latte",
     icon: Coffee,
-    description: "Warm, inviting design for coffee shops and restaurants",
-    colors: { bg: "#1a0e0a", accent: "#d4a574", card: "rgba(30,15,10,0.9)", text: "#f5e6d3" },
-    preview: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=300&fit=crop",
-  },
-  {
-    id: "hotel",
-    name: "Hotel & Resort",
-    icon: Hotel,
-    description: "Elegant, premium feel for hotels and resorts",
-    colors: { bg: "#0f1729", accent: "#4f8fc9", card: "rgba(15,23,41,0.92)", text: "#e8eef5" },
-    preview: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=300&fit=crop",
-  },
-  {
-    id: "modern",
-    name: "Modern ISP",
-    icon: Wifi,
-    description: "Clean, modern design for internet service providers",
-    colors: { bg: "#0a0a0f", accent: "#3b82f6", card: "rgba(15,15,20,0.9)", text: "#f1f5f9" },
-    preview: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=300&fit=crop",
-  },
-  {
-    id: "retail",
-    name: "Retail & Mall",
-    icon: ShoppingBag,
-    description: "Bold, eye-catching design for retail spaces and malls",
-    colors: { bg: "#1a0a2e", accent: "#a855f7", card: "rgba(26,10,46,0.9)", text: "#f3e8ff" },
-    preview: "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=400&h=300&fit=crop",
-  },
-  {
-    id: "corporate",
-    name: "Corporate Office",
-    icon: Building2,
-    description: "Professional, clean design for offices and corporate spaces",
-    colors: { bg: "#0f1117", accent: "#06b6d4", card: "rgba(15,17,23,0.95)", text: "#e2e8f0" },
-    preview: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=300&fit=crop",
-  },
-  {
-    id: "airport",
-    name: "Airport & Transport",
-    icon: Plane,
-    description: "High-contrast, readable design for busy terminals",
-    colors: { bg: "#1c1917", accent: "#f59e0b", card: "rgba(28,25,23,0.93)", text: "#fef3c7" },
-    preview: "https://images.unsplash.com/photo-1436491865332-7a61a109bb05?w=400&h=300&fit=crop",
+    description: "Warm coffee shop vibes with caramel tones",
+    colors: { bg: "#1a1108", bg2: "#2d1c10", accent: "#d4a574", card: "rgba(26,17,8,0.92)", text: "#fef2e0", border: "rgba(212,165,116,0.15)", inputBg: "rgba(212,165,116,0.05)", glow: "0 0 25px rgba(212,165,116,0.1)" },
   },
 ];
 
 function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, primaryColor, phoneNumber, showTerms, packages }) {
-  const tpl = HOTSPOT_TEMPLATES.find(t => t.id === templateId) || HOTSPOT_TEMPLATES[2];
-  const { bg, accent, card, text } = tpl.colors;
+  const tpl = HOTSPOT_TEMPLATES.find(t => t.id === templateId) || HOTSPOT_TEMPLATES[0];
+  const { bg, bg2, accent, card, text, border, inputBg, glow } = tpl.colors;
   const accent2 = primaryColor || accent;
   const company = companyName || "My WiFi";
   const welcome = welcomeText || "Welcome to our HotSpot";
@@ -84,80 +121,128 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${company} — WiFi Login</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: ${bg};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, ${bg} 0%, ${bg2} 100%);
       min-height: 100vh;
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
+      position: relative;
+      overflow: hidden;
     }
-    .container { width: 100%; max-width: 400px; }
-    .logo { text-align: center; margin-bottom: 24px; }
-    .logo img { max-width: 120px; max-height: 50px; }
-    .logo-text { font-size: 28px; font-weight: 700; color: ${text}; margin-top: 8px; }
-    .welcome { text-align: center; color: ${text}; opacity: 0.7; font-size: 15px; margin-bottom: 24px; }
+    body::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 30% 20%, ${accent2}08 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 80%, ${accent2}06 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .container {
+      width: 100%; max-width: 400px;
+      position: relative; z-index: 1;
+    }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo img { max-width: 130px; max-height: 55px; border-radius: 12px; }
+    .logo-icon {
+      width: 56px; height: 56px; margin: 0 auto 12px;
+      background: linear-gradient(135deg, ${accent2}22, ${accent2}10);
+      border: 1px solid ${border}; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: ${glow};
+    }
+    .logo-icon span { font-size: 24px; }
+    .logo-text { font-size: 26px; font-weight: 800; color: ${text}; letter-spacing: -0.3px; }
+    .welcome { text-align: center; color: ${text}; opacity: 0.6; font-size: 14px; margin-top: 6px; margin-bottom: 28px; }
     .card {
       background: ${card};
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 20px;
+      backdrop-filter: blur(24px) saturate(120%);
+      -webkit-backdrop-filter: blur(24px) saturate(120%);
+      border: 1px solid ${border};
+      border-radius: 22px;
       padding: 32px 24px;
+      box-shadow: ${glow};
     }
     .packages {
-      display: grid; grid-template-columns: repeat(${Math.min(pkgList.length, 3)}, 1fr);
-      gap: 8px; margin-bottom: 20px;
+      display: grid; grid-template-columns: repeat(${Math.min(pkgList.length, 4)}, 1fr);
+      gap: 8px; margin-bottom: 22px;
     }
     .pkg-card {
-      background: rgba(255,255,255,0.03);
-      border: 2px solid rgba(255,255,255,0.06);
-      border-radius: 12px; padding: 12px 8px;
+      background: ${inputBg};
+      border: 2px solid ${border};
+      border-radius: 14px; padding: 14px 6px;
       text-align: center; cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s ease;
+      position: relative;
     }
-    .pkg-card:hover { border-color: ${accent2}55; background: rgba(255,255,255,0.06); }
-    .pkg-card.selected { border-color: ${accent2}; background: ${accent2}18; }
-    .pkg-name { font-size: 13px; font-weight: 600; color: ${text}; margin-bottom: 4px; }
-    .pkg-price { font-size: 18px; font-weight: 700; color: ${accent2}; }
-    .pkg-price span { font-size: 11px; font-weight: 400; opacity: 0.7; }
-    .pkg-divider {
-      grid-column: 1 / -1; height: 1px;
-      background: rgba(255,255,255,0.06); margin: 4px 0;
+    .pkg-card:hover {
+      border-color: ${accent2}66;
+      background: ${accent2}0d;
+      transform: translateY(-1px);
     }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; color: ${text}; font-size: 13px; font-weight: 500; margin-bottom: 6px; opacity: 0.8; }
+    .pkg-card.selected {
+      border-color: ${accent2};
+      background: ${accent2}18;
+      box-shadow: 0 0 16px ${accent2}22;
+    }
+    .pkg-badge {
+      position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+      background: ${accent2}; color: ${bg};
+      font-size: 9px; font-weight: 700; padding: 2px 10px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      display: none;
+    }
+    .pkg-card.selected .pkg-badge { display: block; }
+    .pkg-name { font-size: 13px; font-weight: 600; color: ${text}; margin-bottom: 6px; }
+    .pkg-price { font-size: 20px; font-weight: 700; color: ${accent2}; line-height: 1; }
+    .pkg-price span { font-size: 10px; font-weight: 400; opacity: 0.6; display: block; margin-top: 2px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; color: ${text}; font-size: 12px; font-weight: 600;
+      margin-bottom: 6px; opacity: 0.7; letter-spacing: 0.3px; text-transform: uppercase;
+    }
     .form-group input {
       width: 100%; padding: 14px 16px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px; color: ${text}; font-size: 15px;
-      outline: none; transition: border-color 0.2s;
+      background: ${inputBg};
+      border: 1.5px solid ${border};
+      border-radius: 14px; color: ${text}; font-size: 15px;
+      outline: none; transition: all 0.25s;
+      font-family: inherit;
     }
-    .form-group input:focus { border-color: ${accent2}; }
-    .form-group input::placeholder { color: ${text}; opacity: 0.3; }
+    .form-group input:focus {
+      border-color: ${accent2};
+      box-shadow: 0 0 0 3px ${accent2}22;
+      background: ${accent2}08;
+    }
+    .form-group input::placeholder { color: ${text}; opacity: 0.25; }
     .btn-connect {
       width: 100%; padding: 16px;
-      background: ${accent2};
-      color: ${bg}; border: none; border-radius: 12px;
-      font-size: 16px; font-weight: 600;
-      cursor: pointer; margin-top: 8px;
-      transition: opacity 0.2s, transform 0.1s;
+      background: linear-gradient(135deg, ${accent2}, ${accent2}dd);
+      color: ${bg}; border: none; border-radius: 14px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+      transition: all 0.25s;
+      box-shadow: 0 4px 20px ${accent2}33;
+      letter-spacing: 0.3px;
     }
-    .btn-connect:hover { opacity: 0.9; }
+    .btn-connect:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 6px 28px ${accent2}44; }
     .btn-connect:active { transform: scale(0.98); }
-    .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
-    .terms { text-align: center; margin-top: 16px; }
-    .terms label { color: ${text}; opacity: 0.6; font-size: 12px; cursor: pointer; }
+    .btn-connect:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    .terms { text-align: center; margin-top: 14px; }
+    .terms label { color: ${text}; opacity: 0.5; font-size: 11px; cursor: pointer; }
     .terms input { margin-right: 6px; accent-color: ${accent2}; }
-    .footer { text-align: center; margin-top: 24px; color: ${text}; opacity: 0.4; font-size: 12px; }
-    .footer a { color: ${accent2}; text-decoration: none; }
-    .status { text-align: center; margin-top: 12px; font-size: 13px; color: #ef4444; display: none; }
+    .footer { text-align: center; margin-top: 22px; color: ${text}; opacity: 0.3; font-size: 11px; }
+    .footer a { color: ${accent2}; text-decoration: none; font-weight: 500; }
+    .status { text-align: center; margin-top: 12px; font-size: 13px; font-weight: 500; display: none; }
     .status.show { display: block; }
-    .selected-pkg { text-align: center; margin-bottom: 12px; font-size: 12px; color: ${text}; opacity: 0.6; }
+    .status.error { color: #f87171; }
+    .selected-pkg { text-align: center; margin-bottom: 14px; font-size: 12px; color: ${text}; opacity: 0.55; font-weight: 500; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .card, .logo { animation: fadeIn 0.5s ease-out; }
     @media (max-width: 480px) {
-      .card { padding: 24px 16px; }
-      .logo-text { font-size: 24px; }
+      .card { padding: 24px 18px; border-radius: 18px; }
+      .logo-text { font-size: 22px; }
+      .container { max-width: 360px; }
     }
   </style>
   <script src="/md5.js"></script>
@@ -177,33 +262,35 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
       ${showTerms ? `
       const terms = document.getElementById('terms');
       if (terms && !terms.checked) {
-        document.getElementById('status').textContent = 'Please accept the terms to continue';
-        document.getElementById('status').classList.add('show');
+        var s = document.getElementById('status');
+        s.textContent = 'Please accept the terms to continue';
+        s.className = 'status show error';
         return;
       }
       ` : ''}
-      document.getElementById('status').classList.remove('show');
+      var s = document.getElementById('status');
+      s.className = 'status';
       document.getElementById('connect').disabled = true;
       document.getElementById('connect').textContent = 'Connecting...';
       const chal = '${Math.random().toString(36).substring(2, 10)}';
       const pass = hexMD5('\\0' + p + chal);
       var url = 'http://' + location.hostname + '/login?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(pass) + '&dst=' + encodeURIComponent(location.href);
       if (selectedPackage) {
-        url += '&mac-format=1&mac-cookie-timeout=' + encodeURIComponent(selectedPackage.name) + '&comment=' + encodeURIComponent(selectedPackage.name + '|' + selectedPackage.price);
+        url += '&comment=' + encodeURIComponent(selectedPackage.name + '|' + selectedPackage.price);
       }
       const req = new XMLHttpRequest();
       req.open('GET', url, true);
       req.onload = function() {
         if (req.status === 200) {
-          document.getElementById('status').style.color = '#10b981';
-          document.getElementById('status').textContent = 'Connected! Redirecting...';
-          document.getElementById('status').classList.add('show');
+          s.style.color = '#10b981';
+          s.textContent = 'Connected! Redirecting...';
+          s.className = 'status show';
           setTimeout(function() { location.href = '${window.location.origin || "https://google.com"}'; }, 1500);
         } else {
           document.getElementById('connect').disabled = false;
-          document.getElementById('connect').textContent = 'Connect';
-          document.getElementById('status').textContent = 'Login failed. Check your credentials.';
-          document.getElementById('status').classList.add('show');
+          document.getElementById('connect').textContent = 'Connect to WiFi';
+          s.textContent = 'Login failed. Check your credentials.';
+          s.className = 'status show error';
         }
       };
       req.send();
@@ -213,17 +300,18 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
 <body>
   <div class="container">
     <div class="logo">
-      ${logoUrl ? `<img src="${logoUrl}" alt="${company}" />` : ''}
+      <div class="logo-icon"><span>${logoUrl ? `<img src="${logoUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain" />` : '📶'}</span></div>
       <div class="logo-text">${company}</div>
+      <p class="welcome">${welcome}</p>
     </div>
-    <p class="welcome">${welcome}</p>
     <div class="card">
       ${hasPackages ? `
       <div class="packages">
         ${pkgList.map((pkg, i) => `
         <div class="pkg-card${i === 0 ? ' selected' : ''}" onclick="selectPackage(this, '${pkg.name}', '${pkg.price}')">
+          <div class="pkg-badge">TOP</div>
           <div class="pkg-name">${pkg.name}</div>
-          <div class="pkg-price">KES ${pkg.price}<span>/${pkg.duration || ''}</span></div>
+          <div class="pkg-price">KES ${pkg.price}<span>${pkg.duration || ''}</span></div>
         </div>
         `).join('')}
       </div>
@@ -231,12 +319,12 @@ function generatePortalHTML({ templateId, companyName, welcomeText, logoUrl, pri
       ` : ''}
       <form onsubmit="event.preventDefault(); doLogin();">
         <div class="form-group">
-          <label>Phone Number or Username</label>
-          <input id="username" type="text" placeholder="07XX XXX XXX" autocomplete="off" />
+          <label>Phone Number</label>
+          <input id="username" type="text" placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel" />
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input id="password" type="password" placeholder="Enter password" />
+          <input id="password" type="password" placeholder="Enter your password" />
         </div>
         <button type="submit" id="connect" class="btn-connect">Connect to WiFi</button>
       </form>
@@ -366,7 +454,7 @@ export default function CaptivePortalBuilder() {
                 <Palette className="w-4 h-4 text-amber-400" /> Templates
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-2">
+            <CardContent className="grid grid-cols-3 gap-2">
               {HOTSPOT_TEMPLATES.map(tpl => (
                 <button
                   key={tpl.id}
@@ -497,7 +585,7 @@ export default function CaptivePortalBuilder() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className={`bg-zinc-950 rounded-b-xl overflow-hidden ${previewMode === "mobile" ? "w-[375px] mx-auto" : "w-full"}`} style={{ height: previewMode === "mobile" ? "700px" : "600px" }}>
+              <div className={`bg-zinc-950 rounded-b-xl overflow-hidden ${previewMode === "mobile" ? "w-[375px] mx-auto" : "w-full"}`}                   style={{ height: previewMode === "mobile" ? "750px" : "650px" }}>
                 <iframe
                   srcDoc={getHtml()}
                   className="w-full h-full border-0"
