@@ -55,6 +55,7 @@ services:
         - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}
     environment:
       - SERVICE_FQDN_MIKROTIK_APP=5000
+      - COOLIFY_FQDN=${COOLIFY_FQDN:-}
       - NODE_ENV=production
       - PORT=5000
       - DB_HOST=postgres
@@ -64,8 +65,7 @@ services:
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production-to-64-chars}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-this-to-exactly-32-chars}
-      - APP_URL=${COOLIFY_FQDN:-https://mikrotik-billing.example.com}
-      - CORS_ORIGIN=${COOLIFY_FQDN:-https://mikrotik-billing.example.com}
+      - APP_URL=${COOLIFY_FQDN:-}
       - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:-admin@example.com}
       - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-changeme123}
       - RADIUS_ENABLED=true
@@ -90,6 +90,12 @@ services:
       radius:
         condition: service_started
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - mikrotik-net
 

@@ -86,6 +86,25 @@ function parseAllowedOrigins(rawOrigins) {
     return values;
   }
 
+  if (process.env.COOLIFY_FQDN) {
+    const fqdn = process.env.COOLIFY_FQDN;
+    return [
+      `https://${fqdn}`,
+      `http://${fqdn}`,
+      `https://*.${fqdn}`,
+      `http://localhost:${process.env.PORT || 5000}`,
+    ];
+  }
+
+  if (process.env.APP_URL) {
+    try {
+      const url = new URL(process.env.APP_URL);
+      return [url.origin, `http://localhost:${process.env.PORT || 5000}`];
+    } catch (e) {
+      return [`http://localhost:${process.env.PORT || 5000}`];
+    }
+  }
+
   return isProductionEnv ? [] : defaultDevCorsOrigins;
 }
 
@@ -97,13 +116,10 @@ function ensureCriticalProductionConfig() {
   const missing = [];
   if (!process.env.JWT_SECRET) {missing.push("JWT_SECRET");}
   if (!process.env.ENCRYPTION_KEY) {missing.push("ENCRYPTION_KEY");}
-  if (!process.env.CORS_ORIGIN) {missing.push("CORS_ORIGIN");}
 
-  // DATABASE_URL is optional - if not provided, app will use in-memory storage
-  // This allows deployments without a database (for testing/demo purposes)
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
     logger.warn(
-      "DATABASE_URL not set - using in-memory storage (not recommended for production)",
+      "DATABASE_URL or DB_HOST not set - using in-memory storage (not recommended for production)",
     );
   }
 
@@ -225,7 +241,8 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    database: "checking",
+    database: global.dbAvailable ? "connected" : "initializing",
+    deployment: process.env.COOLIFY_FQDN ? "coolify" : (process.env.RENDER ? "render" : "self-hosted"),
   });
 });
 
@@ -706,11 +723,15 @@ const startServer = async () => {
       }
 
       serverInstance = app.listen(PORT, async () => {
-        logger.info("Server started", {
-          port: PORT,
-          environment: process.env.NODE_ENV || "development",
-          database: dbAvailable ? "postgres" : "memory",
-        });
+        logger.info("============================================");
+        logger.info(" MikroTik Billing Platform");
+        logger.info(` Version: ${process.env.npm_package_version || "1.0.0"}`);
+        logger.info(` Port: ${PORT}`);
+        logger.info(` Environment: ${process.env.NODE_ENV || "development"}`);
+        logger.info(` Database: ${dbAvailable ? "PostgreSQL" : "In-Memory"}`);
+        logger.info(` CORS: ${process.env.CORS_ORIGIN || (process.env.COOLIFY_FQDN ? `https://${process.env.COOLIFY_FQDN}` : "auto-detect")}`);
+        logger.info(` Deployment: ${process.env.COOLIFY_FQDN ? "Coolify" : process.env.RENDER ? "Render" : process.env.DOCKER ? "Docker" : "Local"}`);
+        logger.info("============================================");
 
         // Initialize WebSocket service for real-time monitoring
         const websocketService = require("./services/websocketService");
