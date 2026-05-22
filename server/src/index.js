@@ -693,6 +693,17 @@ const startServer = async () => {
         });
       }
 
+      // Start usage alerts cron
+      try {
+        const { startCron: startUsageAlerts } = require("./cron/usageAlerts");
+        startUsageAlerts();
+        logger.info("Usage alerts cron started (every 1 hour)");
+      } catch (e) {
+        logger.warn("Could not start usage alerts cron", {
+          error: e.message,
+        });
+      }
+
       serverInstance = app.listen(PORT, async () => {
         logger.info("Server started", {
           port: PORT,
