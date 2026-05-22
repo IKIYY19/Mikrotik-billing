@@ -59,6 +59,7 @@ const BackupPage = lazy(() => import("./pages/billing/BackupPage").then(m => ({ 
 const CreditNotes = lazy(() => import("./pages/billing/CreditNotes"));
 const InventoryPage = lazy(() => import("./pages/billing/InventoryPage").then(m => ({ default: m.InventoryPage })));
 const AnalyticsReports = lazy(() => import("./pages/billing/AnalyticsReports").then(m => ({ default: m.AnalyticsReports })));
+const SalesPage = lazy(() => import("./pages/billing/SalesPage"));
 const PPPoEManagement = lazy(() => import("./pages/billing/PPPoEManagement").then(m => ({ default: m.PPPoEManagement })));
 const HotspotManagement = lazy(() => import("./pages/billing/HotspotManagement").then(m => ({ default: m.HotspotManagement })));
 const HotspotVouchers = lazy(() => import("./pages/billing/HotspotVouchers").then(m => ({ default: m.HotspotVouchers })));
@@ -272,6 +273,7 @@ function App() {
                         <Route path="/credit-notes" element={<CreditNotes />} />
                         <Route path="/inventory" element={<InventoryPage />} />
                         <Route path="/analytics" element={<AnalyticsReports />} />
+                        <Route path="/billing-sales" element={<SalesPage />} />
                         <Route path="/pppoe" element={<PPPoEManagement />} />
                         <Route path="/hotspot" element={<HotspotManagement />} />
                         <Route

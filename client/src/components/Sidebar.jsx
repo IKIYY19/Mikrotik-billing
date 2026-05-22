@@ -142,6 +142,7 @@ const navGroups = [
     items: [
       { to: "/billing-reports", icon: FileText2, label: "Financial Reports", feature: "reports" },
       { to: "/analytics", icon: TrendingUp, label: "Analytics", feature: "analytics" },
+      { to: "/billing-sales", icon: Zap, label: "Sales", feature: "analytics" },
     ],
   },
 ];

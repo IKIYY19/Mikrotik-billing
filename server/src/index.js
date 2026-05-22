@@ -591,6 +591,7 @@ const startServer = async () => {
     app.use("/api/dashboard", authenticate, require("./routes/dashboard"));
     app.use("/api/settings", authenticate, require("./routes/settings"));
     app.use("/api/fup", authenticate, require("./routes/fup"));
+    app.use("/api/sales", authenticate, require("./routes/sales"));
     app.use("/api/tr069", authenticate, require("./routes/tr069"));
     app.use("/api/speedtest", authenticate, require("./routes/speedtest"));
     if (monitoringApiEnabled) {
