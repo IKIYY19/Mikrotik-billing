@@ -2753,8 +2753,9 @@ router.get("/v1/status", async (req, res) => {
 });
 
 // POST /v1/:slug/routers/:routerId/link-billing
-// Link an unmanaged discovered router to the billing engine by supplying
-// management credentials. Called from the Routers page "Link to Billing" modal.
+// Link an unmanaged discovered router to the billing engine.
+// STEP 1: Performs a REAL live connection test against the MikroTik API.
+// STEP 2: Only if the live test passes, saves credentials and activates billing.
 router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
   try {
     const { slug, routerId } = req.params;
@@ -2770,12 +2771,11 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
     const authHeader = req.headers.authorization;
     const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
 
-    // Resolve the tenant – first try the slug, then the API key as fallback
+    // Resolve the tenant
     let tenant = await findTenantBySlugOrKey(slug, null);
     if (!tenant && apiKey) {
       tenant = await findTenantBySlugOrKey(null, apiKey);
     }
-    // If still not found, try matching the API key directly when slug is actually an api_key prefix
     if (!tenant && apiKey) {
       const tenantByKey = await db.query(
         "SELECT * FROM tenants WHERE settings->>'api_key' = $1 AND is_active = true LIMIT 1",
@@ -2788,44 +2788,101 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
       return res.status(403).json({ error: "Invalid tenant or API key" });
     }
 
-    // Find the router and confirm it belongs to this tenant
-    const routerResult = await db.query(
-      "SELECT * FROM routers WHERE id = $1",
-      [routerId],
-    );
-
+    // Find the router
+    const routerResult = await db.query("SELECT * FROM routers WHERE id = $1", [routerId]);
     if (routerResult.rows.length === 0) {
       return res.status(404).json({ error: "Router not found" });
     }
 
     const routerRow = routerResult.rows[0];
 
-    // If router has a tenant_id, make sure it matches
     if (routerRow.tenant_id && routerRow.tenant_id !== tenant.id) {
       return res.status(403).json({ error: "Router does not belong to this tenant" });
     }
 
-    // 1. Create or update the mikrotik_connection for this router
+    // ── STEP 1: REAL LIVE CONNECTION TEST ──────────────────────────────────
+    // We MUST verify credentials actually work on the router before saving anything.
+    const routerConnectionManager = require("../services/routerConnectionManager");
+    const resolvedPort = port ? parseInt(port, 10) : 8728;
+    const resolvedType = connection_type || "api";
+
+    // Determine the IP to test against (prefer stored IP, fallback to source IP)
+    const testIp = routerRow.ip_address || routerRow.source_ip || null;
+    if (!testIp) {
+      return res.status(400).json({
+        error: "Cannot test connection: router has no known IP address yet. Make sure the router has reported its IP by running the install command first.",
+        code: "NO_ROUTER_IP",
+      });
+    }
+
+    logger.info(`[link-billing] Testing real connection to ${testIp}:${resolvedPort} (${resolvedType}) for router ${routerRow.name}`);
+
+    const testConfig = {
+      ip_address: testIp,
+      api_port: resolvedPort,
+      ssh_port: resolvedType === "ssh" ? resolvedPort : 22,
+      username,
+      password,           // testConnection handles decryption; plain text is fine here
+      password_encrypted: null,
+      connection_type: resolvedType,
+    };
+
+    try {
+      if (resolvedType === "ssh") {
+        await routerConnectionManager.testSSHConnection(testConfig);
+      } else {
+        await routerConnectionManager.testConnection(testConfig);
+      }
+      logger.info(`[link-billing] Real connection test PASSED for router ${routerRow.name} (${testIp})`);
+    } catch (testErr) {
+      // Connection test failed — return the real error, save nothing
+      const rawMsg = testErr.message || String(testErr);
+      logger.warn(`[link-billing] Real connection test FAILED for ${testIp}: ${rawMsg}`);
+
+      // Translate common MikroTik errors into helpful messages
+      let friendlyMsg = rawMsg;
+      if (/ECONNREFUSED/.test(rawMsg))    { friendlyMsg = `Connection refused on ${testIp}:${resolvedPort}. Make sure the router's API (or SSH) service is enabled and the port is correct.`; }
+      else if (/ETIMEDOUT|EHOSTUNREACH/.test(rawMsg)) { friendlyMsg = `Cannot reach ${testIp}:${resolvedPort}. Check that your server can reach the router (firewall, NAT, or VPN issue).`; }
+      else if (/ENOTFOUND/.test(rawMsg))  { friendlyMsg = `Cannot resolve host ${testIp}. Use the router's IP address, not a hostname.`; }
+      else if (/wrong password|invalid user|cannot log in|login failed|authentication|rejected/i.test(rawMsg)) {
+        friendlyMsg = `Authentication failed — wrong username or password. Check MikroTik Users > user "${username}" exists and has full API access.`;
+      } else if (/ssl|certificate/i.test(rawMsg)) {
+        friendlyMsg = `SSL handshake failed. Try connection type "API" (port 8728) instead of "API-SSL".`;
+      }
+
+      return res.status(400).json({
+        error: friendlyMsg,
+        raw_error: rawMsg,
+        code: "CONNECTION_TEST_FAILED",
+        test_ip: testIp,
+        test_port: resolvedPort,
+      });
+    }
+    // ── END REAL TEST ────────────────────────────────────────────────────────
+
+    // ── STEP 2: Save credentials and activate billing ────────────────────────
+    // We only reach here if the live test passed.
+
     const activationResult = await zeroTouchBilling.ensureMikrotikConnection(routerId, {
       mgmt_username: username,
       mgmt_password: password,
-      mgmt_port: port ? parseInt(port, 10) : 8728,
-      connection_type: connection_type || "api",
+      mgmt_port: resolvedPort,
+      connection_type: resolvedType,
     });
 
     if (!activationResult.success) {
       return res.status(400).json({
-        error: activationResult.error || "Failed to create MikroTik connection",
+        error: activationResult.error || "Failed to create MikroTik connection record",
         detail: activationResult,
       });
     }
 
     const connectionId = activationResult.connection?.id;
     if (!connectionId) {
-      return res.status(500).json({ error: "Connection created but ID missing" });
+      return res.status(500).json({ error: "Connection record created but ID missing" });
     }
 
-    // 2. Store credentials on the router row and mark billing_activated_at
+    // Persist credentials on the router row
     const encryption = require("../utils/encryption");
     const encryptedPass = encryption.encrypt(password);
 
@@ -2838,20 +2895,19 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
            billing_activated_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $5`,
-      [connectionId, username, encryptedPass, port || 8728, routerId],
+      [connectionId, username, encryptedPass, resolvedPort, routerId],
     );
 
-    // 3. Sync existing subscriptions that were waiting for a connection
+    // Sync existing subscriptions that were waiting for a connection
     let syncResults = [];
     try {
       const fullActivation = await zeroTouchBilling.activateRouterInBilling(routerId);
-      syncResults = fullActivation.sync_results || [];
-      logger.info(`[link-billing] Synced ${syncResults.length} subscriptions for router ${routerId}`);
+      syncResults = fullActivation?.sync_results || [];
+      logger.info(`[link-billing] Synced ${syncResults.length} subscription(s) for router ${routerRow.name}`);
     } catch (syncErr) {
-      logger.warn(`[link-billing] Subscription sync failed for router ${routerId}: ${syncErr.message}`);
+      logger.warn(`[link-billing] Subscription sync after link failed: ${syncErr.message}`);
     }
 
-    // 4. Return success
     const updatedRouter = await db.query(
       "SELECT id, name, model, ip_address, mac_address, linked_mikrotik_connection_id, provision_status, billing_activated_at FROM routers WHERE id = $1",
       [routerId],
@@ -2862,15 +2918,17 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
       router_id: routerId,
       connection_id: connectionId,
       name: routerRow.name || routerRow.identity,
+      test_ip: testIp,
       router: updatedRouter.rows[0] || null,
       subscriptions_synced: syncResults.length,
       sync_results: syncResults,
     });
   } catch (error) {
-    logger.error("[link-billing] Error:", { error: error.message, stack: error.stack });
+    logger.error("[link-billing] Unexpected error:", { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // PUT /v1/upgrade — Add management credentials to an existing router link
 router.put("/v1/upgrade", async (req, res) => {

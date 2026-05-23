@@ -50,8 +50,9 @@ export default function RoutersPage() {
   const [linkModal, setLinkModal] = useState(null); // { router }
   const [linkForm, setLinkForm] = useState({ username: "admin", password: "", port: "8728", connection_type: "api" });
   const [linking, setLinking] = useState(false);
-  const [linkError, setLinkError] = useState("");
+  const [linkError, setLinkError] = useState(null); // { message, rawError, testIp, testPort, code }
   const [linkSuccess, setLinkSuccess] = useState(null);
+  const [linkPhase, setLinkPhase] = useState(""); // "testing" | "saving" | ""
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { fetchTenant(); return () => stopWatching(); }, []);
@@ -187,19 +188,22 @@ export default function RoutersPage() {
 
   const closeLinkModal = () => {
     setLinkModal(null);
-    setLinkError("");
+    setLinkError(null);
     setLinkSuccess(null);
+    setLinkPhase("");
   };
 
   const handleLinkToBilling = async (e) => {
     e.preventDefault();
     if (!linkModal) { return; }
     setLinking(true);
-    setLinkError("");
+    setLinkError(null);
     setLinkSuccess(null);
+    setLinkPhase("testing");
 
     try {
       const token = getToken();
+      // Phase indication: the backend tests the real connection first
       const { data } = await axios.post(
         `${API}/router/v1/${tenantSlug}/routers/${linkModal.router.id}/link-billing`,
         {
@@ -211,24 +215,31 @@ export default function RoutersPage() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
+      setLinkPhase("");
       setLinkSuccess({
         connection_id: data.connection_id,
         subscriptions_synced: data.subscriptions_synced || 0,
+        test_ip: data.test_ip,
       });
 
       toast.success(
         `Router "${data.name}" linked to billing`,
         data.subscriptions_synced > 0
           ? `${data.subscriptions_synced} subscription(s) synced to MikroTik`
-          : "No existing subscriptions to sync",
+          : "Connection verified and router linked",
       );
 
-      // Refresh the router list so the badge flips to "managed"
       await fetchRouters();
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || "Link failed";
-      setLinkError(msg);
-      toast.error("Failed to link router", msg);
+      setLinkPhase("");
+      const resp = err.response?.data || {};
+      setLinkError({
+        message: resp.error || err.message || "Link failed",
+        rawError: resp.raw_error || null,
+        testIp: resp.test_ip || linkModal.router.ip_address,
+        testPort: resp.test_port || linkForm.port,
+        code: resp.code || null,
+      });
     } finally {
       setLinking(false);
     }
@@ -528,7 +539,7 @@ export default function RoutersPage() {
                     <Check className="w-7 h-7 text-green-400" />
                   </div>
                   <div>
-                    <p className="text-white font-semibold">Router Linked!</p>
+                    <p className="text-white font-semibold">Real Connection Verified & Linked!</p>
                     <p className="text-zinc-400 text-sm mt-1">
                       {linkSuccess.subscriptions_synced > 0
                         ? `${linkSuccess.subscriptions_synced} existing subscription(s) were synced to this router.`
@@ -536,7 +547,8 @@ export default function RoutersPage() {
                     </p>
                   </div>
                   <div className="bg-zinc-800/60 rounded-lg p-3 text-left text-xs text-zinc-400 space-y-1">
-                    <p>✅ MikroTik connection created</p>
+                    <p>✅ Live connection test passed{linkSuccess.test_ip ? ` (${linkSuccess.test_ip})` : ""}</p>
+                    <p>✅ MikroTik connection saved</p>
                     <p>✅ Router marked as managed</p>
                     {linkSuccess.subscriptions_synced > 0 && <p>✅ {linkSuccess.subscriptions_synced} PPPoE secret(s) synced</p>}
                     <p className="text-zinc-500 pt-1">New subscriptions linked to this router will auto-provision their PPPoE secrets.</p>
@@ -617,9 +629,23 @@ export default function RoutersPage() {
                   </div>
 
                   {linkError && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-red-400">{linkError}</p>
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                        <p className="text-sm text-red-400 font-medium">{linkError.message}</p>
+                      </div>
+                      {(linkError.testIp || linkError.testPort) && (
+                        <div className="text-xs text-red-400/70 pl-6 space-y-0.5">
+                          {linkError.testIp && <p>Tested IP: <span className="font-mono text-red-300">{linkError.testIp}</span></p>}
+                          {linkError.testPort && <p>Tested port: <span className="font-mono text-red-300">{linkError.testPort}</span></p>}
+                        </div>
+                      )}
+                      {linkError.rawError && linkError.rawError !== linkError.message && (
+                        <details className="pl-6">
+                          <summary className="text-xs text-red-400/60 cursor-pointer hover:text-red-400">Technical detail</summary>
+                          <code className="block mt-1 text-xs text-red-300/70 font-mono bg-red-950/30 rounded px-2 py-1 break-all">{linkError.rawError}</code>
+                        </details>
+                      )}
                     </div>
                   )}
 
@@ -636,7 +662,9 @@ export default function RoutersPage() {
                       disabled={linking}
                       className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-900 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                     >
-                      {linking ? <><Loader2 className="w-4 h-4 animate-spin" /> Linking...</> : <><Link2 className="w-4 h-4" /> Link to Billing</>}
+                      {linking && linkPhase === "testing" && <><Loader2 className="w-4 h-4 animate-spin" /> Testing connection...</>}
+                      {linking && linkPhase !== "testing" && <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>}
+                      {!linking && <><Link2 className="w-4 h-4" /> Link to Billing</>}
                     </button>
                   </div>
                 </form>
