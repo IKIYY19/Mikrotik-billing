@@ -46,6 +46,14 @@ export default function RoutersPage() {
   const [vpnCopied, setVpnCopied] = useState(false);
   const [vpnLoading, setVpnLoading] = useState(false);
 
+  // ── Link to Billing modal state ──────────────────────────────────────────
+  const [linkModal, setLinkModal] = useState(null); // { router }
+  const [linkForm, setLinkForm] = useState({ username: "admin", password: "", port: "8728", connection_type: "api" });
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [linkSuccess, setLinkSuccess] = useState(null);
+  // ─────────────────────────────────────────────────────────────────────────
+
   useEffect(() => { fetchTenant(); return () => stopWatching(); }, []);
 
   const fetchTenant = async () => {
@@ -63,12 +71,12 @@ export default function RoutersPage() {
       }
     } catch (e) {
       const storedKey = localStorage.getItem("router_link_api_key");
-      if (storedKey && !apiKey) {setApiKey(storedKey);}
+      if (storedKey && !apiKey) { setApiKey(storedKey); }
     } finally { setLoading(false); }
   };
 
   const fetchRouters = async () => {
-    if (!tenantSlug) {return;}
+    if (!tenantSlug) { return; }
     setRoutersLoading(true);
     try {
       const { data } = await axios.get(`${API}/router/v1/${tenantSlug}/routers`);
@@ -79,7 +87,7 @@ export default function RoutersPage() {
   useEffect(() => { if (tenantSlug) { fetchRouters(); const i = setInterval(fetchRouters, 15000); return () => clearInterval(i); } }, [tenantSlug]);
 
   const deleteRouter = async (routerId, routerName) => {
-    if (!confirm(`Delete "${routerName}"? This removes the router and its API connection permanently.`)) {return;}
+    if (!confirm(`Delete "${routerName}"? This removes the router and its API connection permanently.`)) { return; }
     setDeleting(routerId);
     try {
       await axios.delete(`${API}/router/v1/${tenantSlug}/routers/${routerId}`);
@@ -95,19 +103,14 @@ export default function RoutersPage() {
     setVpnCopied(false);
     setVpnLoading(true);
     try {
-      const token = getToken();
-      const { data } = await axios.get(`${API}/settings`);
-      const addr = data.vpn_server_address;
-      if (!addr) {
-        setVpnModal({ router, slug, noServer: true });
-      }
+      await axios.get(`${API}/settings`);
     } catch (e) {
       setVpnModal({ router, slug, noServer: true });
     } finally { setVpnLoading(false); }
   };
 
   const getVpnCommand = () => {
-    if (!vpnModal) {return "";}
+    if (!vpnModal) { return ""; }
     const { slug } = vpnModal;
     const origin = window.location.origin;
     const token = getToken();
@@ -122,7 +125,7 @@ export default function RoutersPage() {
 
   // Watch session
   const startWatching = async () => {
-    if (!tenantSlug) {return;}
+    if (!tenantSlug) { return; }
     stopWatching();
     try {
       const { data } = await axios.post(`${API}/router/v1/${tenantSlug}/watch/start`);
@@ -130,17 +133,17 @@ export default function RoutersPage() {
       setWatchAttempts(0); setLastError(null);
       const poll = async () => {
         try {
-          const { data } = await axios.get(`${API}/router/v1/${tenantSlug}/watch/${data.sessionId}`);
+          const { data: pollData } = await axios.get(`${API}/router/v1/${tenantSlug}/watch/${data.sessionId}`);
           setWatchAttempts((c) => c + 1);
-          if (data.found) {
+          if (pollData.found) {
             stopWatching();
-            setConnectionStatus({ connected: true, status: "online", router: data.router, message: data.message });
+            setConnectionStatus({ connected: true, status: "online", router: pollData.router, message: pollData.message });
             fetchRouters();
-            toast.success(data.message);
-          } else if (data.expired) {
+            toast.success(pollData.message);
+          } else if (pollData.expired) {
             stopWatching();
-            setConnectionStatus({ connected: false, status: "timeout", message: data.message });
-          } else { setWatchRemaining(Math.max(0, 600 - (data.elapsed || 0))); }
+            setConnectionStatus({ connected: false, status: "timeout", message: pollData.message });
+          } else { setWatchRemaining(Math.max(0, 600 - (pollData.elapsed || 0))); }
         } catch (e) {
           console.warn("Poll status failed:", e);
         }
@@ -151,7 +154,7 @@ export default function RoutersPage() {
   };
   const stopWatching = () => { if (watchIntervalRef.current) { clearInterval(watchIntervalRef.current); watchIntervalRef.current = null; } };
 
-  useEffect(() => { if (tenantSlug && apiKey) {startWatching();} }, [tenantSlug, apiKey]);
+  useEffect(() => { if (tenantSlug && apiKey) { startWatching(); } }, [tenantSlug, apiKey]);
 
   const generateKey = async () => {
     setGenerating(true);
@@ -170,25 +173,77 @@ export default function RoutersPage() {
     const certFlag = appUrl.startsWith("https") ? " check-certificate=no" : "";
     const slugPath = tenantSlug ? `/v1/${tenantSlug}/install` : "/v1/scripts/install";
     let prefix = "";
-    if (mgmtUser && mgmtPass) {prefix = `:global ztpMgmtUser "${mgmtUser}"; :global ztpMgmtPass "${mgmtPass}"; `;}
+    if (mgmtUser && mgmtPass) { prefix = `:global ztpMgmtUser "${mgmtUser}"; :global ztpMgmtPass "${mgmtPass}"; `; }
     return `${prefix}/tool fetch url="${appUrl}/api/router${slugPath}" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
   };
 
-  const buildSimpleCommand = () => {
-    const mode = appUrl.startsWith("https") ? "https" : "http";
-    const certFlag = appUrl.startsWith("https") ? " check-certificate=no" : "";
-    return `/tool fetch url="${appUrl}/api/router/v1/${tenantSlug}/install" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
+  // ── Link to Billing handlers ─────────────────────────────────────────────
+  const openLinkModal = (router) => {
+    setLinkModal({ router });
+    setLinkForm({ username: router.mgmt_username || "admin", password: "", port: String(router.mgmt_port || 8728), connection_type: "api" });
+    setLinkError("");
+    setLinkSuccess(null);
   };
 
-  if (loading) {return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;}
+  const closeLinkModal = () => {
+    setLinkModal(null);
+    setLinkError("");
+    setLinkSuccess(null);
+  };
+
+  const handleLinkToBilling = async (e) => {
+    e.preventDefault();
+    if (!linkModal) { return; }
+    setLinking(true);
+    setLinkError("");
+    setLinkSuccess(null);
+
+    try {
+      const token = getToken();
+      const { data } = await axios.post(
+        `${API}/router/v1/${tenantSlug}/routers/${linkModal.router.id}/link-billing`,
+        {
+          username: linkForm.username,
+          password: linkForm.password,
+          port: parseInt(linkForm.port, 10) || 8728,
+          connection_type: linkForm.connection_type,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      setLinkSuccess({
+        connection_id: data.connection_id,
+        subscriptions_synced: data.subscriptions_synced || 0,
+      });
+
+      toast.success(
+        `Router "${data.name}" linked to billing`,
+        data.subscriptions_synced > 0
+          ? `${data.subscriptions_synced} subscription(s) synced to MikroTik`
+          : "No existing subscriptions to sync",
+      );
+
+      // Refresh the router list so the badge flips to "managed"
+      await fetchRouters();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || "Link failed";
+      setLinkError(msg);
+      toast.error("Failed to link router", msg);
+    } finally {
+      setLinking(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  if (loading) { return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>; }
 
   const isLinked = connectionStatus?.connected && connectionStatus?.router?.has_connection;
   const isOnline = connectionStatus?.router?.is_online !== false;
 
   const getRouterStatus = (r) => {
-    if (r.is_online) {return { color: 'green', label: 'ONLINE', Icon: Wifi, dotClass: 'bg-green-500 shadow-lg shadow-green-500/30', badgeClass: 'bg-green-500/10 text-green-400' };}
-    if (r.is_reporting && r.linked_mikrotik_connection_id) {return { color: 'amber', label: 'RADIUS', Icon: Shield, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' };}
-    if (r.is_reporting) {return { color: 'slate', label: 'HEARTBEAT', Icon: Activity, dotClass: 'bg-slate-500', badgeClass: 'bg-slate-500/10 text-slate-400' };}
+    if (r.is_online) { return { color: 'green', label: 'ONLINE', Icon: Wifi, dotClass: 'bg-green-500 shadow-lg shadow-green-500/30', badgeClass: 'bg-green-500/10 text-green-400' }; }
+    if (r.is_reporting && r.linked_mikrotik_connection_id) { return { color: 'amber', label: 'RADIUS', Icon: Shield, dotClass: 'bg-amber-500 shadow-lg shadow-amber-500/30', badgeClass: 'bg-amber-500/10 text-amber-400' }; }
+    if (r.is_reporting) { return { color: 'slate', label: 'HEARTBEAT', Icon: Activity, dotClass: 'bg-slate-500', badgeClass: 'bg-slate-500/10 text-slate-400' }; }
     return { color: 'red', label: 'OFFLINE', Icon: WifiOff, dotClass: 'bg-red-500', badgeClass: 'bg-red-500/10 text-red-400' };
   };
 
@@ -252,43 +307,83 @@ export default function RoutersPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {routers.map((r) => {
                 const status = getRouterStatus(r);
+                const isManaged = !!r.linked_mikrotik_connection_id;
                 return (
-                <div key={r.id} className="bg-zinc-900/60 border border-zinc-800/50 rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${status.dotClass}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white">{r.name || 'Unknown'}</p>
-                      <span className={`text-xs px-2 py-1 rounded-full ${status.badgeClass}`}>
-                        <status.Icon className="w-3 h-3 inline mr-1" />
-                        {status.label}
-                      </span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${r.linked_mikrotik_connection_id ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                        {r.linked_mikrotik_connection_id ? 'managed' : 'unmanaged'}
-                      </span>
-                      <button
-                        onClick={() => openVpnModal(r, tenantSlug)}
-                        className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                        title="Remote Winbox"
-                      >
-                        <Plug className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteRouter(r.id, r.name)}
-                        disabled={deleting === r.id}
-                        className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Delete router"
-                      >
-                        {deleting === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
+                  <Card key={r.id} className={`bg-zinc-900/60 border-zinc-800/50 overflow-hidden transition-all ${!isManaged ? 'border-l-4 border-l-amber-500/60' : 'border-l-4 border-l-transparent'}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        {/* Status dot + name + badges */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={`w-3 h-3 rounded-full shrink-0 ${status.dotClass}`} />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-white truncate">{r.name || r.identity || 'Unknown'}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${status.badgeClass}`}>
+                                <status.Icon className="w-3 h-3 inline mr-1" />{status.label}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${isManaged ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                {isManaged ? '✓ managed' : '⚠ unmanaged'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-zinc-500">
+                              {r.model && <span>{r.model}</span>}
+                              {r.ip_address && <span>IP: {r.ip_address}</span>}
+                              {r.mac_address && <span>MAC: {r.mac_address}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Link to Billing button — prominent for unmanaged routers */}
+                          {!isManaged ? (
+                            <button
+                              onClick={() => openLinkModal(r)}
+                              title="Link this router to the billing engine"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 text-xs font-medium transition-colors border border-amber-500/30"
+                            >
+                              <Link2 className="w-3.5 h-3.5" /> Link to Billing
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => openLinkModal(r)}
+                              title="Update management credentials"
+                              className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            >
+                              <Link2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openVpnModal(r, tenantSlug)}
+                            className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            title="Remote Winbox"
+                          >
+                            <Plug className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteRouter(r.id, r.name)}
+                            disabled={deleting === r.id}
+                            className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete router"
+                          >
+                            {deleting === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Unmanaged call-to-action strip */}
+                      {!isManaged && (
+                        <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-center gap-2 text-xs text-amber-400/80">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>This router is not linked to billing. Click <strong>Link to Billing</strong> to enable auto-provisioning of PPPoE secrets.</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
               })}
             </div>
           )}
@@ -331,6 +426,9 @@ export default function RoutersPage() {
                   <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">2</span> Management Credentials
                   {!showCredentials && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full ml-2">Recommended</span>}
                 </CardTitle>
+                <CardDescription>
+                  Include these so the router auto-links to billing on first contact. Without them, you can still link manually from the Routers list.
+                </CardDescription>
               </CardHeader>
               {showCredentials ? (
                 <CardContent className="space-y-3">
@@ -353,12 +451,12 @@ export default function RoutersPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <input type="text" value={appUrl} onChange={(e) => { setAppUrl(e.target.value); localStorage.setItem("router_link_app_url", e.target.value); }} placeholder="https://your-server.com" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                {!mgmtUser && (
+                {!mgmtPass && (
                   <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 flex items-start gap-2">
                     <AlertCircle className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs text-blue-300 font-medium">Auto-detection mode</p>
-                      <p className="text-xs text-blue-400/70 mt-0.5">Router will auto-detect WAN, MAC, and model. RADIUS auth works immediately. Add credentials for live monitoring & graphs.</p>
+                      <p className="text-xs text-blue-400/70 mt-0.5">Router will auto-detect WAN, MAC, and model. RADIUS auth works immediately. Add credentials above for live monitoring & auto billing linking.</p>
                     </div>
                   </div>
                 )}
@@ -366,8 +464,8 @@ export default function RoutersPage() {
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
                     <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs text-amber-300 font-medium">Credentials included</p>
-                      <p className="text-xs text-amber-400/70 mt-0.5">Full device management — live monitoring, graphs, and Winbox API access will work automatically.</p>
+                      <p className="text-xs text-amber-300 font-medium">Credentials included — auto billing link enabled</p>
+                      <p className="text-xs text-amber-400/70 mt-0.5">The router will auto-link to billing on first contact. PPPoE provisioning will work immediately.</p>
                     </div>
                   </div>
                 )}
@@ -392,7 +490,7 @@ export default function RoutersPage() {
                   <div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3 space-y-1">
                     <p className="text-sm text-white font-medium">{connectionStatus.router.name} ({connectionStatus.router.model || "Unknown"})</p>
                     <p className="text-xs text-zinc-500">MAC: {connectionStatus.router.mac} &middot; IP: {connectionStatus.router.ip}</p>
-                    <p className="text-xs">{connectionStatus.router.has_connection ? <span className="text-green-400">Fully managed</span> : <span className="text-amber-400">Needs credentials for management</span>}</p>
+                    <p className="text-xs">{connectionStatus.router.has_connection ? <span className="text-green-400">Fully managed</span> : <span className="text-amber-400">Needs credentials for management — go to Routers → Link to Billing</span>}</p>
                   </div>
                 )}
                 {lastError && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2"><AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{lastError}</p></div>}
@@ -400,6 +498,151 @@ export default function RoutersPage() {
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ── Link to Billing Modal ───────────────────────────────────────────── */}
+      {linkModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-700/60 rounded-2xl w-full max-w-md shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Link2 className="w-5 h-5 text-amber-400" />
+                  {linkModal.router.linked_mikrotik_connection_id ? 'Update Credentials' : 'Link to Billing'}
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">{linkModal.router.name || linkModal.router.identity}</p>
+              </div>
+              <button onClick={closeLinkModal} className="text-zinc-500 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5">
+              {linkSuccess ? (
+                /* Success state */
+                <div className="text-center space-y-4">
+                  <div className="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                    <Check className="w-7 h-7 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">Router Linked!</p>
+                    <p className="text-zinc-400 text-sm mt-1">
+                      {linkSuccess.subscriptions_synced > 0
+                        ? `${linkSuccess.subscriptions_synced} existing subscription(s) were synced to this router.`
+                        : 'No existing subscriptions to sync. New subscriptions will provision automatically.'}
+                    </p>
+                  </div>
+                  <div className="bg-zinc-800/60 rounded-lg p-3 text-left text-xs text-zinc-400 space-y-1">
+                    <p>✅ MikroTik connection created</p>
+                    <p>✅ Router marked as managed</p>
+                    {linkSuccess.subscriptions_synced > 0 && <p>✅ {linkSuccess.subscriptions_synced} PPPoE secret(s) synced</p>}
+                    <p className="text-zinc-500 pt-1">New subscriptions linked to this router will auto-provision their PPPoE secrets.</p>
+                  </div>
+                  <button
+                    onClick={closeLinkModal}
+                    className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                /* Form state */
+                <form onSubmit={handleLinkToBilling} className="space-y-4">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-300">
+                    <p className="font-medium mb-1">What happens when you link?</p>
+                    <ul className="space-y-0.5 text-amber-400/80">
+                      <li>• A MikroTik connection is created with these credentials</li>
+                      <li>• Subscriptions on this router auto-provision PPPoE secrets</li>
+                      <li>• Status/suspend/reactivate events sync automatically</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-zinc-300 mb-1.5">Router API Username</label>
+                    <input
+                      type="text"
+                      required
+                      value={linkForm.username}
+                      onChange={(e) => setLinkForm({ ...linkForm, username: e.target.value })}
+                      placeholder="admin"
+                      className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-zinc-300 mb-1.5">Router API Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={linkForm.password}
+                      onChange={(e) => setLinkForm({ ...linkForm, password: e.target.value })}
+                      placeholder="Router password"
+                      className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-zinc-300 mb-1.5">API Port</label>
+                      <input
+                        type="number"
+                        required
+                        value={linkForm.port}
+                        onChange={(e) => setLinkForm({ ...linkForm, port: e.target.value })}
+                        placeholder="8728"
+                        className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-zinc-300 mb-1.5">Connection Type</label>
+                      <select
+                        value={linkForm.connection_type}
+                        onChange={(e) => setLinkForm({ ...linkForm, connection_type: e.target.value, port: e.target.value === 'ssh' ? '22' : '8728' })}
+                        className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                      >
+                        <option value="api">API (port 8728)</option>
+                        <option value="api-ssl">API-SSL (port 8729)</option>
+                        <option value="ssh">SSH (port 22)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5 text-xs text-zinc-500 space-y-0.5">
+                    {linkModal.router.ip_address && <p>Router IP: <span className="text-zinc-300 font-mono">{linkModal.router.ip_address}</span></p>}
+                    {linkModal.router.mac_address && <p>MAC: <span className="text-zinc-300 font-mono">{linkModal.router.mac_address}</span></p>}
+                    {linkModal.router.model && <p>Model: <span className="text-zinc-300">{linkModal.router.model}</span></p>}
+                  </div>
+
+                  {linkError && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                      <p className="text-sm text-red-400">{linkError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={closeLinkModal}
+                      className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={linking}
+                      className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-900 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      {linking ? <><Loader2 className="w-4 h-4 animate-spin" /> Linking...</> : <><Link2 className="w-4 h-4" /> Link to Billing</>}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -439,7 +682,7 @@ export default function RoutersPage() {
                     <p className="text-zinc-400 text-xs mb-2 font-medium">INSTRUCTIONS</p>
                     <ol className="text-zinc-300 text-sm space-y-1 list-decimal pl-4">
                       <li>Copy the command</li>
-                      <li>Paste it into your router's terminal</li>
+                      <li>Paste it into your router&apos;s terminal</li>
                       <li>Press Enter</li>
                     </ol>
                   </div>

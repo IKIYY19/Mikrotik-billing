@@ -2752,6 +2752,126 @@ router.get("/v1/status", async (req, res) => {
   }
 });
 
+// POST /v1/:slug/routers/:routerId/link-billing
+// Link an unmanaged discovered router to the billing engine by supplying
+// management credentials. Called from the Routers page "Link to Billing" modal.
+router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
+  try {
+    const { slug, routerId } = req.params;
+    const { username, password, port, connection_type } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: "username and password are required" });
+    }
+
+    const db = getDb();
+
+    // Accept both Bearer-token auth (admin UI) and slug-based tenant lookup
+    const authHeader = req.headers.authorization;
+    const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
+
+    // Resolve the tenant – first try the slug, then the API key as fallback
+    let tenant = await findTenantBySlugOrKey(slug, null);
+    if (!tenant && apiKey) {
+      tenant = await findTenantBySlugOrKey(null, apiKey);
+    }
+    // If still not found, try matching the API key directly when slug is actually an api_key prefix
+    if (!tenant && apiKey) {
+      const tenantByKey = await db.query(
+        "SELECT * FROM tenants WHERE settings->>'api_key' = $1 AND is_active = true LIMIT 1",
+        [apiKey],
+      );
+      tenant = tenantByKey.rows[0] || null;
+    }
+
+    if (!tenant) {
+      return res.status(403).json({ error: "Invalid tenant or API key" });
+    }
+
+    // Find the router and confirm it belongs to this tenant
+    const routerResult = await db.query(
+      "SELECT * FROM routers WHERE id = $1",
+      [routerId],
+    );
+
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: "Router not found" });
+    }
+
+    const routerRow = routerResult.rows[0];
+
+    // If router has a tenant_id, make sure it matches
+    if (routerRow.tenant_id && routerRow.tenant_id !== tenant.id) {
+      return res.status(403).json({ error: "Router does not belong to this tenant" });
+    }
+
+    // 1. Create or update the mikrotik_connection for this router
+    const activationResult = await zeroTouchBilling.ensureMikrotikConnection(routerId, {
+      mgmt_username: username,
+      mgmt_password: password,
+      mgmt_port: port ? parseInt(port, 10) : 8728,
+      connection_type: connection_type || "api",
+    });
+
+    if (!activationResult.success) {
+      return res.status(400).json({
+        error: activationResult.error || "Failed to create MikroTik connection",
+        detail: activationResult,
+      });
+    }
+
+    const connectionId = activationResult.connection?.id;
+    if (!connectionId) {
+      return res.status(500).json({ error: "Connection created but ID missing" });
+    }
+
+    // 2. Store credentials on the router row and mark billing_activated_at
+    const encryption = require("../utils/encryption");
+    const encryptedPass = encryption.encrypt(password);
+
+    await db.query(
+      `UPDATE routers
+       SET linked_mikrotik_connection_id = $1,
+           mgmt_username = $2,
+           mgmt_password_encrypted = $3,
+           mgmt_port = $4,
+           billing_activated_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [connectionId, username, encryptedPass, port || 8728, routerId],
+    );
+
+    // 3. Sync existing subscriptions that were waiting for a connection
+    let syncResults = [];
+    try {
+      const fullActivation = await zeroTouchBilling.activateRouterInBilling(routerId);
+      syncResults = fullActivation.sync_results || [];
+      logger.info(`[link-billing] Synced ${syncResults.length} subscriptions for router ${routerId}`);
+    } catch (syncErr) {
+      logger.warn(`[link-billing] Subscription sync failed for router ${routerId}: ${syncErr.message}`);
+    }
+
+    // 4. Return success
+    const updatedRouter = await db.query(
+      "SELECT id, name, model, ip_address, mac_address, linked_mikrotik_connection_id, provision_status, billing_activated_at FROM routers WHERE id = $1",
+      [routerId],
+    );
+
+    res.json({
+      success: true,
+      router_id: routerId,
+      connection_id: connectionId,
+      name: routerRow.name || routerRow.identity,
+      router: updatedRouter.rows[0] || null,
+      subscriptions_synced: syncResults.length,
+      sync_results: syncResults,
+    });
+  } catch (error) {
+    logger.error("[link-billing] Error:", { error: error.message, stack: error.stack });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // PUT /v1/upgrade — Add management credentials to an existing router link
 router.put("/v1/upgrade", async (req, res) => {
   try {
