@@ -276,7 +276,7 @@ export function Sidebar({ onSearchOpen, onCloseMobile }) {
 
   return (
     <aside
-      className="relative z-10 w-60 flex flex-col border-r"
+      className="relative z-10 w-60 h-screen flex flex-col border-r overflow-hidden"
       style={{
         backgroundColor: "var(--sidebar-bg)",
         backdropFilter: "blur(20px)",
