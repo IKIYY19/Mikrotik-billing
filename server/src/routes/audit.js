@@ -31,20 +31,20 @@ router.get("/logs", async (req, res) => {
     let paramIdx = 1;
 
     if (action) {
-      conditions.push(`action = $${paramIdx++}`);
+      conditions.push(`al.action = $${paramIdx++}`);
       params.push(action);
     }
     if (entity_type) {
-      conditions.push(`entity_type = $${paramIdx++}`);
+      conditions.push(`al.entity_type = $${paramIdx++}`);
       params.push(entity_type);
     }
     if (user_id) {
-      conditions.push(`user_id = $${paramIdx++}`);
+      conditions.push(`al.user_id = $${paramIdx++}`);
       params.push(user_id);
     }
     if (search) {
       conditions.push(
-        `(action ILIKE $${paramIdx} OR entity_type ILIKE $${paramIdx})`,
+        `(al.action ILIKE $${paramIdx} OR al.entity_type ILIKE $${paramIdx} OR u.name ILIKE $${paramIdx} OR u.email ILIKE $${paramIdx})`,
       );
       params.push(`%${search}%`);
       paramIdx++;
@@ -53,22 +53,31 @@ router.get("/logs", async (req, res) => {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const query = `
-      SELECT id, user_id, action, entity_type, entity_id,
-             old_values as before_data, new_values as after_data,
-             ip_address, user_agent, created_at
-      FROM billing_audit_logs
+    const dataQuery = `
+      SELECT al.id, al.user_id, al.action, al.entity_type, al.entity_id,
+             al.old_values as before_data, al.new_values as after_data,
+             al.ip_address, al.user_agent, al.created_at,
+             COALESCE(u.name, 'System') as user_name,
+             u.role as user_role
+      FROM billing_audit_logs al
+      LEFT JOIN users u ON u.id = al.user_id
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY al.created_at DESC
       LIMIT $${paramIdx++} OFFSET $${paramIdx++}
     `;
 
     params.push(parseInt(limit), parseInt(offset));
-    const result = await db.query(query, params);
+    const result = await db.query(dataQuery, params);
 
-    const countQuery = `SELECT COUNT(*) as total FROM billing_audit_logs ${whereClause}`;
-    console.log("[AUDIT API] Returning", result.rows.length, "logs, total:", countResult.rows[0]?.total);
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM billing_audit_logs al
+      LEFT JOIN users u ON u.id = al.user_id
+      ${whereClause}
+    `;
     const countResult = await db.query(countQuery, params.slice(0, -2));
+
+    console.log("[AUDIT API] Returning", result.rows.length, "logs, total:", countResult.rows[0]?.total);
 
     res.json({
       logs: result.rows,
@@ -79,6 +88,7 @@ router.get("/logs", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch audit logs" });
   }
 });
+
 
 // DELETE /api/audit/logs/:id
 router.delete("/logs/:id", async (req, res) => {
