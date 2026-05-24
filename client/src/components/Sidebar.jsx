@@ -63,6 +63,7 @@ const API = import.meta.env.VITE_API_URL || "/api";
 const mainNavItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard", feature: "dashboard" },
   { to: "/routers", icon: Router, label: "Routers", feature: "settings" },
+  { to: "/router-link", icon: Link, label: "Router Link", feature: "settings" },
   { to: "/integrations", icon: Key, label: "Integrations", feature: "integrations" },
 ];
 

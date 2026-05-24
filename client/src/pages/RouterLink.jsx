@@ -114,11 +114,12 @@ export default function RouterLink() {
   };
 
   useEffect(() => {
+    fetchTenant();
     return () => stopWatching();
   }, []);
 
   useEffect(() => {
-    if (apiKey) {setPolling(true);}
+    if (apiKey) { setPolling(true); }
   }, [apiKey]);
 
   const fetchTenant = async () => {

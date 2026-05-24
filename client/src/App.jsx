@@ -28,6 +28,7 @@ const MergeCustomers = lazy(() => import("./pages/MergeCustomers"));
 const MessagingPage = lazy(() => import("./pages/billing/MessagingPage"));
 const IntegrationsSettings = lazy(() => import("./pages/IntegrationsSettings"));
 const RoutersPage = lazy(() => import("./pages/RoutersPage"));
+const RouterLink = lazy(() => import("./pages/RouterLink"));
 const TenantSettingsPage = lazy(() => import("./pages/TenantSettingsPage"));
 const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
 const IPAMPage = lazy(() => import("./pages/IPAMPage"));
@@ -314,7 +315,7 @@ function App() {
                         />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/routers" element={<RoutersPage />} />
-                        <Route path="/router-link" element={<RoutersPage />} />
+                        <Route path="/router-link" element={<RouterLink />} />
                         <Route path="/tenant-branding" element={<TenantSettingsPage />} />
                         <Route path="/audit-logs" element={<AuditLogs />} />
                         <Route path="/webhooks" element={<WebhooksPage />} />
