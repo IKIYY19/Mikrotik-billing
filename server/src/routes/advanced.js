@@ -124,9 +124,9 @@ router.get("/map/data", async (req, res) => {
         lng: b.lng || null,
         city: b.city,
         status: b.status,
-        active_pppoe: b.active_pppoe || Math.floor(Math.random() * 50) + 10,
-        online_routers: b.online_routers || Math.floor(Math.random() * 3) + 1,
-        total_routers: b.total_routers || 3,
+        active_pppoe: b.active_pppoe || 0,
+        online_routers: b.online_routers || 0,
+        total_routers: b.total_routers || 0,
       }));
     }
 

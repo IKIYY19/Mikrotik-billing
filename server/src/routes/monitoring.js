@@ -241,7 +241,8 @@ router.get('/alerts/:id', async (req, res) => {
 // Acknowledge an alert
 router.post('/alerts/:id/acknowledge', async (req, res) => {
   try {
-    const { user_id } = req.body;
+    // Use authenticated user's ID from JWT — never trust client-supplied user_id
+    const user_id = req.user?.id || req.user?.userId || null;
     
     const result = await getDb().query(
       `UPDATE alerts 

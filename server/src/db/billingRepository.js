@@ -894,22 +894,31 @@ const notifications = {
   },
 
   async trigger(eventType, data) {
-    // In production, this would queue a job to send email/SMS
-    // For now, just log it
-    const template = await this.getTemplate(eventType, "email");
-    if (!template) {return;}
+    try {
+      // Dispatch via the real notification service (SMS + WhatsApp)
+      const notificationService = require('./notificationService');
+      const customer = data.customer || null;
+      if (customer?.phone) {
+        notificationService.triggerSMS(eventType, data).catch((e) =>
+          console.error(`[Notification] SMS dispatch failed for ${eventType}:`, e?.message || e)
+        );
+      }
 
-    // Render template with data
-    let body = template.body;
-    for (const [key, value] of Object.entries(data)) {
-      body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value || "");
+      // Also try email via the email service
+      const emailService = require('../services/email');
+      const customerEmail = data.customer?.email || data.customerEmail;
+      if (customerEmail) {
+        emailService.triggerEmail(eventType, {
+          customerName: data.customer?.name || 'Customer',
+          customerEmail,
+          ...data,
+        }).catch((e) =>
+          console.error(`[Notification] Email dispatch failed for ${eventType}:`, e?.message || e)
+        );
+      }
+    } catch (e) {
+      console.error(`[Notification] trigger error for ${eventType}:`, e?.message || e);
     }
-
-    console.log(
-      `[Notification] ${eventType} (${template.channel}): ${body.substring(0, 100)}...`,
-    );
-    // In production: send via SendGrid/Twilio/etc.
-    return { event: eventType, channel: template.channel, rendered: body };
   },
 };
 

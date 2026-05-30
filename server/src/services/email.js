@@ -76,9 +76,9 @@ const TEMPLATES = {
           <tr><td style="padding: 8px; border: 1px solid #ddd;">Plan</td><td style="padding: 8px; border: 1px solid #ddd;">${data.plan}</td></tr>
           <tr><td style="padding: 8px; border: 1px solid #ddd;">Speed</td><td style="padding: 8px; border: 1px solid #ddd;">${data.speed}</td></tr>
           <tr><td style="padding: 8px; border: 1px solid #ddd;">Username</td><td style="padding: 8px; border: 1px solid #ddd;">${data.username}</td></tr>
-          <tr><td style="padding: 8px; border: 1px solid #ddd;">Password</td><td style="padding: 8px; border: 1px solid #ddd;">${data.password}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;">Password</td><td style="padding: 8px; border: 1px solid #ddd;">Contact support or visit the customer portal to retrieve your password.</td></tr>
         </table>
-        <p style="color: #6b7280; font-size: 12px;">Please keep your credentials secure.</p>
+        <p style="color: #6b7280; font-size: 12px;">Keep your credentials secure. Never share your password via email or phone.</p>
       </div>
     `,
   },
@@ -179,7 +179,11 @@ async function sendEmail({ to, subject, html, template, data }) {
     }
 
     const transporter = createTransporter();
-    const from = process.env.EMAIL_FROM || 'noreply@yourisp.com';
+    const from = process.env.EMAIL_FROM;
+    if (!from || from.includes('yourisp.com')) {
+      console.warn('⚠️  EMAIL_FROM is not configured or still uses the placeholder value. Emails will not be sent.');
+      return false;
+    }
 
     await transporter.sendMail({
       from,

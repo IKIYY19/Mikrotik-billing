@@ -475,66 +475,15 @@ const seedVouchers = () => {
 seedVouchers();
 
 // ─── Seed network metrics ───
-const seedMetrics = () => {
-  if (deviceMetrics.length > 0) {return;}
-  const now = Date.now();
-  _branches.forEach((branch) => {
-    for (let i = 0; i < 24; i++) {
-      deviceMetrics.push({
-        id: uuidv4(),
-        branch_id: branch.id,
-        timestamp: new Date(now - (23 - i) * 3600000).toISOString(),
-        active_pppoe: Math.floor(Math.random() * 50) + 10,
-        bandwidth_in_mbps: Math.floor(Math.random() * 200) + 50,
-        bandwidth_out_mbps: Math.floor(Math.random() * 400) + 100,
-        cpu_usage: Math.floor(Math.random() * 40) + 20,
-        memory_usage: Math.floor(Math.random() * 30) + 50,
-        online_routers: Math.floor(Math.random() * 3) + 1,
-        total_routers: 3,
-      });
-    }
-  });
-};
+// Real metrics are collected from MikroTik API via realMonitoringService.
+// The in-memory fallback starts empty; data populates once routers connect.
+const seedMetrics = () => {};
 seedMetrics();
 
 // ─── Seed PPPoE sessions ───
-const seedPPPoE = () => {
-  if (pppoeSessions.length > 0) {return;}
-  const subs = require("./billingStore").store.subscriptions || [];
-  subs
-    .filter((s) => s.pppoe_username && s.status === "active")
-    .forEach((sub) => {
-      pppoeSessions.push({
-        id: uuidv4(),
-        username: sub.pppoe_username,
-        customer_name: sub.customer?.name || "Unknown",
-        ip_address: `10.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-        bytes_in: Math.floor(Math.random() * 5000000000),
-        bytes_out: Math.floor(Math.random() * 10000000000),
-        uptime_seconds: Math.floor(Math.random() * 86400 * 7),
-        connected_at: new Date(
-          Date.now() - Math.random() * 86400000,
-        ).toISOString(),
-      });
-    });
-  // Add some fake sessions if none exist
-  if (pppoeSessions.length === 0) {
-    ["kamau01", "jane02", "alice03", "bob04"].forEach((user, i) => {
-      pppoeSessions.push({
-        id: uuidv4(),
-        username: user,
-        customer_name: `Customer ${i + 1}`,
-        ip_address: `10.10.${i + 1}.${Math.floor(Math.random() * 254) + 1}`,
-        bytes_in: Math.floor(Math.random() * 5000000000),
-        bytes_out: Math.floor(Math.random() * 10000000000),
-        uptime_seconds: Math.floor(Math.random() * 86400 * 7),
-        connected_at: new Date(
-          Date.now() - Math.random() * 86400000,
-        ).toISOString(),
-      });
-    });
-  }
-};
+// Real PPPoE sessions are fetched from the MikroTik router via the API.
+// The in-memory fallback starts empty when no real router is connected.
+const seedPPPoE = () => {};
 seedPPPoE();
 
 module.exports = {

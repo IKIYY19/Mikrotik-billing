@@ -220,7 +220,7 @@ router.post("/confirm-payment", async (req, res) => {
     const plan = sub ? await billing.getPlanById(sub.plan_id) : null;
 
     const pppoeUsername = customer ? `isp-${customer.phone}` : null;
-    const pppoePassword = Math.random().toString(36).substring(2, 10);
+    const pppoePassword = require('crypto').randomBytes(6).toString('hex'); // cryptographically secure
 
     res.json({
       success: true,

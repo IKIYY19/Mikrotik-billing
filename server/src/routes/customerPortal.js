@@ -27,6 +27,9 @@ const isNonEmptyString = (value) =>
 // Get all reviews (admin only)
 router.get("/admin/reviews", async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     const result = await db.query(
       `SELECT r.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
        FROM reviews r
@@ -43,6 +46,9 @@ router.get("/admin/reviews", async (req, res) => {
 // Get staff points leaderboard
 router.get("/admin/staff-points", async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     const result = await db.query(
       `SELECT u.id, u.name, u.email, u.role, COALESCE(SUM(sp.points), 0) as total_points
        FROM users u
@@ -61,6 +67,9 @@ router.get("/admin/staff-points", async (req, res) => {
 // Get staff point history
 router.get("/admin/staff-points/:userId", async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     const result = await db.query(
       `SELECT sp.*, r.rating, r.service_quality, c.name as customer_name
        FROM staff_points sp
@@ -84,7 +93,11 @@ router.get("/admin/staff-points/:userId", async (req, res) => {
 // Customer login (phone + PIN)
 router.post("/login", async (req, res) => {
   try {
+    const bcrypt = require('bcrypt');
     const { phone, pin } = req.body;
+    if (!phone || !pin) {
+      return res.status(400).json({ error: 'Phone and PIN are required' });
+    }
     const normalizedPhone = String(phone || "").replace(/\s/g, "");
 
     const customers = await billingData.listCustomers();
@@ -94,9 +107,13 @@ router.post("/login", async (req, res) => {
 
     if (!customer) {return res.status(401).json({ error: "Customer not found" });}
 
-    // Simple PIN check - in production use bcrypt
-    const expectedPin = customer.pin || phone?.slice(-4) || "1234";
-    if (pin !== expectedPin) {
+    // Verify PIN using bcrypt — PIN is stored as portal_pin_hash (set on customer creation/reset)
+    if (!customer.portal_pin_hash && !customer.pin_hash) {
+      return res.status(401).json({ error: "No PIN set for this account. Please contact support to set your PIN." });
+    }
+    const storedHash = customer.portal_pin_hash || customer.pin_hash;
+    const pinValid = await bcrypt.compare(String(pin), storedHash);
+    if (!pinValid) {
       return res.status(401).json({ error: "Invalid PIN" });
     }
 

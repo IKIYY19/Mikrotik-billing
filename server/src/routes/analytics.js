@@ -130,7 +130,57 @@ router.get('/overview', async (req, res) => {
     const customerGrowthTrend = prevNewCustomers > 0 ? ((newCustomers - prevNewCustomers) / prevNewCustomers) * 100 : 0;
     const activeCustomersTrend = prevActiveCustomers > 0 ? ((activeCustomers - prevActiveCustomers) / prevActiveCustomers) * 100 : 0;
 
-    // Generate sparkline data (simplified daily breakdown)
+    // Real daily sparklines (last 14 days)
+    const sparkStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const [churnSparkRes, growthSparkRes, activeSparkRes, prevArpuRes] = await Promise.all([
+      db.query(
+        `SELECT DATE(updated_at) as day, COUNT(*) as cnt
+         FROM subscriptions WHERE status = 'suspended' AND updated_at >= $1
+         GROUP BY DATE(updated_at) ORDER BY day ASC`,
+        [sparkStart]
+      ),
+      db.query(
+        `SELECT DATE(created_at) as day, COUNT(*) as cnt
+         FROM customers WHERE created_at >= $1
+         GROUP BY DATE(created_at) ORDER BY day ASC`,
+        [sparkStart]
+      ),
+      db.query(
+        `SELECT DATE(created_at) as day, COUNT(*) as cnt
+         FROM customers WHERE status = 'active' AND created_at >= $1
+         GROUP BY DATE(created_at) ORDER BY day ASC`,
+        [sparkStart]
+      ),
+      // ARPU previous period for trend
+      db.query(
+        `SELECT CASE WHEN COUNT(DISTINCT c.id) > 0
+          THEN COALESCE(SUM(p.amount), 0) / COUNT(DISTINCT c.id) ELSE 0 END as arpu
+         FROM customers c
+         LEFT JOIN payments p ON p.customer_id = c.id
+           AND p.received_at >= $1 AND p.received_at < $2
+         WHERE c.status = 'active'`,
+        [new Date(startDate.getTime() - (now.getTime() - startDate.getTime())), startDate]
+      ),
+    ]);
+
+    // Fill 14-slot arrays from daily query results
+    function fillSpark(rows, valueKey = 'cnt') {
+      const arr = new Array(14).fill(0);
+      rows.forEach(row => {
+        const idx = Math.floor((new Date(row.day) - sparkStart) / (24 * 60 * 60 * 1000));
+        if (idx >= 0 && idx < 14) { arr[idx] = parseFloat(row[valueKey]); }
+      });
+      return arr;
+    }
+
+    const churnSpark = fillSpark(churnSparkRes.rows);
+    const growthSpark = fillSpark(growthSparkRes.rows);
+    const activeSpark = fillSpark(activeSparkRes.rows);
+    const prevArpu = parseFloat(prevArpuRes.rows[0].arpu);
+    const arpuTrend = prevArpu > 0 ? ((arpu - prevArpu) / prevArpu) * 100 : 0;
+
+    // Also generate revenue sparkline
     const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365;
     const dailyRevenueRes = await db.query(
       `SELECT DATE(received_at) as day, COALESCE(SUM(amount), 0) as total
@@ -144,7 +194,7 @@ router.get('/overview', async (req, res) => {
       if (idx >= 0 && idx < days) {revenueSpark[idx] = parseFloat(row.total);}
     });
 
-    // Generate insights
+    // Generate insights from real data
     const insights = [];
     if (revenueTrend > 10) {insights.push({ type: 'positive', text: `Revenue is up ${revenueTrend.toFixed(1)}% compared to the previous period. Great growth momentum!` });}
     else if (revenueTrend < -10) {insights.push({ type: 'warning', text: `Revenue declined ${Math.abs(revenueTrend).toFixed(1)}% vs previous period. Consider reviewing pricing or retention strategies.` });}
@@ -169,15 +219,15 @@ router.get('/overview', async (req, res) => {
       mrr_trend: mrrTrend,
       churn_rate: parseFloat(churnRate.toFixed(2)),
       churn_trend: parseFloat(churnTrend.toFixed(2)),
-      churn_spark: new Array(14).fill(0).map((_, i) => Math.random() * 2),
+      churn_spark: churnSpark,
       net_customer_growth: newCustomers - churned,
       customer_growth_trend: customerGrowthTrend,
-      customer_growth_spark: new Array(14).fill(0).map((_, i) => Math.round(newCustomers * (i / 14))),
+      customer_growth_spark: growthSpark,
       active_customers: activeCustomers,
       active_customers_trend: activeCustomersTrend,
-      active_customers_spark: new Array(14).fill(activeCustomers),
+      active_customers_spark: activeSpark,
       arpu: parseFloat(arpu.toFixed(2)),
-      arpu_trend: 0,
+      arpu_trend: parseFloat(arpuTrend.toFixed(2)),
       ltv: parseFloat(ltv.toFixed(2)),
       avg_lifespan: parseFloat(avgLifespan.toFixed(1)),
       insights,
@@ -272,9 +322,9 @@ router.get('/churn', async (req, res) => {
       }).length;
       const other = churnedSubs.rows.length - highPrice - shortLifespan;
 
-      if (highPrice > 0) {reasons.push({ reason: 'Too expensive', count: highPrice, percentage: Math.round((highPrice / churnedSubs.rows.length) * 100) });}
-      if (shortLifespan > 0) {reasons.push({ reason: 'Trial / Short usage', count: shortLifespan, percentage: Math.round((shortLifespan / churnedSubs.rows.length) * 100) });}
-      if (other > 0) {reasons.push({ reason: 'Other reasons', count: other, percentage: Math.round((other / churnedSubs.rows.length) * 100) });}
+      if (highPrice > 0) {reasons.push({ reason: 'Too expensive (inferred from plan price)', count: highPrice, percentage: Math.round((highPrice / churnedSubs.rows.length) * 100) });}
+      if (shortLifespan > 0) {reasons.push({ reason: 'Trial / Short usage (inferred from subscription age)', count: shortLifespan, percentage: Math.round((shortLifespan / churnedSubs.rows.length) * 100) });}
+      if (other > 0) {reasons.push({ reason: 'Other / Unknown', count: other, percentage: Math.round((other / churnedSubs.rows.length) * 100) });}
     }
 
     res.json({

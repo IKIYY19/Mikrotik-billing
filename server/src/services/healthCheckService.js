@@ -450,45 +450,73 @@ class HealthCheckService {
     }
   }
 
-  // Send notifications (placeholder - integrate with SMS/Email/WhatsApp services)
+  // Send notifications via real email, SMS, and WhatsApp channels
   async sendNotifications(connectionId, alertType, severity, title, message) {
     try {
       const db = this.getDb();
 
       // Get enabled notification channels for admin users
       const channelsResult = await db.query(
-        `SELECT nc.channel_type, nc.config, u.email
+        `SELECT nc.channel_type, nc.config, u.email, u.phone, u.name
          FROM notification_channels nc
          JOIN users u ON u.id = nc.user_id
          WHERE nc.is_enabled = true AND u.role = 'admin'`,
       );
 
+      if (channelsResult.rows.length === 0) {
+        logger.debug('No enabled notification channels for admins', { connectionId, alertType });
+        return;
+      }
+
+      const emailService = require('./email');
+      const notificationService = require('./notificationService');
+
+      const alertData = {
+        customer: null, // system alert, not customer-specific
+        subject: `[${severity.toUpperCase()}] ${title}`,
+        body: message,
+        alertType,
+        severity,
+        connectionId,
+      };
+
       for (const channel of channelsResult.rows) {
-        if (channel.channel_type === "email") {
-          // Send email notification
-          logger.info("Sending email notification", {
-            email: channel.email,
-            title,
+        try {
+          if (channel.channel_type === 'email' && channel.email) {
+            await emailService.sendEmail({
+              to: channel.email,
+              subject: `[${severity.toUpperCase()}] ${title}`,
+              html: `<div style="font-family:Arial,sans-serif;max-width:600px"><h3 style="color:${severity === 'critical' ? '#ef4444' : '#f59e0b'}">${title}</h3><p>${message}</p><p style="color:#6b7280;font-size:12px">Alert type: ${alertType} | Severity: ${severity} | Connection: ${connectionId}</p></div>`,
+            });
+            logger.info('Alert email sent', { to: channel.email, title });
+          } else if (channel.channel_type === 'sms') {
+            const phone = channel.config?.phone || channel.phone;
+            if (phone) {
+              await notificationService.triggerSMS('service_suspended', {
+                customer: { phone, name: channel.name || 'Admin' },
+                custom_message: `[${severity.toUpperCase()}] ${title}: ${message}`,
+              });
+              logger.info('Alert SMS sent', { phone, title });
+            }
+          } else if (channel.channel_type === 'whatsapp') {
+            const phone = channel.config?.phone || channel.phone;
+            if (phone) {
+              const wa = await notificationService.getWhatsAppService();
+              if (wa && wa.isConfigured) {
+                await wa.sendMessage(phone, `*[${severity.toUpperCase()}] ${title}*\n${message}`);
+                logger.info('Alert WhatsApp sent', { phone, title });
+              }
+            }
+          }
+        } catch (channelError) {
+          logger.error('Failed to send alert via channel', {
+            channel: channel.channel_type,
+            error: channelError.message,
           });
-          // Integrate with your existing email service
-        } else if (channel.channel_type === "sms") {
-          // Send SMS notification
-          logger.info("Sending SMS notification", {
-            phone: channel.config.phone,
-            title,
-          });
-          // Integrate with your existing SMS service
-        } else if (channel.channel_type === "whatsapp") {
-          // Send WhatsApp notification
-          logger.info("Sending WhatsApp notification", {
-            phone: channel.config.phone,
-            title,
-          });
-          // Integrate with your existing WhatsApp service
         }
       }
     } catch (error) {
-      logger.error("Failed to send notifications", { error: error.message });
+      logger.error('Failed to send notifications', { error: error.message });
     }
   }
 }
