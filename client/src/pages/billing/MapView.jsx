@@ -195,8 +195,21 @@ export function MapView() {
 
     mapRef.current = map;
 
+    // CRITICAL: force Leaflet to recalculate container size after React paint
+    // Without this, tiles render as 0px boxes when container height isn't
+    // resolved at the moment L.map() is called.
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 500);
+
+    // Also invalidate on window resize so tiles fill correctly after layout shifts
+    const onResize = () => map.invalidateSize();
+    window.addEventListener("resize", onResize);
+
     // Clean up on unmount
     return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", onResize);
       map.remove();
       mapRef.current = null;
     };
@@ -326,7 +339,7 @@ export function MapView() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full bg-slate-900 overflow-hidden" style={{ minHeight: 0 }}>
+    <div className="flex bg-slate-900 overflow-hidden" style={{ height: "100%", minHeight: 0, width: "100%" }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <div
@@ -437,7 +450,7 @@ export function MapView() {
       </div>
 
       {/* ── Map area ────────────────────────────────────────────────────── */}
-      <div className="flex-1 relative" style={{ minWidth: 0 }}>
+      <div className="flex-1 relative" style={{ minWidth: 0, minHeight: 0, height: "100%" }}>
 
         {/* Sidebar toggle */}
         <button
@@ -448,8 +461,11 @@ export function MapView() {
           <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${sidebarOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {/* Map */}
-        <div ref={mapDivRef} className="absolute inset-0" style={{ zIndex: 1 }} />
+        {/* Map — must have explicit width+height for Leaflet tile rendering */}
+        <div
+          ref={mapDivRef}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
+        />
 
         {/* Coordinate picker panel */}
         {clickedCoords && (
@@ -547,16 +563,13 @@ export function MapView() {
           </div>
         )}
 
-        {/* No locations hint */}
+        {/* No locations hint — small corner badge, does NOT block the map */}
         {stats.withLocation === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center z-[400] pointer-events-none">
-            <div className="bg-slate-900/90 backdrop-blur border border-slate-700 rounded-2xl p-6 text-center max-w-xs shadow-2xl pointer-events-auto">
-              <MapPin className="w-10 h-10 text-indigo-400 mx-auto mb-3" />
-              <h3 className="text-white font-semibold mb-1">No locations set yet</h3>
-              <p className="text-slate-400 text-sm">
-                Click anywhere on the map to get coordinates, then add them to customer profiles to see pins here.
-              </p>
-            </div>
+          <div className="absolute bottom-4 right-4 z-[500] bg-slate-900/90 backdrop-blur border border-slate-700 rounded-xl px-3 py-2 flex items-center gap-2 shadow-lg max-w-xs">
+            <MapPin className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+            <p className="text-slate-400 text-xs">
+              No client pins yet — click the map to get coordinates.
+            </p>
           </div>
         )}
       </div>
