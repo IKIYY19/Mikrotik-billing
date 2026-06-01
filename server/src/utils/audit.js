@@ -6,7 +6,10 @@
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./logger');
 
-const db = global.dbAvailable ? global.db : require('../db/memory');
+// Resolve DB lazily on every call — global.db isn't available at module-load time
+function getDb() {
+  return global.dbAvailable ? global.db : require('../db/memory');
+}
 
 // Audit log entry
 async function logAudit({
@@ -23,7 +26,7 @@ async function logAudit({
   after,
 }) {
   try {
-    await db.query(
+    await getDb().query(
       `INSERT INTO audit_logs
        (id, action, entity_type, entity_id, user_id, user_name, user_role,
         ip_address, user_agent, details, before_data, after_data, created_at)
