@@ -1,92 +1,105 @@
 /**
  * Rate Limiting Configuration
- * Protects API from abuse and brute force attacks
+ * All limiters are tenant-aware: key by tenant_id (authenticated) or IP (public).
+ * This prevents one ISP from saturating limits and affecting others.
  */
 
 const rateLimit = require("express-rate-limit");
-const logger = require("../utils/logger");
+const logger    = require("../utils/logger");
 
-// General API rate limiter
+// ─── Key generators ───────────────────────────────────────────────────────────
+
+/** Authenticated routes: key by tenant_id so limits are per-ISP, not per-IP */
+function tenantKey(req) {
+  return req.user?.tenant_id || req.tenantId || req.ip;
+}
+
+/** Auth routes: combine tenant + IP to block both credential-stuffing and ISP abuse */
+function tenantIpKey(req) {
+  const tenant = req.user?.tenant_id || req.tenantId || "public";
+  return `${tenant}:${req.ip}`;
+}
+
+// ─── Shared handler factory ───────────────────────────────────────────────────
+
+function makeHandler(label) {
+  return (req, res) => {
+    logger.warn(`Rate limit exceeded: ${label}`, {
+      ip:       req.ip,
+      tenantId: req.user?.tenant_id || req.tenantId,
+      url:      req.originalUrl,
+      method:   req.method,
+    });
+    res.status(429).json({
+      error: "Too many requests. Please try again later.",
+      retryAfter: res.getHeader("RateLimit-Reset"),
+    });
+  };
+}
+
+// ─── Tenant-aware general API limiter ────────────────────────────────────────
+// 2000 req / 15 min per tenant (generous for ISPs managing hundreds of customers)
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    error: "Too many requests from this IP, please try again later.",
-  },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (req, res) => {
-    logger.warn("Rate limit exceeded", {
-      ip: req.ip,
-      url: req.originalUrl,
-      method: req.method,
-    });
-    res.status(429).json({
-      error: "Too many requests from this IP, please try again later.",
-    });
-  },
+  windowMs:       15 * 60 * 1000,
+  max:            2000,
+  keyGenerator:   tenantKey,
+  standardHeaders: true,
+  legacyHeaders:  false,
+  handler:        makeHandler("api"),
 });
 
-// Strict rate limiter for authentication endpoints
+// ─── Tenant-aware auth limiter ────────────────────────────────────────────────
+// 30 login attempts / 15 min per tenant+IP combo
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 login attempts per windowMs
-  message: {
-    error: "Too many login attempts, please try again later.",
-  },
+  windowMs:       15 * 60 * 1000,
+  max:            30,
+  keyGenerator:   tenantIpKey,
   standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    logger.warn("Auth rate limit exceeded", {
-      ip: req.ip,
-      url: req.originalUrl,
-      method: req.method,
-    });
-    res.status(429).json({
-      error: "Too many login attempts, please try again later.",
-    });
-  },
+  legacyHeaders:  false,
+  handler:        makeHandler("auth"),
 });
 
-// Very strict rate limiter for password reset
+// ─── Password reset (strict) ──────────────────────────────────────────────────
 const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // Limit each IP to 5 password reset attempts per hour
-  message: {
-    error: "Too many password reset attempts, please try again later.",
-  },
+  windowMs:       60 * 60 * 1000,
+  max:            5,
+  keyGenerator:   tenantIpKey,
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders:  false,
+  handler:        makeHandler("password-reset"),
 });
 
-// Rate limiter for payment endpoints
+// ─── Payment endpoints ────────────────────────────────────────────────────────
+// 100 req / 15 min per tenant
 const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // Limit each IP to 30 payment requests per windowMs
-  message: {
-    error: "Too many payment requests, please try again later.",
-  },
+  windowMs:       15 * 60 * 1000,
+  max:            100,
+  keyGenerator:   tenantKey,
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders:  false,
+  handler:        makeHandler("payment"),
 });
 
-// Rate limiter for SMS/WhatsApp endpoints
+// ─── SMS / WhatsApp / Email ───────────────────────────────────────────────────
+// 50 req / 15 min per tenant (prevents accidental mass-SMS billing)
 const messagingLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 messages per windowMs
-  message: {
-    error: "Too many messaging requests, please try again later.",
-  },
+  windowMs:       15 * 60 * 1000,
+  max:            50,
+  keyGenerator:   tenantKey,
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders:  false,
+  handler:        makeHandler("messaging"),
 });
 
+// ─── MikroTik API / provisioning ─────────────────────────────────────────────
+// Routers poll frequently — higher limit, keyed by IP (routers don't have JWT)
 const mikrotikLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 200 requests per window per IP (enough for polling + router traffic)
-  message: { error: "Too many requests from this IP, please try again later." },
+  windowMs:       15 * 60 * 1000,
+  max:            500,
+  keyGenerator:   (req) => req.ip,
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders:  false,
+  handler:        makeHandler("mikrotik"),
 });
 
 module.exports = {

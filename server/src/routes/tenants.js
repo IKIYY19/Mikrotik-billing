@@ -15,9 +15,16 @@ const {
   requireSuperAdmin,
   DEFAULT_TENANT_ID,
 } = require("../middleware/tenantContext");
+const { invalidateDomainCache } = require("../middleware/domainResolver");
 
 function getDb() {
   return global.dbAvailable ? global.db : require("../db/memory");
+}
+
+// Validate domain format (basic — ISP is responsible for DNS setup)
+function isValidDomain(domain) {
+  if (!domain) return true; // empty is fine
+  return /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(domain);
 }
 
 // Logo upload config
@@ -87,6 +94,29 @@ router.get("/current", async (req, res) => {
   }
 });
 
+// ─── Public: Get tenant branding by custom domain (no auth required) ───
+// Used by frontends on custom domains to load logos, colors etc.
+router.get("/by-domain/:domain", async (req, res) => {
+  try {
+    const db = getDb();
+    const domain = req.params.domain.toLowerCase().replace(/^www\./, "");
+    const result = await db.query(
+      `SELECT id, name, slug, company_name, logo_url,
+              primary_color, secondary_color, accent_color, domain
+       FROM tenants
+       WHERE LOWER(domain) = $1 AND is_active = true
+       LIMIT 1`,
+      [domain]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No tenant found for this domain" });
+    }
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Super Admin: Create tenant ───
 router.post("/", requireSuperAdmin, async (req, res) => {
   try {
@@ -106,6 +136,11 @@ router.post("/", requireSuperAdmin, async (req, res) => {
       return res.status(400).json({ error: "name and slug are required" });
     }
 
+    // Validate domain format
+    if (domain && !isValidDomain(domain)) {
+      return res.status(400).json({ error: "Invalid domain format. Example: billing.my-isp.co.ke" });
+    }
+
     const existing = await db.query("SELECT id FROM tenants WHERE slug = $1", [
       slug,
     ]);
@@ -113,6 +148,17 @@ router.post("/", requireSuperAdmin, async (req, res) => {
       return res
         .status(409)
         .json({ error: "A tenant with this slug already exists" });
+    }
+
+    // Validate domain uniqueness
+    if (domain) {
+      const domainCheck = await db.query(
+        "SELECT id FROM tenants WHERE LOWER(domain) = LOWER($1)",
+        [domain]
+      );
+      if (domainCheck.rows.length > 0) {
+        return res.status(409).json({ error: "This domain is already registered to another tenant" });
+      }
     }
 
     const id = uuidv4();
@@ -185,11 +231,29 @@ router.put("/:id", async (req, res) => {
       max_routers,
     } = req.body;
 
+    // Validate domain format
+    if (domain !== undefined && domain !== null && !isValidDomain(domain)) {
+      return res.status(400).json({ error: "Invalid domain format. Example: billing.my-isp.co.ke" });
+    }
+
     const existing = await db.query("SELECT * FROM tenants WHERE id = $1", [
       req.params.id,
     ]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    // Validate domain uniqueness (allow keeping the same domain)
+    if (domain && domain !== existing.rows[0].domain) {
+      const domainCheck = await db.query(
+        "SELECT id FROM tenants WHERE LOWER(domain) = LOWER($1) AND id != $2",
+        [domain, req.params.id]
+      );
+      if (domainCheck.rows.length > 0) {
+        return res.status(409).json({ error: "This domain is already registered to another tenant" });
+      }
+      // Invalidate old domain in cache
+      invalidateDomainCache(existing.rows[0].domain);
     }
 
     const result = await db.query(

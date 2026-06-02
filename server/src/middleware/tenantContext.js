@@ -10,43 +10,70 @@
  *   req.isSuperAdmin - true if user has no tenant (sees all data)
  *
  * Super admins can override with X-Tenant-ID header.
+ * Custom domains are resolved upstream by domainResolver middleware.
  */
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
+/**
+ * Sets the PostgreSQL session variable used by RLS policies.
+ * Must be called within a transaction or at query time.
+ * Pass tenantId=null or '' for super-admin (sees all rows).
+ *
+ * @param {object} db  - pg Pool or Client
+ * @param {string|null} tenantId
+ */
+async function setTenantSession(db, tenantId) {
+  try {
+    await db.query(
+      "SELECT set_config('app.current_tenant_id', $1, true)",
+      [tenantId || ""]
+    );
+  } catch {
+    // Non-fatal — RLS still works via app-layer filtering
+  }
+}
+
 function tenantContext(req, res, next) {
-  // Tenant already resolved (set by auth middleware)
-  if (req.tenantId !== undefined) {return next();}
+  // Tenant already resolved (e.g. by domainResolver)
+  // Still need to set the RLS session variable
+  if (req.tenantId !== undefined) {
+    if (global.dbAvailable && global.db) {
+      setTenantSession(global.db, req.tenantId).catch(() => {});
+    }
+    return next();
+  }
 
   const user = req.user;
 
-  // No user = public route, use default tenant context
+  // No user = public route
   if (!user) {
-    req.tenantId = null;
+    req.tenantId     = null;
     req.isSuperAdmin = false;
     return next();
   }
 
   // Super admin: no tenant_id = sees everything
   if (user.role === "admin" && !user.tenant_id) {
-    // Allow super admin to impersonate a tenant via header
     const overrideHeader = req.headers["x-tenant-id"];
     if (overrideHeader && overrideHeader !== "all") {
-      req.tenantId = overrideHeader;
-      req.isSuperAdmin = true;
-    } else if (overrideHeader === "all") {
-      req.tenantId = null;
+      req.tenantId     = overrideHeader;
       req.isSuperAdmin = true;
     } else {
-      req.tenantId = null;
+      req.tenantId     = null;   // '' in RLS = see all
       req.isSuperAdmin = true;
     }
-    return next();
+  } else {
+    // Regular user: scoped to their tenant
+    req.tenantId     = user.tenant_id || DEFAULT_TENANT_ID;
+    req.isSuperAdmin = false;
   }
 
-  // Regular user: scoped to their tenant
-  req.tenantId = user.tenant_id || DEFAULT_TENANT_ID;
-  req.isSuperAdmin = false;
+  // Set RLS session variable so PostgreSQL policies take effect
+  if (global.dbAvailable && global.db) {
+    setTenantSession(global.db, req.tenantId).catch(() => {});
+  }
+
   next();
 }
 
@@ -98,5 +125,6 @@ module.exports = {
   tenantFilter,
   requireSuperAdmin,
   requireTenant,
+  setTenantSession,
   DEFAULT_TENANT_ID,
 };

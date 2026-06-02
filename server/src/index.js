@@ -8,6 +8,7 @@ const logger = require("./utils/logger");
 const { validateSecrets } = require("./utils/security");
 const { initSentry, sentryErrorHandler } = require("./services/sentry");
 const helmet = require("helmet");
+const { domainResolver } = require("./middleware/domainResolver");
 
 const isTestEnv = process.env.NODE_ENV === "test";
 const isProductionEnv = process.env.NODE_ENV === "production";
@@ -133,13 +134,24 @@ function ensureCriticalProductionConfig() {
 function createCorsOriginHandler() {
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
 
-  return (origin, callback) => {
-    if (!origin) {
+  return async (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    // Static allowed origins (from env / config)
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    // Dynamic: allow custom tenant domains registered in the DB
+    if (global.dbAvailable && global.db) {
+      try {
+        const hostname = new URL(origin).hostname.replace(/^www\./, "");
+        const result = await global.db.query(
+          "SELECT id FROM tenants WHERE LOWER(domain) = LOWER($1) AND is_active = true LIMIT 1",
+          [hostname]
+        );
+        if (result.rows.length > 0) return callback(null, true);
+      } catch { /* ignore */ }
     }
 
     return callback(new Error("Origin not allowed by CORS"));
@@ -184,6 +196,10 @@ app.disable("x-powered-by");
 app.set("trust proxy", isProductionEnv ? 1 : false);
 app.set("query parser", "simple");
 const monitoringApiEnabled = process.env.ENABLE_MONITORING_API !== "false";
+
+// Domain resolver — runs first so custom ISP domains are identified
+// before authentication middleware reads the JWT
+app.use(domainResolver);
 
 // HTTPS redirect (respects proxy headers from Render, Railway, etc.)
 app.use((req, res, next) => {
