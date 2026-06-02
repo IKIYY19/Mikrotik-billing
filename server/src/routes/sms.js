@@ -12,114 +12,76 @@ const { messagingLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
 
+/**
+ * Resolve the provider service once — eliminates the triple switch-case
+ * that was copy-pasted across /send, /send-template, and /send-bulk.
+ */
+async function resolveProviderService(providerName) {
+  switch (providerName) {
+    case "smsleopard":    return notificationService.getSmsLeopardService();
+    case "bulksms_kenya": return notificationService.getBulkSmsKenyaService();
+    case "nexmo":         return notificationService.getNexmoService();
+    case "twilio":        return notificationService.getTwilioService();
+    case "whatsapp":      return notificationService.getWhatsAppService();
+    case "africas_talking":
+    default:              return notificationService.getATService();
+  }
+}
+
+/**
+ * Send a message through the resolved provider.
+ * Handles the africas_talking / whatsapp / generic branching in one place.
+ */
+async function sendViaProvider(service, providerName, recipients, message) {
+  if (providerName === "africas_talking" || providerName === undefined) {
+    const formatted = recipients.map(r => notificationService.formatPhone(r));
+    return service.sendSMS(formatted, message);
+  }
+  if (providerName === "whatsapp") {
+    return service.sendMessage(recipients[0], message);
+  }
+  return service.sendSMS(recipients[0], message);
+}
+
 // ═══════════════════════════════════════
-// SEND BULK SMS (raw message to customers)
+// BULK SEND RAW MESSAGE to filtered customers
+// POST /bulk-send-raw  { message, provider, filter: 'all'|'active'|'overdue' }
+// (was: /send-bulk — renamed to avoid confusion with /bulk-send)
 // ═══════════════════════════════════════
-router.post("/send-bulk", messagingLimiter, async (req, res) => {
+router.post("/bulk-send-raw", messagingLimiter, async (req, res) => {
   try {
     const { message, provider, filter = "all" } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "message required" });
-    }
+    if (!message) return res.status(400).json({ error: "message required" });
 
-    // Fetch customers based on filter
     let customers = [];
     if (global.db) {
-      let query =
-        "SELECT id, name, phone, status FROM customers WHERE phone IS NOT NULL AND phone != ''";
+      let query = "SELECT id, name, phone, status FROM customers WHERE phone IS NOT NULL AND phone != ''";
       let params = [];
-
-      if (filter === "active") {
-        query += " AND status = $1";
-        params = ["active"];
-      } else if (filter === "overdue") {
-        query +=
-          " AND id IN (SELECT DISTINCT customer_id FROM invoices WHERE status != 'paid' AND due_date < CURRENT_DATE)";
-      }
-
+      if (filter === "active") { query += " AND status = $1"; params = ["active"]; }
+      else if (filter === "overdue") { query += " AND id IN (SELECT DISTINCT customer_id FROM invoices WHERE status != 'paid' AND due_date < CURRENT_DATE)"; }
       const result = await global.db.query(query, params);
       customers = result.rows;
     }
-
-    if (customers.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No customers found with phone numbers" });
-    }
+    if (customers.length === 0) return res.status(404).json({ error: "No customers found with phone numbers" });
 
     const usedProvider = provider || "africas_talking";
-    let service;
-
-    switch (usedProvider) {
-      case "smsleopard":
-        service = await notificationService.getSmsLeopardService();
-        break;
-      case "bulksms_kenya":
-        service = await notificationService.getBulkSmsKenyaService();
-        break;
-      case "nexmo":
-        service = await notificationService.getNexmoService();
-        break;
-      case "twilio":
-        service = await notificationService.getTwilioService();
-        break;
-      case "whatsapp":
-        service = await notificationService.getWhatsAppService();
-        break;
-      case "africas_talking":
-      default:
-        service = await notificationService.getATService();
-        break;
-    }
-
-    // Send to all customers
+    const service = await resolveProviderService(usedProvider);
     const results = [];
-    let successCount = 0;
-    let failCount = 0;
+    let successCount = 0, failCount = 0;
 
     for (const customer of customers) {
       try {
-        let result;
-        if (usedProvider === "africas_talking") {
-          const formattedPhone = notificationService.formatPhone(customer.phone);
-          result = await service.sendSMS([formattedPhone], message);
-        } else if (usedProvider === "whatsapp") {
-          result = await service.sendMessage(customer.phone, message);
-        } else {
-          result = await service.sendSMS(customer.phone, message);
-        }
-
-        await notificationService.logMessage({
-          to: [customer.phone],
-          message,
-          status: result.success ? "sent" : "failed",
-          cost: result.cost || 0,
-          is_sandbox: false,
-        });
-
-        if (result.success) {
-          successCount++;
-        } else {
-          failCount++;
-        }
+        const result = await sendViaProvider(service, usedProvider, [customer.phone], message);
+        await notificationService.logMessage({ to: [customer.phone], message, status: result.success ? "sent" : "failed", cost: result.cost || 0, is_sandbox: false });
+        result.success ? successCount++ : failCount++;
         results.push({ phone: customer.phone, success: result.success });
       } catch (err) {
         failCount++;
         results.push({ phone: customer.phone, success: false, error: err.message });
       }
     }
-
-    res.json({
-      success: true,
-      provider: usedProvider,
-      total: customers.length,
-      sent: successCount,
-      failed: failCount,
-      results,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    res.json({ success: true, provider: usedProvider, total: customers.length, sent: successCount, failed: failCount, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ═══════════════════════════════════════
@@ -128,65 +90,23 @@ router.post("/send-bulk", messagingLimiter, async (req, res) => {
 router.post("/send", messagingLimiter, async (req, res) => {
   try {
     const { to, message, provider } = req.body;
-    if (!to || !message) {
-      return res.status(400).json({ error: "to and message required" });
-    }
+    if (!to || !message) return res.status(400).json({ error: "to and message required" });
 
     const recipients = Array.isArray(to) ? to : [to];
-    let result;
     const usedProvider = provider || "africas_talking";
-
-    switch (usedProvider) {
-      case "smsleopard": {
-        const smsLeopard = await notificationService.getSmsLeopardService();
-        result = await smsLeopard.sendSMS(recipients[0], message);
-        break;
-      }
-      case "bulksms_kenya": {
-        const bulkSms = await notificationService.getBulkSmsKenyaService();
-        result = await bulkSms.sendSMS(recipients[0], message);
-        break;
-      }
-      case "nexmo": {
-        const nexmo = await notificationService.getNexmoService();
-        result = await nexmo.sendSMS(recipients[0], message);
-        break;
-      }
-      case "twilio": {
-        const twilio = await notificationService.getTwilioService();
-        result = await twilio.sendSMS(recipients[0], message);
-        break;
-      }
-      case "whatsapp": {
-        const whatsapp = await notificationService.getWhatsAppService();
-        result = await whatsapp.sendMessage(recipients[0], message);
-        break;
-      }
-      case "africas_talking":
-      default: {
-        const at = await notificationService.getATService();
-        const formattedRecipients = recipients.map((item) =>
-          notificationService.formatPhone(item),
-        );
-        result = await at.sendSMS(formattedRecipients, message);
-        break;
-      }
-    }
+    const service = await resolveProviderService(usedProvider);
+    const result = await sendViaProvider(service, usedProvider, recipients, message);
 
     await notificationService.logMessage({
-      to: recipients,
-      message,
+      to: recipients, message,
       status: result.success ? "sent" : "failed",
       message_id: result.messageId || result.results?.[0]?.messageId || null,
       cost: result.cost || result.results?.[0]?.cost || 0,
       is_sandbox: result.isSandbox,
       metadata: { provider: usedProvider },
     });
-
     res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ═══════════════════════════════════════
@@ -195,71 +115,26 @@ router.post("/send", messagingLimiter, async (req, res) => {
 router.post("/send-template", messagingLimiter, async (req, res) => {
   try {
     const { template_id, to, variables, provider } = req.body;
-    if (!template_id || !to) {
-      return res.status(400).json({ error: "template_id and to required" });
-    }
+    if (!template_id || !to) return res.status(400).json({ error: "template_id and to required" });
 
     const message = await notificationService.renderTemplate(template_id, variables || {});
-    if (!message) {
-      return res.status(404).json({ error: "Template not found or inactive" });
-    }
+    if (!message) return res.status(404).json({ error: "Template not found or inactive" });
 
     const recipients = Array.isArray(to) ? to : [to];
-    let result;
     const usedProvider = provider || "africas_talking";
-
-    switch (usedProvider) {
-      case "smsleopard": {
-        const smsLeopard = await notificationService.getSmsLeopardService();
-        result = await smsLeopard.sendSMS(recipients[0], message);
-        break;
-      }
-      case "bulksms_kenya": {
-        const bulkSms = await notificationService.getBulkSmsKenyaService();
-        result = await bulkSms.sendSMS(recipients[0], message);
-        break;
-      }
-      case "nexmo": {
-        const nexmo = await notificationService.getNexmoService();
-        result = await nexmo.sendSMS(recipients[0], message);
-        break;
-      }
-      case "twilio": {
-        const twilio = await notificationService.getTwilioService();
-        result = await twilio.sendSMS(recipients[0], message);
-        break;
-      }
-      case "whatsapp": {
-        const whatsapp = await notificationService.getWhatsAppService();
-        result = await whatsapp.sendMessage(recipients[0], message);
-        break;
-      }
-      case "africas_talking":
-      default: {
-        const at = await notificationService.getATService();
-        const formattedRecipients = recipients.map((item) =>
-          notificationService.formatPhone(item),
-        );
-        result = await at.sendSMS(formattedRecipients, message);
-        break;
-      }
-    }
+    const service = await resolveProviderService(usedProvider);
+    const result = await sendViaProvider(service, usedProvider, recipients, message);
 
     await notificationService.logMessage({
-      template_id,
-      to: recipients,
-      message,
+      template_id, to: recipients, message,
       status: result.success ? "sent" : "failed",
       provider: usedProvider,
       message_id: result.id || result.results?.[0]?.messageId || null,
       cost: result.cost || result.results?.[0]?.cost || 0,
       is_sandbox: result.isSandbox || false,
     });
-
     res.json({ ...result, template_id, message, provider: usedProvider });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ═══════════════════════════════════════

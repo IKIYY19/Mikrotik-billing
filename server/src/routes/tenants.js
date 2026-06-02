@@ -5,6 +5,7 @@
  */
 
 const express = require("express");
+const { getDb } = require("../db");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
@@ -17,9 +18,7 @@ const {
 } = require("../middleware/tenantContext");
 const { invalidateDomainCache } = require("../middleware/domainResolver");
 
-function getDb() {
-  return global.dbAvailable ? global.db : require("../db/memory");
-}
+
 
 // Validate domain format (basic — ISP is responsible for DNS setup)
 function isValidDomain(domain) {

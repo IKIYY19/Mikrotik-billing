@@ -17,24 +17,8 @@ const billingMigrations = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
 
-  // Customers
-  `CREATE TABLE IF NOT EXISTS customers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
-    phone VARCHAR(50),
-    address TEXT,
-    city VARCHAR(100),
-    country VARCHAR(100),
-    lat DECIMAL(10,8),
-    lng DECIMAL(11,8),
-    id_number VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'active',
-    notes TEXT,
-    telegram_chat_id VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
+  // Customers (authoritative definition is in migrate.js coreMigrations)
+  // Only add billing-specific columns here via ALTER TABLE
 
   // Subscriptions
   `CREATE TABLE IF NOT EXISTS subscriptions (
@@ -212,17 +196,8 @@ const billingMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_captive_portal_templates_name ON captive_portal_templates(name)`,
 
-  // Users (for auth)
-  `CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    role VARCHAR(20) DEFAULT 'user',
-    is_active BOOLEAN DEFAULT true,
-    last_login_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
+  // Users (authoritative definition is in migrate.js coreMigrations)
+  // Only add role/auth columns here via ALTER TABLE
 
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
@@ -275,22 +250,7 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_usage_customer_recorded ON usage_records(customer_id, recorded_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_entity ON billing_audit_logs(entity_type, entity_id)`,
 
-  // Hotspot Vouchers
-  `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(100) NOT NULL,
-    password VARCHAR(100) NOT NULL,
-    profile VARCHAR(100),
-    valid_for VARCHAR(50),
-    rate_limit VARCHAR(50),
-    data_limit VARCHAR(50),
-    price DECIMAL(10,2) DEFAULT 0,
-    company_name VARCHAR(255),
-    connection_id UUID,
-    used BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_vouchers_connection ON hotspot_vouchers(connection_id)`,
+  // Hotspot vouchers (authoritative definition is in migrate.js coreMigrations)
 
   // RADIUS NAS clients
   `CREATE TABLE IF NOT EXISTS nas (

@@ -109,4 +109,12 @@ module.exports = {
     }
   },
   pool,
+  /**
+   * Returns the active database (PostgreSQL or in-memory fallback).
+   * Use this in route files instead of copy-pasting the same function.
+   *
+   * @returns {object} db instance with a .query() method
+   */
+  getDb: () => (global.dbAvailable ? global.db : require("./memory")),
 };
+

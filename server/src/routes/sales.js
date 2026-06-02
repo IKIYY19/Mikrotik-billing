@@ -1,9 +1,8 @@
 const express = require("express");
+const { getDb } = require("../db");
 const router = express.Router();
 
-function getDb() {
-  return global.dbAvailable ? global.db : require("../db/memory");
-}
+
 
 router.get("/dashboard", async (req, res) => {
   try {

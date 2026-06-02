@@ -4,6 +4,7 @@
  */
 
 const express = require("express");
+const { getDb } = require("../db");
 const router = express.Router();
 const slack = require("../services/slackNotifier");
 

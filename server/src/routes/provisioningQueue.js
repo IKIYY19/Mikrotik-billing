@@ -1,10 +1,9 @@
 const express = require("express");
+const { getDb } = require("../db");
 const router = express.Router();
 const provisioningQueue = require("../services/provisioningQueue");
 
-function getDb() {
-  return global.dbAvailable ? global.db : require("../db/memory");
-}
+
 
 // Get all queued tasks
 router.get("/", async (req, res) => {
