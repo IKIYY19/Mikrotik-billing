@@ -115,6 +115,7 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
   }
 
   const db = getDb();
+  const tenantId = router.tenant_id || null;
   let connection;
 
   if (router.linked_mikrotik_connection_id) {
@@ -132,8 +133,9 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
            tunnel_port = $10,
            tunnel_username = $11,
            tunnel_password_encrypted = $12,
+           tenant_id = COALESCE($13, tenant_id),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $13
+       WHERE id = $14
        RETURNING id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, is_online, last_seen, created_at, updated_at`,
       [
         fields.name,
@@ -148,6 +150,7 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
         fields.tunnel_port,
         fields.tunnel_username,
         fields.tunnel_password_encrypted,
+        tenantId,
         router.linked_mikrotik_connection_id,
       ],
     );
@@ -158,8 +161,8 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
     const connectionId = uuidv4();
     const result = await db.query(
       `INSERT INTO mikrotik_connections
-       (id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password_encrypted, is_online, last_seen)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, NOW())
+       (id, name, ip_address, api_port, ssh_port, username, password_encrypted, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password_encrypted, tenant_id, is_online, last_seen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, NOW())
        RETURNING id, name, ip_address, api_port, ssh_port, username, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, is_online, last_seen, created_at, updated_at`,
       [
         connectionId,
@@ -175,6 +178,7 @@ async function ensureMikrotikConnection(routerId, overrides = {}) {
         fields.tunnel_port,
         fields.tunnel_username,
         fields.tunnel_password_encrypted,
+        tenantId,
       ],
     );
     connection = result.rows[0] || null;

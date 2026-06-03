@@ -48,7 +48,7 @@ export default function RoutersPage() {
 
   // ── Link to Billing modal state ──────────────────────────────────────────
   const [linkModal, setLinkModal] = useState(null); // { router }
-  const [linkForm, setLinkForm] = useState({ username: "admin", password: "", port: "8728", connection_type: "api" });
+  const [linkForm, setLinkForm] = useState({ username: "admin", password: "", port: "8728", connection_type: "api", test_ip: "" });
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState(null); // { message, rawError, testIp, testPort, code }
   const [linkSuccess, setLinkSuccess] = useState(null);
@@ -181,7 +181,13 @@ export default function RoutersPage() {
   // ── Link to Billing handlers ─────────────────────────────────────────────
   const openLinkModal = (router) => {
     setLinkModal({ router });
-    setLinkForm({ username: router.mgmt_username || "admin", password: "", port: String(router.mgmt_port || 8728), connection_type: "api" });
+    setLinkForm({
+      username: router.mgmt_username || "admin",
+      password: "",
+      port: String(router.mgmt_port || 8728),
+      connection_type: "api",
+      test_ip: router.ip_address || "",
+    });
     setLinkError("");
     setLinkSuccess(null);
   };
@@ -211,6 +217,7 @@ export default function RoutersPage() {
           password: linkForm.password,
           port: parseInt(linkForm.port, 10) || 8728,
           connection_type: linkForm.connection_type,
+          test_ip: linkForm.test_ip?.trim() || undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -622,8 +629,22 @@ export default function RoutersPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-sm text-zinc-300 mb-1.5">Connection IP</label>
+                    <input
+                      type="text"
+                      value={linkForm.test_ip}
+                      onChange={(e) => setLinkForm({ ...linkForm, test_ip: e.target.value })}
+                      placeholder="IP your billing server can reach (VPN/LAN)"
+                      className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Use the router&apos;s VPN or LAN address if the reported IP is behind NAT.
+                    </p>
+                  </div>
+
                   <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5 text-xs text-zinc-500 space-y-0.5">
-                    {linkModal.router.ip_address && <p>Router IP: <span className="text-zinc-300 font-mono">{linkModal.router.ip_address}</span></p>}
+                    {linkModal.router.ip_address && <p>Reported IP: <span className="text-zinc-300 font-mono">{linkModal.router.ip_address}</span></p>}
                     {linkModal.router.mac_address && <p>MAC: <span className="text-zinc-300 font-mono">{linkModal.router.mac_address}</span></p>}
                     {linkModal.router.model && <p>Model: <span className="text-zinc-300">{linkModal.router.model}</span></p>}
                   </div>
@@ -645,6 +666,16 @@ export default function RoutersPage() {
                           <summary className="text-xs text-red-400/60 cursor-pointer hover:text-red-400">Technical detail</summary>
                           <code className="block mt-1 text-xs text-red-300/70 font-mono bg-red-950/30 rounded px-2 py-1 break-all">{linkError.rawError}</code>
                         </details>
+                      )}
+                      {linkError.code === "NO_ROUTER_IP" && (
+                        <p className="text-xs text-amber-300/90 pl-6">
+                          Run the install script from <strong>Router Link</strong> or <strong>Link New Router</strong> first so the router reports in.
+                        </p>
+                      )}
+                      {linkError.code === "CONNECTION_TEST_FAILED" && (
+                        <p className="text-xs text-amber-300/90 pl-6">
+                          Your server must reach the MikroTik API on this IP. If the router is behind NAT, set up VPN (Remote Winbox on this page) and use the VPN IP above. Enable API on the router: IP → Services → api (port 8728).
+                        </p>
                       )}
                     </div>
                   )}

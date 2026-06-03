@@ -20,8 +20,10 @@ import {
   Wifi,
   Shield,
   AlertTriangle,
+  Smartphone,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
+import { MpesaStkModal } from "../../components/MpesaStkModal";
 
 const API = import.meta.env.VITE_API_URL || "/api";
 
@@ -44,6 +46,7 @@ export function BillingCustomerDetail() {
   const [telegramModal, setTelegramModal] = useState(false);
   const [telegramChatId, setTelegramChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
+  const [stkModal, setStkModal] = useState(false);
 
   useEffect(() => {
     fetchCustomer();
@@ -220,11 +223,11 @@ export function BillingCustomerDetail() {
             {customer.status}
           </span>
           <button
-            onClick={() => setPaymentPromptModal(true)}
+            onClick={() => setStkModal(true)}
             className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Send Payment Prompt</span>
+            <Smartphone className="w-4 h-4" />
+            <span className="hidden sm:inline">Send M-Pesa Push</span>
           </button>
           <button
             onClick={openPortalModal}
@@ -666,57 +669,15 @@ export function BillingCustomerDetail() {
         </div>
       )}
 
-      {/* Payment Prompt Modal */}
-      {paymentPromptModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4">
-              Send M-Pesa Payment Prompt
-            </h3>
-            <p className="text-sm text-slate-400 mb-4">
-              Send a payment prompt to {customer.name} ({customer.phone}). They
-              will receive an M-Pesa prompt on their phone and can enter their
-              PIN to complete the payment.
-            </p>
-            <form onSubmit={sendPaymentPrompt} className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Amount (KES) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  step="0.01"
-                  value={promptAmount}
-                  onChange={(e) => setPromptAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentPromptModal(false);
-                    setPromptAmount("");
-                  }}
-                  className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={sendingPrompt}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {sendingPrompt ? "Sending..." : "Send Prompt"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* M-Pesa STK Push Modal */}
+      <MpesaStkModal
+        open={stkModal}
+        onClose={() => setStkModal(false)}
+        onSuccess={() => { setStkModal(false); fetchCustomer(); }}
+        customer={customer}
+        invoice={customer?.invoices?.find(i => i.status !== 'paid') || null}
+        defaultAmount={outstanding > 0 ? outstanding : undefined}
+      />
 
       {/* Telegram Chat ID Modal */}
       {telegramModal && (

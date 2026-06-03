@@ -2271,7 +2271,7 @@ router.get("/v1/:slug/routers", async (req, res) => {
       return res.json({ error: "Tenant not found", routers: [] });
     }
 
-    const routers = await findRoutersByTenant(tenant.id, slug);
+    const routers = await findRoutersByTenant(tenant.id, slug, { includeAllStatuses: true });
     res.json({
       tenant: { id: tenant.id, name: tenant.name, slug },
       routers,
@@ -2312,8 +2312,9 @@ router.delete("/v1/:slug/routers/:id", async (req, res) => {
 // In-memory watch sessions
 const watchSessions = new Map();
 
-async function findRoutersByTenant(tenantId, slug) {
+async function findRoutersByTenant(tenantId, slug, { includeAllStatuses = false } = {}) {
   const db = getDb();
+  const statusFilter = includeAllStatuses ? "" : " AND r.provision_status = 'online'";
   // Try tenant_id first
   try {
     const result = await db.query(
@@ -2323,7 +2324,7 @@ async function findRoutersByTenant(tenantId, slug) {
               (r.updated_at > NOW() - INTERVAL '10 minutes') as is_reporting
        FROM routers r
        LEFT JOIN mikrotik_connections mc ON mc.id = r.linked_mikrotik_connection_id
-       WHERE r.tenant_id = $1 AND r.provision_status = 'online'
+       WHERE r.tenant_id = $1${statusFilter}
        ORDER BY r.updated_at DESC`,
       [tenantId],
     );
@@ -2757,7 +2758,7 @@ router.get("/v1/status", async (req, res) => {
 router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
   try {
     const { slug, routerId } = req.params;
-    const { username, password, port, connection_type } = req.body;
+    const { username, password, port, connection_type, test_ip: testIpOverride } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: "username and password are required" });
@@ -2805,7 +2806,7 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
     const resolvedType = connection_type || "api";
 
     // Determine the IP to test against (prefer stored IP, fallback to source IP)
-    const testIp = routerRow.ip_address || routerRow.source_ip || null;
+    const testIp = (testIpOverride && String(testIpOverride).trim()) || routerRow.ip_address || routerRow.source_ip || null;
     if (!testIp) {
       return res.status(400).json({
         error: "Cannot test connection: router has no known IP address yet. Make sure the router has reported its IP by running the install command first.",
@@ -2895,6 +2896,30 @@ router.post("/v1/:slug/routers/:routerId/link-billing", async (req, res) => {
        WHERE id = $5`,
       [connectionId, username, encryptedPass, resolvedPort, routerId],
     );
+
+    try {
+      await db.query(
+        "UPDATE mikrotik_connections SET tenant_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [tenant.id, connectionId],
+      );
+    } catch (tenantColErr) {
+      logger.warn(`[link-billing] Could not set tenant_id on connection: ${tenantColErr.message}`);
+    }
+
+    if (testIpOverride && String(testIpOverride).trim() && testIp !== routerRow.ip_address) {
+      try {
+        await db.query(
+          "UPDATE routers SET ip_address = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          [testIp, routerId],
+        );
+        await db.query(
+          "UPDATE mikrotik_connections SET ip_address = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          [testIp, connectionId],
+        );
+      } catch (ipErr) {
+        logger.warn(`[link-billing] Could not persist override IP: ${ipErr.message}`);
+      }
+    }
 
     // Sync existing subscriptions that were waiting for a connection
     let syncResults = [];

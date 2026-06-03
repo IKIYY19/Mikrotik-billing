@@ -828,6 +828,7 @@ module.exports = {
 
     // INSERT mikrotik_connections
     if (lowerText.includes("insert into mikrotik_connections")) {
+      const hasTenantId = lowerText.includes("tenant_id");
       const conn = {
         id: params[0],
         name: params[1],
@@ -842,8 +843,9 @@ module.exports = {
         tunnel_port: params[10],
         tunnel_username: params[11],
         tunnel_password_encrypted: params[12],
-        is_online: false,
-        last_seen: null,
+        tenant_id: hasTenantId ? params[13] : null,
+        is_online: hasTenantId ? true : false,
+        last_seen: hasTenantId ? new Date().toISOString() : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -867,7 +869,22 @@ module.exports = {
 
     // UPDATE mikrotik_connections
     if (lowerText.includes("update mikrotik_connections")) {
-      const id = params[12];
+      if (lowerText.includes("set tenant_id = $1") && params.length === 2) {
+        const conn = store.mikrotik_connections.find((c) => c.id === params[1]);
+        if (!conn) {return { rows: [] };}
+        conn.tenant_id = params[0];
+        conn.updated_at = new Date().toISOString();
+        return { rows: [conn] };
+      }
+      if (lowerText.includes("set ip_address = $1") && params.length === 2) {
+        const conn = store.mikrotik_connections.find((c) => c.id === params[1]);
+        if (!conn) {return { rows: [] };}
+        conn.ip_address = params[0];
+        conn.updated_at = new Date().toISOString();
+        return { rows: [conn] };
+      }
+      const hasTenantId = lowerText.includes("tenant_id = coalesce");
+      const id = hasTenantId ? params[13] : params[12];
       const conn = store.mikrotik_connections.find((c) => c.id === id);
       if (!conn) {return { rows: [] };}
       conn.name = params[0];
@@ -882,6 +899,7 @@ module.exports = {
       conn.tunnel_port = params[9];
       conn.tunnel_username = params[10];
       conn.tunnel_password_encrypted = params[11];
+      if (hasTenantId && params[12]) {conn.tenant_id = params[12];}
       conn.updated_at = new Date().toISOString();
 
       return {

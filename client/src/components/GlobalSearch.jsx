@@ -8,7 +8,8 @@ const SEARCH_ITEMS = [
   // Main navigation
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', category: 'Main' },
   { to: '/topology', icon: Network, label: 'Topology', category: 'Main' },
-  { to: '/router-linking', icon: Link, label: 'Router Linking', category: 'Main' },
+  { to: '/routers', icon: Link, label: 'Routers', category: 'Main' },
+  { to: '/router-link', icon: Link, label: 'Router Link', category: 'Main' },
   { to: '/devices', icon: HardDrive, label: 'Provisioning', category: 'Main' },
   { to: '/templates', icon: FileCode, label: 'Templates', category: 'Main' },
   { to: '/mikrotik-api', icon: Server, label: 'MikroTik API', category: 'Main' },
