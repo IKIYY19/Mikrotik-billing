@@ -203,31 +203,51 @@ export default function RouterLink() {
       toast.error("Enter management username and password first");
       return;
     }
-    if (!connectionStatus?.router?.mac) {
-      toast.error("Router MAC address not available. Wait for the router to connect first.");
+    if (!connectionStatus?.router?.id && !connectionStatus?.router?.mac) {
+      toast.error("Router details not available. Wait for the router to connect first.");
       return;
     }
 
     setIsUpgrading(true);
     try {
-      const { data } = await axios.put(
-        `${API}/router/v1/upgrade`,
-        {
-          mac: connectionStatus.router.mac,
-          username: mgmtUser,
-          password: mgmtPass,
-          port: mgmtPort,
-          connection_type: "api",
-        },
-        {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        },
+      const payload = {
+        username: mgmtUser,
+        password: mgmtPass,
+        port: mgmtPort,
+        connection_type: "api",
+      };
+
+      const headers = { Authorization: `Bearer ${apiKey}` };
+
+      const { data } = connectionStatus.router.id
+        ? await axios.post(
+            `${API}/router/v1/${tenantSlug}/routers/${connectionStatus.router.id}/link-billing`,
+            {
+              ...payload,
+              test_ip: connectionStatus.router.ip || undefined,
+            },
+            { headers },
+          )
+        : await axios.put(
+            `${API}/router/v1/upgrade`,
+            {
+              ...payload,
+              mac: connectionStatus.router.mac,
+            },
+            { headers },
+          );
+
+      toast.success(
+        data.subscriptions_synced
+          ? `Router upgraded. Synced ${data.subscriptions_synced} subscription(s).`
+          : "Router upgraded to full management",
       );
-      toast.success("Router upgraded to full management");
       localStorage.setItem("router_link_mgmt_user", mgmtUser);
       manualCheck();
     } catch (e) {
-      toast.error(e.response?.data?.error || "Upgrade failed");
+      const detail = e.response?.data?.raw_error;
+      const message = e.response?.data?.error || "Upgrade failed";
+      toast.error(detail ? `${message} (${detail})` : message);
     } finally {
       setIsUpgrading(false);
     }
