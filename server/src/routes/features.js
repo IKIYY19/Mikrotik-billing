@@ -8,85 +8,91 @@ const { v4: uuidv4 } = require("uuid");
 const multiStore = require("../db/multiFeatureStore");
 const billingData = require("../services/billingData");
 const slack = require("../services/slackNotifier");
-const db = global.dbAvailable ? global.db : require("../db/memory");
+
 
 // ═══════════════════════════════════════
 // BRANCHES
 // ═══════════════════════════════════════
 router.get("/branches", async (req, res) => {
-  const allCustomers = await billingData.listCustomers();
-  const allPayments = await billingData.listPayments();
-  const allInvoices = await billingData.listInvoices();
+  try {
+    const branches = await multiStore.getBranches();
+    const allCustomers = await billingData.listCustomers();
+    const allPayments = await billingData.listPayments();
+    const allInvoices = await billingData.listInvoices();
 
-  const branchStats = multiStore.branches.map((b) => {
-    const branchCustomers = allCustomers.filter((c) => c.branch_id === b.id);
-    const customerIds = branchCustomers.map((c) => c.id);
-    const revenue = allPayments
-      .filter((p) => {
-        const inv = allInvoices.find((i) => i.id === p.invoice_id);
-        return inv && customerIds.includes(inv.customer_id);
-      })
-      .reduce((sum, p) => sum + billingData.toNumber(p.amount, 0), 0);
-    return { ...b, customer_count: branchCustomers.length, router_count: 0, revenue };
-  });
-  res.json(branchStats);
+    const branchStats = branches.map((b) => {
+      const branchCustomers = allCustomers.filter((c) => c.branch_id === b.id);
+      const customerIds = branchCustomers.map((c) => c.id);
+      const revenue = allPayments
+        .filter((p) => {
+          const inv = allInvoices.find((i) => i.id === p.invoice_id);
+          return inv && customerIds.includes(inv.customer_id);
+        })
+        .reduce((sum, p) => sum + billingData.toNumber(p.amount, 0), 0);
+      return { ...b, customer_count: branchCustomers.length, router_count: 0, revenue };
+    });
+    res.json(branchStats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.post("/branches", (req, res) => {
-  const branch = {
-    id: uuidv4(),
-    ...req.body,
-    created_at: new Date().toISOString(),
-    status: "active",
-  };
-  multiStore.branches.push(branch);
-  res.status(201).json(branch);
+router.post("/branches", async (req, res) => {
+  try {
+    const branch = await multiStore.createBranch(req.body);
+    res.status(201).json(branch);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════
 // AGENTS/RESELLERS
 // ═══════════════════════════════════════
-router.get("/agents", (req, res) => {
-  const agentStats = multiStore.agents.map((a) => {
-    const sold = multiStore.vouchers.filter((v) => v.sold_by === a.id).length;
-    const revenue = multiStore.vouchers
-      .filter((v) => v.sold_by === a.id)
-      .reduce((sum, v) => sum + v.price, 0);
-    const commission = revenue * (a.commission_rate / 100);
-    return {
-      ...a,
-      vouchers_sold: sold,
-      voucher_revenue: revenue,
-      commission_earned: commission,
-    };
-  });
-  res.json(agentStats);
+router.get("/agents", async (req, res) => {
+  try {
+    const agents = await multiStore.getAgents();
+    const agentStats = agents.map((a) => {
+      const sold = (multiStore.vouchers || []).filter((v) => v.sold_by === a.id).length;
+      const revenue = (multiStore.vouchers || [])
+        .filter((v) => v.sold_by === a.id)
+        .reduce((sum, v) => sum + (v.price || 0), 0);
+      const commission = revenue * ((a.commission_rate || 0) / 100);
+      return { ...a, vouchers_sold: sold, voucher_revenue: revenue, commission_earned: commission };
+    });
+    res.json(agentStats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.post("/agents", (req, res) => {
-  const agent = {
-    id: uuidv4(),
-    ...req.body,
-    balance: 0,
-    status: "active",
-    created_at: new Date().toISOString(),
-  };
-  multiStore.agents.push(agent);
-  res.status(201).json(agent);
+router.post("/agents", async (req, res) => {
+  try {
+    const agent = await multiStore.createAgent(req.body);
+    res.status(201).json(agent);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.put("/agents/:id", (req, res) => {
-  const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
-  if (idx === -1) {return res.status(404).json({ error: "Agent not found" });}
-  multiStore.agents[idx] = { ...multiStore.agents[idx], ...req.body };
-  res.json(multiStore.agents[idx]);
+router.put("/agents/:id", async (req, res) => {
+  try {
+    const agent = await multiStore.updateAgent(req.params.id, req.body);
+    if (!agent) {return res.status(404).json({ error: "Agent not found" });}
+    res.json(agent);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.delete("/agents/:id", (req, res) => {
-  const idx = multiStore.agents.findIndex((a) => a.id === req.params.id);
-  if (idx === -1) {return res.status(404).json({ error: "Agent not found" });}
-  multiStore.agents.splice(idx, 1);
-  res.json({ message: "Agent deleted" });
+router.delete("/agents/:id", async (req, res) => {
+  try {
+    const agent = await multiStore.deleteAgent(req.params.id);
+    if (!agent) {return res.status(404).json({ error: "Agent not found" });}
+    res.json({ message: "Agent deleted" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════
@@ -398,17 +404,27 @@ router.get("/monitoring/branch/:branchId", (req, res) => {
 // ═══════════════════════════════════════
 // AUTO-SUSPEND WITH GRACE PERIOD
 // ═══════════════════════════════════════
-router.get("/auto-suspend/config", (req, res) => {
-  res.json(multiStore.graceConfig);
+router.get("/auto-suspend/config", async (req, res) => {
+  try {
+    const config = await multiStore.getGraceConfig();
+    res.json(config);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.put("/auto-suspend/config", (req, res) => {
-  Object.assign(multiStore.graceConfig, req.body);
-  res.json(multiStore.graceConfig);
+router.put("/auto-suspend/config", async (req, res) => {
+  try {
+    const config = await multiStore.updateGraceConfig(req.body);
+    res.json(config);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post("/auto-suspend/run", async (req, res) => {
-  const { warn_days, throttle_days, suspend_days } = multiStore.graceConfig;
+  const graceConfig = await multiStore.getGraceConfig();
+  const { warn_days, throttle_days, suspend_days } = graceConfig;
   const results = { warned: [], throttled: [], suspended: [] };
 
   const allInvoices = await billingData.listInvoices();
@@ -451,7 +467,7 @@ router.post("/auto-suspend/run", async (req, res) => {
           .catch((e) => console.error("slack notification failed:", e?.message || e));
       } else if (daysOverdue >= throttle_days && !sub.throttled) {
         sub.throttled = true;
-        sub.throttle_speed = `${multiStore.graceConfig.throttle_speed_up}/${multiStore.graceConfig.throttle_speed_down}`;
+        sub.throttle_speed = `${graceConfig.throttle_speed_up}/${graceConfig.throttle_speed_down}`;
         results.throttled.push({
           subscription_id: sub.id,
           customer: sub.customer?.name,
@@ -469,7 +485,7 @@ router.post("/auto-suspend/run", async (req, res) => {
     }
   }
 
-  res.json({ success: true, results, config: multiStore.graceConfig });
+  res.json({ success: true, results, config: graceConfig });
 });
 
 // ═══════════════════════════════════════
