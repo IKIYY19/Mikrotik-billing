@@ -8,10 +8,7 @@ const { getDb } = require("../db");
 const router = express.Router();
 const slack = require("../services/slackNotifier");
 
-// Get database connection
-function getDb() {
-  return global.db;
-}
+
 
 // Helper to get setting value from database
 async function getSetting(key, defaultValue = "") {

@@ -3,7 +3,7 @@ const { getDb } = require("../db");
 const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
 
-function getDb() { return global.db || require("../db/memory"); }
+
 
 // GET /api/ipam/subnets — List all subnets
 router.get("/subnets", async (req, res) => {

@@ -8,9 +8,7 @@ const express = require("express");
 const { getDb } = require("../db");
 const router = express.Router();
 
-function getDb() {
-  return global.db;
-}
+
 
 // GET /api/audit/logs?action=&entity_type=&user_id=&search=&limit=50&offset=0
 router.get("/logs", async (req, res) => {

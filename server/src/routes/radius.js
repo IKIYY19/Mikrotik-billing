@@ -1,13 +1,7 @@
 const express = require("express");
 const { getDb } = require("../db");
 const router = express.Router();
-const db = global.db || require("../db/memory");
 
-// Helper: get DB connection
-function getDb() {
-  if (global.dbAvailable) {return global.db;}
-  return require("../db/memory");
-}
 
 // ═══════════════════════════════════════
 // NAS CLIENTS (MikroTik routers)

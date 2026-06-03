@@ -12,9 +12,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 
-function getDb() {
-  return global.db || require("../db/memory");
-}
+
 
 // ──────────────────────────────────────
 // GET /api/webhooks — List all webhooks

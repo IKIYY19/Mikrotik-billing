@@ -5,9 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-function getDb() {
-  return global.db || require("../db/memory");
-}
+
 
 // GET /api/public/tenant-branding - Public tenant branding for login page
 router.get("/tenant-branding", async (req, res) => {

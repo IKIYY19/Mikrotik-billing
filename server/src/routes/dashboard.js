@@ -12,9 +12,7 @@ const router = express.Router();
 const cache = { stats: null, ts: 0 };
 const CACHE_TTL = 10000; // 10 seconds
 
-function getDb() {
-  return global.db || require("../db/memory");
-}
+
 
 // ─── GET DASHBOARD STATS ───
 router.get("/stats", async (req, res) => {

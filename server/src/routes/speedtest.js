@@ -8,10 +8,7 @@ function decryptPassword(encrypted) {
   return decrypt(encrypted);
 }
 
-function getDb() {
-  if (global.dbAvailable && global.db) return global.db;
-  return require("../db/memory");
-}
+
 
 async function getConnection(id) {
   const db = getDb();

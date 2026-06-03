@@ -3,9 +3,7 @@ const { getDb } = require("../db");
 const router = express.Router();
 const os = require("os");
 
-function getDb() {
-  return global.db || require("../db/memory");
-}
+
 
 // Prometheus metrics endpoint (no auth - used by Prometheus server internally)
 router.get("/", async (req, res) => {

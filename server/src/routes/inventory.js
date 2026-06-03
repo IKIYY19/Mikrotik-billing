@@ -8,9 +8,7 @@ const { getDb } = require("../db");
 const router = express.Router();
 const inv = require("../db/inventoryStore");
 
-function getDb() {
-  return global.dbAvailable ? global.db : null;
-}
+
 
 // ─── Stats ───
 router.get("/stats", async (req, res) => {

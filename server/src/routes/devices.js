@@ -7,9 +7,7 @@ const memoryDb = require("../db/memory");
 const zeroTouchBilling = require("../services/zeroTouchBilling");
 const enrollmentMemoryStore = require("../services/enrollmentMemoryStore");
 
-function getDb() {
-  return global.db || memoryDb;
-}
+
 
 function toSafeDevice(device) {
   if (!device) {return null;}

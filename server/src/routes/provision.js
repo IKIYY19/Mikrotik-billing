@@ -15,9 +15,6 @@ function safeError(error) {
   return isProduction ? "Internal server error" : error.message;
 }
 
-function getDb() {
-  return global.db || memoryDb;
-}
 
 function getClientIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
