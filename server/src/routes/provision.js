@@ -2663,6 +2663,136 @@ router.get("/v1/:slug/routers/:routerId/diagnostics", async (req, res) => {
   }
 });
 
+async function getDiagnosticRouterForTenant(tenant, routerId) {
+  const result = await getDb().query(
+    `SELECT r.*, mc.id as connection_id, mc.ip_address as connection_ip, mc.api_port,
+            mc.ssh_port, mc.username as connection_username, mc.connection_type,
+            mc.password_encrypted
+     FROM routers r
+     LEFT JOIN mikrotik_connections mc ON mc.id = r.linked_mikrotik_connection_id
+     WHERE r.id = $1`,
+    [routerId],
+  );
+  if (result.rows.length === 0) {
+    const err = new Error("Router not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  const routerRow = result.rows[0];
+  if (routerRow.tenant_id && tenant?.id && routerRow.tenant_id !== tenant.id) {
+    const err = new Error("Router does not belong to this tenant");
+    err.statusCode = 403;
+    throw err;
+  }
+  if (!routerRow.linked_mikrotik_connection_id) {
+    const err = new Error("Router is not fully managed yet. Add management credentials first.");
+    err.statusCode = 400;
+    throw err;
+  }
+  if (routerRow.connection_type === "ssh") {
+    const err = new Error("One-click fixes require an API-backed MikroTik connection.");
+    err.statusCode = 400;
+    throw err;
+  }
+  return routerRow;
+}
+
+async function applyDiagnosticFix({ tenant, slug, routerId, stepId, apiKey }) {
+  const routerRow = await getDiagnosticRouterForTenant(tenant, routerId);
+  const routerConnectionManager = require("../services/routerConnectionManager");
+  const connectionId = routerRow.linked_mikrotik_connection_id;
+  const apiPort = Number(routerRow.api_port || routerRow.mgmt_port || 8728);
+  const appUrl = process.env.APP_URL || process.env.PUBLIC_APP_URL || "https://YOUR_APP_URL";
+  const isHttps = appUrl.startsWith("https");
+  const fetchMode = isHttps ? "https" : "http";
+  const certFlag = isHttps ? " check-certificate=no" : "";
+
+  if (stepId === "api_service") {
+    const apiServiceName = routerRow.connection_type === "api-ssl" ? "api-ssl" : "api";
+    await routerConnectionManager.executeCommand(connectionId, "/ip/service/set", {
+      numbers: apiServiceName,
+      disabled: "no",
+      port: String(apiPort),
+    });
+    return { step: stepId, message: `${apiServiceName} service enabled on port ${apiPort}.` };
+  }
+
+  if (stepId === "radius_client") {
+    const radiusServer = process.env.RADIUS_SERVER || "BILLING_SERVER_IP";
+    const radiusSecret = process.env.RADIUS_SECRET || (apiKey || slug || "CHANGE_ME").substring(0, 16);
+    await routerConnectionManager.executeCommand(connectionId, "/radius/add", {
+      address: radiusServer,
+      secret: radiusSecret,
+      service: "ppp,hotspot",
+      timeout: "300ms",
+      comment: "ISP RADIUS",
+      disabled: "no",
+    });
+    return { step: stepId, message: `RADIUS client added for ${radiusServer}.` };
+  }
+
+  if (stepId === "pppoe_server") {
+    await routerConnectionManager.executeCommand(connectionId, "/interface/pppoe-server/server/add", {
+      "service-name": "pppoe-internet",
+      interface: "bridge1",
+      authentication: "pap,chap,mschap1,mschap2",
+      "one-session-per-host": "yes",
+      disabled: "no",
+    });
+    return { step: stepId, message: "PPPoE server added on bridge1." };
+  }
+
+  if (stepId === "billing_sync") {
+    const existing = await routerConnectionManager.print(
+      connectionId,
+      "/system/scheduler",
+      ".id,name",
+    );
+    for (const scheduler of existing.filter((item) => item.name === "billing-sync")) {
+      await routerConnectionManager.executeCommand(connectionId, "/system/scheduler/remove", {
+        numbers: scheduler[".id"] || scheduler.name,
+      });
+    }
+    const syncUrl = `${appUrl.replace(/\/$/, "")}/api/router/v1/${tenant.slug || slug}/sync`;
+    await routerConnectionManager.executeCommand(connectionId, "/system/scheduler/add", {
+      name: "billing-sync",
+      interval: "5m",
+      "on-event": `/tool fetch url="${syncUrl}" http-header-field="Authorization: Bearer ${apiKey || "API_KEY"}" mode=${fetchMode}${certFlag} output=none`,
+      comment: "ISP Billing Sync",
+      disabled: "no",
+    });
+    return { step: stepId, message: "Billing sync scheduler recreated." };
+  }
+
+  const err = new Error("This diagnostic step cannot be fixed automatically.");
+  err.statusCode = 400;
+  throw err;
+}
+
+// POST /v1/:slug/routers/:routerId/diagnostics/:stepId/apply — Allowlisted one-click fixes
+router.post("/v1/:slug/routers/:routerId/diagnostics/:stepId/apply", async (req, res) => {
+  try {
+    const { slug, routerId, stepId } = req.params;
+    const authHeader = req.headers.authorization;
+    const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
+    const tenant = await findTenantBySlugOrKey(slug, apiKey);
+    if (!tenant) {
+      return res.status(403).json({ error: "Invalid tenant or API key" });
+    }
+
+    const result = await applyDiagnosticFix({ tenant, slug, routerId, stepId, apiKey });
+    const diagnostics = await runRouterDiagnostics({ tenant, routerId, apiKey });
+    res.json({ success: true, ...result, diagnostics });
+  } catch (error) {
+    logger.warn("[diagnostics] Apply fix failed", {
+      step: req.params.stepId,
+      routerId: req.params.routerId,
+      error: error.message,
+    });
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
 // POST /v1/:slug/watch/start — Create a watch session
 router.post("/v1/:slug/watch/start", async (req, res) => {
   try {

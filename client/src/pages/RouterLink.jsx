@@ -67,6 +67,7 @@ export default function RouterLink() {
   const [watchRemaining, setWatchRemaining] = useState(0);
   const [diagnostics, setDiagnostics] = useState(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [applyingFix, setApplyingFix] = useState(null);
   const watchIntervalRef = React.useRef(null);
 
   const startWatching = async () => {
@@ -203,6 +204,30 @@ export default function RouterLink() {
       });
     } finally {
       setDiagnosticsLoading(false);
+    }
+  };
+
+  const applyDiagnosticFix = async (stepId) => {
+    const routerId = connectionStatus?.router?.id;
+    if (!tenantSlug || !routerId || !stepId) {return;}
+
+    setApplyingFix(stepId);
+    try {
+      const { data } = await axios.post(
+        `${API}/router/v1/${tenantSlug}/routers/${routerId}/diagnostics/${stepId}/apply`,
+        {},
+        { headers: { Authorization: `Bearer ${apiKey}` } },
+      );
+      if (data.diagnostics) {
+        setDiagnostics(data.diagnostics);
+      } else {
+        fetchDiagnostics(routerId);
+      }
+      toast.success(data.message || "Fix applied");
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Failed to apply fix");
+    } finally {
+      setApplyingFix(null);
     }
   };
 
@@ -379,6 +404,12 @@ export default function RouterLink() {
       label: "text-amber-300",
     };
   };
+  const autoFixableDiagnosticSteps = new Set([
+    "api_service",
+    "radius_client",
+    "pppoe_server",
+    "billing_sync",
+  ]);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -670,6 +701,10 @@ export default function RouterLink() {
                       const classes = getDiagnosticClasses(step.status);
                       const fixText = String(step.fix || "");
                       const fixIsCommand = fixText.trim().startsWith("/") || fixText.trim().startsWith(":");
+                      const canApplyFix =
+                        fixIsCommand &&
+                        step.status !== "ok" &&
+                        autoFixableDiagnosticSteps.has(step.id);
                       return (
                         <div
                           key={step.id}
@@ -702,17 +737,33 @@ export default function RouterLink() {
                                       {step.fix}
                                     </p>
                                   )}
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(step.fix);
-                                      toast.success(fixIsCommand ? "Command copied" : "Fix copied");
-                                    }}
-                                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                    {fixIsCommand ? "Copy Command" : "Copy Fix"}
-                                  </Button>
+                                  <div className="flex flex-wrap gap-2">
+                                    {canApplyFix && (
+                                      <Button
+                                        onClick={() => applyDiagnosticFix(step.id)}
+                                        disabled={applyingFix === step.id}
+                                        className="h-8 gap-2"
+                                      >
+                                        {applyingFix === step.id ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Shield className="w-3 h-3" />
+                                        )}
+                                        {applyingFix === step.id ? "Applying..." : "Apply Fix"}
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(step.fix);
+                                        toast.success(fixIsCommand ? "Command copied" : "Fix copied");
+                                      }}
+                                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                      {fixIsCommand ? "Copy Command" : "Copy Fix"}
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </div>
