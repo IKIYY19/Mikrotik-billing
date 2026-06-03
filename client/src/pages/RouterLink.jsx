@@ -65,6 +65,8 @@ export default function RouterLink() {
   const [allRouters, setAllRouters] = useState([]);
   const [watchAttempts, setWatchAttempts] = useState(0);
   const [watchRemaining, setWatchRemaining] = useState(0);
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const watchIntervalRef = React.useRef(null);
 
   const startWatching = async () => {
@@ -86,6 +88,7 @@ export default function RouterLink() {
           if (data.found) {
             stopWatching();
             setConnectionStatus({ connected: true, status: "online", router: data.router, message: data.message });
+            fetchDiagnostics(data.router?.id);
             fetchAllRouters();
             toast.success(data.message);
           } else if (data.expired) {
@@ -177,6 +180,32 @@ export default function RouterLink() {
     }
   };
 
+  const fetchDiagnostics = async (routerId = connectionStatus?.router?.id) => {
+    if (!tenantSlug || !routerId) {return;}
+    setDiagnosticsLoading(true);
+    try {
+      const { data } = await axios.get(
+        `${API}/router/v1/${tenantSlug}/routers/${routerId}/diagnostics`,
+        { headers: { Authorization: `Bearer ${apiKey}` } },
+      );
+      setDiagnostics(data);
+    } catch (e) {
+      setDiagnostics({
+        status: "error",
+        steps: [
+          {
+            id: "diagnostics",
+            label: "Diagnostics",
+            status: "error",
+            message: e.response?.data?.error || e.message,
+          },
+        ],
+      });
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  };
+
   const buildCommand = () => {
     const mode = appUrl.startsWith("https") ? "https" : "http";
     const certFlag = appUrl.startsWith("https") ? " check-certificate=no" : "";
@@ -244,6 +273,7 @@ export default function RouterLink() {
       );
       localStorage.setItem("router_link_mgmt_user", mgmtUser);
       manualCheck();
+      fetchDiagnostics(data.router?.id || connectionStatus.router.id);
     } catch (e) {
       const detail = e.response?.data?.raw_error;
       const message = e.response?.data?.error || "Upgrade failed";
@@ -277,6 +307,11 @@ export default function RouterLink() {
       setDebugInfo({ url, response: data });
       setCheckCount((c) => c + 1);
       fetchAllRouters();
+      if (data.router?.id) {
+        fetchDiagnostics(data.router.id);
+      } else {
+        setDiagnostics(null);
+      }
       if (data.connected) {
         toast.success("Router found!");
       } else {
@@ -305,6 +340,45 @@ export default function RouterLink() {
   }
 
   const isLinked = connectionStatus?.connected && connectionStatus?.router?.has_connection;
+  const diagnosticSummary = diagnostics?.steps?.reduce(
+    (summary, step) => {
+      summary[step.status] = (summary[step.status] || 0) + 1;
+      return summary;
+    },
+    { ok: 0, warning: 0, error: 0, pending: 0 },
+  );
+  const getDiagnosticClasses = (status) => {
+    if (status === "ok") {
+      return {
+        icon: "text-green-400",
+        bg: "bg-green-500/10",
+        border: "border-green-500/30",
+        label: "text-green-300",
+      };
+    }
+    if (status === "error") {
+      return {
+        icon: "text-red-400",
+        bg: "bg-red-500/10",
+        border: "border-red-500/30",
+        label: "text-red-300",
+      };
+    }
+    if (status === "pending") {
+      return {
+        icon: "text-zinc-400",
+        bg: "bg-zinc-800/50",
+        border: "border-zinc-700/50",
+        label: "text-zinc-300",
+      };
+    }
+    return {
+      icon: "text-amber-400",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/30",
+      label: "text-amber-300",
+    };
+  };
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -560,6 +634,94 @@ export default function RouterLink() {
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Diagnostics */}
+            {connectionStatus?.router?.id && (
+              <div className="border border-zinc-800/70 rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-white font-medium">Router Link Diagnostics</p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {diagnostics
+                        ? `${diagnosticSummary?.ok || 0} ok, ${diagnosticSummary?.warning || 0} warnings, ${diagnosticSummary?.error || 0} errors`
+                        : "Run a read-only setup check against this router."}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchDiagnostics()}
+                    disabled={diagnosticsLoading}
+                    className="gap-2 border-zinc-700/50 text-zinc-300 shrink-0"
+                  >
+                    {diagnosticsLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Shield className="w-4 h-4" />
+                    )}
+                    Check Setup
+                  </Button>
+                </div>
+
+                {diagnostics?.steps?.length > 0 && (
+                  <div className="space-y-2">
+                    {diagnostics.steps.map((step) => {
+                      const classes = getDiagnosticClasses(step.status);
+                      const fixText = String(step.fix || "");
+                      const fixIsCommand = fixText.trim().startsWith("/") || fixText.trim().startsWith(":");
+                      return (
+                        <div
+                          key={step.id}
+                          className={`${classes.bg} ${classes.border} border rounded-lg p-3`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {step.status === "ok" ? (
+                              <Check className={`w-4 h-4 mt-0.5 shrink-0 ${classes.icon}`} />
+                            ) : step.status === "pending" ? (
+                              <Loader2 className={`w-4 h-4 mt-0.5 shrink-0 ${classes.icon}`} />
+                            ) : (
+                              <AlertCircle className={`w-4 h-4 mt-0.5 shrink-0 ${classes.icon}`} />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className={`text-sm font-medium ${classes.label}`}>{step.label}</p>
+                                <span className="text-[10px] uppercase text-zinc-500">
+                                  {step.status}
+                                </span>
+                              </div>
+                              <p className="text-xs text-zinc-400 mt-1">{step.message}</p>
+                              {step.fix && (
+                                <div className="mt-2 space-y-2">
+                                  {fixIsCommand ? (
+                                    <pre className="bg-zinc-950/80 border border-zinc-800 rounded-md p-2 text-xs text-green-300 font-mono overflow-x-auto whitespace-pre-wrap">
+                                      {step.fix}
+                                    </pre>
+                                  ) : (
+                                    <p className="text-xs text-zinc-300 bg-zinc-950/60 border border-zinc-800 rounded-md p-2">
+                                      {step.fix}
+                                    </p>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(step.fix);
+                                      toast.success(fixIsCommand ? "Command copied" : "Fix copied");
+                                    }}
+                                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    {fixIsCommand ? "Copy Command" : "Copy Fix"}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

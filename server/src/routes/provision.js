@@ -2366,6 +2366,303 @@ async function findRoutersByTenant(tenantId, slug, { includeAllStatuses = false 
   return [];
 }
 
+function createDiagnosticStep(id, label, status, message, fix = null, detail = null) {
+  return { id, label, status, message, fix, detail };
+}
+
+function normalizeDisabled(value) {
+  return value === true || value === "true" || value === "yes";
+}
+
+function diagnoseConnectionError(error, ipAddress, port) {
+  const raw = error?.message || String(error || "Unknown error");
+  if (/ECONNREFUSED/.test(raw)) {
+    return {
+      message: `Connection refused on ${ipAddress}:${port}`,
+      fix: `/ip service enable api\n/ip service set api port=${port}\n/ip firewall filter add chain=input protocol=tcp dst-port=${port} action=accept comment="Allow billing API"`,
+      raw,
+    };
+  }
+  if (/ETIMEDOUT|EHOSTUNREACH/.test(raw)) {
+    return {
+      message: `The billing server cannot reach ${ipAddress}:${port}`,
+      fix: "Confirm the router IP is reachable from this server, or use a VPN/tunnel for management traffic.",
+      raw,
+    };
+  }
+  if (/wrong password|invalid user|cannot log in|login failed|authentication|rejected/i.test(raw)) {
+    return {
+      message: "MikroTik rejected the management username or password",
+      fix: "/user add name=billing group=full password=STRONG_PASSWORD comment=\"Billing API user\"",
+      raw,
+    };
+  }
+  return {
+    message: raw,
+    fix: "Check the router management IP, API port, firewall rules, and credentials.",
+    raw,
+  };
+}
+
+async function runRouterDiagnostics({ tenant, routerId, apiKey }) {
+  const db = getDb();
+  const routerResult = await db.query(
+    `SELECT r.*, mc.id as connection_id, mc.ip_address as connection_ip, mc.api_port, mc.ssh_port,
+            mc.username as connection_username, mc.connection_type, mc.is_online, mc.last_seen,
+            mc.password_encrypted
+     FROM routers r
+     LEFT JOIN mikrotik_connections mc ON mc.id = r.linked_mikrotik_connection_id
+     WHERE r.id = $1`,
+    [routerId],
+  );
+
+  if (routerResult.rows.length === 0) {
+    const err = new Error("Router not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const row = routerResult.rows[0];
+  if (row.tenant_id && tenant?.id && row.tenant_id !== tenant.id) {
+    const err = new Error("Router does not belong to this tenant");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const steps = [];
+  const routerIp = row.connection_ip || row.ip_address || row.source_ip || null;
+  const apiPort = Number(row.api_port || row.mgmt_port || 8728);
+
+  steps.push(createDiagnosticStep(
+    "router_reported",
+    "Router Reported In",
+    row.provision_status === "online" ? "ok" : "warning",
+    row.provision_status === "online"
+      ? "The router has contacted the billing platform."
+      : "The router exists, but it has not reported online yet.",
+    row.provision_status === "online" ? null : "Run the install command again from the Router Link page.",
+    { ip: row.ip_address, mac: row.mac_address, updated_at: row.updated_at },
+  ));
+
+  if (!row.linked_mikrotik_connection_id) {
+    steps.push(createDiagnosticStep(
+      "management_credentials",
+      "Management Credentials",
+      "warning",
+      "No MikroTik API connection is linked yet.",
+      "Enter the router username/password and run Upgrade to Full Management.",
+    ));
+    steps.push(createDiagnosticStep(
+      "api_connection",
+      "API Login",
+      "pending",
+      "Waiting for management credentials before testing RouterOS API access.",
+    ));
+  } else if (!routerIp) {
+    steps.push(createDiagnosticStep(
+      "api_connection",
+      "API Login",
+      "error",
+      "No router management IP is saved for this connection.",
+      "Re-run the install command, or update the router IP on the Routers page.",
+    ));
+  } else {
+    const routerConnectionManager = require("../services/routerConnectionManager");
+    try {
+      if (row.connection_type === "ssh") {
+        await routerConnectionManager.testSSHConnection({
+          ip_address: routerIp,
+          ssh_port: row.ssh_port || 22,
+          username: row.connection_username,
+          password_encrypted: row.password_encrypted,
+          connection_type: row.connection_type,
+        });
+      } else {
+        await routerConnectionManager.testConnection({
+          ip_address: routerIp,
+          api_port: apiPort,
+          username: row.connection_username,
+          password_encrypted: row.password_encrypted,
+          connection_type: row.connection_type || "api",
+        });
+      }
+      steps.push(createDiagnosticStep(
+        "api_connection",
+        "API Login",
+        "ok",
+        `Billing can log in to ${routerIp}:${apiPort}.`,
+        null,
+        { ip: routerIp, port: apiPort, username: row.connection_username },
+      ));
+
+      const services = await routerConnectionManager.print(
+        row.linked_mikrotik_connection_id,
+        "/ip/service",
+        ".id,name,disabled,port",
+      ).catch((error) => ({ error }));
+      if (Array.isArray(services)) {
+        const apiServiceName = row.connection_type === "api-ssl" ? "api-ssl" : "api";
+        const apiService = services.find((svc) => svc.name === apiServiceName);
+        steps.push(createDiagnosticStep(
+          "api_service",
+          "RouterOS API Service",
+          apiService && !normalizeDisabled(apiService.disabled) ? "ok" : "warning",
+          apiService && !normalizeDisabled(apiService.disabled)
+            ? `${apiServiceName} service is enabled on port ${apiService.port || apiPort}.`
+            : `${apiServiceName} service is disabled or missing.`,
+          apiService && !normalizeDisabled(apiService.disabled)
+            ? null
+            : `/ip service enable ${apiServiceName}\n/ip service set ${apiServiceName} port=${apiPort}`,
+          apiService || null,
+        ));
+      } else {
+        steps.push(createDiagnosticStep("api_service", "RouterOS API Service", "warning", "Could not inspect RouterOS services.", null, services.error?.message));
+      }
+
+      const radiusRows = await routerConnectionManager.print(
+        row.linked_mikrotik_connection_id,
+        "/radius",
+        ".id,address,service,disabled,comment",
+      ).catch((error) => ({ error }));
+      if (Array.isArray(radiusRows)) {
+        const radius = radiusRows.find((item) => !normalizeDisabled(item.disabled) && String(item.service || "").match(/ppp|hotspot/));
+        steps.push(createDiagnosticStep(
+          "radius_client",
+          "RADIUS Client",
+          radius ? "ok" : "warning",
+          radius ? `RADIUS is configured for ${radius.service}.` : "No enabled PPP/Hotspot RADIUS client was found.",
+          radius ? null : `/radius add address=${process.env.RADIUS_SERVER || "BILLING_SERVER_IP"} secret="${process.env.RADIUS_SECRET || (apiKey || "CHANGE_ME").substring(0, 16)}" service=ppp,hotspot timeout=300ms comment="ISP RADIUS" disabled=no`,
+          radius || null,
+        ));
+      } else {
+        steps.push(createDiagnosticStep("radius_client", "RADIUS Client", "warning", "Could not inspect RADIUS settings.", null, radiusRows.error?.message));
+      }
+
+      const pppoeRows = await routerConnectionManager.print(
+        row.linked_mikrotik_connection_id,
+        "/interface/pppoe-server/server",
+        ".id,service-name,interface,disabled,authentication",
+      ).catch((error) => ({ error }));
+      if (Array.isArray(pppoeRows)) {
+        const pppoe = pppoeRows.find((item) => !normalizeDisabled(item.disabled));
+        steps.push(createDiagnosticStep(
+          "pppoe_server",
+          "PPPoE Server",
+          pppoe ? "ok" : "warning",
+          pppoe ? `PPPoE server is enabled on ${pppoe.interface || "an interface"}.` : "No enabled PPPoE server was found.",
+          pppoe ? null : "/interface pppoe-server server add service-name=pppoe-internet interface=bridge1 authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no",
+          pppoe || null,
+        ));
+      } else {
+        steps.push(createDiagnosticStep("pppoe_server", "PPPoE Server", "warning", "Could not inspect PPPoE server settings.", null, pppoeRows.error?.message));
+      }
+
+      const schedulerRows = await routerConnectionManager.print(
+        row.linked_mikrotik_connection_id,
+        "/system/scheduler",
+        ".id,name,disabled,interval,on-event",
+      ).catch((error) => ({ error }));
+      if (Array.isArray(schedulerRows)) {
+        const scheduler = schedulerRows.find((item) => item.name === "billing-sync" && !normalizeDisabled(item.disabled));
+        steps.push(createDiagnosticStep(
+          "billing_sync",
+          "Billing Sync Scheduler",
+          scheduler ? "ok" : "warning",
+          scheduler ? `billing-sync runs every ${scheduler.interval || "configured interval"}.` : "billing-sync scheduler is missing or disabled.",
+          scheduler ? null : `/system scheduler add name=billing-sync interval=5m on-event="/tool fetch url=\\"${process.env.APP_URL || "https://YOUR_APP_URL"}/api/router/v1/${tenant?.slug || "TENANT_SLUG"}/sync\\" http-header-field=\\"Authorization: Bearer ${apiKey || "API_KEY"}\\" mode=https check-certificate=no output=none" comment="ISP Billing Sync" disabled=no`,
+          scheduler || null,
+        ));
+      } else {
+        steps.push(createDiagnosticStep("billing_sync", "Billing Sync Scheduler", "warning", "Could not inspect scheduler settings.", null, schedulerRows.error?.message));
+      }
+    } catch (error) {
+      const diagnosis = diagnoseConnectionError(error, routerIp, apiPort);
+      steps.push(createDiagnosticStep(
+        "api_connection",
+        "API Login",
+        "error",
+        diagnosis.message,
+        diagnosis.fix,
+        { raw_error: diagnosis.raw },
+      ));
+    }
+  }
+
+  let subscriptionSummary = {
+    total: 0,
+    ready: 0,
+    synced: 0,
+    failed: 0,
+    queued: 0,
+  };
+  try {
+    const subResult = await db.query(
+      `SELECT status, pppoe_username, auto_provision, last_sync_status
+       FROM subscriptions
+       WHERE router_id = $1 OR mikrotik_connection_id = $2`,
+      [row.id, row.linked_mikrotik_connection_id],
+    );
+    subscriptionSummary = subResult.rows.reduce((summary, sub) => {
+      summary.total += 1;
+      if (sub.pppoe_username && sub.auto_provision !== false) {summary.ready += 1;}
+      if (sub.last_sync_status === "synced") {summary.synced += 1;}
+      if (sub.last_sync_status === "failed") {summary.failed += 1;}
+      if (sub.last_sync_status === "queued") {summary.queued += 1;}
+      return summary;
+    }, subscriptionSummary);
+  } catch (e) {
+    subscriptionSummary.error = e.message;
+  }
+
+  steps.push(createDiagnosticStep(
+    "subscription_sync",
+    "Subscription Sync",
+    subscriptionSummary.failed > 0 ? "warning" : "ok",
+    subscriptionSummary.total === 0
+      ? "No subscriptions are assigned to this router yet."
+      : `${subscriptionSummary.ready}/${subscriptionSummary.total} subscription(s) are ready for MikroTik sync.`,
+    subscriptionSummary.total === 0
+      ? "Assign customer subscriptions to this router or MikroTik connection before expecting PPPoE secrets to sync."
+      : null,
+    subscriptionSummary,
+  ));
+
+  const hasError = steps.some((step) => step.status === "error");
+  const hasWarning = steps.some((step) => step.status === "warning");
+  return {
+    router: {
+      id: row.id,
+      name: row.name || row.identity,
+      model: row.model,
+      mac: row.mac_address,
+      ip: row.ip_address,
+      management_ip: routerIp,
+      connection_id: row.linked_mikrotik_connection_id,
+    },
+    status: hasError ? "error" : hasWarning ? "warning" : "ok",
+    checked_at: new Date().toISOString(),
+    steps,
+  };
+}
+
+// GET /v1/:slug/routers/:routerId/diagnostics — Read-only link/setup checks
+router.get("/v1/:slug/routers/:routerId/diagnostics", async (req, res) => {
+  try {
+    const { slug, routerId } = req.params;
+    const authHeader = req.headers.authorization;
+    const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
+    const tenant = await findTenantBySlugOrKey(slug, apiKey);
+    if (!tenant) {
+      return res.status(403).json({ error: "Invalid tenant or API key" });
+    }
+
+    const diagnostics = await runRouterDiagnostics({ tenant, routerId, apiKey });
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
 // POST /v1/:slug/watch/start — Create a watch session
 router.post("/v1/:slug/watch/start", async (req, res) => {
   try {
