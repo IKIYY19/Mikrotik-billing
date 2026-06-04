@@ -17,8 +17,10 @@ import {
   RefreshCw,
   X,
   MapPin,
+  Smartphone,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
+import { MpesaStkModal } from "../../components/MpesaStkModal";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -118,6 +120,7 @@ export function BillingCustomers() {
   const [portalUrl, setPortalUrl] = useState(null);
   const [portalCredentials, setPortalCredentials] = useState(null);
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [stkTarget, setStkTarget] = useState(null); // customer object for STK modal
   const mapPickerRef = useRef(null);
   const pickerMapRef = useRef(null);
   const pickerMarkerRef = useRef(null);
@@ -715,6 +718,15 @@ export function BillingCustomers() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setStkTarget(c)}
+                  className="flex items-center gap-1 text-green-400 border-green-800 hover:bg-green-900/30"
+                  title="Send M-Pesa STK Push"
+                >
+                  <Smartphone className="w-3 h-3" /> M-Pesa
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => editCustomer(c)}
                   className="flex items-center gap-1"
                 >
@@ -1138,5 +1150,15 @@ export function BillingCustomers() {
         </div>
       )}
     </div>
+
+      {/* M-Pesa STK Push Modal — triggered from customer card 📱 button */}
+      <MpesaStkModal
+        open={!!stkTarget}
+        onClose={() => setStkTarget(null)}
+        onSuccess={() => { setStkTarget(null); fetchCustomers(); }}
+        customer={stkTarget}
+        invoice={null}
+        defaultAmount={undefined}
+      />
   );
 }

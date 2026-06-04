@@ -416,7 +416,7 @@ router.get('/methods', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// M-PESA STK PUSH
+// M-PESA STK PUSH (Production only)
 // ═══════════════════════════════════════
 router.post('/mpesa/stk', async (req, res) => {
   try {
@@ -426,36 +426,18 @@ router.post('/mpesa/stk', async (req, res) => {
     const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
     if (!customerId) {return res.status(404).json({ error: 'Customer not found' });}
 
-    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
-    const description = invoice ? `Payment for ${invoice.invoice_number}` : 'Wallet top-up';
-
-    const mpesaService = await getMpesaService();
     const mpesaConfigured = await isMpesaConfigured();
-
     if (!mpesaConfigured) {
-      const checkoutId = `sandbox-${uuidv4()}`;
-      await paymentSessions.savePending({
-        id: uuidv4(),
-        invoice_id,
-        customer_id: customerId,
-        phone,
-        amount: parseFloat(amount),
-        method: 'mpesa_stk',
-        status: 'pending',
-        checkoutRequestId: checkoutId,
-      });
-
-      return res.json({
-        success: true,
-        checkoutRequestId: checkoutId,
-        message: 'STK Push sent (sandbox mode)',
-        phone: mpesaService.formatPhone(phone),
-        amount: parseFloat(amount),
-        instructions: 'Enter M-Pesa PIN 1234 to confirm payment',
+      return res.status(503).json({
+        success: false,
+        error: 'M-Pesa is not configured. Add your Daraja Consumer Key, Secret, Shortcode, Passkey, and Callback URL in Integrations → M-Pesa.',
       });
     }
 
-    // Production STK Push
+    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
+    const description = invoice ? `Payment for ${invoice.invoice_number}` : 'ISP Payment';
+
+    const mpesaService = await getMpesaService();
     const result = await mpesaService.stkPush(phone, amount, accountRef, description);
 
     if (result.success) {
@@ -479,7 +461,7 @@ router.post('/mpesa/stk', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// CHECK STK STATUS
+// CHECK STK STATUS (Production only)
 // ═══════════════════════════════════════
 router.post('/mpesa/stk/check', async (req, res) => {
   try {
@@ -487,9 +469,10 @@ router.post('/mpesa/stk/check', async (req, res) => {
 
     const pending = await paymentSessions.findByCheckoutRequestId(checkoutRequestId);
     if (!pending) {
-      return res.status(404).json({ error: 'Payment not found' });
+      return res.status(404).json({ error: 'Payment session not found' });
     }
 
+    // Already finalised — return cached result
     if (pending.payment_id) {
       const payment = await billing.getPaymentById(pending.payment_id);
       return res.json({
@@ -501,22 +484,14 @@ router.post('/mpesa/stk/check', async (req, res) => {
     }
 
     const mpesaConfigured = await isMpesaConfigured();
-
-    // Sandbox mode for local/test environments only
     if (!mpesaConfigured) {
-      const mpesaReceipt = `QKH${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const payment = await finalizeSessionPayment(pending, mpesaReceipt, pending.phone);
-
-      return res.json({
-        success: true,
-        status: 'completed',
-        mpesaReceipt,
-        amount: pending.amount,
-        payment,
+      return res.status(503).json({
+        success: false,
+        error: 'M-Pesa is not configured.',
       });
     }
 
-    // Production status check
+    // Query Safaricom for real status
     const mpesaService = await getMpesaService();
     const result = await mpesaService.checkStkStatus(checkoutRequestId);
 
@@ -535,12 +510,17 @@ router.post('/mpesa/stk/check', async (req, res) => {
         status: 'failed',
         provider_response: result,
       });
+      return res.json({
+        success: false,
+        status: 'failed',
+        message: result.description || 'Payment was cancelled or declined.',
+      });
     }
 
     return res.json({
       success: false,
       status: pending.status || 'pending',
-      message: result.description || result.message || 'Waiting for payment',
+      message: result.description || result.message || 'Waiting for customer to enter PIN...',
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

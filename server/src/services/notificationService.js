@@ -194,6 +194,8 @@ class NotificationService {
         payment_received: "payment_received",
         service_suspended: "service_suspended",
         service_restored: "service_restored",
+        outage_detected: "outage_detected",
+        outage_resolved: "outage_resolved",
         welcome: "welcome",
         password_reset: "password_reset",
       }[event];
@@ -288,6 +290,8 @@ class NotificationService {
         payment_received: "payment_received",
         service_suspended: "service_suspended",
         service_restored: "service_restored",
+        outage_detected: "outage_detected",
+        outage_resolved: "outage_resolved",
         welcome: "welcome",
       }[event];
 

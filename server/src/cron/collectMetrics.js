@@ -6,6 +6,7 @@
 
 const db = global.db || require('../db/memory');
 const { v4: uuidv4 } = require('uuid');
+const outageDetection = require('../services/outageDetection');
 
 // Connect to MikroTik and get both active sessions and simple queues
 async function getRouterMetrics(connection) {
@@ -227,6 +228,20 @@ async function collectMetrics() {
 
       if (!data.success) {
         return { sessionsCount: 0, records: [], success: false, isError: true };
+      }
+
+      const activeSessionNames = data.sessions
+        .map((session) => session.name || session.username)
+        .filter(Boolean);
+      try {
+        const outageResult = await outageDetection.detectCustomerOutage(device, activeSessionNames);
+        if (outageResult?.status === 'created') {
+          console.warn(`[Outage] Created alert for ${device.name}: ${outageResult.outage.offlineCount}/${outageResult.outage.totalCustomers} customers offline`);
+        } else if (outageResult?.status === 'resolved') {
+          console.log(`[Outage] Resolved alert for ${device.name}`);
+        }
+      } catch (error) {
+        console.warn(`[Outage] Detection failed for ${device.name}: ${error.message}`);
       }
 
       const recordsToInsert = [];
