@@ -64,7 +64,7 @@ class MikroTikRestService {
             username: connection.username,
             password: connection.password,
           },
-          timeout: 10000,
+          timeout: 5000,
           httpsAgent: !connection.useSSL
             ? new (require("https").Agent)({ rejectUnauthorized: false })
             : undefined,

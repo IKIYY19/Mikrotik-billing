@@ -24,7 +24,7 @@ class MikroTikSSHService {
         host,
         port,
         username,
-        readyTimeout: 30000,
+        readyTimeout: 10000,
       };
 
       if (privateKey) {

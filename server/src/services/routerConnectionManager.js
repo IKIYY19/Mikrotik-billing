@@ -62,7 +62,7 @@ class RouterConnectionManager {
     const device = new MikroNode(config.ip_address, {
       port,
       ssl: isSSL,
-      timeout: 10000, // 10s timeout
+      timeout: 5000, // 5s timeout for initial connect
     });
 
     const connection = await device.connect(config.username, password);
@@ -168,7 +168,7 @@ class RouterConnectionManager {
     const device = new MikroNode(config.ip_address, {
       port,
       ssl: isSSL,
-      timeout: 10000,
+      timeout: 5000,
     });
 
     const connection = await device.connect(config.username, password);

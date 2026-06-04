@@ -126,56 +126,176 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Test connection
-router.post('/test', async (req, res) => {
-  try {
-    const { ip_address, api_port, ssh_port, username, password, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password } = req.body;
+// Categorize errors and return fix suggestions
+function diagnoseConnectionError(error, config) {
+  const msg = (error.message || '').toLowerCase();
+  const port = config.connection_type === 'ssh' ? (config.ssh_port || 22) : (config.api_port || 8728);
+  const protocol = config.connection_type === 'ssh' ? 'SSH' : 'API';
 
-    if (connection_type === 'ssh') {
-      // Test SSH connection
-      const MikroTikSSHService = require('../services/mikrotikSSH');
-      const sshService = MikroTikSSHService;
-
-      try {
-        if (use_tunnel) {
-          // For SSH tunnel, we would need to establish the tunnel first
-          // This is a simplified version - in production you'd use a proper SSH tunnel library
-          return res.json({ success: false, message: 'SSH tunneling requires additional setup. Please use VPN or direct SSH access.' });
-        }
-
-        const connection = await sshService.createConnection({
-          host: ip_address,
-          port: ssh_port || 22,
-          username,
-          password,
-        });
-
-        const testResult = await sshService.testConnection(connection.id);
-        await sshService.removeConnection(connection.id);
-
-        if (testResult.success) {
-          res.json({ success: true, message: 'SSH connection successful', data: testResult.data });
-        } else {
-          res.json({ success: false, message: testResult.error });
-        }
-      } catch (error) {
-        res.json({ success: false, message: error.message });
-      }
+  if (msg.includes('timeout') || msg.includes('etimedout') || msg.includes('econnrefused') || msg.includes('enotfound') || msg.includes('ehostunreach') || msg.includes('econnreset')) {
+    const fixes = [];
+    if (config.connection_type !== 'ssh') {
+      fixes.push('Run on the router: /ip service enable api  (or /ip service enable api-ssl for port 8729)');
+      fixes.push(`Allow the port: /ip firewall filter add chain=input protocol=tcp dst-port=${port} src-address=<billing-server-ip> action=accept`);
+      fixes.push(`Verify the router is reachable: ping ${config.ip_address} from this server`);
     } else {
-      // Test API connection
-      const routerConnectionManager = require('../services/routerConnectionManager');
-      try {
-        await routerConnectionManager.testConnection({
-          ip_address,
-          api_port,
-          connection_type,
-          username,
-          password
-        });
-        res.json({ success: true, message: 'API connection successful' });
-      } catch (error) {
-        res.json({ success: false, message: error.message });
+      fixes.push('Run on the router: /ip service enable ssh');
+      fixes.push(`Allow SSH: /ip firewall filter add chain=input protocol=tcp dst-port=${port} src-address=<billing-server-ip> action=accept`);
+    }
+    if (/^10\.|^172\.1[6-9]\.|^172\.2\d\.|^172\.3[0-1]\.|^192\.168\./.test(config.ip_address || '')) {
+      fixes.push(`${config.ip_address} is a private IP. Use the VPN-side IP or set up port forwarding.`);
+    }
+    return { category: 'unreachable', title: 'Router unreachable', description: `Could not reach ${config.ip_address}:${port} via ${protocol}. The router may be offline, the port may be blocked, or the IP may be wrong.`, fixes };
+  }
+
+  if (msg.includes('login') || msg.includes('auth') || msg.includes('credential') || msg.includes('denied') || msg.includes('invalid') || msg.includes('could not login') || msg.includes('not allowed')) {
+    return { category: 'auth_failed', title: 'Authentication failed', description: `The ${protocol} login was rejected for user "${config.username}" on ${config.ip_address}.`, fixes: [
+      `Verify the username and password are correct for ${config.ip_address}`,
+      'Check the user group has API/SSH permissions: /user print detail',
+      'Create a dedicated user: /user add name=api-billing group=full password=<strong-password>',
+    ] };
+  }
+
+  if (msg.includes('ssl') || msg.includes('tls') || msg.includes('certificate') || msg.includes('unsafe legacy') || msg.includes('self signed')) {
+    return { category: 'ssl_error', title: 'SSL/TLS error', description: `API-SSL connection to ${config.ip_address}:${port} failed due to a certificate or TLS issue.`, fixes: [
+      'Install a certificate on the router: /certificate add name=local-cert common-name=<router-ip>',
+      'For api-ssl, enable it: /ip service enable api-ssl',
+      'Or use plain API (port 8728) on a trusted management network instead',
+    ] };
+  }
+
+  if (msg.includes('decrypt') || msg.includes('encryption') || msg.includes('auth tag')) {
+    return { category: 'encryption_error', title: 'Password decryption failed', description: 'The saved password could not be decrypted. The ENCRYPTION_KEY may have changed.', fixes: [
+      'Re-enter the router password in the connection form and save again',
+      'Ensure ENCRYPTION_KEY is stable across deployments',
+    ] };
+  }
+
+  return { category: 'unknown', title: 'Connection failed', description: `${protocol} connection to ${config.ip_address}:${port} failed: ${error.message}`, fixes: [
+    'Verify the router is powered on and accessible',
+    'Confirm the correct IP, port, and connection type',
+    'Check router services: /ip service print',
+    `Try connecting manually: ssh admin@${config.ip_address}`,
+  ] };
+}
+
+// Fast TCP reachability check (3s timeout, fails fast)
+function checkTcpReachable(host, port, timeoutMs = 3000) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeoutMs);
+    socket.on('connect', () => { socket.destroy(); resolve({ reachable: true }); });
+    socket.on('timeout', () => { socket.destroy(); resolve({ reachable: false, reason: 'timeout' }); });
+    socket.on('error', (err) => { socket.destroy(); resolve({ reachable: false, reason: err.code || err.message }); });
+    socket.connect(port, host);
+  });
+}
+
+// Test connection with fast TCP-first diagnostics
+router.post('/test', async (req, res) => {
+  const startTime = Date.now();
+  const { ip_address, api_port, ssh_port, username, password, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password } = req.body;
+  const config = { ip_address, api_port, ssh_port, username, password, connection_type, use_tunnel, tunnel_host, tunnel_port, tunnel_username, tunnel_password };
+  const diagnostics = { steps: [] };
+
+  if (!ip_address || !username) {
+    return res.json({ success: false, message: 'Router IP and username are required', diagnostics: { steps: [{ step: 'input_validation', status: 'failed', detail: 'Missing ip_address or username' }] } });
+  }
+  diagnostics.steps.push({ step: 'input_validation', status: 'passed' });
+
+  // Fast TCP check (3s) before slow API/SSH attempt
+  const targetPort = connection_type === 'ssh' ? (ssh_port || 22) : (api_port || 8728);
+  const tcpCheck = await checkTcpReachable(ip_address, targetPort);
+  diagnostics.steps.push({
+    step: 'tcp_reachability',
+    status: tcpCheck.reachable ? 'passed' : 'failed',
+    detail: tcpCheck.reachable ? `TCP ${ip_address}:${targetPort} reachable` : `TCP ${ip_address}:${targetPort} failed (${tcpCheck.reason})`,
+  });
+
+  if (!tcpCheck.reachable) {
+    const diag = diagnoseConnectionError(new Error(tcpCheck.reason === 'timeout' ? 'ETIMEDOUT' : 'ECONNREFUSED'), config);
+    return res.json({ success: false, message: `Could not reach ${ip_address}:${targetPort}`, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: diag });
+  }
+
+  // Authenticate (5s timeout)
+  if (connection_type === 'ssh') {
+    const MikroTikSSHService = require('../services/mikrotikSSH');
+    try {
+      if (use_tunnel) {
+        return res.json({ success: false, message: 'SSH tunneling requires additional setup. Use VPN or direct SSH.', diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: { category: 'tunnel_unsupported', title: 'SSH tunneling not fully supported', description: 'Jump-host SSH tunneling is basic. Use VPN for reliable remote access.', fixes: ['Set up WireGuard or IPsec VPN', 'Use the router VPN-side IP with the VPN/API profile'] } });
       }
+      const connection = await sshService.createConnection({ host: ip_address, port: ssh_port || 22, username, password });
+      const testResult = await sshService.testConnection(connection.id);
+      await sshService.removeConnection(connection.id);
+      diagnostics.steps.push({ step: 'authentication', status: 'passed', detail: 'SSH login successful' });
+      res.json({ success: true, message: 'SSH connection successful', data: testResult.data, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime } });
+    } catch (error) {
+      const diag = diagnoseConnectionError(error, config);
+      diagnostics.steps.push({ step: 'authentication', status: 'failed', detail: error.message });
+      res.json({ success: false, message: error.message, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: diag });
+    }
+  } else {
+    const routerConnectionManager = require('../services/routerConnectionManager');
+    try {
+      await routerConnectionManager.testConnection({ ip_address, api_port, connection_type, username, password });
+      diagnostics.steps.push({ step: 'authentication', status: 'passed', detail: 'API login successful' });
+      res.json({ success: true, message: 'API connection successful', diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime } });
+    } catch (error) {
+      const diag = diagnoseConnectionError(error, config);
+      diagnostics.steps.push({ step: 'authentication', status: 'failed', detail: error.message });
+      res.json({ success: false, message: error.message, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: diag });
+    }
+  }
+});
+
+// Diagnose a saved connection (fetches from DB, tests, returns full report)
+router.post('/:id/diagnose', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { id } = req.params;
+    const connResult = await db.query('SELECT * FROM mikrotik_connections WHERE id = $1', [id]);
+    if (connResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+
+    const conn = connResult.rows[0];
+    const config = {
+      ip_address: conn.ip_address, api_port: conn.api_port, ssh_port: conn.ssh_port,
+      username: conn.username,
+      password: require('../utils/encryption').decrypt(conn.password_encrypted),
+      connection_type: conn.connection_type, use_tunnel: conn.use_tunnel,
+      tunnel_host: conn.tunnel_host, tunnel_port: conn.tunnel_port, tunnel_username: conn.tunnel_username,
+    };
+    const diagnostics = { steps: [], connection: toSafeConnection(conn) };
+
+    if (!config.password) {
+      diagnostics.steps.push({ step: 'decryption', status: 'failed', detail: 'Saved password could not be decrypted. ENCRYPTION_KEY may have changed.' });
+      return res.json({ success: false, message: 'Password decryption failed. Re-enter the password and save the connection again.', diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: { category: 'encryption_error', title: 'Password decryption failed', description: 'The saved password could not be decrypted. This usually means the ENCRYPTION_KEY has changed.', fixes: ['Re-enter the router password in the connection form and save again', 'Ensure ENCRYPTION_KEY is stable across deployments'] } });
+    }
+    diagnostics.steps.push({ step: 'decryption', status: 'passed' });
+
+    const targetPort = config.connection_type === 'ssh' ? (config.ssh_port || 22) : (config.api_port || 8728);
+    const tcpCheck = await checkTcpReachable(config.ip_address, targetPort);
+    diagnostics.steps.push({ step: 'tcp_reachability', status: tcpCheck.reachable ? 'passed' : 'failed', detail: tcpCheck.reachable ? `TCP ${config.ip_address}:${targetPort} reachable` : `TCP ${config.ip_address}:${targetPort} failed (${tcpCheck.reason})` });
+
+    if (!tcpCheck.reachable) {
+      const diag = diagnoseConnectionError(new Error(tcpCheck.reason === 'timeout' ? 'ETIMEDOUT' : 'ECONNREFUSED'), config);
+      await db.query('UPDATE mikrotik_connections SET is_online = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+      return res.json({ success: false, message: `Router at ${config.ip_address}:${targetPort} is not reachable`, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: diag });
+    }
+
+    const routerConnectionManager = require('../services/routerConnectionManager');
+    try {
+      await routerConnectionManager.testConnection(config);
+      diagnostics.steps.push({ step: 'authentication', status: 'passed', detail: `${config.connection_type || 'api'} login successful` });
+      await db.query('UPDATE mikrotik_connections SET is_online = true, last_seen = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+      res.json({ success: true, message: 'Connection healthy', diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime } });
+    } catch (error) {
+      const diag = diagnoseConnectionError(error, config);
+      diagnostics.steps.push({ step: 'authentication', status: 'failed', detail: error.message });
+      await db.query('UPDATE mikrotik_connections SET is_online = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+      res.json({ success: false, message: error.message, diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: diag });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
