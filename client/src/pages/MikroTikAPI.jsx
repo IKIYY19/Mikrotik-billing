@@ -1,28 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import {
-  Server,
-  TestTube,
-  Trash2,
-  Wifi,
-  WifiOff,
-  Clock,
-  RefreshCw,
-  Users,
-  Download,
-  X,
-  Check,
-  Pencil,
-  Shield,
-  ArrowRightLeft,
-  Globe,
-  Cable,
-  Lock,
-} from 'lucide-react';
+import { Server, TestTube, Trash2, Wifi, WifiOff, Clock, RefreshCw, Users, Download, X, Check, Pencil, Shield, ArrowRightLeft, Globe, Cable, Lock, TriangleAlert as AlertTriangle, Stethoscope, ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { getToken } from '../lib/auth';
 
 const API = import.meta.env.VITE_API_URL || '/api';
+
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+const DIAGNOSTIC_TIMEOUT = 15000;
 
 const REMOTE_PROFILES = [
   {
@@ -101,6 +90,44 @@ function formatLastSeen(date) {
   return `${diffDays}d ago`;
 }
 
+const ROUTER_SETUP_GUIDES = {
+  api: {
+    title: 'Enable MikroTik API Access',
+    steps: [
+      { label: 'Open WinBox or terminal', command: null, detail: 'Connect to your MikroTik router via WinBox, SSH, or serial console.' },
+      { label: 'Enable the API service', command: '/ip service enable api', detail: 'Enables RouterOS API on the default port 8728.' },
+      { label: 'Restrict API to billing server', command: '/ip service set api address=<billing-server-ip>/32', detail: 'Restrict API access to only the billing server IP for security.' },
+      { label: 'Create a dedicated API user', command: '/user add name=api-billing group=full password=<strong-password>', detail: 'Use a dedicated user with full permissions.' },
+      { label: 'Allow API port in firewall', command: '/ip firewall filter add chain=input protocol=tcp dst-port=8728 src-address=<billing-server-ip> action=accept', detail: 'Add this rule before any drop/reject rules.' },
+      { label: 'Verify the service is running', command: '/ip service print', detail: 'You should see "api" listed with port 8728 and status "running".' },
+    ],
+  },
+  'api-ssl': {
+    title: 'Enable MikroTik API-SSL Access',
+    steps: [
+      { label: 'Open WinBox or terminal', command: null, detail: 'Connect to your MikroTik router via WinBox, SSH, or serial console.' },
+      { label: 'Generate or import a certificate', command: '/certificate add name=api-cert common-name=<router-ip> days-valid=3650', detail: 'For production, use a CA-signed certificate. For internal use, self-signed works.' },
+      { label: 'Enable the API-SSL service', command: '/ip service enable api-ssl', detail: 'Enables RouterOS encrypted API on port 8729.' },
+      { label: 'Set API-SSL certificate', command: '/ip service set api-ssl certificate=api-cert', detail: 'Associate the certificate with the API-SSL service.' },
+      { label: 'Restrict API-SSL to billing server', command: '/ip service set api-ssl address=<billing-server-ip>/32', detail: 'Restrict access to only the billing server IP.' },
+      { label: 'Create a dedicated API user', command: '/user add name=api-billing group=full password=<strong-password>', detail: 'Use a dedicated user with full permissions.' },
+      { label: 'Allow API-SSL port in firewall', command: '/ip firewall filter add chain=input protocol=tcp dst-port=8729 src-address=<billing-server-ip> action=accept', detail: 'Add this rule before any drop/reject rules.' },
+      { label: 'Verify the service is running', command: '/ip service print', detail: 'You should see "api-ssl" listed with port 8729 and status "running".' },
+    ],
+  },
+  ssh: {
+    title: 'Enable MikroTik SSH Access',
+    steps: [
+      { label: 'Open WinBox or terminal', command: null, detail: 'Connect to your MikroTik router via WinBox, SSH, or serial console.' },
+      { label: 'Enable the SSH service', command: '/ip service enable ssh', detail: 'Enables SSH on the default port 22.' },
+      { label: 'Restrict SSH to trusted IPs', command: '/ip service set ssh address=<billing-server-ip>/32', detail: 'Restrict SSH access to only the billing server IP.' },
+      { label: 'Create a dedicated SSH user', command: '/user add name=ssh-billing group=full password=<strong-password>', detail: 'Use a dedicated user with full permissions.' },
+      { label: 'Allow SSH port in firewall', command: '/ip firewall filter add chain=input protocol=tcp dst-port=22 src-address=<billing-server-ip> action=accept', detail: 'Add this rule before any drop/reject rules.' },
+      { label: 'Verify the service is running', command: '/ip service print', detail: 'You should see "ssh" listed with port 22 and status "running".' },
+    ],
+  },
+};
+
 export function MikroTikAPI() {
   const toast = useToast();
   const [connections, setConnections] = useState([]);
@@ -124,6 +151,10 @@ export function MikroTikAPI() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [diagnosingId, setDiagnosingId] = useState(null);
+  const [diagnosticResult, setDiagnosticResult] = useState(null);
+
   const activeProfile = useMemo(
     () => REMOTE_PROFILES.find((profile) => profile.id === remoteProfile) || REMOTE_PROFILES[0],
     [remoteProfile]
@@ -131,7 +162,7 @@ export function MikroTikAPI() {
 
   const fetchConnections = async () => {
     try {
-      const { data } = await axios.get(`${API}/mikrotik`);
+      const { data } = await axios.get(`${API}/mikrotik`, { headers: authHeaders() });
       setConnections(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error('Failed to load MikroTik connections', error.response?.data?.error || error.message);
@@ -140,7 +171,7 @@ export function MikroTikAPI() {
 
   const fetchPlans = async () => {
     try {
-      const { data } = await axios.get(`${API}/billing/plans`);
+      const { data } = await axios.get(`${API}/billing/plans`, { headers: authHeaders() });
       setPlans(Array.isArray(data) ? data : []);
     } catch (error) {
       toast.error('Failed to load billing plans', error.response?.data?.error || error.message);
@@ -184,7 +215,7 @@ export function MikroTikAPI() {
     setLoading(true);
     setTestResult(null);
     try {
-      const { data } = await axios.post(`${API}/mikrotik/test`, payload);
+      const { data } = await axios.post(`${API}/mikrotik/test`, payload, { headers: authHeaders(), timeout: DIAGNOSTIC_TIMEOUT });
       setTestResult(data);
       if (data.success) {toast.success('Connection test passed', data.message || 'Router responded successfully');}
       else {toast.error('Connection test failed', data.message || 'Router did not respond');}
@@ -210,8 +241,8 @@ export function MikroTikAPI() {
     setSaving(true);
     try {
       const { data } = editingConnectionId
-        ? await axios.put(`${API}/mikrotik/${editingConnectionId}`, payload)
-        : await axios.post(`${API}/mikrotik`, payload);
+        ? await axios.put(`${API}/mikrotik/${editingConnectionId}`, payload, { headers: authHeaders() })
+        : await axios.post(`${API}/mikrotik`, payload, { headers: authHeaders() });
 
       setConnections((current) => editingConnectionId
         ? current.map((connection) => connection.id === editingConnectionId ? data : connection)
@@ -261,9 +292,8 @@ export function MikroTikAPI() {
 
   const checkConnection = async (connectionId) => {
     try {
-      const token = getToken();
       await axios.post(`${API}/mikrotik/${connectionId}/check`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(),
       });
       await fetchConnections();
       toast.success('Connection check complete', 'Router status has been refreshed');
@@ -272,10 +302,34 @@ export function MikroTikAPI() {
     }
   };
 
+  const handleDiagnose = async (connectionId) => {
+    setDiagnosingId(connectionId);
+    setDiagnosticResult(null);
+    try {
+      const { data } = await axios.post(`${API}/mikrotik/${connectionId}/diagnose`, {}, {
+        headers: authHeaders(),
+        timeout: DIAGNOSTIC_TIMEOUT,
+      });
+      setDiagnosticResult(data);
+      await fetchConnections();
+      if (data.success) {
+        toast.success('Connection healthy', 'Router responded successfully');
+      } else {
+        toast.error('Connection problem detected', data.message || 'See diagnosis for details');
+      }
+    } catch (error) {
+      const result = { success: false, message: error.response?.data?.error || error.message, diagnosis: { category: 'unknown', title: 'Diagnosis failed', description: error.message, fixes: ['Check that the backend server is running', 'Verify the connection ID is valid'] } };
+      setDiagnosticResult(result);
+      toast.error('Diagnosis failed', error.response?.data?.error || error.message);
+    } finally {
+      setDiagnosingId(null);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this connection?')) {return;}
     try {
-      await axios.delete(`${API}/mikrotik/${id}`);
+      await axios.delete(`${API}/mikrotik/${id}`, { headers: authHeaders() });
       setConnections((current) => current.filter((connection) => connection.id !== id));
       if (editingConnectionId === id) {resetForm();}
       toast.success('Connection deleted', 'The MikroTik connection has been removed');
@@ -283,6 +337,15 @@ export function MikroTikAPI() {
       toast.error('Failed to delete connection', error.response?.data?.error || error.message);
     }
   };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(
+      () => toast.success('Copied', 'Command copied to clipboard'),
+      () => {},
+    );
+  };
+
+  const activeSetupGuide = ROUTER_SETUP_GUIDES[connectionType === 'ssh' ? 'ssh' : (connectionType === 'api-ssl' ? 'api-ssl' : 'api')];
 
   const handleScanUsers = async (connection) => {
     setSelectedConnection(connection);
@@ -293,7 +356,7 @@ export function MikroTikAPI() {
 
     try {
       const endpoint = userType === 'ppp' ? `/mikrotik/${connection.id}/ppp-secrets` : `/mikrotik/${connection.id}/hotspot-users`;
-      const { data } = await axios.get(`${API}${endpoint}`);
+      const { data } = await axios.get(`${API}${endpoint}`, { headers: authHeaders() });
       setFoundUsers(data.users || []);
       setShowImportModal(true);
     } catch (error) {
@@ -329,7 +392,7 @@ export function MikroTikAPI() {
         userType,
         plan_id: userType === 'ppp' ? selectedImportPlanId : null,
         billing_cycle: importBillingCycle,
-      });
+      }, { headers: authHeaders() });
       setImportResult(data);
       if (data.imported > 0) {toast.success('Import finished', `Imported ${data.imported} router users into billing`);}
       else {toast.warning('Nothing imported', 'Every selected user was skipped or failed');}
@@ -522,8 +585,47 @@ export function MikroTikAPI() {
             )}
 
             {testResult && (
-              <div className={`mt-4 rounded p-3 text-sm ${testResult.success ? 'bg-green-600/20 text-green-300' : 'bg-red-600/20 text-red-300'}`}>
-                {testResult.message}
+              <div className={`mt-4 rounded-lg p-4 ${testResult.success ? 'bg-emerald-600/20 border border-emerald-500/40' : 'bg-red-600/20 border border-red-500/40'}`}>
+                <div className={`text-sm font-medium ${testResult.success ? 'text-emerald-300' : 'text-red-300'}`}>
+                  {testResult.message}
+                </div>
+                {testResult.diagnostics && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs font-medium text-slate-400 uppercase tracking-wide">Diagnostic Steps</div>
+                    {testResult.diagnostics.steps?.map((step, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className={`inline-block h-2 w-2 rounded-full ${step.status === 'passed' ? 'bg-emerald-400' : step.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                        <span className="text-slate-300">{step.step}: </span>
+                        <span className={step.status === 'passed' ? 'text-emerald-400' : 'text-red-400'}>{step.detail || step.status}</span>
+                      </div>
+                    ))}
+                    {testResult.diagnostics.elapsed_ms && (
+                      <div className="text-xs text-slate-500">Completed in {testResult.diagnostics.elapsed_ms}ms</div>
+                    )}
+                  </div>
+                )}
+                {testResult.diagnosis && (
+                  <div className="mt-3 rounded border border-slate-700 bg-slate-800/60 p-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+                      <AlertTriangle className="h-4 w-4" />
+                      {testResult.diagnosis.title}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">{testResult.diagnosis.description}</p>
+                    {testResult.diagnosis.fixes?.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs font-medium text-slate-300">Suggested fixes:</div>
+                        <ul className="mt-1 space-y-1">
+                          {testResult.diagnosis.fixes.map((fix, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                              <Check className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-400" />
+                              <span>{fix}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </form>
@@ -564,6 +666,47 @@ export function MikroTikAPI() {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+            <button
+              type="button"
+              onClick={() => setShowSetupGuide(!showSetupGuide)}
+              className="flex w-full items-center justify-between text-lg font-semibold text-white"
+            >
+              <span className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Router Setup Guide
+              </span>
+              {showSetupGuide ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+            </button>
+
+            {showSetupGuide && (
+              <div className="mt-4">
+                <h4 className="mb-3 text-sm font-medium text-blue-300">{activeSetupGuide.title}</h4>
+                <div className="space-y-3">
+                  {activeSetupGuide.steps.map((step, i) => (
+                    <div key={i} className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600/30 text-xs font-bold text-blue-300">{i + 1}</span>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-white">{step.label}</div>
+                          {step.command && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <code className="flex-1 rounded bg-slate-900 px-2 py-1 font-mono text-xs text-emerald-400 break-all">{step.command}</code>
+                              <button type="button" onClick={() => copyToClipboard(step.command)} className="flex-shrink-0 rounded p-1 text-slate-400 hover:text-white" title="Copy command">
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          {step.detail && <p className="mt-1 text-xs text-slate-400">{step.detail}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -623,6 +766,9 @@ export function MikroTikAPI() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button onClick={() => handleDiagnose(connection.id)} disabled={diagnosingId === connection.id} className="rounded-lg bg-amber-600/20 p-2 text-amber-400 transition-colors hover:bg-amber-600/30 disabled:opacity-50" title="Run full diagnostics">
+                        {diagnosingId === connection.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Stethoscope className="h-4 w-4" />}
+                      </button>
                       <button onClick={() => handleScanUsers(connection)} disabled={scanningUsers} className="rounded-lg bg-emerald-600/20 p-2 text-emerald-400 transition-colors hover:bg-emerald-600/30 disabled:opacity-50" title="Scan for users">
                         <Users className="h-4 w-4" />
                       </button>
@@ -648,6 +794,58 @@ export function MikroTikAPI() {
               Save only management paths you actually trust. For many remote routers, VPN + API or RADIUS-centered control is still safer than exposing SSH/API broadly on the public internet.
             </p>
           </div>
+
+          {diagnosticResult && (
+            <div className={`mt-4 rounded-lg border p-4 ${diagnosticResult.success ? 'border-emerald-500/40 bg-emerald-600/10' : 'border-red-500/40 bg-red-600/10'}`}>
+              <h4 className="flex items-center gap-2 font-semibold text-white">
+                <Stethoscope className="h-5 w-5" />
+                Diagnostic Report
+                {diagnosticResult.diagnostics?.connection?.name && (
+                  <span className="text-slate-400">- {diagnosticResult.diagnostics.connection.name}</span>
+                )}
+              </h4>
+
+              {diagnosticResult.diagnostics?.steps && (
+                <div className="mt-3 space-y-2">
+                  {diagnosticResult.diagnostics.steps.map((step, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${step.status === 'passed' ? 'bg-emerald-400' : step.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                      <span className="text-slate-300 font-medium">{step.step}:</span>
+                      <span className={step.status === 'passed' ? 'text-emerald-400' : 'text-red-400'}>{step.detail || step.status}</span>
+                    </div>
+                  ))}
+                  {diagnosticResult.diagnostics.elapsed_ms && (
+                    <div className="text-xs text-slate-500">Completed in {diagnosticResult.diagnostics.elapsed_ms}ms</div>
+                  )}
+                </div>
+              )}
+
+              {diagnosticResult.diagnosis && (
+                <div className="mt-3 rounded border border-slate-700 bg-slate-800/80 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+                    <AlertTriangle className="h-4 w-4" />
+                    {diagnosticResult.diagnosis.title}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">{diagnosticResult.diagnosis.description}</p>
+                  {diagnosticResult.diagnosis.fixes?.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="text-xs font-medium text-slate-300">How to fix:</div>
+                      {diagnosticResult.diagnosis.fixes.map((fix, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                          <Check className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-400" />
+                          <span>{fix}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button type="button" onClick={() => setDiagnosticResult(null)} className="mt-3 text-xs text-slate-400 hover:text-white">
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
