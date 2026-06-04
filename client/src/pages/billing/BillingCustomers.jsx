@@ -483,6 +483,7 @@ export function BillingCustomers() {
   );
 
   return (
+    <>
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -1160,5 +1161,6 @@ export function BillingCustomers() {
         invoice={null}
         defaultAmount={undefined}
       />
+    </>
   );
 }
