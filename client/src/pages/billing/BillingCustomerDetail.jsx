@@ -21,6 +21,7 @@ import {
   Shield,
   AlertTriangle,
   Smartphone,
+  Download,
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { MpesaStkModal } from "../../components/MpesaStkModal";
@@ -230,6 +231,13 @@ export function BillingCustomerDetail() {
             <span className="hidden sm:inline">Send M-Pesa Push</span>
           </button>
           <button
+            onClick={() => window.open(`${API}/billing/customers/${id}/statement`, '_blank')}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Statement</span>
+          </button>
+          <button
             onClick={openPortalModal}
             className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
@@ -415,15 +423,24 @@ export function BillingCustomerDetail() {
                         {inv.due_date}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-white font-semibold">
-                        ${inv.total.toFixed(2)}
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <div className="text-white font-semibold">
+                          KES {inv.total.toFixed(2)}
+                        </div>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded ${statusColor(inv.status)}`}
+                        >
+                          {inv.status}
+                        </span>
                       </div>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded ${statusColor(inv.status)}`}
+                      <button
+                        onClick={() => window.open(`${API}/billing/invoices/${inv.id}/pdf`, '_blank')}
+                        title="Download Invoice PDF"
+                        className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 hover:text-white transition-colors"
                       >
-                        {inv.status}
-                      </span>
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}

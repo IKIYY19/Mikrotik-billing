@@ -52,6 +52,7 @@ import {
   Zap,
   BarChart2,
   Globe,
+  AlertTriangle,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
@@ -79,6 +80,7 @@ const navGroups = [
       { to: "/billing-plans", icon: Package, label: "Plans", feature: "plans" },
       { to: "/billing-subscriptions", icon: Activity, label: "Subscriptions", feature: "subscriptions" },
       { to: "/billing-invoices", icon: Receipt, label: "Invoices", feature: "invoices" },
+      { to: "/billing-aging", icon: AlertTriangle, label: "Aging Report", feature: "invoices" },
       { to: "/billing-payments", icon: CreditCard, label: "Payments", feature: "payments" },
       { to: "/billing-wallet", icon: Wallet, label: "Wallet", feature: "wallet" },
       { to: "/billing-reconcile", icon: Link, label: "Reconcile", feature: "subscriptions" },
@@ -142,6 +144,7 @@ const navGroups = [
     color: "cyan",
     items: [
       { to: "/billing-reports", icon: FileText2, label: "Financial Reports", feature: "reports" },
+      { to: "/billing-aging", icon: AlertTriangle, label: "AR Aging", feature: "reports" },
       { to: "/analytics", icon: TrendingUp, label: "Analytics", feature: "analytics" },
       { to: "/billing-sales", icon: Zap, label: "Sales", feature: "analytics" },
     ],

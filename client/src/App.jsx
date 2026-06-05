@@ -52,6 +52,7 @@ const AutoSuspendPage = lazy(() => import("./pages/billing/AutoSuspendPage").the
 const CustomerPortal = lazy(() => import("./pages/billing/EnhancedCustomerPortal").then(m => ({ default: m.CustomerPortal })));
 const ReviewsManagement = lazy(() => import("./pages/billing/ReviewsManagement").then(m => ({ default: m.ReviewsManagement })));
 const FinancialReports = lazy(() => import("./pages/billing/FinancialReports").then(m => ({ default: m.FinancialReports })));
+const AgingReport = lazy(() => import("./pages/billing/AgingReport").then(m => ({ default: m.AgingReport })));
 const WhatsAppPage = lazy(() => import("./pages/billing/WhatsAppPage").then(m => ({ default: m.WhatsAppPage })));
 const MapView = lazy(() => import("./pages/billing/MapView").then(m => ({ default: m.MapView })));
 const WalletPage = lazy(() => import("./pages/billing/WalletPage").then(m => ({ default: m.WalletPage })));
@@ -228,6 +229,10 @@ function App() {
                         <Route
                           path="/billing-invoices"
                           element={<BillingInvoices />}
+                        />
+                        <Route
+                          path="/billing-aging"
+                          element={<AgingReport />}
                         />
                         <Route
                           path="/billing-payments"
