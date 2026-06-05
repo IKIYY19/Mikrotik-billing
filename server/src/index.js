@@ -733,9 +733,25 @@ const startServer = async () => {
         startUsageAlerts();
         logger.info("Usage alerts cron started (every 1 hour)");
       } catch (e) {
-        logger.warn("Could not start usage alerts cron", {
-          error: e.message,
-        });
+        logger.warn("Could not start usage alerts cron", { error: e.message });
+      }
+
+      // Start recurring billing cron (runs 1st of each month at 00:05)
+      try {
+        const { startCron: startRecurringBilling } = require("./cron/recurringBilling");
+        startRecurringBilling();
+        logger.info("Recurring billing cron started (1st of each month)");
+      } catch (e) {
+        logger.warn("Could not start recurring billing cron", { error: e.message });
+      }
+
+      // Start late payment penalties cron (daily)
+      try {
+        const { startCron: startLatePenalties } = require("./cron/latePenalties");
+        startLatePenalties();
+        logger.info("Late payment penalties cron started (daily)");
+      } catch (e) {
+        logger.warn("Could not start late penalties cron", { error: e.message });
       }
 
       serverInstance = app.listen(PORT, async () => {
