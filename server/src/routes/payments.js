@@ -869,4 +869,147 @@ router.post('/flutterwave/webhook', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// M-PESA C2B PAYBILL — AUTO-RECONCILIATION (Production)
+// Customers pay directly to Paybill; Safaricom sends a callback here.
+// Account Reference = Invoice Number (e.g. "INV-2024-001")
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /payments/mpesa/c2b/register
+ * Registers the C2B confirmation and validation URLs with Safaricom.
+ * Call this once when you configure your Paybill shortcode.
+ */
+router.post('/mpesa/c2b/register', async (req, res) => {
+  try {
+    if (!(await isMpesaConfigured())) {
+      return res.status(503).json({ error: 'M-Pesa not configured. Set MPESA env vars or configure in Integrations.' });
+    }
+    const mpesa = await getMpesaService();
+    const baseUrl = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
+    const confirmationUrl = `${baseUrl}/api/payments/mpesa/c2b/confirmation`;
+    const validationUrl = `${baseUrl}/api/payments/mpesa/c2b/validation`;
+    const result = await mpesa.registerC2BUrl({ ValidationURL: validationUrl, ConfirmationURL: confirmationUrl });
+    res.json({ success: true, confirmation_url: confirmationUrl, validation_url: validationUrl, safaricom_response: result });
+  } catch (e) {
+    console.error('[C2B Register] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** POST /payments/mpesa/c2b/validation — Safaricom pre-validation (accept all) */
+router.post('/mpesa/c2b/validation', (req, res) => {
+  console.log('[C2B Validation]', JSON.stringify(req.body));
+  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+});
+
+/**
+ * POST /payments/mpesa/c2b/confirmation
+ * Safaricom fires this when a Paybill payment completes.
+ * BillRefNumber = Account Reference the customer entered (Invoice# or phone)
+ */
+router.post('/mpesa/c2b/confirmation', async (req, res) => {
+  // Respond immediately — Safaricom needs a fast 200
+  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+
+  const { TransID: transId, TransAmount: transAmountStr, BillRefNumber: billRef, MSISDN: phone, FirstName, MiddleName, LastName } = req.body || {};
+  const amount = parseFloat(transAmountStr) || 0;
+  const payerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
+  console.log(`[C2B] TransID=${transId} | Amount=KES ${amount} | Ref=${billRef} | Phone=${phone}`);
+
+  if (!global.dbAvailable || !global.db || !transId || amount <= 0) {
+    console.error('[C2B] Missing required data or DB unavailable');
+    return;
+  }
+
+  try {
+    // Duplicate check
+    const dup = await global.db.query('SELECT id FROM payments WHERE reference = $1 LIMIT 1', [transId]);
+    if (dup.rows.length > 0) { console.log(`[C2B] Duplicate skipped: ${transId}`); return; }
+
+    let invoice = null;
+    let customerId = null;
+
+    // 1) Match by invoice number
+    if (billRef) {
+      const r = await global.db.query('SELECT * FROM invoices WHERE LOWER(invoice_number) = LOWER($1) LIMIT 1', [billRef.trim()]);
+      if (r.rows.length > 0) { invoice = r.rows[0]; customerId = invoice.customer_id; }
+    }
+    // 2) Match by account_number
+    if (!customerId && billRef) {
+      const r = await global.db.query('SELECT * FROM customers WHERE LOWER(account_number) = LOWER($1) LIMIT 1', [billRef.trim()]);
+      if (r.rows.length > 0) customerId = r.rows[0].id;
+    }
+    // 3) Match by phone
+    if (!customerId && phone) {
+      const normalized = phone.replace(/^\+/, '');
+      const r = await global.db.query(`SELECT id FROM customers WHERE phone LIKE $1 OR phone LIKE $2 LIMIT 1`, [`%${normalized.slice(-9)}`, `%${normalized}`]);
+      if (r.rows.length > 0) customerId = r.rows[0].id;
+    }
+    // 4) Find oldest unpaid invoice for customer
+    if (customerId && !invoice) {
+      const r = await global.db.query(`SELECT * FROM invoices WHERE customer_id = $1 AND status NOT IN ('paid','cancelled') ORDER BY due_date ASC LIMIT 1`, [customerId]);
+      if (r.rows.length > 0) invoice = r.rows[0];
+    }
+
+    // Create payment
+    const { v4: uuid } = require('uuid');
+    const paymentId = uuid();
+    await global.db.query(
+      `INSERT INTO payments (id, customer_id, invoice_id, phone, amount, method, status, reference, receipt_number, notes, received_at)
+       VALUES ($1,$2,$3,$4,$5,'mpesa_c2b','completed',$6,$7,$8,NOW())`,
+      [paymentId, customerId || null, invoice?.id || null, phone || null, amount, transId, transId,
+       `M-Pesa Paybill: ${payerName || phone} | Ref: ${billRef || 'N/A'}`]
+    );
+
+    // Update invoice status
+    if (invoice) {
+      const paid = await global.db.query(`SELECT COALESCE(SUM(amount),0) as total FROM payments WHERE invoice_id = $1 AND status='completed'`, [invoice.id]);
+      const totalPaid = parseFloat(paid.rows[0]?.total || 0);
+      const newStatus = totalPaid >= parseFloat(invoice.total) ? 'paid' : totalPaid > 0 ? 'partial' : invoice.status;
+      if (newStatus !== invoice.status) {
+        await global.db.query(`UPDATE invoices SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2`, [newStatus, invoice.id]);
+        console.log(`[C2B] Invoice ${invoice.invoice_number} → ${newStatus}`);
+      }
+    }
+
+    // SMS confirmation
+    if (customerId) {
+      const custRow = await global.db.query('SELECT * FROM customers WHERE id=$1', [customerId]);
+      if (custRow.rows[0]?.phone) {
+        notificationService.triggerSMS('payment_received', {
+          customer: custRow.rows[0],
+          invoice: invoice || { invoice_number: billRef || transId },
+          payment: { amount, reference: transId, receipt_number: transId },
+        }).catch(e => console.error('[C2B] SMS:', e.message));
+      }
+    }
+
+    // Auto-provision
+    if (invoice?.id) {
+      autoProvision.autoProvisionOnPayment({ id: paymentId, customer_id: customerId, invoice_id: invoice.id, amount })
+        .catch(e => console.error('[C2B] AutoProvision:', e.message));
+    }
+    console.log(`[C2B] ✅ ${transId} processed — KES ${amount}`);
+  } catch (err) {
+    console.error('[C2B] Error:', err.message);
+  }
+});
+
+/** GET /payments/mpesa/c2b/status — Configuration status */
+router.get('/mpesa/c2b/status', async (req, res) => {
+  try {
+    const configured = await isMpesaConfigured();
+    const baseUrl = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
+    res.json({
+      configured,
+      confirmation_url: `${baseUrl}/api/payments/mpesa/c2b/confirmation`,
+      validation_url: `${baseUrl}/api/payments/mpesa/c2b/validation`,
+      setup: configured
+        ? 'Call POST /payments/mpesa/c2b/register to register with Safaricom'
+        : 'Configure MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_PASSKEY, MPESA_SHORTCODE first',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

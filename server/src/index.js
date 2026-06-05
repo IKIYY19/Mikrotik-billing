@@ -744,6 +744,33 @@ const startServer = async () => {
         });
       }
 
+      // Start recurring billing cron (1st of each month at 00:05)
+      try {
+        const { startCron: startRecurringBilling } = require("./cron/recurringBilling");
+        startRecurringBilling();
+        logger.info("Recurring billing cron started (1st of each month)");
+      } catch (e) {
+        logger.warn("Could not start recurring billing cron", { error: e.message });
+      }
+
+      // Start late payment penalties cron (daily, 15min startup delay)
+      try {
+        const { startCron: startLatePenalties } = require("./cron/latePenalties");
+        startLatePenalties();
+        logger.info("Late payment penalties cron started (daily)");
+      } catch (e) {
+        logger.warn("Could not start late penalties cron", { error: e.message });
+      }
+
+      // Start dunning workflow cron (every 6h — reminder, warning, throttle)
+      try {
+        const { startCron: startDunning } = require("./cron/dunningWorkflow");
+        startDunning();
+        logger.info("Dunning workflow cron started (every 6h)");
+      } catch (e) {
+        logger.warn("Could not start dunning workflow cron", { error: e.message });
+      }
+
       serverInstance = app.listen(PORT, async () => {
         logger.info("============================================");
         logger.info(" MikroTik Billing Platform");

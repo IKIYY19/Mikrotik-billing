@@ -170,6 +170,23 @@ class MpesaService {
       String(now.getMinutes()).padStart(2, '0') +
       String(now.getSeconds()).padStart(2, '0');
   }
+
+  // Register C2B confirmation and validation URLs with Safaricom
+  async registerC2BUrl({ ValidationURL, ConfirmationURL, ResponseType = 'Completed' }) {
+    await this.authenticate();
+    const payload = {
+      ShortCode: this.shortcode,
+      ResponseType,
+      ConfirmationURL,
+      ValidationURL,
+    };
+    const response = await axios.post(
+      `${this.baseUrl}/mpesa/c2b/v1/registerurl`,
+      payload,
+      { headers: { Authorization: `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' } }
+    );
+    return response.data;
+  }
 }
 
 module.exports = MpesaService;
