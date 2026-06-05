@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Full-stack web application for generating MikroTik RouterOS scripts",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently --kill-others-on-fail=false \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "nodemon server/src/index.js",
     "dev:client": "cd client && npm run dev",
     "build": "cd server && npm install --omit=dev && cd ../client && npm install && npm run build",
