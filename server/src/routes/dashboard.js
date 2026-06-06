@@ -54,6 +54,10 @@ router.get("/stats", async (req, res) => {
       revenueByDayResult,
       radacctResult,
       recentPaymentsResult,
+      revenueSpark12Result,
+      customerSpark12Result,
+      outstandingSpark12Result,
+      prevWeekActiveResult,
     ] = await Promise.allSettled([
       db.query("SELECT COUNT(*) FROM projects"),
       db.query("SELECT COUNT(*) FROM templates"),
@@ -104,6 +108,31 @@ router.get("/stats", async (req, res) => {
       db.query("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL"),
       db.query(
         "SELECT p.id, p.amount, p.method, p.received_at, c.name as customer_name FROM payments p LEFT JOIN customers c ON c.id = p.customer_id ORDER BY p.received_at DESC LIMIT 5"
+      ),
+      // Sparkline: daily revenue for last 12 days
+      db.query(
+        `SELECT d::date as date, COALESCE(SUM(p.amount), 0) as total
+         FROM generate_series(CURRENT_DATE - INTERVAL '11 days', CURRENT_DATE, '1 day') d
+         LEFT JOIN payments p ON DATE(p.received_at) = d::date
+         GROUP BY d::date ORDER BY d::date`,
+      ),
+      // Sparkline: daily new customers for last 12 days
+      db.query(
+        `SELECT d::date as date, COUNT(c.id) as total
+         FROM generate_series(CURRENT_DATE - INTERVAL '11 days', CURRENT_DATE, '1 day') d
+         LEFT JOIN customers c ON DATE(c.created_at) = d::date
+         GROUP BY d::date ORDER BY d::date`,
+      ),
+      // Sparkline: daily outstanding balance for last 12 days
+      db.query(
+        `SELECT d::date as date, COALESCE(SUM(i.total - COALESCE(i.paid_amount, 0)), 0) as total
+         FROM generate_series(CURRENT_DATE - INTERVAL '11 days', CURRENT_DATE, '1 day') d
+         LEFT JOIN invoices i ON DATE(i.created_at) <= d::date AND i.status IN ('pending', 'partial', 'overdue')
+         GROUP BY d::date ORDER BY d::date`,
+      ),
+      // Customer growth: count at end of previous week vs current
+      db.query(
+        "SELECT COUNT(*) as count FROM customers WHERE created_at < NOW() - INTERVAL '7 days' AND status = 'active'",
       ),
     ]);
 
@@ -159,6 +188,42 @@ router.get("/stats", async (req, res) => {
       recentPaymentsResult.status === "fulfilled"
         ? recentPaymentsResult.value.rows
         : [];
+
+    // Sparkline series (arrays of numbers for the last 12 days)
+    const toSparkArray = (result) => {
+      if (result.status !== "fulfilled") {
+        return [];
+      }
+      return result.value.rows.map((r) => parseFloat(r.total) || 0);
+    };
+    stats.revenueSpark = toSparkArray(revenueSpark12Result);
+    stats.customerSpark = toSparkArray(customerSpark12Result);
+    stats.outstandingSpark = toSparkArray(outstandingSpark12Result);
+
+    // Weekly revenue as day-label + value pairs for the bar chart
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    stats.weeklyRevenue =
+      revenueSpark12Result.status === "fulfilled"
+        ? revenueSpark12Result.value.rows.slice(-7).map((r) => ({
+            label: dayNames[new Date(r.date).getDay()],
+            value: parseFloat(r.total) || 0,
+          }))
+        : [];
+
+    // Customer growth trend (percentage change this week vs last week)
+    const prevWeekActive = val(prevWeekActiveResult);
+    stats.customerGrowth =
+      prevWeekActive > 0
+        ? parseFloat(
+            (
+              ((stats.activeCustomers - prevWeekActive) / prevWeekActive) *
+              100
+            ).toFixed(1),
+          )
+        : stats.activeCustomers > 0
+          ? 100
+          : 0;
+
     stats.timestamp = new Date().toISOString();
 
     // Cache for 10 seconds
