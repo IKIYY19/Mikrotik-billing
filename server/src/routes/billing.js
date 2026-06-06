@@ -1328,7 +1328,6 @@ router.get("/customers/online-status", async (req, res) => {
 
     // Get MikroTik connection
     const db = global.db || require("../db/memory");
-    const { decrypt } = require("../utils/encryption");
 
     const connResult = await db.query(
       "SELECT * FROM mikrotik_connections WHERE id = $1",
@@ -1338,33 +1337,11 @@ router.get("/customers/online-status", async (req, res) => {
       return res.json({ online: {}, pppoe: [], hotspot: [], total: 0 });
 
     const device = connResult.rows[0];
-    let password = decrypt(device.password_encrypted) || "";
 
-
-    // Fetch active PPPoE and Hotspot sessions
-    const MikroNode = require("mikronode");
-    const mikrotik = new MikroNode(device.ip_address, {
-      port: device.api_port || 8728,
-    });
-    const connection = await mikrotik.connect(device.username, password);
-    const close = connection.closeOnDone(true);
-
-    // Get PPPoE active sessions
-    const pppoeChan = connection.openChannel();
-    pppoeChan.write("/ppp/active/print");
-    const pppoeActive = await pppoeChan.done;
-
-    // Get Hotspot active sessions
-    const hotspotChan = connection.openChannel();
-    hotspotChan.write("/ip/hotspot/active/print");
-    const hotspotActive = await hotspotChan.done;
-
-    // Get PPPoE secrets to map username → customer
-    const secretsChan = connection.openChannel();
-    secretsChan.write("/ppp/secret/print", { ".proplist": "name,comment" });
-    await secretsChan.done;
-
-    close();
+    // Fetch active PPPoE and Hotspot sessions via the shared connection manager
+    const routerConnectionManager = require("../services/routerConnectionManager");
+    const pppoeActive = await routerConnectionManager.print(device, "/ppp/active");
+    const hotspotActive = await routerConnectionManager.print(device, "/ip/hotspot/active");
 
     // Build online map: customer_id → session info
     const onlineMap = {};
@@ -1526,10 +1503,6 @@ router.get("/usage/history", async (req, res) => {
     if (connection_id) {
       try {
         const db = global.db || require("../db/memory");
-        const crypto = require("crypto");
-        const algorithm = "aes-256-gcm";
-        const ENCRYPTION_KEY =
-          process.env.ENCRYPTION_KEY || "default-key-change-in-production-32";
 
         const connResult = await db.query(
           "SELECT * FROM mikrotik_connections WHERE id = $1",
@@ -1537,30 +1510,8 @@ router.get("/usage/history", async (req, res) => {
         );
         if (connResult.rows.length > 0) {
           const device = connResult.rows[0];
-          const [ivHex, authTagHex, encrypted] =
-            device.password_encrypted.split(":");
-          const iv = Buffer.from(ivHex, "hex");
-          const authTag = Buffer.from(authTagHex, "hex");
-          const decipher = crypto.createDecipheriv(
-            algorithm,
-            Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
-            iv,
-          );
-          decipher.setAuthTag(authTag);
-          let password = decipher.update(encrypted, "hex", "utf8");
-          password += decipher.final("utf8");
-
-          const MikroNode = require("mikronode");
-          const mikrotik = new MikroNode(device.ip_address, {
-            port: device.api_port || 8728,
-          });
-          const connection = await mikrotik.connect(device.username, password);
-          const close = connection.closeOnDone(true);
-
-          const pppoeChan = connection.openChannel();
-          pppoeChan.write("/ppp/active/print");
-          pppoeSessions = await pppoeChan.done;
-          close();
+          const routerConnectionManager = require("../services/routerConnectionManager");
+          pppoeSessions = await routerConnectionManager.print(device, "/ppp/active");
 
           // Calculate total bandwidth from PPPoE sessions
           for (const session of Array.isArray(pppoeSessions)

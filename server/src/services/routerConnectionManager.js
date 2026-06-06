@@ -27,6 +27,52 @@ class RouterConnectionManager {
     return result.rows[0] || null;
   }
 
+  // Determine SSL usage and port from a router config
+  resolveApiParams(config) {
+    const isSSL =
+      config.connection_type === "api-ssl" ||
+      (config.api_port && Number(config.api_port) === 8729);
+    const defaultPort = isSSL ? 8729 : 8728;
+    const port = Number(config.api_port || defaultPort);
+    return { isSSL, port };
+  }
+
+  // Convert object-style args ({ name: 'x', '.proplist': 'a,b' }) into
+  // RouterOS API params ([ '=name=x', '=.proplist=a,b' ]). Arrays pass through.
+  toApiParams(args) {
+    if (!args) {
+      return [];
+    }
+    if (Array.isArray(args)) {
+      return args;
+    }
+    return Object.entries(args)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `=${key}=${value}`);
+  }
+
+  // Create and connect a node-routeros API client for a router config
+  async createApiClient(config) {
+    const { RouterOSAPI } = require("node-routeros");
+    const password = this.decryptPassword(
+      config.password_encrypted || config.password
+    );
+    const { isSSL, port } = this.resolveApiParams(config);
+
+    const api = new RouterOSAPI({
+      host: config.ip_address,
+      user: config.username,
+      password,
+      port,
+      timeout: 8, // seconds
+      // RouterOS routers typically use self-signed certs for api-ssl
+      tls: isSSL ? { rejectUnauthorized: false } : undefined,
+    });
+
+    await api.connect();
+    return api;
+  }
+
   // Get an existing cached connection or establish a new one
   async getOrCreateConnection(routerIdOrConfig) {
     let config = null;
@@ -44,31 +90,25 @@ class RouterConnectionManager {
       throw new Error("Router configuration not found");
     }
 
-    // Check cached connection
+    // Check cached connection (reuse only while still connected)
     if (this.connections.has(routerId)) {
       const connObj = this.connections.get(routerId);
-      connObj.lastUsed = Date.now();
-      return connObj;
+      if (connObj.api && connObj.api.connected) {
+        connObj.lastUsed = Date.now();
+        return connObj;
+      }
+      this.closeConnection(routerId);
     }
 
-    const password = this.decryptPassword(config.password_encrypted || config.password);
-    const isSSL = config.connection_type === "api-ssl" || (config.api_port && Number(config.api_port) === 8729);
-    const defaultPort = isSSL ? 8729 : 8728;
-    const port = Number(config.api_port || defaultPort);
+    const { isSSL, port } = this.resolveApiParams(config);
+    logger.info(
+      `Establishing new MikroTik connection to ${config.name || config.ip_address} on port ${port} (SSL: ${isSSL})`
+    );
 
-    logger.info(`Establishing new MikroTik connection to ${config.name || config.ip_address} on port ${port} (SSL: ${isSSL})`);
-
-    const MikroNode = require("mikronode");
-    const device = new MikroNode(config.ip_address, {
-      port,
-      ssl: isSSL,
-      timeout: 5000, // 5s timeout for initial connect
-    });
-
-    const connection = await device.connect(config.username, password);
+    const api = await this.createApiClient(config);
 
     const connObj = {
-      connection,
+      api,
       config,
       created: Date.now(),
       lastUsed: Date.now(),
@@ -97,9 +137,7 @@ class RouterConnectionManager {
         let connObj = null;
         try {
           connObj = await this.getOrCreateConnection(routerIdOrConfig);
-          const channel = connObj.connection.openChannel();
-          channel.write(command, args);
-          const result = await channel.done;
+          const result = await connObj.api.write(command, this.toApiParams(args));
           connObj.lastUsed = Date.now();
           return result;
         } catch (error) {
@@ -142,7 +180,9 @@ class RouterConnectionManager {
     if (this.connections.has(routerId)) {
       const connObj = this.connections.get(routerId);
       try {
-        connObj.connection.close();
+        if (connObj.api) {
+          connObj.api.close();
+        }
       } catch (err) {
         logger.debug(`Error closing MikroTik connection for router ${routerId}: ${err.message}`);
       }
@@ -159,20 +199,17 @@ class RouterConnectionManager {
 
   // Test credentials/API connection without caching
   async testConnection(config) {
-    const password = this.decryptPassword(config.password_encrypted || config.password);
-    const isSSL = config.connection_type === "api-ssl" || (config.api_port && Number(config.api_port) === 8729);
-    const defaultPort = isSSL ? 8729 : 8728;
-    const port = Number(config.api_port || defaultPort);
-
-    const MikroNode = require("mikronode");
-    const device = new MikroNode(config.ip_address, {
-      port,
-      ssl: isSSL,
-      timeout: 5000,
-    });
-
-    const connection = await device.connect(config.username, password);
-    connection.close();
+    const api = await this.createApiClient(config);
+    try {
+      // A lightweight command confirms both login and command execution.
+      await api.write("/system/identity/print");
+    } finally {
+      try {
+        api.close();
+      } catch (err) {
+        logger.debug(`Error closing test connection: ${err.message}`);
+      }
+    }
     return true;
   }
 

@@ -254,22 +254,17 @@ router.get("/monitoring/dashboard", async (req, res) => {
       if (!device.password) {continue;}
 
       try {
-        const MikroNode = require("mikronode");
-        const mikrotik = new MikroNode(device.ip_address, {
-          port: device.api_port || 8728,
-        });
-        const conn = await mikrotik.connect(device.username, device.password);
-        const close = conn.closeOnDone(true);
+        const routerConnectionManager = require("../services/routerConnectionManager");
 
         // Get real router resources and PPPoE active sessions from MikroTik
-        const resourceChan = conn.openChannel();
-        resourceChan.write("/system/resource/print");
-        const resources = await resourceChan.done;
-
-        const pppoeChan = conn.openChannel();
-        pppoeChan.write("/ppp/active/print");
-        const pppoeActive = await pppoeChan.done;
-        close();
+        const resources = await routerConnectionManager.executeCommand(
+          device,
+          "/system/resource/print",
+        );
+        const pppoeActive = await routerConnectionManager.print(
+          device,
+          "/ppp/active",
+        );
 
         const resource = Array.isArray(resources) ? resources[0] || {} : {};
         const cpuUsage = parseFloat(resource["cpu-load"] || 0);
