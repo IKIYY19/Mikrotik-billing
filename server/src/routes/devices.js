@@ -30,14 +30,6 @@ function normalizeStringList(value, fallback = []) {
   return fallback;
 }
 
-async function runMikroTikPrint(session, path, properties = null) {
-  const channel = session.openChannel();
-  const args = properties ? { ".proplist": properties } : {};
-  channel.write(`${path}/print`, args);
-  const result = await channel.done;
-  return Array.isArray(result) ? result : [];
-}
-
 async function scanMikroTikRouter({
   ip_address,
   api_port,
@@ -53,22 +45,20 @@ async function scanMikroTikRouter({
     throw new Error("Router username and password are required for scan");
   }
 
-  const MikroNode = require("mikronode");
+  const routerConnectionManager = require("../services/routerConnectionManager");
   const port = Number(api_port || mgmt_port || 8728);
-  const mikrotik = new MikroNode(ip_address, { port });
-  const conn = await mikrotik.connect(username, password);
-  const close = conn.closeOnDone(true);
+  const config = { ip_address, api_port: port, username, password };
 
   try {
-    const resources = await runMikroTikPrint(conn, "/system/resource");
-    const identities = await runMikroTikPrint(conn, "/system/identity");
-    const interfaces = await runMikroTikPrint(
-      conn,
+    const resources = await routerConnectionManager.print(config, "/system/resource");
+    const identities = await routerConnectionManager.print(config, "/system/identity");
+    const interfaces = await routerConnectionManager.print(
+      config,
       "/interface",
       ".id,name,type,mac-address,disabled,running,default-name,comment",
     );
-    const addresses = await runMikroTikPrint(
-      conn,
+    const addresses = await routerConnectionManager.print(
+      config,
       "/ip/address",
       ".id,address,interface,disabled,comment",
     );
@@ -123,7 +113,7 @@ async function scanMikroTikRouter({
       },
     };
   } finally {
-    close();
+    routerConnectionManager.closeConnection(config.id || config.ip_address);
   }
 }
 

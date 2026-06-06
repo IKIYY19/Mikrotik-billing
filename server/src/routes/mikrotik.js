@@ -220,7 +220,7 @@ router.post('/test', async (req, res) => {
 
   // Authenticate (5s timeout)
   if (connection_type === 'ssh') {
-    const MikroTikSSHService = require('../services/mikrotikSSH');
+    const sshService = require('../services/mikrotikSSH');
     try {
       if (use_tunnel) {
         return res.json({ success: false, message: 'SSH tunneling requires additional setup. Use VPN or direct SSH.', diagnostics: { ...diagnostics, elapsed_ms: Date.now() - startTime }, diagnosis: { category: 'tunnel_unsupported', title: 'SSH tunneling not fully supported', description: 'Jump-host SSH tunneling is basic. Use VPN for reliable remote access.', fixes: ['Set up WireGuard or IPsec VPN', 'Use the router VPN-side IP with the VPN/API profile'] } });

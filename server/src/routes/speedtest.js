@@ -51,64 +51,52 @@ router.post("/run", async (req, res) => {
       return res.status(400).json({ error: "Connection credentials missing", details: "Add management credentials on the Routers page" });
     }
 
-    const MikroNode = require("mikronode");
-    const isSSL = conn.connection_type === "api-ssl" || (conn.api_port && conn.api_port == 8729);
-    const device = new MikroNode(conn.ip_address, { port: conn.api_port || 8728, ssl: isSSL, timeout: (duration + 10) * 1000 });
-    const session = await device.connect(conn.username, conn.password);
-    const close = session.closeOnDone(true);
+    const routerConnectionManager = require("../services/routerConnectionManager");
 
-    try {
-      const args = {
-        duration: String(duration),
-        protocol: protocol,
-        "interval": "1s",
-      };
-      if (test_to) args["address"] = test_to;
-      if (direction === "tx") args.direction = "transmit";
-      else if (direction === "rx") args.direction = "receive";
+    const args = {
+      duration: String(duration),
+      protocol: protocol,
+    };
+    if (test_to) args["address"] = test_to;
+    if (direction === "tx") args.direction = "transmit";
+    else if (direction === "rx") args.direction = "receive";
 
-      logger.info(`[SpeedTest] Starting on ${conn.name} (${conn.ip_address})`, { direction, duration, protocol });
+    logger.info(`[SpeedTest] Starting on ${conn.name} (${conn.ip_address})`, { direction, duration, protocol });
 
-      const channel = session.openChannel();
-      channel.write("/tool/bandwidth-test", args);
+    // bandwidth-test streams !re sentences and resolves on !done after the duration
+    const monitorResult = await routerConnectionManager.executeCommand(
+      conn,
+      "/tool/bandwidth-test",
+      args,
+    );
 
-      await new Promise(resolve => setTimeout(resolve, (duration + 3) * 1000));
-
-      const monitorChannel = session.openChannel();
-      const monitorResult = await monitorChannel.write("/tool/bandwidth-test/print");
-      close();
-
-      if (!monitorResult || monitorResult.length === 0) {
-        const fallback = await runPingTest(session, conn, test_to, duration);
-        fallback.connection_id = connection_id;
-        fallback.connection_name = conn.name;
-        await saveResult(fallback);
-        return res.json(fallback);
-      }
-
-      const last = Array.isArray(monitorResult) ? monitorResult[monitorResult.length - 1] : monitorResult;
-      const result = {
-        connection_id,
-        connection_name: conn.name,
-        test_to: test_to || conn.ip_address,
-        direction,
-        duration: duration,
-        protocol,
-        download_mbps: parseFloat(last["rx-10-second-average"] || last["rx-current"] || 0) / 1000000,
-        upload_mbps: parseFloat(last["tx-10-second-average"] || last["tx-current"] || 0) / 1000000,
-        latency_ms: parseFloat(last["tcp-latency"] || 0),
-        jitter_ms: parseFloat(last["udp-jitter"] || 0),
-        packet_loss_pct: parseFloat(last["lost-packets"] || 0) / Math.max(parseFloat(last["total-packets"] || 1), 1) * 100,
-        timestamp: new Date().toISOString(),
-      };
-
-      await saveResult(result);
-      logger.info(`[SpeedTest] ${conn.name}: ↓${result.download_mbps.toFixed(1)}Mbps ↑${result.upload_mbps.toFixed(1)}Mbps`);
-      res.json(result);
-
-    } finally {
-      if (close) close();
+    if (!monitorResult || monitorResult.length === 0) {
+      const fallback = await runPingTest(conn, test_to, duration);
+      fallback.connection_id = connection_id;
+      fallback.connection_name = conn.name;
+      await saveResult(fallback);
+      return res.json(fallback);
     }
+
+    const last = Array.isArray(monitorResult) ? monitorResult[monitorResult.length - 1] : monitorResult;
+    const result = {
+      connection_id,
+      connection_name: conn.name,
+      test_to: test_to || conn.ip_address,
+      direction,
+      duration: duration,
+      protocol,
+      download_mbps: parseFloat(last["rx-10-second-average"] || last["rx-current"] || 0) / 1000000,
+      upload_mbps: parseFloat(last["tx-10-second-average"] || last["tx-current"] || 0) / 1000000,
+      latency_ms: parseFloat(last["tcp-latency"] || 0),
+      jitter_ms: parseFloat(last["udp-jitter"] || 0),
+      packet_loss_pct: parseFloat(last["lost-packets"] || 0) / Math.max(parseFloat(last["total-packets"] || 1), 1) * 100,
+      timestamp: new Date().toISOString(),
+    };
+
+    await saveResult(result);
+    logger.info(`[SpeedTest] ${conn.name}: ↓${result.download_mbps.toFixed(1)}Mbps ↑${result.upload_mbps.toFixed(1)}Mbps`);
+    res.json(result);
   } catch (e) {
     logger.error("[SpeedTest] Failed:", { error: e.message });
     const fallback = await runFallbackTest(req.body.connection_id);
@@ -116,16 +104,16 @@ router.post("/run", async (req, res) => {
   }
 });
 
-async function runPingTest(session, conn, testTo, count) {
+async function runPingTest(conn, testTo, count) {
+  const routerConnectionManager = require("../services/routerConnectionManager");
   const target = testTo || "8.8.8.8";
-  const chan = session.openChannel();
   const results = [];
   let lost = 0;
 
   for (let i = 0; i < Math.min(count, 5); i++) {
     try {
       const start = Date.now();
-      const pingResult = await chan.write("/ping", { address: target, count: "1" });
+      const pingResult = await routerConnectionManager.executeCommand(conn, "/ping", { address: target, count: "1" });
       const elapsed = Date.now() - start;
       if (pingResult && !pingResult.error) {
         results.push(elapsed);
@@ -157,17 +145,13 @@ async function runPingTest(session, conn, testTo, count) {
 async function runFallbackTest(connectionId) {
   try {
     const conn = await getConnection(connectionId);
-    const MikroNode = require("mikronode");
-    const isSSL = conn.connection_type === "api-ssl" || (conn.api_port && conn.api_port == 8729);
-    const device = new MikroNode(conn.ip_address, { port: conn.api_port || 8728, ssl: isSSL, timeout: 15000 });
-    const session = await device.connect(conn.username, conn.password);
-    const close = session.closeOnDone(true);
+    const routerConnectionManager = require("../services/routerConnectionManager");
+    const resourceResult = await routerConnectionManager.executeCommand(
+      conn,
+      "/system/resource/print",
+    );
 
-    const chan = session.openChannel();
-    const resourceResult = await chan.write("/system/resource/print");
-    close();
-
-    const cpu = resourceResult[0]?.["cpu-load"] || "0";
+    const cpu = (Array.isArray(resourceResult) ? resourceResult[0] : resourceResult)?.["cpu-load"] || "0";
     return {
       connection_id: connectionId,
       connection_name: conn.name,
