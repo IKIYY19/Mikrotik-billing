@@ -177,34 +177,46 @@ function ActivityItem({ type, name, amount, time, currency }) {
 
 // ─── Mini Bar Chart ───────────────────────────────────────────────────────────
 function MiniBarChart({ data = [], color = "#818cf8", label = "" }) {
-  if (!data || data.length === 0) return null;
-  const max = Math.max(...data.map(d => d.value || 0), 1);
+  const hasData = data && data.length > 0 && data.some(d => (d.value || 0) > 0);
+  const max = hasData ? Math.max(...data.map(d => d.value || 0), 1) : 1;
 
   return (
     <div>
       {label && <p className="text-xs font-semibold text-white/60 mb-3 uppercase tracking-wider">{label}</p>}
-      <div className="flex items-end gap-1.5 h-16">
-        {data.map((d, i) => {
-          const pct = ((d.value || 0) / max) * 100;
-          const isLast = i === data.length - 1;
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-              <div
-                className="w-full rounded-t-sm transition-all duration-300"
-                style={{
-                  height: `${Math.max(pct, 4)}%`,
-                  background: isLast ? color : `${color}55`,
-                  boxShadow: isLast ? `0 0 8px ${color}66` : "none",
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>{data[0]?.label}</span>
-        <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>{data[data.length - 1]?.label}</span>
-      </div>
+      {!hasData ? (
+        <div className="flex items-center justify-center h-16" style={{ color: "var(--text-muted)" }}>
+          <p className="text-xs">No revenue data yet</p>
+        </div>
+      ) : (
+        <div className="flex items-end gap-1.5 h-16">
+          {data.map((d, i) => {
+            const pct = ((d.value || 0) / max) * 100;
+            const isLast = i === data.length - 1;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-medium whitespace-nowrap px-1 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}>
+                  {(d.value || 0).toLocaleString()}
+                </div>
+                <div
+                  className="w-full rounded-t-sm transition-all duration-300"
+                  style={{
+                    height: `${Math.max(pct, 4)}%`,
+                    background: isLast ? color : `${color}55`,
+                    boxShadow: isLast ? `0 0 8px ${color}66` : "none",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {data.length > 0 && (
+        <div className="flex justify-between mt-1">
+          {data.map((d, i) => (
+            <span key={i} className="text-[10px] flex-1 text-center" style={{ color: "var(--text-dim)" }}>{d.label}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -235,16 +247,7 @@ function QuickAction({ icon: Icon, label, color, onClick }) {
   );
 }
 
-// ─── Fake sparkline generator ─────────────────────────────────────────────────
-function generateFakeSparkline(base = 100, points = 12, variance = 0.2) {
-  const data = [];
-  let current = base;
-  for (let i = 0; i < points; i++) {
-    current = current + (Math.random() - 0.45) * base * variance;
-    data.push(Math.max(0, Math.round(current)));
-  }
-  return data;
-}
+
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export function Dashboard() {
@@ -296,9 +299,11 @@ export function Dashboard() {
     toast.success("Dashboard refreshed");
   };
 
-  // Build monthly bar data from last 7 days (placeholder until real data)
-  const weekLabels = ["M", "T", "W", "T", "F", "S", "S"];
-  const weekRevenue = stats?.weeklyRevenue || weekLabels.map((_, i) => ({ label: weekLabels[i], value: Math.floor(Math.random() * 50000 + 10000) }));
+  // Build weekly bar data from real backend data
+  const defaultWeekLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekRevenue = stats?.weeklyRevenue?.length > 0
+    ? stats.weeklyRevenue
+    : defaultWeekLabels.map((l) => ({ label: l, value: 0 }));
 
   if (loading && !stats) {
     return (
@@ -360,7 +365,7 @@ export function Dashboard() {
               trend={stats.revenueChange || 0}
               trendLabel={`${stats.todayPayments || 0} payments today`}
               color="emerald"
-              sparkData={generateFakeSparkline(stats.todayRevenue || 100)}
+              sparkData={stats.revenueSpark || []}
               onClick={() => navigate("/billing-reports")}
             />
             <KpiCard
@@ -371,7 +376,7 @@ export function Dashboard() {
               trend={stats.revenueChange || 0}
               trendLabel="vs last month"
               color="blue"
-              sparkData={generateFakeSparkline(stats.monthRevenue || 500)}
+              sparkData={stats.revenueSpark || []}
               onClick={() => navigate("/billing-reports")}
             />
             <KpiCard
@@ -381,17 +386,17 @@ export function Dashboard() {
               prefix={`${currencySymbol} `}
               trendLabel={`${stats.overdueInvoices || 0} overdue invoices`}
               color="amber"
-              sparkData={generateFakeSparkline(stats.outstandingBalance || 200, 12, 0.1)}
+              sparkData={stats.outstandingSpark || []}
               onClick={() => navigate("/billing-invoices")}
             />
             <KpiCard
               icon={Users}
               label="Active Customers"
               value={stats.activeCustomers || 0}
-              trend={2}
+              trend={stats.customerGrowth}
               trendLabel={`${stats.activeSubscriptions || 0} subscriptions`}
               color="violet"
-              sparkData={generateFakeSparkline(stats.activeCustomers || 50, 12, 0.05)}
+              sparkData={stats.customerSpark || []}
               onClick={() => navigate("/billing-customers")}
             />
           </div>
@@ -433,7 +438,7 @@ export function Dashboard() {
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#818cf8" }}>7 days</span>
             </div>
             <MiniBarChart
-              data={weekLabels.map((l, i) => ({ label: l, value: stats?.weeklyRevenue?.[i] || Math.floor(Math.random() * 60000 + 5000) }))}
+              data={weekRevenue}
               color="#818cf8"
             />
             <div className="mt-4 pt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
