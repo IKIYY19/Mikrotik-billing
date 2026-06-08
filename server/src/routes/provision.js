@@ -3056,4 +3056,299 @@ router.get("/v1/scripts/sync", async (req, res) => {
   res.type("text/plain").send(':log info "[Billing] Sync OK"');
 });
 
+// GET /v1/:slug/routers/:routerId/diagnostics
+router.get("/v1/:slug/routers/:routerId/diagnostics", async (req, res) => {
+  try {
+    const { slug, routerId } = req.params;
+    const authHeader = req.headers.authorization;
+    const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
+
+    const db = getDb();
+    let tenant = await findTenantBySlugOrKey(slug, null);
+    if (!tenant && apiKey) {
+      tenant = await findTenantBySlugOrKey(null, apiKey);
+    }
+    if (!tenant) {
+      return res.status(403).json({ error: "Invalid tenant or API key" });
+    }
+
+    const routerResult = await db.query("SELECT * FROM routers WHERE id = $1", [routerId]);
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: "Router not found" });
+    }
+    const routerRow = routerResult.rows[0];
+
+    const steps = [];
+
+    // 1. Check if router has a management connection linked
+    if (!routerRow.linked_mikrotik_connection_id) {
+      steps.push({
+        id: "credentials",
+        label: "Management Credentials",
+        status: "error",
+        message: "No management credentials are configured for this router. Sync and push features will not work.",
+        fix: "Upgrade to Full Management by submitting the router admin credentials below."
+      });
+      return res.json({ status: "error", steps });
+    }
+
+    // Load connection record
+    const connResult = await db.query("SELECT * FROM mikrotik_connections WHERE id = $1", [routerRow.linked_mikrotik_connection_id]);
+    if (connResult.rows.length === 0) {
+      steps.push({
+        id: "credentials",
+        label: "Management Connection",
+        status: "error",
+        message: "The linked connection record was deleted or is missing from database.",
+        fix: "Re-link this router by upgrading to full management again."
+      });
+      return res.json({ status: "error", steps });
+    }
+    const conn = connResult.rows[0];
+
+    // Check TCP reachability
+    const targetPort = conn.connection_type === "ssh" ? (conn.ssh_port || 22) : (conn.api_port || 8728);
+    const net = require("net");
+    const checkTcp = () => new Promise((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(2500);
+      socket.on("connect", () => { socket.destroy(); resolve(true); });
+      socket.on("timeout", () => { socket.destroy(); resolve(false); });
+      socket.on("error", () => { socket.destroy(); resolve(false); });
+      socket.connect(targetPort, conn.ip_address);
+    });
+
+    const isTcpReachable = await checkTcp();
+    steps.push({
+      id: "api_service",
+      label: "API Service Reachability",
+      status: isTcpReachable ? "ok" : "error",
+      message: isTcpReachable 
+        ? `API port ${targetPort} is open and reachable at ${conn.ip_address}.`
+        : `Could not reach API port ${targetPort} at ${conn.ip_address}. The router may be offline or firewall is blocking incoming connections.`,
+      fix: isTcpReachable ? null : `/ip service enable api\n/ip firewall filter add chain=input protocol=tcp dst-port=${targetPort} action=accept comment="Allow Billing Server API" place-before=0`
+    });
+
+    if (!isTcpReachable) {
+      return res.json({ status: "error", steps });
+    }
+
+    // Try connecting to verify credentials
+    const routerConnectionManager = require("../services/routerConnectionManager");
+    const config = {
+      ip_address: conn.ip_address,
+      api_port: conn.api_port,
+      ssh_port: conn.ssh_port,
+      username: conn.username,
+      password: require("../utils/encryption").decrypt(conn.password_encrypted),
+      connection_type: conn.connection_type,
+    };
+
+    let isAuthOk = false;
+    let authErrorMsg = "";
+    try {
+      await routerConnectionManager.testConnection(config);
+      isAuthOk = true;
+    } catch (authErr) {
+      authErrorMsg = authErr.message || String(authErr);
+    }
+
+    steps.push({
+      id: "credentials",
+      label: "Router Authentication",
+      status: isAuthOk ? "ok" : "error",
+      message: isAuthOk 
+        ? "API authentication credentials verified successfully."
+        : `API login failed for user "${conn.username}". Error: ${authErrorMsg}.`,
+      fix: isAuthOk ? null : "Enter the correct router Winbox admin username and password under 'Upgrade to Full Management' below and submit."
+    });
+
+    if (!isAuthOk) {
+      return res.json({ status: "error", steps });
+    }
+
+    // If connected, query settings to verify RADIUS, PPPoE server, and Sync scheduler
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+    const isHttps = baseUrl.startsWith("https");
+    const fetchMode = isHttps ? "https" : "http";
+    const certFlag = isHttps ? "check-certificate=no" : "";
+
+    try {
+      const radiusClientList = await routerConnectionManager.print(conn, "/radius");
+      const radiusOk = radiusClientList.some(r => r.address && r.service && r.service.includes("ppp"));
+      
+      steps.push({
+        id: "radius_client",
+        label: "RADIUS Client Configuration",
+        status: radiusOk ? "ok" : "warning",
+        message: radiusOk 
+          ? "RADIUS client is configured on the router."
+          : "RADIUS client is missing or not configured for PPP/Hotspot services.",
+        fix: radiusOk ? null : `/radius add address=${process.env.RADIUS_SERVER || req.get("host")} secret="YOUR_RADIUS_SECRET" service=ppp,hotspot timeout=300ms comment="ISP RADIUS" disabled=no`
+      });
+    } catch (e) {
+      steps.push({ id: "radius_client", label: "RADIUS Client Configuration", status: "warning", message: `Failed to check: ${e.message}` });
+    }
+
+    try {
+      const pppoeServers = await routerConnectionManager.print(conn, "/interface/pppoe-server/server");
+      const pppoeOk = pppoeServers.some(s => s.disabled === "false");
+      steps.push({
+        id: "pppoe_server",
+        label: "PPPoE Server Service",
+        status: pppoeOk ? "ok" : "warning",
+        message: pppoeOk 
+          ? "PPPoE server is running on the router."
+          : "No active PPPoE server found on the router interface.",
+        fix: pppoeOk ? null : `/interface pppoe-server server add service-name=pppoe-internet interface=bridge1 authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no`
+      });
+    } catch (e) {
+      steps.push({ id: "pppoe_server", label: "PPPoE Server Service", status: "warning", message: `Failed to check: ${e.message}` });
+    }
+
+    try {
+      const schedulers = await routerConnectionManager.print(conn, "/system/scheduler");
+      const syncOk = schedulers.some(s => s.name === "billing-sync" && s.disabled === "false");
+      steps.push({
+        id: "billing_sync",
+        label: "Billing Sync Scheduler",
+        status: syncOk ? "ok" : "warning",
+        message: syncOk 
+          ? "Billing auto-sync scheduler is active."
+          : "Billing auto-sync scheduler is missing or disabled on the router.",
+        fix: syncOk ? null : `/system scheduler add name=billing-sync interval=5m on-event="/tool fetch url=\\"${baseUrl}/api/router/v1/${slug}/sync\\" http-header-field=\\"Authorization: Bearer ${apiKey}\\" mode=${fetchMode} ${certFlag} output=none" comment="ISP Billing Sync" disabled=no`
+      });
+    } catch (e) {
+      steps.push({ id: "billing_sync", label: "Billing Sync Scheduler", status: "warning", message: `Failed to check: ${e.message}` });
+    }
+
+    res.json({ status: "ok", steps });
+  } catch (err) {
+    logger.error("Router diagnostics error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /v1/:slug/routers/:routerId/diagnostics/:stepId/apply
+router.post("/v1/:slug/routers/:routerId/diagnostics/:stepId/apply", async (req, res) => {
+  try {
+    const { slug, routerId, stepId } = req.params;
+    const authHeader = req.headers.authorization;
+    const apiKey = (authHeader && authHeader.startsWith("Bearer ")) ? authHeader.split(" ")[1] : null;
+
+    const db = getDb();
+    let tenant = await findTenantBySlugOrKey(slug, null);
+    if (!tenant && apiKey) {
+      tenant = await findTenantBySlugOrKey(null, apiKey);
+    }
+    if (!tenant) {
+      return res.status(403).json({ error: "Invalid tenant or API key" });
+    }
+
+    const routerResult = await db.query("SELECT * FROM routers WHERE id = $1", [routerId]);
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: "Router not found" });
+    }
+    const routerRow = routerResult.rows[0];
+
+    if (!routerRow.linked_mikrotik_connection_id) {
+      return res.status(400).json({ error: "Router has no management connection linked" });
+    }
+
+    const connResult = await db.query("SELECT * FROM mikrotik_connections WHERE id = $1", [routerRow.linked_mikrotik_connection_id]);
+    if (connResult.rows.length === 0) {
+      return res.status(400).json({ error: "Linked connection not found" });
+    }
+    const conn = connResult.rows[0];
+
+    const routerConnectionManager = require("../services/routerConnectionManager");
+
+    if (stepId === "radius_client") {
+      const radiusServer = process.env.RADIUS_SERVER || req.get("host");
+      const radiusSecret = process.env.RADIUS_SECRET || (apiKey || slug).substring(0, 16);
+      
+      try {
+        const existing = await routerConnectionManager.print(conn, "/radius");
+        if (existing.length > 0) {
+          await routerConnectionManager.executeCommand(conn, "/radius/set", {
+            ".id": existing[0][".id"],
+            address: radiusServer,
+            secret: radiusSecret,
+            service: "ppp,hotspot",
+            comment: "ISP RADIUS",
+            disabled: "no"
+          });
+        } else {
+          await routerConnectionManager.executeCommand(conn, "/radius/add", {
+            address: radiusServer,
+            secret: radiusSecret,
+            service: "ppp,hotspot",
+            timeout: "300ms",
+            comment: "ISP RADIUS",
+            disabled: "no"
+          });
+        }
+      } catch (e) {
+        throw new Error(`Failed to configure RADIUS client: ${e.message}`);
+      }
+      return res.json({ success: true, message: "RADIUS client configured successfully" });
+    }
+
+    if (stepId === "pppoe_server") {
+      try {
+        const existing = await routerConnectionManager.print(conn, "/interface/pppoe-server/server");
+        if (existing.length > 0) {
+          await routerConnectionManager.executeCommand(conn, "/interface/pppoe-server/server/set", {
+            ".id": existing[0][".id"],
+            disabled: "no"
+          });
+        } else {
+          await routerConnectionManager.executeCommand(conn, "/interface/pppoe-server/server/add", {
+            "service-name": "pppoe-internet",
+            interface: "bridge1",
+            authentication: "pap,chap,mschap1,mschap2",
+            "one-session-per-host": "yes",
+            disabled: "no"
+          });
+        }
+      } catch (e) {
+        throw new Error(`Failed to configure PPPoE server: ${e.message}`);
+      }
+      return res.json({ success: true, message: "PPPoE server enabled successfully" });
+    }
+
+    if (stepId === "billing_sync") {
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+      const isHttps = baseUrl.startsWith("https");
+      const fetchMode = isHttps ? "https" : "http";
+      const certFlag = isHttps ? "check-certificate=no" : "";
+      const syncUrl = `${baseUrl}/api/router/v1/${slug}/sync`;
+
+      try {
+        const existing = await routerConnectionManager.print(conn, "/system/scheduler", { name: "billing-sync" });
+        if (existing.length > 0) {
+          await routerConnectionManager.executeCommand(conn, "/system/scheduler/remove", {
+            ".id": existing[0][".id"]
+          });
+        }
+        await routerConnectionManager.executeCommand(conn, "/system/scheduler/add", {
+          name: "billing-sync",
+          interval: "5m",
+          "on-event": `/tool fetch url="${syncUrl}" http-header-field="Authorization: Bearer ${apiKey}" mode=${fetchMode} ${certFlag} output=none`,
+          comment: "ISP Billing Sync",
+          disabled: "no"
+        });
+      } catch (e) {
+        throw new Error(`Failed to configure sync scheduler: ${e.message}`);
+      }
+      return res.json({ success: true, message: "Billing auto-sync scheduler installed successfully" });
+    }
+
+    res.status(400).json({ error: `Step '${stepId}' is not auto-fixable via this API` });
+  } catch (err) {
+    logger.error("Failed to apply diagnostics fix:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
