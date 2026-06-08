@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+# ─── Northflank Dockerfile ────────────────────────────────────────────────────
+# Single image: builds React client, serves via Node.js backend on port 5000.
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM node:20-alpine AS builder
+
+# Build-time variable passed via Northflank "Build arguments"
+ARG VITE_API_URL=/api
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
+RUN apk add --no-cache wget curl
+
+WORKDIR /build
+
+# Install dependencies (layer-cached)
+COPY client/package*.json ./client/
+RUN cd client && npm install
+
+# Build React frontend
+COPY client/ ./client/
+RUN cd client && npm run build
+
+# ─── Production image ─────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+RUN apk add --no-cache wget curl netcat-openbsd
+
+WORKDIR /app
+
+# Install server dependencies
+COPY server/package*.json ./server/
+RUN cd server && npm install --omit=dev --ignore-scripts
+
+# Copy server source + built client
+COPY server/ ./server/
+COPY --from=builder /build/client/dist ./client/dist
+
+EXPOSE 5000
+
+CMD ["sh", "-eu", "-c", "\
+  cd /app/server && \
+  echo '=== MikroTik Billing — Northflank ===' && \
+  if [ -n \"${DB_HOST:-}\" ] && [ -n \"${DB_PORT:-}\" ]; then \
+    echo \"Waiting for PostgreSQL at ${DB_HOST}:${DB_PORT}...\" && \
+    for i in $(seq 1 40); do \
+      if nc -z \"${DB_HOST}\" \"${DB_PORT}\" 2>/dev/null; then \
+        echo 'PostgreSQL ready'; break; \
+      fi; \
+      echo \"Attempt $i/40 — waiting 3s...\"; \
+      sleep 3; \
+    done; \
+  fi && \
+  echo 'Running migrations...' && \
+  node src/db/migrate.js && \
+  echo 'Starting server on :5000...' && \
+  exec node src/index.js \
+"]

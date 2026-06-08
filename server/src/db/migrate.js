@@ -362,6 +362,24 @@ const coreMigrations = [
 
 async function runMigrations() {
   console.log("Running database migrations...");
+  
+  // Wait for database connection to be ready (up to 10 retries, 3s delay)
+  let retries = 10;
+  while (retries > 0) {
+    try {
+      await db.query("SELECT 1");
+      console.log("Database connection verified.");
+      break;
+    } catch (err) {
+      retries--;
+      console.warn(`Database not ready yet (attempts left: ${retries}): ${err.message}`);
+      if (retries === 0) {
+        throw new Error("Could not connect to database after multiple attempts");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+
   try {
     for (const migration of coreMigrations) {
       try {

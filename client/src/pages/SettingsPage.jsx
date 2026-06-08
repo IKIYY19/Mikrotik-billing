@@ -199,7 +199,7 @@ function TwoFactorSetup() {
 }
 
 export function SettingsPage() {
-  const { theme, setTheme, mode, setMode, themes } = useTheme();
+  const { theme, setTheme, mode, setMode, eyeFilter, setEyeFilter, eyeIntensity, setEyeIntensity, themes } = useTheme();
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -581,6 +581,7 @@ export function SettingsPage() {
       <div className="flex gap-1 border-b border-zinc-800 mb-6">
         {[
           "general",
+          "appearance",
           "permissions",
           "wireguard",
           "security",
@@ -850,6 +851,162 @@ export function SettingsPage() {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* Appearance Settings */}
+      {activeTab === "appearance" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Theme Mode Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5 text-blue-400" /> Theme Mode
+              </CardTitle>
+              <CardDescription>
+                Select your preferred interface mode.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setMode("dark")}
+                  className={`flex items-center gap-4 p-5 rounded-xl border text-left transition-all ${
+                    mode === "dark"
+                      ? "bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] text-blue-400"
+                      : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  <div className={`p-3 rounded-lg ${mode === "dark" ? "bg-blue-500/20 text-blue-400" : "bg-zinc-800 text-zinc-500"}`}>
+                    <Moon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Dark Mode</h4>
+                    <p className="text-xs text-zinc-400 mt-0.5">Sleek dark theme, easy on the eyes</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMode("light")}
+                  className={`flex items-center gap-4 p-5 rounded-xl border text-left transition-all ${
+                    mode === "light"
+                      ? "bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] text-blue-400"
+                      : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  <div className={`p-3 rounded-lg ${mode === "light" ? "bg-blue-500/20 text-blue-400" : "bg-zinc-800 text-zinc-500"}`}>
+                    <Sun className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Light Mode</h4>
+                    <p className="text-xs text-zinc-400 mt-0.5">Clean and bright layout</p>
+                  </div>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Color Schemes Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5 text-blue-400" /> Color Accent Themes
+              </CardTitle>
+              <CardDescription>
+                Choose an accent theme to personalize your workspace highlight colors.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {themes.map((t) => {
+                  let gradient = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                  if (t.id === "emerald") gradient = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+                  if (t.id === "sunset") gradient = "linear-gradient(135deg, #f97316 0%, #ea580c 100%)";
+                  if (t.id === "purple") gradient = "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)";
+                  if (t.id === "ocean") gradient = "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)";
+                  if (t.id === "midnight") gradient = "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)";
+                  if (t.id === "slate") gradient = "linear-gradient(135deg, #64748b 0%, #475569 100%)";
+                  if (t.id === "rose") gradient = "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
+                  if (t.id === "techy") gradient = "linear-gradient(135deg, #00ff41 0%, #00cc33 100%)";
+
+                  const isActive = theme === t.id;
+
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTheme(t.id)}
+                      className={`flex flex-col p-4 rounded-xl border text-left transition-all ${
+                        isActive
+                          ? "bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+                          : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-3">
+                        <span className="font-semibold text-sm text-white">{t.name}</span>
+                        {isActive && (
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Gradient preview bar */}
+                      <div className="w-full h-8 rounded-lg mb-2" style={{ background: gradient }} />
+                      
+                      <span className="text-xs text-zinc-400 line-clamp-2">{t.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Eye Strain Filter Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" /> Eye Strain Filter
+              </CardTitle>
+              <CardDescription>
+                Reduce blue light emissions to protect your eyes during late hours.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-white">Enable Warm Filter</h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">Applies a gentle amber overlay across the dashboard</p>
+                </div>
+                <Switch
+                  checked={eyeFilter}
+                  onCheckedChange={setEyeFilter}
+                />
+              </div>
+
+              {eyeFilter && (
+                <div className="space-y-2 pt-2 border-t border-zinc-800">
+                  <div className="flex justify-between text-xs font-semibold text-zinc-400">
+                    <span>Filter Intensity</span>
+                    <span>{eyeIntensity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={eyeIntensity}
+                    onChange={(e) => setEyeIntensity(parseInt(e.target.value))}
+                    className="w-full h-2 rounded-lg bg-zinc-800 appearance-none cursor-pointer accent-amber-500"
+                    style={{
+                      background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${eyeIntensity}%, #27272a ${eyeIntensity}%, #27272a 100%)`,
+                    }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Permissions Settings */}
