@@ -35,24 +35,24 @@
 
     .light {
         --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
+        --foreground: 222.2 40% 10%;
         --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
+        --card-foreground: 222.2 40% 10%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        --primary: 217.2 91.2% 59.8%;
+        --popover-foreground: 222.2 40% 10%;
+        --primary: 217.2 72% 48%;
         --primary-foreground: 210 40% 98%;
         --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
+        --secondary-foreground: 222.2 40% 15%;
         --muted: 210 40% 96.1%;
         --muted-foreground: 215.4 16.3% 46.9%;
         --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
+        --accent-foreground: 222.2 40% 15%;
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 210 40% 98%;
         --border: 214.3 31.8% 91.4%;
         --input: 214.3 31.8% 91.4%;
-        --ring: 217.2 91.2% 59.8%;
+        --ring: 217.2 72% 48%;
     }
 }
 
@@ -447,7 +447,7 @@
 
     --glass-bg: rgba(255, 255, 255, 0.78);
     --glass-border: rgba(0, 0, 0, 0.10);
-    --glass-blur: blur(16px) saturate(120%);
+    --glass-blur: blur(16px);
 
     --zinc-50: 220 14% 20%;
     --zinc-100: 220 13% 26%;
@@ -479,11 +479,24 @@
 }
 
 .light .bg-mesh {
-    opacity: 0.30;
+    opacity: 0.12;
     background:
-        radial-gradient(ellipse 120% 60% at 25% 0%, rgba(99, 102, 241, 0.09) 0%, transparent 50%),
-        radial-gradient(ellipse 100% 40% at 75% 100%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-        linear-gradient(135deg, #f0f2f5 0%, #e4e7ed 100%);
+        radial-gradient(ellipse 120% 60% at 25% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 100% 40% at 75% 100%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+        linear-gradient(135deg, #f4f6f9 0%, #e8ebf2 100%);
+}
+
+.light .card-gradient {
+    backdrop-filter: blur(20px);
+}
+.light .glass-strong {
+    backdrop-filter: blur(24px);
+}
+.light .glass-morphism {
+    backdrop-filter: blur(20px);
+}
+.light .surface-floating {
+    backdrop-filter: blur(20px);
 }
 
 .light .bg-noise {
