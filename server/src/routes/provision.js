@@ -2262,6 +2262,33 @@ router.get("/v1/:slug/status", async (req, res) => {
   }
 });
 
+// TEMPORARY DEBUG ROUTE
+router.get("/v1/:slug/debug-connection/:connectionId", async (req, res) => {
+  try {
+    const { connectionId } = req.params;
+    const db = getDb();
+    const result = await db.query("SELECT * FROM mikrotik_connections WHERE id = $1", [connectionId]);
+    if (result.rows.length === 0) {
+      return res.json({ error: "Connection not found" });
+    }
+    const conn = result.rows[0];
+    const encryption = require("../utils/encryption");
+    const decryptedPass = encryption.decrypt(conn.password_encrypted);
+    res.json({
+      id: conn.id,
+      name: conn.name,
+      ip_address: conn.ip_address,
+      username: conn.username,
+      api_port: conn.api_port,
+      password_encrypted: conn.password_encrypted,
+      decrypted_password: decryptedPass,
+      raw_password_length: conn.password_encrypted ? conn.password_encrypted.length : 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /v1/:slug/routers — List all routers for this tenant (diagnostic)
 router.get("/v1/:slug/routers", async (req, res) => {
   try {
