@@ -134,11 +134,19 @@ function ensureCriticalProductionConfig() {
 function createCorsOriginHandler() {
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
 
+  // Helper to match wildcards like https://*.bolt.app
+  function matchesPattern(origin, pattern) {
+    if (pattern === origin) return true;
+    if (!pattern.includes('*')) return false;
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\./g, '\\.') + '$');
+    return regex.test(origin);
+  }
+
   return async (origin, callback) => {
     if (!origin) return callback(null, true);
 
-    // Static allowed origins (from env / config)
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    // Static allowed origins (from env / config) with wildcard support
+    if (allowedOrigins.length === 0 || allowedOrigins.some(pattern => matchesPattern(origin, pattern))) {
       return callback(null, true);
     }
 
