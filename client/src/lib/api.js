@@ -20,11 +20,14 @@ api.interceptors.request.use((config) => {
 });
 
 let isRedirecting = false;
-// Handle 401 responses
+// Handle 401 and 403 (invalid token) responses
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const isInvalidToken = status === 403 && error.response?.data?.error === "Invalid or expired token";
+    
+    if (status === 401 || isInvalidToken) {
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
       if (!isRedirecting) {

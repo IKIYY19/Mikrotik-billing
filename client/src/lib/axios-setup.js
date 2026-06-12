@@ -25,12 +25,15 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-// RESPONSE interceptor - handles 401 errors
+// RESPONSE interceptor - handles 401 and 403 (invalid token) errors
 axios.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
-      console.error('❌ 401 Unauthorized - clearing token and redirecting');
+    const status = error.response?.status;
+    const isInvalidToken = status === 403 && error.response?.data?.error === 'Invalid or expired token';
+    
+    if (status === 401 || isInvalidToken) {
+      console.error('❌ Session invalid - clearing token and redirecting');
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       window.location.href = '/login';
