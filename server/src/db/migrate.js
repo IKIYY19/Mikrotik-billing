@@ -160,6 +160,7 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_portal_username ON customers(portal_username)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at)`,
 
   // Hotspot vouchers table
   `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
