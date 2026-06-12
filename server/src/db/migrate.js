@@ -405,19 +405,8 @@ async function runMigrations() {
       throw new Error("Integrations migration reported failure");
     }
 
-    // Run provisioning migrations (routers table)
-    for (const migration of provisioningMigrations) {
-      await db.query(migration);
-    }
-    console.log("Provisioning migrations completed successfully");
-
-    // Run provisioning queue migrations
-    for (const migration of provisioningQueueMigrations) {
-      await db.query(migration);
-    }
-    console.log("Provisioning Queue migrations completed successfully");
-
     // Run unified migrations (inventory, wallet, backup, branches, agents, radius)
+    // MUST run before tenant migrations because tenant migrations alters tables created here (branches, agents, wallets)
     for (const migration of unifiedMigrations) {
       try {
         await db.query(migration);
@@ -431,6 +420,7 @@ async function runMigrations() {
     console.log("Unified migrations completed");
 
     // Run tenant migrations (multi-tenancy)
+    // MUST run before provisioning migrations because provisioning migrations creates tables (routers) referencing tenants
     for (const migration of tenantMigrations) {
       try {
         await db.query(migration);
@@ -442,6 +432,18 @@ async function runMigrations() {
       }
     }
     console.log("Tenant migrations completed");
+
+    // Run provisioning migrations (routers table)
+    for (const migration of provisioningMigrations) {
+      await db.query(migration);
+    }
+    console.log("Provisioning migrations completed successfully");
+
+    // Run provisioning queue migrations
+    for (const migration of provisioningQueueMigrations) {
+      await db.query(migration);
+    }
+    console.log("Provisioning Queue migrations completed successfully");
 
     // Run RLS migrations (must be LAST — depends on tenant_id columns existing)
     await runRlsMigrations(db);
