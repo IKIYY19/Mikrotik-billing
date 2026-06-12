@@ -95,6 +95,15 @@ function App() {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
+  // Clear chunk load reload flag on successful mount
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('chunk-load-reload-attempted');
+    } catch (e) {
+      // Ignore session storage access errors
+    }
+  }, []);
+
   // Heartbeat to keep user online status updated
   useEffect(() => {
     const token = getToken();

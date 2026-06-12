@@ -27,6 +27,25 @@ class ErrorBoundary extends React.Component {
       console.error('Component stack:', errorInfo.componentStack);
     }
 
+    // Check for chunk loading errors / failed dynamic imports
+    const isChunkError = 
+      error && 
+      (error.message?.includes('Failed to fetch dynamically imported module') ||
+       error.message?.includes('error loading dynamically imported module') ||
+       error.name === 'ChunkLoadError');
+
+    if (isChunkError) {
+      const chunkErrorKey = 'chunk-load-reload-attempted';
+      const lastAttempt = sessionStorage.getItem(chunkErrorKey);
+      
+      // If we haven't attempted a reload in this session yet, do it automatically
+      if (!lastAttempt) {
+        sessionStorage.setItem(chunkErrorKey, 'true');
+        window.location.reload();
+        return;
+      }
+    }
+
     // Report to Sentry for production monitoring
     try {
       const { captureError } = require('../services/sentry');
