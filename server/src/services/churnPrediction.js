@@ -49,10 +49,10 @@ async function calculateChurnScore(customerId) {
 
       if (lateRatio > 0.7) {
         score += 40;
-        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late", severity: "high" });
+        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late`, severity: "high" });
       } else if (lateRatio > 0.4) {
         score += 25;
-        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late", severity: "medium" });
+        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late`, severity: "medium" });
       } else if (lateRatio > 0.1) {
         score += 10;
         factors.push({ name: "Payment pattern", detail: "Some payments are late", severity: "low" });
