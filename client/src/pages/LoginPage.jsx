@@ -5,7 +5,7 @@ import { Shield, Eye, EyeOff, Loader as Loader2 } from "lucide-react";
 import { useToast } from "../hooks/useToast";
 import { setAuth } from "../lib/auth";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const DEFAULT_BRANDING = {
   company_name: "MikroTik Billing",
