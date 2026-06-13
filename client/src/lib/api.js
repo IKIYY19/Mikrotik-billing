@@ -20,20 +20,37 @@ api.interceptors.request.use((config) => {
 });
 
 let isRedirecting = false;
-// Handle 401 and 403 (invalid token) responses
+
+function clearSessionAndRedirect() {
+  if (isRedirecting) return;
+  isRedirecting = true;
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("auth_user");
+  sessionStorage.clear();
+  window.location.href = "/login";
+}
+
+// Handle all auth failure responses
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    isRedirecting = false;
+    return res;
+  },
   (error) => {
     const status = error.response?.status;
-    const isInvalidToken = status === 403 && error.response?.data?.error === "Invalid or expired token";
-    
-    if (status === 401 || isInvalidToken) {
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_user");
-      if (!isRedirecting) {
-        isRedirecting = true;
-        window.location.href = "/login";
-      }
+    const errMsg = error.response?.data?.error || "";
+
+    const isAuthFailure =
+      status === 401 ||
+      (status === 403 &&
+        (errMsg === "Invalid or expired token" ||
+          errMsg.toLowerCase().includes("jwt") ||
+          errMsg.toLowerCase().includes("token") ||
+          errMsg.toLowerCase().includes("malformed") ||
+          errMsg.toLowerCase().includes("expired")));
+
+    if (isAuthFailure) {
+      clearSessionAndRedirect();
     }
     return Promise.reject(error);
   },
