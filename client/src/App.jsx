@@ -196,7 +196,7 @@ function App() {
                   </div>
 
                   {/* Main content */}
-                  <main className="flex-1 overflow-auto">
+                  <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
                     {/* Mobile header bar */}
                     <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800/50">
                       <button
@@ -211,6 +211,7 @@ function App() {
                       <div className="w-5" /> {/* spacer */}
                     </div>
                     <Suspense fallback={<PageLoader />}>
+                      <div className="flex-1 flex flex-col min-h-0 h-full overflow-auto">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/project/:id" element={<ProjectDetail />} />
@@ -337,6 +338,7 @@ function App() {
                         {/* Fallback */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
+                      </div>
                     </Suspense>
                   </main>
                   <Toast />
