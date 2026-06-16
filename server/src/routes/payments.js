@@ -6,6 +6,10 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const MpesaService = require('../services/mpesa');
+const AirtelMoneyService = require('../services/airtelMoney');
+const MtnMomoService = require('../services/mtnMomo');
+const PaystackService = require('../services/paystackService');
+const { PesaLinkService, PESALINK_BANKS } = require('../services/pesalinkService');
 const stripeService = require('../services/stripe');
 const paypalService = require('../services/paypal');
 const flutterwaveService = require('../services/flutterwave');
@@ -112,6 +116,52 @@ async function isPaypalConfigured() {
     return Boolean(config.client_id && config.client_secret);
   }
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+}
+
+async function isAirtelMoneyConfigured() {
+  const config = await getIntegrationConfig('airtel_money');
+  return Boolean(config?.is_active && config?.client_id && config?.client_secret);
+}
+
+async function isMtnMomoConfigured() {
+  const config = await getIntegrationConfig('mtn_momo');
+  return Boolean(config?.is_active && config?.subscription_key && config?.api_user && config?.api_key);
+}
+
+async function isPaystackConfigured() {
+  const config = await getIntegrationConfig('paystack');
+  if (config?.is_active && config?.secret_key) return true;
+  return Boolean(process.env.PAYSTACK_SECRET_KEY);
+}
+
+async function isPesaLinkConfigured() {
+  const config = await getIntegrationConfig('pesalink');
+  return Boolean(config?.is_active && config?.account_number && config?.bank_name);
+}
+
+async function getAirtelService() {
+  const config = await getIntegrationConfig('airtel_money');
+  if (config) return new AirtelMoneyService(config);
+  return new AirtelMoneyService({ client_id: process.env.AIRTEL_CLIENT_ID || '', client_secret: process.env.AIRTEL_CLIENT_SECRET || '', environment: process.env.AIRTEL_ENVIRONMENT || 'sandbox', country: process.env.AIRTEL_COUNTRY || 'KE' });
+}
+
+async function getMtnService() {
+  const config = await getIntegrationConfig('mtn_momo');
+  if (config) return new MtnMomoService(config);
+  return new MtnMomoService({ subscription_key: process.env.MTN_SUBSCRIPTION_KEY || '', api_user: process.env.MTN_API_USER || '', api_key: process.env.MTN_API_KEY || '', environment: process.env.MTN_ENVIRONMENT || 'sandbox', country: process.env.MTN_COUNTRY || 'UG' });
+}
+
+async function getPaystackService() {
+  const config = await getIntegrationConfig('paystack');
+  const secretKey = (config?.is_active && config?.secret_key) ? config.secret_key : (process.env.PAYSTACK_SECRET_KEY || '');
+  const publicKey = (config?.is_active && config?.public_key) ? config.public_key : (process.env.PAYSTACK_PUBLIC_KEY || '');
+  return new PaystackService({ secret_key: secretKey, public_key: publicKey });
+}
+
+async function getPesaLinkService() {
+  const config = await getIntegrationConfig('pesalink');
+  if (config) return new PesaLinkService(config);
+  return new PesaLinkService({ bank_name: process.env.BANK_NAME || '', account_name: process.env.BANK_ACCOUNT_NAME || '', account_number: process.env.BANK_ACCOUNT_NUMBER || '' });
 }
 
 function ensureWebhookSecretConfigured(provider) {
@@ -298,6 +348,10 @@ router.get('/methods', async (req, res) => {
   const mpesaEnabled = await isMpesaConfigured();
   const stripeEnabled = await isStripeConfigured();
   const paypalEnabled = await isPaypalConfigured();
+  const airtelEnabled = await isAirtelMoneyConfigured();
+  const mtnEnabled = await isMtnMomoConfigured();
+  const paystackEnabled = await isPaystackConfigured();
+  const pesalinkEnabled = await isPesaLinkConfigured();
   const bankPaybills = await getBankPaybills();
 
   const methods = [
@@ -306,9 +360,7 @@ router.get('/methods', async (req, res) => {
       name: 'M-Pesa (STK Push)',
       icon: '📱',
       description: 'Pay via M-Pesa - instant prompt on your phone',
-      min: 1,
-      max: 150000,
-      fee: 0,
+      min: 1, max: 150000, fee: 0,
       enabled: mpesaEnabled || !isProductionEnv,
     },
     {
@@ -316,11 +368,41 @@ router.get('/methods', async (req, res) => {
       name: 'M-Pesa Paybill',
       icon: '🏦',
       description: 'Send to Paybill: 123456, Account: your invoice number',
-      min: 1,
-      max: 70000,
-      fee: 0,
+      min: 1, max: 70000, fee: 0,
       enabled: true,
       paybill: process.env.MPESA_PAYBILL || '123456',
+    },
+    {
+      id: 'airtel_money',
+      name: 'Airtel Money (STK Push)',
+      icon: '📲',
+      description: 'Pay via Airtel Money — instant push to your phone',
+      min: 1, max: 50000, fee: 0,
+      enabled: airtelEnabled || !isProductionEnv,
+    },
+    {
+      id: 'mtn_momo',
+      name: 'MTN Mobile Money',
+      icon: '📳',
+      description: 'Pay via MTN MoMo — approve on your phone',
+      min: 1, max: 500000, fee: 0,
+      enabled: mtnEnabled || !isProductionEnv,
+    },
+    {
+      id: 'paystack',
+      name: 'Card / Bank (Paystack)',
+      icon: '💳',
+      description: 'Pay with Visa, Mastercard, bank transfer, or USSD',
+      min: 1, max: 5000000, fee: 1.5,
+      enabled: paystackEnabled || !isProductionEnv,
+    },
+    {
+      id: 'pesalink',
+      name: 'PesaLink (Bank Transfer)',
+      icon: '🏛️',
+      description: 'Kenya bank-to-bank instant transfer via PesaLink',
+      min: 10, max: 999999, fee: 0,
+      enabled: pesalinkEnabled,
     },
   ];
 
@@ -331,9 +413,7 @@ router.get('/methods', async (req, res) => {
       name: `${bank.name} Paybill`,
       icon: '🏦',
       description: `Pay via ${bank.name} Paybill: ${bank.paybill}`,
-      min: 1,
-      max: 150000,
-      fee: 0,
+      min: 1, max: 150000, fee: 0,
       enabled: true,
       paybill: bank.paybill,
       account_number: bank.account_number,
@@ -348,9 +428,7 @@ router.get('/methods', async (req, res) => {
       name: 'Credit/Debit Card (Stripe)',
       icon: '💳',
       description: 'Pay securely with Visa, Mastercard, Amex',
-      min: 1,
-      max: 1000000,
-      fee: 2.9,
+      min: 1, max: 1000000, fee: 2.9,
       enabled: stripeEnabled || !isProductionEnv,
     },
     {
@@ -358,9 +436,7 @@ router.get('/methods', async (req, res) => {
       name: 'PayPal',
       icon: '🅿️',
       description: 'Pay with your PayPal account',
-      min: 1,
-      max: 1000000,
-      fee: 3.4,
+      min: 1, max: 1000000, fee: 3.4,
       enabled: paypalEnabled || !isProductionEnv,
     },
     {
@@ -368,29 +444,15 @@ router.get('/methods', async (req, res) => {
       name: 'Flutterwave',
       icon: '🌍',
       description: 'Mobile money, card, bank transfer across Africa',
-      min: 1,
-      max: 1000000,
-      fee: 1.4,
+      min: 1, max: 1000000, fee: 1.4,
       enabled: flutterwaveConfigured || !isProductionEnv,
-    },
-    {
-      id: 'airtel_money',
-      name: 'Airtel Money',
-      icon: '📲',
-      description: 'Pay via Airtel Money',
-      min: 1,
-      max: 50000,
-      fee: 0,
-      enabled: false,
     },
     {
       id: 'bank_transfer',
       name: 'Bank Transfer (EFT/RTGS)',
       icon: '🏛️',
       description: 'Direct bank transfer',
-      min: 100,
-      max: 10000000,
-      fee: 0,
+      min: 100, max: 10000000, fee: 0,
       enabled: true,
       bank_details: {
         bank_name: process.env.BANK_NAME || 'Example Bank',
@@ -405,9 +467,7 @@ router.get('/methods', async (req, res) => {
       name: 'Cash',
       icon: '💵',
       description: 'Pay cash at our office',
-      min: 0,
-      max: 1000000,
-      fee: 0,
+      min: 0, max: 1000000, fee: 0,
       enabled: true,
     }
   );
@@ -865,6 +925,376 @@ router.post('/flutterwave/webhook', async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('Flutterwave webhook error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// AIRTEL MONEY STK PUSH
+// ═══════════════════════════════════════
+router.post('/airtel/stk', async (req, res) => {
+  try {
+    const { phone, amount, invoice_id, customer_id } = req.body;
+    if (!phone || !amount) return res.status(400).json({ error: 'phone and amount are required' });
+
+    const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
+    if (!customerId) return res.status(404).json({ error: 'Customer not found' });
+
+    const configured = await isAirtelMoneyConfigured();
+    if (!configured && isProductionEnv) {
+      return res.status(503).json({ error: 'Airtel Money is not configured. Add Client ID and Secret in Integrations → Airtel Money.' });
+    }
+
+    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
+    const airtel = await getAirtelService();
+    const result = await airtel.stkPush(phone, amount, accountRef, `Payment for ${accountRef}`);
+
+    if (result.success) {
+      await paymentSessions.savePending({
+        id: uuidv4(),
+        invoice_id: invoice_id || null,
+        customer_id: customerId,
+        phone,
+        amount: parseFloat(amount),
+        method: 'airtel_money',
+        status: 'pending',
+        checkoutRequestId: result.transactionId,
+        provider_response: result,
+      });
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Poll Airtel Money status
+router.post('/airtel/stk/check', async (req, res) => {
+  try {
+    const { transactionId } = req.body;
+    if (!transactionId) return res.status(400).json({ error: 'transactionId is required' });
+
+    const pending = await paymentSessions.findByCheckoutRequestId(transactionId);
+    if (pending?.payment_id) {
+      const payment = await billing.getPaymentById(pending.payment_id);
+      return res.json({ success: true, status: 'completed', payment });
+    }
+
+    const airtel = await getAirtelService();
+    const result = await airtel.checkStatus(transactionId);
+
+    if (result.success && result.status === 'completed' && pending) {
+      const payment = await billing.createPayment({
+        invoice_id: pending.invoice_id, customer_id: pending.customer_id,
+        amount: pending.amount, method: 'airtel_money',
+        reference: result.transactionId || transactionId,
+        gateway_transaction_id: transactionId,
+        notes: `Airtel Money STK - ${pending.phone}`,
+      });
+      await paymentSessions.markCompleted(transactionId, { payment_id: payment.id });
+      const customer = await billing.getCustomerById(pending.customer_id).catch(() => null);
+      const invoice = pending.invoice_id ? await billing.getInvoiceById(pending.invoice_id).catch(() => null) : null;
+      if (customer?.phone) notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch(() => {});
+      autoProvision.autoProvisionOnPayment(payment).catch(() => {});
+      return res.json({ success: true, status: 'completed', payment });
+    }
+
+    if (result.status === 'failed' && pending) {
+      await paymentSessions.markFailed(transactionId, { status: 'failed', provider_response: result });
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Airtel Money Callback (webhook)
+router.post('/airtel/callback', async (req, res) => {
+  try {
+    const body = req.body;
+    const txId = body?.transaction?.id || body?.id;
+    const status = body?.transaction?.status || body?.status;
+
+    if (txId && (status === 'TS' || status === 'SUCCESS')) {
+      const pending = await paymentSessions.findByCheckoutRequestId(txId);
+      if (pending && !pending.payment_id) {
+        const payment = await billing.createPayment({
+          invoice_id: pending.invoice_id, customer_id: pending.customer_id,
+          amount: body?.transaction?.amount || pending.amount,
+          method: 'airtel_money', reference: txId, gateway_transaction_id: txId,
+          notes: `Airtel Money - ${pending.phone}`,
+        });
+        await paymentSessions.markCompleted(txId, { payment_id: payment.id, provider_response: body });
+        const customer = await billing.getCustomerById(pending.customer_id).catch(() => null);
+        const invoice = pending.invoice_id ? await billing.getInvoiceById(pending.invoice_id).catch(() => null) : null;
+        if (customer?.phone) notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch(() => {});
+        autoProvision.autoProvisionOnPayment(payment).catch(() => {});
+      }
+    }
+    res.status(200).json({ status: 'ok' }); // Always 200 to Airtel
+  } catch (e) {
+    console.error('Airtel callback error:', e);
+    res.status(200).json({ status: 'ok' });
+  }
+});
+
+// ═══════════════════════════════════════
+// MTN MOBILE MONEY
+// ═══════════════════════════════════════
+router.post('/mtn/request-to-pay', async (req, res) => {
+  try {
+    const { phone, amount, invoice_id, customer_id } = req.body;
+    if (!phone || !amount) return res.status(400).json({ error: 'phone and amount are required' });
+
+    const { customer, invoice, customerId } = await getCustomerAndInvoice(customer_id, invoice_id);
+    if (!customerId) return res.status(404).json({ error: 'Customer not found' });
+
+    const configured = await isMtnMomoConfigured();
+    if (!configured && isProductionEnv) {
+      return res.status(503).json({ error: 'MTN MoMo is not configured. Add your credentials in Integrations → MTN Mobile Money.' });
+    }
+
+    const accountRef = invoice?.invoice_number || `INV-${Date.now()}`;
+    const mtn = await getMtnService();
+    const result = await mtn.requestToPay(phone, amount, accountRef, `Payment for ${accountRef}`);
+
+    if (result.success) {
+      await paymentSessions.savePending({
+        id: uuidv4(),
+        invoice_id: invoice_id || null,
+        customer_id: customerId,
+        phone,
+        amount: parseFloat(amount),
+        method: 'mtn_momo',
+        status: 'pending',
+        checkoutRequestId: result.referenceId,
+        provider_response: result,
+      });
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Poll MTN MoMo status
+router.post('/mtn/stk/check', async (req, res) => {
+  try {
+    const { referenceId } = req.body;
+    if (!referenceId) return res.status(400).json({ error: 'referenceId is required' });
+
+    const pending = await paymentSessions.findByCheckoutRequestId(referenceId);
+    if (pending?.payment_id) {
+      const payment = await billing.getPaymentById(pending.payment_id);
+      return res.json({ success: true, status: 'completed', payment });
+    }
+
+    const mtn = await getMtnService();
+    const result = await mtn.checkStatus(referenceId);
+
+    if (result.success && result.status === 'completed' && pending) {
+      const payment = await billing.createPayment({
+        invoice_id: pending.invoice_id, customer_id: pending.customer_id,
+        amount: pending.amount, method: 'mtn_momo',
+        reference: result.transactionId || referenceId,
+        gateway_transaction_id: referenceId,
+        notes: `MTN MoMo - ${pending.phone}`,
+      });
+      await paymentSessions.markCompleted(referenceId, { payment_id: payment.id });
+      const customer = await billing.getCustomerById(pending.customer_id).catch(() => null);
+      const invoice = pending.invoice_id ? await billing.getInvoiceById(pending.invoice_id).catch(() => null) : null;
+      if (customer?.phone) notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch(() => {});
+      autoProvision.autoProvisionOnPayment(payment).catch(() => {});
+      return res.json({ success: true, status: 'completed', payment });
+    }
+
+    if (result.status === 'failed' && pending) {
+      await paymentSessions.markFailed(referenceId, { status: 'failed', provider_response: result });
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// MTN Callback
+router.post('/mtn/callback', async (req, res) => {
+  try {
+    // MTN sends a notification to this URL when status changes
+    const body = req.body;
+    const referenceId = body?.externalId || body?.financialTransactionId;
+    if (referenceId) {
+      const pending = await paymentSessions.findByCheckoutRequestId(referenceId).catch(() => null);
+      if (pending && !pending.payment_id && body?.status === 'SUCCESSFUL') {
+        const payment = await billing.createPayment({
+          invoice_id: pending.invoice_id, customer_id: pending.customer_id,
+          amount: pending.amount, method: 'mtn_momo',
+          reference: body.financialTransactionId || referenceId,
+          gateway_transaction_id: referenceId,
+          notes: `MTN MoMo callback - ${pending.phone}`,
+        });
+        await paymentSessions.markCompleted(referenceId, { payment_id: payment.id, provider_response: body });
+        const customer = await billing.getCustomerById(pending.customer_id).catch(() => null);
+        const invoice = pending.invoice_id ? await billing.getInvoiceById(pending.invoice_id).catch(() => null) : null;
+        if (customer?.phone) notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch(() => {});
+        autoProvision.autoProvisionOnPayment(payment).catch(() => {});
+      }
+    }
+    res.status(200).json({ status: 'ok' });
+  } catch (e) {
+    res.status(200).json({ status: 'ok' });
+  }
+});
+
+// ═══════════════════════════════════════
+// PAYSTACK
+// ═══════════════════════════════════════
+router.post('/paystack/initialize', async (req, res) => {
+  try {
+    const { amount, customer_id, invoice_id, email, description, currency } = req.body;
+    if (!amount || !customer_id) return res.status(400).json({ error: 'amount and customer_id are required' });
+
+    const configured = await isPaystackConfigured();
+    if (!configured && isProductionEnv) {
+      return res.status(503).json({ error: 'Paystack is not configured. Add your Secret Key in Integrations → Paystack.' });
+    }
+
+    const customer = await billing.getCustomerById(customer_id);
+    const invoice = invoice_id ? await billing.getInvoiceById(invoice_id) : null;
+    const customerEmail = email || customer?.email || `${customer_id}@billing.local`;
+    const reference = `PAY-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const callbackUrl = `${process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || ''}/api/payments/paystack/verify?ref=${reference}`;
+
+    const paystack = await getPaystackService();
+    const result = await paystack.initializeTransaction({
+      email: customerEmail,
+      amount: parseFloat(amount),
+      reference,
+      callbackUrl,
+      currency: currency || 'KES',
+      metadata: { customer_id, invoice_id: invoice_id || null, invoice_number: invoice?.invoice_number || '' },
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Paystack verify after redirect
+router.get('/paystack/verify', async (req, res) => {
+  try {
+    const { ref, reference } = req.query;
+    const ref_ = ref || reference;
+    if (!ref_) return res.status(400).json({ error: 'reference is required' });
+
+    const paystack = await getPaystackService();
+    const result = await paystack.verifyTransaction(ref_);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Paystack verify (POST version for frontend polling)
+router.post('/paystack/verify', async (req, res) => {
+  try {
+    const { reference } = req.body;
+    if (!reference) return res.status(400).json({ error: 'reference is required' });
+
+    const paystack = await getPaystackService();
+    const result = await paystack.verifyTransaction(reference);
+
+    // If verified successful, record the payment
+    if (result.success && result.customerId) {
+      const existing = await global.db?.query(
+        "SELECT id FROM payments WHERE reference = $1 LIMIT 1", [reference]
+      ).catch(() => ({ rows: [] }));
+      if (!existing?.rows?.length) {
+        const payment = await billing.createPayment({
+          invoice_id: result.invoiceId || null,
+          customer_id: result.customerId,
+          amount: result.amount,
+          method: 'paystack',
+          reference: result.reference,
+          gateway_transaction_id: result.reference,
+          notes: `Paystack - ${result.channel || 'card'}`,
+        });
+        const customer = await billing.getCustomerById(result.customerId).catch(() => null);
+        const invoice = result.invoiceId ? await billing.getInvoiceById(result.invoiceId).catch(() => null) : null;
+        if (customer?.phone) notificationService.triggerSMS('payment_received', { customer, invoice, payment }).catch(() => {});
+        autoProvision.autoProvisionOnPayment(payment).catch(() => {});
+        result.payment = payment;
+      }
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Paystack Webhook (HMAC-SHA512 verified)
+router.post('/paystack/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['x-paystack-signature'];
+    const paystack = await getPaystackService();
+
+    // raw body needed for HMAC verification — express.json() already parsed it
+    // We re-stringify to verify consistently
+    if (signature) {
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+      if (!paystack.verifyWebhookSignature(rawBody, signature)) {
+        return res.status(400).json({ error: 'Invalid webhook signature' });
+      }
+    }
+
+    const result = await paystack.handleWebhookEvent(req.body, { billing, notificationService, autoProvision, alertSystem });
+    res.json(result);
+  } catch (e) {
+    console.error('Paystack webhook error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// PESALINK
+// ═══════════════════════════════════════
+router.get('/pesalink/details', async (req, res) => {
+  try {
+    const { invoice_id, amount } = req.query;
+    const invoice = invoice_id ? await billing.getInvoiceById(invoice_id).catch(() => null) : null;
+    const pesalink = await getPesaLinkService();
+    const details = pesalink.getPaymentDetails(invoice?.invoice_number || `INV-${Date.now()}`, amount || 0);
+    details.banks = pesalink.getBanks();
+    res.json(details);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/pesalink/banks', (req, res) => {
+  res.json(PESALINK_BANKS);
+});
+
+router.post('/pesalink/confirm', async (req, res) => {
+  try {
+    const { reference, amount, invoice_id, customer_id, sender_name, sender_bank } = req.body;
+    if (!reference || !amount || !customer_id) {
+      return res.status(400).json({ error: 'reference, amount, and customer_id are required' });
+    }
+
+    const pesalink = await getPesaLinkService();
+    const result = await pesalink.confirmPayment(
+      { reference, amount: parseFloat(amount), invoiceId: invoice_id, customerId: customer_id, senderName: sender_name, senderBank: sender_bank },
+      { billing, notificationService, autoProvision, alertSystem }
+    );
+    res.json(result);
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });

@@ -111,6 +111,18 @@ router.post('/:id/test', async (req, res) => {
       case 'mpesa':
         testResult = await testMpesa(config);
         break;
+      case 'airtel_money':
+        testResult = await testAirtelMoney(config);
+        break;
+      case 'mtn_momo':
+        testResult = await testMtnMomo(config);
+        break;
+      case 'paystack':
+        testResult = await testPaystack(config);
+        break;
+      case 'pesalink':
+        testResult = await testPesaLink(config);
+        break;
       case 'whatsapp':
         testResult = await testWhatsApp(config);
         break;
@@ -602,6 +614,121 @@ async function testGoogleCloudStorage(config) {
     return { success: true, message: 'Google Cloud Storage configuration saved' };
   } catch (error) {
     return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+// ─── AIRTEL MONEY ───
+async function testAirtelMoney(config) {
+  try {
+    if (!config.client_id || !config.client_secret) {
+      return { success: false, message: 'Client ID and Client Secret are required' };
+    }
+    const resp = await fetch('https://openapi.airtel.africa/auth/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': '*/*' },
+      body: JSON.stringify({
+        client_id: config.client_id,
+        client_secret: config.client_secret,
+        grant_type: 'client_credentials',
+      }),
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      if (data.access_token) {
+        const country = config.country || 'KE';
+        return { success: true, message: `Airtel Money connected successfully (${country}) — OAuth2 token obtained` };
+      }
+      return { success: false, message: 'Authentication failed: no token returned. Check your Client ID and Secret.' };
+    }
+    const err = await resp.json().catch(() => ({}));
+    return { success: false, message: err.error_description || `Authentication failed (${resp.status})` };
+  } catch (error) {
+    return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+// ─── MTN MOBILE MONEY ───
+async function testMtnMomo(config) {
+  try {
+    if (!config.subscription_key) {
+      return { success: false, message: 'Subscription Key (Ocp-Apim-Subscription-Key) is required. Get it from momodeveloper.mtn.com' };
+    }
+    if (!config.api_user || !config.api_key) {
+      return { 
+        success: false, 
+        message: 'API User and API Key are required. In sandbox: go to momodeveloper.mtn.com → create API User → generate API Key.' 
+      };
+    }
+    // Try to get a token
+    const auth = Buffer.from(`${config.api_user}:${config.api_key}`).toString('base64');
+    const baseUrl = config.environment === 'production'
+      ? 'https://proxy.momoapi.mtn.com'
+      : 'https://sandbox.momodeveloper.mtn.com';
+    const resp = await fetch(`${baseUrl}/collection/token/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Ocp-Apim-Subscription-Key': config.subscription_key,
+      },
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      if (data.access_token) {
+        const country = config.country || 'UG';
+        return { success: true, message: `MTN MoMo connected successfully (${country} Collections) — Bearer token obtained` };
+      }
+    }
+    const err = await resp.json().catch(() => ({}));
+    return { success: false, message: err.error || err.message || `Authentication failed (${resp.status})` };
+  } catch (error) {
+    return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+// ─── PAYSTACK ───
+async function testPaystack(config) {
+  try {
+    if (!config.secret_key) {
+      return { success: false, message: 'Secret Key is required. Get it from dashboard.paystack.com → Settings → API Keys & Webhooks' };
+    }
+    if (!config.secret_key.startsWith('sk_')) {
+      return { success: false, message: 'Invalid Secret Key format — should start with sk_test_ or sk_live_' };
+    }
+    const resp = await fetch('https://api.paystack.co/bank?country=kenya&use_cursor=true&perPage=5', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${config.secret_key}` },
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      const mode = config.secret_key.startsWith('sk_live_') ? 'LIVE' : 'SANDBOX/TEST';
+      return { success: true, message: `Paystack connected (${mode} mode) — ${data.data?.length || 0} banks fetched successfully` };
+    }
+    const err = await resp.json().catch(() => ({}));
+    return { success: false, message: err.message || `Authentication failed (${resp.status})` };
+  } catch (error) {
+    return { success: false, message: 'Connection failed: ' + error.message };
+  }
+}
+
+// ─── PESALINK ───
+async function testPesaLink(config) {
+  try {
+    const missing = [];
+    if (!config.bank_name) missing.push('Bank Name');
+    if (!config.account_name) missing.push('Account Name');
+    if (!config.account_number) missing.push('Account Number');
+    if (missing.length > 0) {
+      return { success: false, message: `Missing required fields: ${missing.join(', ')}` };
+    }
+    if (!/^\d{8,20}$/.test(config.account_number.replace(/\s/g, ''))) {
+      return { success: false, message: 'Account number should be 8-20 digits' };
+    }
+    return {
+      success: true,
+      message: `PesaLink configured: ${config.account_name} at ${config.bank_name} (${config.account_number}). Customers will transfer to this account and provide their reference.`,
+    };
+  } catch (error) {
+    return { success: false, message: 'Validation failed: ' + error.message };
   }
 }
 

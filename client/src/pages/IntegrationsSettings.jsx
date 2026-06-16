@@ -141,6 +141,36 @@ const serviceDocs = {
     desc: "Accept card and mobile money payments across Africa using Flutterwave.",
     link: "https://developer.flutterwave.com",
     tip: "Retrieve your Secret Key, Public Key, and Encryption Key from the API Settings section of the Flutterwave merchant dashboard."
+  },
+  airtel_money: {
+    desc: "Accept Airtel Money STK push payments in Kenya, Uganda, Tanzania, Rwanda, and Zambia.",
+    link: "https://developers.airtel.africa",
+    tip: "Register at developers.airtel.africa → Create an App → Get Client ID and Client Secret. Set Country to your operating country (KE, UG, TZ, RW). Use 'sandbox' environment for testing.",
+    icon: "📲",
+    country_options: ["KE", "UG", "TZ", "RW", "ZM", "MW", "NG", "GH", "CD"],
+    webhook: "/api/payments/airtel/callback"
+  },
+  mtn_momo: {
+    desc: "Accept MTN Mobile Money payments in Uganda, Rwanda, Ghana, Cameroon, and Ivory Coast.",
+    link: "https://momodeveloper.mtn.com",
+    tip: "1. Sign up at momodeveloper.mtn.com\n2. Subscribe to 'Collection' product → get Subscription Key\n3. In sandbox: create API User via the portal UI, then generate API Key\n4. For production: submit a go-live request to MTN",
+    icon: "📳",
+    country_options: ["UG", "RW", "GH", "CM", "CI", "ZM"],
+    webhook: "/api/payments/mtn/callback"
+  },
+  paystack: {
+    desc: "Accept card payments, bank transfers, mobile money, and USSD across Africa via Paystack.",
+    link: "https://dashboard.paystack.com",
+    tip: "Get your Secret Key from dashboard.paystack.com → Settings → API Keys & Webhooks. Add Webhook URL: your-app.onrender.com/api/payments/paystack/webhook. Use 'sk_test_' keys for sandbox, 'sk_live_' for production.",
+    icon: "💳",
+    webhook: "/api/payments/paystack/webhook"
+  },
+  pesalink: {
+    desc: "Receive Kenya bank-to-bank PesaLink transfers. Customers pay from their banking app to your account.",
+    link: "https://www.pesalink.co.ke",
+    tip: "Enter your ISP company bank account details. When a customer pays via PesaLink, they provide the transaction reference. An admin then confirms the payment manually in the billing system.",
+    icon: "🏛️",
+    note: "PesaLink is an interbank transfer rail — there is no STK push. Customers initiate from their own bank app."
   }
 };
 
@@ -442,13 +472,48 @@ export default function IntegrationsSettings() {
             onFocus={() => setEditingId(integration.id)}
             className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer transition-all hover:bg-white/[0.05]"
           >
-            <option value="usd" className="bg-[#10121a]">USD ($) - US Dollar</option>
-            <option value="kes" className="bg-[#10121a]">KES (Sh) - Kenyan Shilling</option>
-            <option value="eur" className="bg-[#10121a]">EUR (€) - Euro</option>
-            <option value="gbp" className="bg-[#10121a]">GBP (£) - British Pound</option>
-            <option value="zar" className="bg-[#10121a]">ZAR (R) - South African Rand</option>
-            <option value="ugx" className="bg-[#10121a]">UGX (USh) - Ugandan Shilling</option>
-            <option value="tzs" className="bg-[#10121a]">TZS (TSh) - Tanzanian Shilling</option>
+            <option value="KES" className="bg-[#10121a]">KES (KSh) - Kenyan Shilling</option>
+            <option value="UGX" className="bg-[#10121a]">UGX (USh) - Ugandan Shilling</option>
+            <option value="TZS" className="bg-[#10121a]">TZS (TSh) - Tanzanian Shilling</option>
+            <option value="RWF" className="bg-[#10121a]">RWF (RF) - Rwandan Franc</option>
+            <option value="GHS" className="bg-[#10121a]">GHS (GH₵) - Ghanaian Cedi</option>
+            <option value="NGN" className="bg-[#10121a]">NGN (₦) - Nigerian Naira</option>
+            <option value="ZAR" className="bg-[#10121a]">ZAR (R) - South African Rand</option>
+            <option value="USD" className="bg-[#10121a]">USD ($) - US Dollar</option>
+            <option value="EUR" className="bg-[#10121a]">EUR (€) - Euro</option>
+            <option value="GBP" className="bg-[#10121a]">GBP (£) - British Pound</option>
+            <option value="usd" className="bg-[#10121a]">usd - US Dollar (legacy)</option>
+            <option value="kes" className="bg-[#10121a]">kes - Kenyan Shilling (legacy)</option>
+          </select>
+        </div>
+      );
+    }
+
+    if (key === 'country') {
+      const countryOptions = [
+        { code: 'KE', name: 'Kenya' }, { code: 'UG', name: 'Uganda' },
+        { code: 'TZ', name: 'Tanzania' }, { code: 'RW', name: 'Rwanda' },
+        { code: 'GH', name: 'Ghana' }, { code: 'ZM', name: 'Zambia' },
+        { code: 'NG', name: 'Nigeria' }, { code: 'CM', name: 'Cameroon' },
+        { code: 'CI', name: "Côte d'Ivoire" }, { code: 'MW', name: 'Malawi' },
+        { code: 'CD', name: 'DR Congo' }, { code: 'BJ', name: 'Benin' },
+        { code: 'GA', name: 'Gabon' },
+      ];
+      return (
+        <div key={key} className="space-y-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
+            Country of Operation
+          </label>
+          <select
+            value={value}
+            onChange={(e) => updateConfig(integration, key, e.target.value)}
+            onFocus={() => setEditingId(integration.id)}
+            className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer transition-all hover:bg-white/[0.05]"
+          >
+            {countryOptions.map(c => (
+              <option key={c.code} value={c.code} className="bg-[#10121a]">{c.code} — {c.name}</option>
+            ))}
           </select>
         </div>
       );
