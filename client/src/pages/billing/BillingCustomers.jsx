@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { MpesaStkModal } from "../../components/MpesaStkModal";
+import AirtelStkModal from "../../components/AirtelStkModal";
+import MtnStkModal from "../../components/MtnStkModal";
+import PaystackModal from "../../components/PaystackModal";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -121,6 +124,9 @@ export function BillingCustomers() {
   const [portalCredentials, setPortalCredentials] = useState(null);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [stkTarget, setStkTarget] = useState(null); // customer object for STK modal
+  const [airtelTarget, setAirtelTarget] = useState(null);
+  const [mtnTarget, setMtnTarget] = useState(null);
+  const [paystackTarget, setPaystackTarget] = useState(null);
   const mapPickerRef = useRef(null);
   const pickerMapRef = useRef(null);
   const pickerMarkerRef = useRef(null);
@@ -1160,6 +1166,33 @@ export function BillingCustomers() {
         customer={stkTarget}
         invoice={null}
         defaultAmount={undefined}
+      />
+
+      {/* Airtel Money Modal */}
+      <AirtelStkModal
+        open={!!airtelTarget}
+        onClose={() => setAirtelTarget(null)}
+        onSuccess={() => { setAirtelTarget(null); fetchCustomers(); }}
+        customer={airtelTarget}
+        invoice={null}
+      />
+
+      {/* MTN Mobile Money Modal */}
+      <MtnStkModal
+        open={!!mtnTarget}
+        onClose={() => setMtnTarget(null)}
+        onSuccess={() => { setMtnTarget(null); fetchCustomers(); }}
+        customer={mtnTarget}
+        invoice={null}
+      />
+
+      {/* Paystack Modal */}
+      <PaystackModal
+        open={!!paystackTarget}
+        onClose={() => setPaystackTarget(null)}
+        onSuccess={() => { setPaystackTarget(null); fetchCustomers(); }}
+        customer={paystackTarget}
+        invoice={null}
       />
     </>
   );
