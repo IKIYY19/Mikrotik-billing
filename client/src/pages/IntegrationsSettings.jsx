@@ -613,7 +613,7 @@ export default function IntegrationsSettings() {
   const issuesCount = integrations.filter(i => i.is_active && i.last_test_status === 'failed').length;
 
   return (
-    <div className="min-h-screen bg-[#0f111a] text-white p-8 relative overflow-hidden">
+    <div className="bg-[#0f111a] text-white p-6 md:p-8 relative overflow-x-hidden">
       {/* Decorative gradient overlay */}
       <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
       

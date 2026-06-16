@@ -211,7 +211,7 @@ function App() {
                       <div className="w-5" /> {/* spacer */}
                     </div>
                     <Suspense fallback={<PageLoader />}>
-                      <div className="flex-1 flex flex-col min-h-0 h-full overflow-auto">
+                      <div className="flex-1 overflow-y-auto">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/project/:id" element={<ProjectDetail />} />
