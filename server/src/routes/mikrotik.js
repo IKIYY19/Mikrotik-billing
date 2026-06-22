@@ -19,6 +19,9 @@ function toSafeConnection(connection) {
     tunnel_host: connection.tunnel_host,
     tunnel_port: connection.tunnel_port,
     tunnel_username: connection.tunnel_username,
+    wireguard_tunnel_ip: connection.wireguard_tunnel_ip,
+    wireguard_public_key: connection.wireguard_public_key,
+    wireguard_interface_name: connection.wireguard_interface_name,
     is_online: connection.is_online,
     last_seen: connection.last_seen,
     created_at: connection.created_at,
@@ -142,8 +145,10 @@ function diagnoseConnectionError(error, config) {
       fixes.push('Run on the router: /ip service enable ssh');
       fixes.push(`Allow SSH: /ip firewall filter add chain=input protocol=tcp dst-port=${port} src-address=<billing-server-ip> action=accept`);
     }
-    if (/^10\.|^172\.1[6-9]\.|^172\.2\d\.|^172\.3[0-1]\.|^192\.168\./.test(config.ip_address || '')) {
-      fixes.push(`${config.ip_address} is a private IP. Use the VPN-side IP or set up port forwarding.`);
+    if (/^10\.|^172\.1[6-9]\.|^172\.2\d\.|^172\.3[0-1]\.|^192\.168\.|^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(config.ip_address || '')) {
+      fixes.push(`${config.ip_address} is a private/CGNAT IP. The router is behind NAT and cannot be reached directly.`);
+      fixes.push('Set up a WireGuard tunnel: POST /api/cgnat-tunnel/create with { connectionId }');
+      fixes.push('Or use the CGNAT Tunnel page in the UI to create a WireGuard tunnel automatically.');
     }
     return { category: 'unreachable', title: 'Router unreachable', description: `Could not reach ${config.ip_address}:${port} via ${protocol}. The router may be offline, the port may be blocked, or the IP may be wrong.`, fixes };
   }

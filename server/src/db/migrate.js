@@ -290,8 +290,14 @@ const coreMigrations = [
   // Add router connectivity tracking (Phase 1 - basic online/offline)
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`,
+  // WireGuard tunnel fields for CGNAT bypass
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_tunnel_ip VARCHAR(45)`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_public_key TEXT`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_private_key TEXT`,
+  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_interface_name VARCHAR(50)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
+  `CREATE INDEX IF NOT EXISTS idx_mikrotik_wg_tunnel ON mikrotik_connections(use_tunnel, wireguard_tunnel_ip)`,
 
   // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
   `CREATE TABLE IF NOT EXISTS health_checks (
