@@ -393,6 +393,39 @@ module.exports = {
         return { id: p.id, amount: p.amount, method: p.method, received_at: p.received_at, customer_name: customer?.name || "Unknown" };
       });
 
+    // Try to get real active RADIUS sessions from radacct table
+    let activeRadiusSessions = 0;
+    try {
+      const db = global.dbAvailable ? global.db : null;
+      if (db) {
+        const result = await db.query("SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL");
+        activeRadiusSessions = parseInt(result.rows[0].count) || 0;
+      }
+    } catch (e) {
+      // radacct table may not exist in in-memory mode
+    }
+
+    // Calculate revenue trend (month-over-month percentage change)
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const lastMonthRevenue = billingStore.payments
+      .filter((p) => {
+        const d = new Date(p.received_at);
+        return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear();
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    const revenueTrend = lastMonthRevenue > 0 ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100) : undefined;
+
+    // Get currency symbol from settings
+    let currencySymbol = '$';
+    try {
+      const db = global.dbAvailable ? global.db : null;
+      if (db) {
+        const result = await db.query("SELECT value FROM settings WHERE key = 'currency_symbol' LIMIT 1");
+        if (result.rows.length > 0) { currencySymbol = result.rows[0].value; }
+      }
+    } catch (e) {}
+
     return {
       total_customers: totalCustomers,
       active_customers: activeCustomers,
@@ -407,7 +440,9 @@ module.exports = {
       mrr,
       arpu: activeCustomers > 0 ? mrr / activeCustomers : 0,
       tax_rate: 16,
-      active_radius_sessions: 0,
+      active_radius_sessions: activeRadiusSessions,
+      revenue_trend: revenueTrend,
+      currency_symbol: currencySymbol,
       recent_payments: recentPayments,
     };
   },

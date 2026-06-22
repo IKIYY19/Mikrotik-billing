@@ -53,6 +53,7 @@ import {
   BarChart2,
   Globe,
   AlertTriangle,
+  LayoutGrid,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
@@ -95,6 +96,7 @@ const navGroups = [
     icon: Network,
     color: "blue",
     items: [
+      { to: "/network-dashboard", icon: LayoutGrid, label: "Net Dashboard", feature: "monitoring" },
       { to: "/pppoe", icon: Network, label: "PPPoE", feature: "pppoe" },
       { to: "/hotspot", icon: Wifi, label: "Hotspot", feature: "hotspot" },
       { to: "/hotspot-vouchers", icon: Ticket, label: "Vouchers", feature: "vouchers" },
