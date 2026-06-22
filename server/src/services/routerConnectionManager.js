@@ -27,6 +27,38 @@ class RouterConnectionManager {
     return result.rows[0] || null;
   }
 
+  /**
+   * Resolve the effective connection parameters for a router.
+   * If the router is behind CGNAT and has a WireGuard tunnel configured,
+   * use the tunnel IP address for the connection. This enables the billing
+   * server to reach routers that are otherwise unreachable due to CGNAT.
+   */
+  resolveEffectiveConfig(config) {
+    const effective = { ...config };
+
+    // If use_tunnel is enabled and we have a WireGuard tunnel IP, use it
+    if (config.use_tunnel && config.wireguard_tunnel_ip) {
+      const tunnelIp = config.wireguard_tunnel_ip.split("/")[0];
+      if (tunnelIp && tunnelIp !== config.ip_address) {
+        logger.info(
+          `Router ${config.name || config.ip_address} is behind CGNAT — routing via WireGuard tunnel IP ${tunnelIp}`
+        );
+        effective.ip_address = tunnelIp;
+      }
+    }
+
+    // If use_tunnel is enabled and we have SSH tunnel settings (legacy support)
+    if (config.use_tunnel && config.tunnel_host && !config.wireguard_tunnel_ip) {
+      logger.info(
+        `Router ${config.name || config.ip_address} using SSH jump host ${config.tunnel_host}`
+      );
+      // For SSH tunnel, we'll handle this in the SSH connection method
+      effective._useSshJump = true;
+    }
+
+    return effective;
+  }
+
   // Determine SSL usage and port from a router config
   resolveApiParams(config) {
     const isSSL =
@@ -54,14 +86,15 @@ class RouterConnectionManager {
   // Create and connect a node-routeros API client for a router config
   async createApiClient(config) {
     const { RouterOSAPI } = require("node-routeros");
+    const effectiveConfig = this.resolveEffectiveConfig(config);
     const password = this.decryptPassword(
-      config.password_encrypted || config.password
+      effectiveConfig.password_encrypted || effectiveConfig.password
     );
-    const { isSSL, port } = this.resolveApiParams(config);
+    const { isSSL, port } = this.resolveApiParams(effectiveConfig);
 
     const api = new RouterOSAPI({
-      host: config.ip_address,
-      user: config.username,
+      host: effectiveConfig.ip_address,
+      user: effectiveConfig.username,
       password,
       port,
       timeout: 8, // seconds
@@ -216,12 +249,44 @@ class RouterConnectionManager {
   // Test SSH connection
   async testSSHConnection(config) {
     const { NodeSSH } = require("node-ssh");
-    const password = this.decryptPassword(config.password_encrypted || config.password);
+    const effectiveConfig = this.resolveEffectiveConfig(config);
+    const password = this.decryptPassword(effectiveConfig.password_encrypted || effectiveConfig.password);
+
+    // If SSH jump host is configured, use it
+    if (effectiveConfig._useSshJump && effectiveConfig.tunnel_host) {
+      const jumpSsh = new NodeSSH();
+      const jumpPassword = this.decryptPassword(effectiveConfig.tunnel_password_encrypted);
+      await jumpSsh.connect({
+        host: effectiveConfig.tunnel_host,
+        port: Number(effectiveConfig.tunnel_port || 22),
+        username: effectiveConfig.tunnel_username || "root",
+        password: jumpPassword,
+        readyTimeout: 10000,
+      });
+
+      // Use the jump host to connect to the target router
+      const targetSsh = new NodeSSH();
+      await targetSsh.connect({
+        host: effectiveConfig.ip_address,
+        port: Number(effectiveConfig.ssh_port || 22),
+        username: effectiveConfig.username,
+        password: password,
+        readyTimeout: 10000,
+        sock: jumpSsh.getConnection(),
+      });
+
+      await targetSsh.execCommand("/system resource print");
+      targetSsh.dispose();
+      jumpSsh.dispose();
+      return true;
+    }
+
+    // Direct SSH connection (including through WireGuard tunnel IP)
     const ssh = new NodeSSH();
     await ssh.connect({
-      host: config.ip_address,
-      port: Number(config.ssh_port || 22),
-      username: config.username,
+      host: effectiveConfig.ip_address,
+      port: Number(effectiveConfig.ssh_port || 22),
+      username: effectiveConfig.username,
       password: password,
       readyTimeout: 10000,
     });
