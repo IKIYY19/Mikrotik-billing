@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Router, Copy, Check, Key, Terminal, Loader2, Shield, AlertCircle,
-  Link2, Plug, Wifi, WifiOff, Activity, Server, Trash2, X
+  Link2, Plug, Wifi, WifiOff, Activity, Server, Trash2, X,
+  Globe, RefreshCw, Lock
 } from "lucide-react";
 import { useToastStore } from "../stores/toastStore";
 import { getToken } from "../lib/auth";
@@ -14,6 +15,7 @@ const API = import.meta.env.VITE_API_URL || "/api";
 const TABS = [
   { id: "link", label: "Link New Router", icon: Link2 },
   { id: "routers", label: "All Routers", icon: Server },
+  { id: "cgnat", label: "CGNAT Tunnel", icon: Lock },
 ];
 
 export default function RoutersPage() {
@@ -55,7 +57,102 @@ export default function RoutersPage() {
   const [linkPhase, setLinkPhase] = useState(""); // "testing" | "saving" | ""
   // ─────────────────────────────────────────────────────────────────────────
 
+  // ── CGNAT WireGuard tunnel state ───────────────────────────────────────────
+  const [tunnelServer, setTunnelServer] = useState(null); // /status payload
+  const [tunnels, setTunnels] = useState([]);             // list of active tunnels
+  const [tunnelsLoading, setTunnelsLoading] = useState(false);
+  const [tunnelBusy, setTunnelBusy] = useState(null);     // connectionId being created/removed
+  const [syncingHealth, setSyncingHealth] = useState(false);
+  const [scriptModal, setScriptModal] = useState(null);   // { title, script }
+  const [scriptCopied, setScriptCopied] = useState(false);
+  // ─────────────────────────────────────────────────────────────────────────
+
   useEffect(() => { fetchTenant(); return () => stopWatching(); }, []);
+
+  // Load tunnel data when the CGNAT tab is opened
+  useEffect(() => {
+    if (activeTab === "cgnat") { fetchTunnels(); }
+  }, [activeTab]);
+
+  const fetchTunnels = async () => {
+    setTunnelsLoading(true);
+    try {
+      const { data } = await axios.get(`${API}/cgnat-tunnel/status`);
+      setTunnelServer(data);
+      setTunnels(data.tunnels || []);
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Could not load tunnel status");
+    } finally { setTunnelsLoading(false); }
+  };
+
+  const createTunnel = async (connectionId, routerName) => {
+    if (!connectionId) { toast.error("Link this router to billing first"); return; }
+    setTunnelBusy(connectionId);
+    try {
+      const { data } = await axios.post(`${API}/cgnat-tunnel/create`, { connectionId });
+      if (data.success === false) { throw new Error(data.error || "Create failed"); }
+      toast.success(`Tunnel created for ${routerName || "router"}`);
+      setScriptModal({
+        title: `Apply on ${routerName || "router"} (RouterOS terminal)`,
+        script: data.mikrotikScript || "",
+        hint: data.hint,
+      });
+      fetchTunnels();
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message || "Tunnel create failed");
+    } finally { setTunnelBusy(null); }
+  };
+
+  const removeTunnel = async (connectionId, routerName) => {
+    if (!confirm(`Remove the WireGuard tunnel for "${routerName || "this router"}"? The router will be unreachable until reconfigured.`)) { return; }
+    setTunnelBusy(connectionId);
+    try {
+      await axios.delete(`${API}/cgnat-tunnel/${connectionId}`);
+      toast.success("Tunnel removed");
+      fetchTunnels();
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Remove failed");
+    } finally { setTunnelBusy(null); }
+  };
+
+  const viewTunnelScript = async (connectionId, routerName) => {
+    setTunnelBusy(connectionId);
+    try {
+      const { data } = await axios.get(`${API}/cgnat-tunnel/${connectionId}/mikrotik-script`);
+      setScriptModal({ title: `Tunnel script — ${routerName || "router"}`, script: data.script || "" });
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Could not load script");
+    } finally { setTunnelBusy(null); }
+  };
+
+  const viewServerSetupScript = async () => {
+    try {
+      const { data } = await axios.get(`${API}/cgnat-tunnel/scripts/server-setup`, { responseType: "text" });
+      setScriptModal({ title: "Billing server WireGuard setup (run on your VPS)", script: typeof data === "string" ? data : "" });
+    } catch (e) {
+      toast.error("Could not load server setup script");
+    }
+  };
+
+  const syncTunnelHealth = async () => {
+    setSyncingHealth(true);
+    try {
+      const { data } = await axios.post(`${API}/cgnat-tunnel/health/sync`);
+      if (!data.wgAvailable) {
+        toast.error("WireGuard not detected on the server. Run the server setup script first.");
+      } else {
+        toast.success(`Synced ${data.checked} tunnel(s) — ${data.onlineCount} online`);
+      }
+      fetchTunnels();
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Health sync failed");
+    } finally { setSyncingHealth(false); }
+  };
+
+  const copyScript = async () => {
+    if (!scriptModal?.script) { return; }
+    try { await navigator.clipboard.writeText(scriptModal.script); setScriptCopied(true); setTimeout(() => setScriptCopied(false), 2000); } catch { /* ignore */ }
+  };
 
   const fetchTenant = async () => {
     try {
@@ -700,6 +797,187 @@ export default function RoutersPage() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CGNAT TUNNEL TAB */}
+      {activeTab === "cgnat" && (() => {
+        const tunnelByConn = {};
+        for (const t of tunnels) { tunnelByConn[t.connectionId] = t; }
+        const managed = routers.filter((r) => r.linked_mikrotik_connection_id);
+        const untunneled = managed.filter((r) => !tunnelByConn[r.linked_mikrotik_connection_id]);
+        return (
+        <div className="space-y-4">
+          {/* Explainer */}
+          <Card className="bg-blue-500/5 border-blue-500/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lock className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="text-blue-200 font-medium">WireGuard tunnels for routers behind CGNAT</p>
+                <p className="text-zinc-400 mt-1 leading-relaxed">
+                  When a router is behind Carrier-Grade NAT, the billing server cannot reach its API directly.
+                  Create a tunnel here, apply the generated script on the router, and the router dials home over
+                  WireGuard. PPPoE provisioning, suspensions, and queues then run transparently over the tunnel IP.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Server status */}
+          <Card className="bg-zinc-900/60 border-zinc-800/50">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-white text-base flex items-center gap-2">
+                <Globe className="w-4 h-4 text-blue-400" /> Tunnel Server
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={syncTunnelHealth} disabled={syncingHealth}
+                  className="gap-2 border-zinc-700/50 text-zinc-300 h-8">
+                  {syncingHealth ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Sync Health
+                </Button>
+                <Button variant="outline" size="sm" onClick={viewServerSetupScript}
+                  className="gap-2 border-zinc-700/50 text-zinc-300 h-8">
+                  <Terminal className="w-3.5 h-3.5" /> Server Setup
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {tunnelsLoading && !tunnelServer ? (
+                <p className="text-zinc-500 text-sm">Loading...</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <p className="text-zinc-500 text-xs">Service</p>
+                    <p className={tunnelServer?.serviceInitialized ? "text-green-400 font-medium" : "text-amber-400 font-medium"}>
+                      {tunnelServer?.serviceInitialized ? "Ready" : "Not initialized"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 text-xs">Endpoint</p>
+                    <p className="text-zinc-200 font-mono text-xs break-all">{tunnelServer?.serverEndpoint || "—"}:{tunnelServer?.serverPort || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 text-xs">Subnet</p>
+                    <p className="text-zinc-200 font-mono text-xs">{tunnelServer?.tunnelSubnet || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 text-xs">Active Tunnels</p>
+                    <p className="text-zinc-200 font-medium">{tunnelServer?.activeTunnels ?? tunnels.length}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Active tunnels */}
+          <div>
+            <h3 className="text-zinc-300 text-sm font-medium mb-2 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-blue-400" /> Active Tunnels ({tunnels.length})
+            </h3>
+            {tunnels.length === 0 ? (
+              <Card className="bg-zinc-900/60 border-zinc-800/50">
+                <CardContent className="p-6 text-center text-zinc-500 text-sm">No tunnels configured yet.</CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {tunnels.map((t) => (
+                  <Card key={t.connectionId} className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${t.tunnelActive ? "bg-green-500 shadow-lg shadow-green-500/30" : "bg-red-500"}`} />
+                        <div className="min-w-0">
+                          <p className="text-white font-medium truncate">{t.routerName || "Router"}</p>
+                          <p className="text-zinc-500 text-xs font-mono">
+                            {t.tunnelIp || "—"} · {t.interfaceName || "wg"} · {t.tunnelActive ? "handshake OK" : "no recent handshake"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => viewTunnelScript(t.connectionId, t.routerName)}
+                          disabled={tunnelBusy === t.connectionId} className="gap-1.5 border-zinc-700/50 text-zinc-300 h-8">
+                          <Terminal className="w-3.5 h-3.5" /> Script
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => removeTunnel(t.connectionId, t.routerName)}
+                          disabled={tunnelBusy === t.connectionId} className="gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10 h-8">
+                          {tunnelBusy === t.connectionId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Routers eligible for a tunnel */}
+          <div>
+            <h3 className="text-zinc-300 text-sm font-medium mb-2 flex items-center gap-2">
+              <Plug className="w-4 h-4 text-amber-400" /> Add a Tunnel
+            </h3>
+            {managed.length === 0 ? (
+              <Card className="bg-zinc-900/60 border-zinc-800/50">
+                <CardContent className="p-6 text-center text-zinc-500 text-sm">
+                  Link a router to billing first (Link New Router tab), then create its tunnel here.
+                </CardContent>
+              </Card>
+            ) : untunneled.length === 0 ? (
+              <Card className="bg-zinc-900/60 border-zinc-800/50">
+                <CardContent className="p-6 text-center text-zinc-500 text-sm">All managed routers already have a tunnel.</CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {untunneled.map((r) => (
+                  <Card key={r.id} className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-white font-medium truncate">{r.name}</p>
+                        <p className="text-zinc-500 text-xs font-mono truncate">{r.ip_address || "no IP"}</p>
+                      </div>
+                      <Button size="sm" onClick={() => createTunnel(r.linked_mikrotik_connection_id, r.name)}
+                        disabled={tunnelBusy === r.linked_mikrotik_connection_id} className="gap-1.5 h-8 shrink-0">
+                        {tunnelBusy === r.linked_mikrotik_connection_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                        Create Tunnel
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* WireGuard Script Modal */}
+      {scriptModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2 min-w-0">
+                <Terminal className="w-5 h-5 text-blue-400 shrink-0" />
+                <span className="truncate">{scriptModal.title}</span>
+              </h3>
+              <button onClick={() => setScriptModal(null)} className="text-zinc-400 hover:text-white shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {scriptModal.hint && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-blue-300 text-xs">{scriptModal.hint}</div>
+              )}
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-amber-300/90 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>This script contains the router&apos;s private key. Apply it once on the router, then keep it secret.</span>
+              </div>
+              <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">
+                {scriptModal.script}
+              </pre>
+              <Button onClick={copyScript} className="gap-2 w-full">
+                {scriptCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {scriptCopied ? "Copied!" : "Copy Script"}
+              </Button>
             </div>
           </div>
         </div>

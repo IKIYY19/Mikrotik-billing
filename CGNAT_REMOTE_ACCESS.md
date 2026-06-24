@@ -43,7 +43,21 @@ curl -X POST http://your-billing-server/api/cgnat-tunnel/detect-cgnat \
   -d '{"ip_address": "100.64.5.10"}'
 ```
 
+## Using the Dashboard (Recommended)
+
+The fastest way to manage tunnels is the **Routers → CGNAT Tunnel** tab in the app. No `curl` required.
+
+1. **One-time server setup.** Open the CGNAT Tunnel tab and click **Server Setup**. Copy the generated script and run it once on your billing VPS (it installs WireGuard, enables IP forwarding, opens the UDP port, and brings up the `wg-billing` interface). Make sure the environment variables in [Environment Variables](#environment-variables) are set so the server advertises the correct public endpoint.
+2. **Link the router to billing.** A tunnel can only be created for a router that is already linked to a billing connection (use the **Link New Router** tab). Routers behind CGNAT can be linked using the phone-home flow, which works outbound through CGNAT.
+3. **Create the tunnel.** Under **Add a Tunnel**, find the router and click **Create Tunnel**. A modal shows the RouterOS script (it contains the router's private key).
+4. **Apply on the router.** Paste the script into the router's terminal (WinBox → New Terminal, or SSH from the LAN). The router dials home over WireGuard with `persistent-keepalive=25s`.
+5. **Confirm health.** Click **Sync Health**. Tunnels with a recent WireGuard handshake turn green, and `is_online`/`last_seen` are updated in the database. From this point, PPPoE provisioning, suspensions, reactivations, and queue updates run transparently over the tunnel IP — no further billing configuration is needed.
+
+The **Tunnel Server** card shows the service status, public endpoint, subnet, and active tunnel count. Use the **Script** button on any active tunnel to re-display its RouterOS configuration, and the trash button to remove a tunnel.
+
 ## Setup Instructions
+
+> The steps below are the manual/API equivalents of the dashboard flow above, useful for automation or headless setups.
 
 ### Prerequisites
 
@@ -226,6 +240,13 @@ Checks if an IP address appears to be behind CGNAT.
 GET /api/cgnat-tunnel/scripts/server-setup
 ```
 Returns a bash script to set up WireGuard on the billing server.
+
+### Sync Tunnel Health
+```
+POST /api/cgnat-tunnel/health/sync
+Body: { "staleSeconds": 180 }   // optional, default 180
+```
+Reads WireGuard handshakes once and refreshes `is_online`/`last_seen` for every tunnel-enabled router. A router is marked online if it handshook within `staleSeconds`. Returns `{ wgAvailable, checked, onlineCount, results[] }`. This is the cheapest health signal for CGNAT routers because it requires no probe back through the tunnel. `GET /api/cgnat-tunnel/status` and `/tunnels` also include a live `tunnelActive` flag and `lastHandshake` per tunnel.
 
 ## Environment Variables
 
