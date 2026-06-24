@@ -295,8 +295,33 @@ export function NetworkManagementDashboard() {
     );
   }
 
-  const d = data || { routers: [], ipPools: [], pppoeSessions: { total: 0, sessions: [], byRouter: {} }, radiusNAS: [], summary: {} };
-  const s = d.summary;
+  const d = data || {
+    routers: [],
+    ipPools: [],
+    pppoeSessions: { total: 0, sessions: [], byRouter: {} },
+    radiusNAS: [],
+    summary: {},
+  };
+  const s = {
+    totalRouters: 0,
+    onlineRouters: 0,
+    totalPPPoEActive: 0,
+    totalIPPools: 0,
+    totalIPUsed: 0,
+    totalIPFree: 0,
+    totalNASDevices: 0,
+    activeNASSessions: 0,
+    ...(d.summary || {}),
+  };
+  const routers = Array.isArray(d.routers) ? d.routers : [];
+  const ipPools = Array.isArray(d.ipPools) ? d.ipPools : [];
+  const radiusNAS = Array.isArray(d.radiusNAS) ? d.radiusNAS : [];
+  const pppoeSessions = {
+    total: 0,
+    sessions: [],
+    byRouter: {},
+    ...(d.pppoeSessions || {}),
+  };
   const topSessions = Array.isArray(d.pppoeSessions?.sessions)
     ? d.pppoeSessions.sessions.slice(0, 10)
     : [];
@@ -336,7 +361,7 @@ export function NetworkManagementDashboard() {
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Server className="w-5 h-5 text-blue-400" /> Router Health
         </h3>
-        {d.routers.length === 0 ? (
+        {routers.length === 0 ? (
           <Card className="card-gradient">
             <CardContent className="p-8 flex flex-col items-center">
               <Router className="w-10 h-10 text-zinc-600 mb-3" />
@@ -345,7 +370,7 @@ export function NetworkManagementDashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {d.routers.map(r => <RouterHealthCard key={r.id} router={r} />)}
+            {routers.map(r => <RouterHealthCard key={r.id} router={r} />)}
           </div>
         )}
       </div>
@@ -360,13 +385,13 @@ export function NetworkManagementDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 max-h-[400px] overflow-y-auto">
-            {d.ipPools.length === 0 ? (
+            {ipPools.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-zinc-500">
                 <Network className="w-8 h-8 mb-2 opacity-40" />
                 <span className="text-sm">No IP pools configured. Create subnets in IPAM.</span>
               </div>
             ) : (
-              d.ipPools.map(pool => <IPPoolRow key={pool.id} pool={pool} />)
+              ipPools.map(pool => <IPPoolRow key={pool.id} pool={pool} />)
             )}
           </CardContent>
         </Card>
@@ -379,13 +404,13 @@ export function NetworkManagementDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 max-h-[400px] overflow-y-auto">
-            {d.radiusNAS.length === 0 ? (
+            {radiusNAS.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-zinc-500">
                 <Shield className="w-8 h-8 mb-2 opacity-40" />
                 <span className="text-sm">No NAS devices configured. Add NAS in RADIUS management.</span>
               </div>
             ) : (
-              d.radiusNAS.map(nas => <NASRow key={nas.id} nas={nas} />)
+              radiusNAS.map(nas => <NASRow key={nas.id} nas={nas} />)
             )}
           </CardContent>
         </Card>
@@ -398,10 +423,10 @@ export function NetworkManagementDashboard() {
             <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
               <Wifi className="w-4 h-4 text-emerald-400" /> Active PPPoE Sessions
               <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium">
-                {d.pppoeSessions.total}
+                {pppoeSessions.total}
               </span>
             </CardTitle>
-            {d.pppoeSessions.total > 10 && (
+            {pppoeSessions.total > 10 && (
               <span className="text-xs text-zinc-500">Showing top 10 by router</span>
             )}
           </div>
@@ -435,7 +460,7 @@ export function NetworkManagementDashboard() {
       </Card>
 
       {/* Bandwidth by Router */}
-      {Object.keys(d.pppoeSessions.byRouter).length > 0 && (
+      {Object.keys(pppoeSessions.byRouter).length > 0 && (
         <Card className="card-gradient">
           <CardHeader className="border-b border-zinc-800">
             <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
@@ -444,7 +469,7 @@ export function NetworkManagementDashboard() {
           </CardHeader>
           <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(d.pppoeSessions.byRouter).map(([id, r]) => (
+              {Object.entries(pppoeSessions.byRouter).map(([id, r]) => (
                 <div key={id} className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-800/50">
                   <div className="text-sm font-medium text-white mb-3">{r.name}</div>
                   <div className="space-y-2">
