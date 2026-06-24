@@ -297,7 +297,9 @@ export function NetworkManagementDashboard() {
 
   const d = data || { routers: [], ipPools: [], pppoeSessions: { total: 0, sessions: [], byRouter: {} }, radiusNAS: [], summary: {} };
   const s = d.summary;
-  const topSessions = d.pppoeSessions.sessions.slice(0, 10);
+  const topSessions = Array.isArray(d.pppoeSessions?.sessions)
+    ? d.pppoeSessions.sessions.slice(0, 10)
+    : [];
 
   return (
     <div className="p-8 animate-fade-in">
