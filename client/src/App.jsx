@@ -66,6 +66,7 @@ const PPPoEManagement = lazy(() => import("./pages/billing/PPPoEManagement").the
 const HotspotManagement = lazy(() => import("./pages/billing/HotspotManagement").then(m => ({ default: m.HotspotManagement })));
 const HotspotVouchers = lazy(() => import("./pages/billing/HotspotVouchers").then(m => ({ default: m.HotspotVouchers })));
 const NetworkServices = lazy(() => import("./pages/billing/NetworkServices").then(m => ({ default: m.NetworkServices })));
+const NetworkManagement = lazy(() => import("./pages/billing/NetworkManagement").then(m => ({ default: m.NetworkManagement })));
 const RadiusManagement = lazy(() => import("./pages/billing/RadiusManagement").then(m => ({ default: m.RadiusManagement })));
 const RadiusImport = lazy(() => import("./pages/RadiusImport").then(m => ({ default: m.RadiusImport })));
 const TicketSystem = lazy(() => import("./pages/billing/TicketSystem").then(m => ({ default: m.TicketSystem })));
@@ -301,14 +302,14 @@ function App() {
                           path="/network-services"
                           element={<NetworkServices />}
                         />
+                        <Route path="/network-management" element={<NetworkManagement />} />
                         <Route path="/olt" element={<OLTManagement />} />
                         <Route path="/fup" element={<FUPProfiles />} />
                         <Route path="/tr069" element={<TR069Devices />} />
                         <Route path="/speedtest" element={<SpeedTest />} />
                         <Route path="/ipam" element={<IPAMPage />} />
                         <Route path="/network-dashboard" element={<NetworkManagementDashboard />} />
-                        {/* <Route path="/alerts" element={<Alerts />} /> */}
-                        {/* <Route path="/monitoring" element={<Monitoring />} /> */}
+                        <Route path="/billing-monitoring" element={<MonitoringDashboard />} />
                         <Route path="/radius" element={<RadiusManagement />} />
                         <Route path="/radius-import" element={<RadiusImport />} />
                         <Route path="/tickets" element={<TicketSystem />} />

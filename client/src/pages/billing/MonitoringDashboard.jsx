@@ -47,6 +47,11 @@ export function MonitoringDashboard() {
   const [bandwidthHistory, setBandwidthHistory] = useState([]);
   const intervalRef = useRef(null);
   const wsRef = useRef(null);
+  const dashboard = data || {};
+  const sessions = Array.isArray(dashboard.sessions) ? dashboard.sessions : [];
+  const branchMetrics = Array.isArray(dashboard.branch_metrics)
+    ? dashboard.branch_metrics
+    : [];
 
   // Initialize WebSocket connection
   const connectWebSocket = useCallback(() => {
@@ -158,7 +163,13 @@ export function MonitoringDashboard() {
   const fetchData = async () => {
     try {
       const { data } = await axios.get(`${API}/features/monitoring/dashboard`);
-      setData(data);
+      setData({
+        ...data,
+        sessions: Array.isArray(data?.sessions) ? data.sessions : [],
+        branch_metrics: Array.isArray(data?.branch_metrics)
+          ? data.branch_metrics
+          : [],
+      });
       setLastUpdated(new Date());
     } catch (e) {
       console.error(e);
@@ -447,7 +458,7 @@ export function MonitoringDashboard() {
             <span className="text-sm text-slate-400">Branches</span>
           </div>
           <div className="text-3xl font-bold text-white">
-            {data.branch_metrics.length}
+            {branchMetrics.length}
           </div>
           <div className="text-xs text-amber-400 mt-1">POP locations</div>
         </Card>
@@ -464,7 +475,10 @@ export function MonitoringDashboard() {
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {realTimeData.currentBandwidth.customerUsage
+              {(Array.isArray(realTimeData.currentBandwidth.customerUsage)
+                ? realTimeData.currentBandwidth.customerUsage
+                : []
+              )
                 .filter((customer) => customer.percentage > 80)
                 .map((customer, index) => (
                   <Card key={index} className="card-gradient p-4">
@@ -512,7 +526,7 @@ export function MonitoringDashboard() {
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.branch_metrics.map((bm, i) => (
+            {branchMetrics.map((bm, i) => (
               <Card key={i} className="card-gradient p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-white font-semibold">{bm.branch.name}</h4>
@@ -588,11 +602,11 @@ export function MonitoringDashboard() {
         <CardHeader className="border-b border-zinc-800">
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="w-5 h-5" /> Active PPPoE Sessions (
-            {data.sessions.length})
+            {sessions.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {data.sessions.length === 0 ? (
+          {sessions.length === 0 ? (
             <div className="p-8 text-center text-slate-500">
               No active sessions
             </div>
@@ -612,7 +626,7 @@ export function MonitoringDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.sessions.map((session) => (
+                  {sessions.map((session) => (
                     <tr
                       key={session.id}
                       className="border-t border-zinc-800 hover:bg-zinc-800/50 transition-colors"

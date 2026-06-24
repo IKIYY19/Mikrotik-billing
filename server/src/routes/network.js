@@ -815,4 +815,74 @@ router.get('/management/dashboard', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════
+// NETWORK MANAGEMENT SUMMARY
+// Single endpoint for the unified dashboard
+// ═══════════════════════════════════════
+router.get('/summary', async (req, res) => {
+  const db = global.db || require('../db/memory');
+  try {
+    const [
+      routersRes,
+      nasRes,
+      ipamRes,
+      subsRes,
+      pppoeSessionsRes,
+    ] = await Promise.allSettled([
+      db.query(`SELECT id, name, ip_address, connection_type, is_online, last_seen FROM mikrotik_connections ORDER BY name`),
+      db.query(`SELECT id, nasname, shortname, type, description, connection_id FROM nas ORDER BY shortname`),
+      db.query(`SELECT
+          COUNT(*) FILTER (WHERE status = 'free') AS free_ips,
+          COUNT(*) FILTER (WHERE status = 'used') AS used_ips,
+          COUNT(*) FILTER (WHERE status = 'reserved') AS reserved_ips,
+          COUNT(*) AS total_ips
+        FROM ip_addresses`).catch(() => ({ rows: [{ free_ips: 0, used_ips: 0, reserved_ips: 0, total_ips: 0 }] })),
+      db.query(`SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE status = 'active') AS active,
+          COUNT(*) FILTER (WHERE status = 'suspended') AS suspended,
+          COUNT(*) FILTER (WHERE status = 'expired') AS expired
+        FROM subscriptions`).catch(() => ({ rows: [{ total: 0, active: 0, suspended: 0, expired: 0 }] })),
+      db.query(`SELECT COUNT(*) AS total FROM radius_sessions WHERE stop_time IS NULL`).catch(() => ({ rows: [{ total: 0 }] })),
+    ]);
+
+    const routers = routersRes.status === 'fulfilled' ? routersRes.value.rows : [];
+    const nas = nasRes.status === 'fulfilled' ? nasRes.value.rows : [];
+    const ipam = ipamRes.status === 'fulfilled' ? ipamRes.value.rows[0] : {};
+    const subs = subsRes.status === 'fulfilled' ? subsRes.value.rows[0] : {};
+    const pppoeSess = pppoeSessionsRes.status === 'fulfilled' ? pppoeSessionsRes.value.rows[0] : { total: 0 };
+
+    const onlineRouters = routers.filter((r) => r.is_online).length;
+    const offlineRouters = routers.filter((r) => !r.is_online).length;
+
+    // Subnet summaries from IPAM
+    let subnets = [];
+    try {
+      const snRes = await db.query(
+        `SELECT s.id, s.name, s.network, s.mask, s.description,
+                COUNT(a.id) FILTER (WHERE a.status='used') AS used_ips,
+                COUNT(a.id) FILTER (WHERE a.status='free') AS free_ips,
+                COUNT(a.id) AS total_ips
+         FROM ip_subnets s
+         LEFT JOIN ip_addresses a ON a.subnet_id = s.id
+         GROUP BY s.id ORDER BY s.network LIMIT 20`,
+      );
+      subnets = snRes.rows;
+    } catch (_) {
+      /* subnets table may not exist */
+    }
+
+    res.json({
+      routers: { total: routers.length, online: onlineRouters, offline: offlineRouters, list: routers },
+      nas: { total: nas.length, list: nas },
+      ipam: { ...ipam, subnets },
+      subscriptions: subs,
+      pppoe_sessions: pppoeSess.total,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
