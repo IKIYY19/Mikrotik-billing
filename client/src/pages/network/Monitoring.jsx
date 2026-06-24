@@ -148,6 +148,56 @@ export function Monitoring() {
     }
   };
 
+  const getAlertTypeLabel = (type) => {
+    switch (type) {
+      case 'customer_outage':
+        return 'Customer outage';
+      case 'router_offline':
+        return 'Router offline';
+      case 'router_online':
+        return 'Router online';
+      default:
+        return type || 'General';
+    }
+  };
+
+  const parseAlertMetadata = (metadata) => {
+    if (!metadata) {
+      return null;
+    }
+
+    if (typeof metadata === 'object') {
+      return metadata;
+    }
+
+    try {
+      return JSON.parse(metadata);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const getOutageSummary = (alert) => {
+    if (alert.alert_type !== 'customer_outage') {
+      return null;
+    }
+
+    const metadata = parseAlertMetadata(alert.metadata);
+    if (!metadata) {
+      return null;
+    }
+
+    const total = metadata.totalCustomers ?? metadata.total_customers;
+    const offline = metadata.offlineCount ?? metadata.offline_count;
+    const online = metadata.onlineCount ?? metadata.online_count;
+
+    if (total == null || offline == null) {
+      return null;
+    }
+
+    return `${offline}/${total} customers offline${online != null ? `, ${online} online` : ''}`;
+  };
+
   return (
     <div className="relative min-h-full p-8 animate-fade-in">
       <div className="absolute inset-0 bg-mesh" />
@@ -257,11 +307,25 @@ export function Monitoring() {
             {alerts.map((alert) => (
               <tr key={alert.id}>
                 <td>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getSeverityColor(alert.severity)}`}>
-                    {alert.severity}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getSeverityColor(alert.severity)}`}>
+                      {alert.severity}
+                    </span>
+                    {alert.alert_type === 'customer_outage' && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                        Outage
+                      </span>
+                    )}
+                  </div>
                 </td>
-                <td className="text-sm text-zinc-400">{alert.alert_type}</td>
+                <td className="text-sm text-zinc-400">
+                  <div className="flex flex-col">
+                    <span>{getAlertTypeLabel(alert.alert_type)}</span>
+                    {alert.alert_type === 'customer_outage' && (
+                      <span className="text-xs text-violet-300/80">{getOutageSummary(alert) || 'Customer sessions dropped below threshold'}</span>
+                    )}
+                  </div>
+                </td>
                 <td>
                   <div>
                     <p className="text-sm font-medium text-white">{alert.title}</p>
