@@ -151,6 +151,20 @@ router.get("/scripts/server-setup", async (req, res) => {
 });
 
 /**
+ * POST /api/cgnat-tunnel/health/sync
+ * Refresh is_online/last_seen for all tunnel routers from WireGuard handshakes.
+ */
+router.post("/health/sync", async (req, res) => {
+  try {
+    const staleSeconds = parseInt(req.body?.staleSeconds, 10) || 180;
+    const result = await cgnatTunnelService.syncTunnelHealth(staleSeconds);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/cgnat-tunnel/detect-cgnat
  * Check if an IP address appears to be behind CGNAT
  * Body: { ip_address }

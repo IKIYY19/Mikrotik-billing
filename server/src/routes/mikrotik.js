@@ -209,6 +209,21 @@ router.post('/test', async (req, res) => {
   }
   diagnostics.steps.push({ step: 'input_validation', status: 'passed' });
 
+  // Proactively flag private/CGNAT addresses so the UI can recommend a tunnel
+  // regardless of whether the connection attempt later succeeds or fails.
+  const isPrivateOrCgnat = /^10\.|^172\.1[6-9]\.|^172\.2\d\.|^172\.3[0-1]\.|^192\.168\.|^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(ip_address || '');
+  const wgSubnetPrefix = (process.env.WG_TUNNEL_SUBNET || '10.200.0');
+  const isTunnelIp = (ip_address || '').startsWith(wgSubnetPrefix + '.');
+  diagnostics.cgnat = {
+    isPrivateOrCgnat,
+    isTunnelIp,
+    recommendation: isTunnelIp
+      ? 'This is a WireGuard tunnel IP — the router is reachable through the CGNAT tunnel.'
+      : isPrivateOrCgnat
+        ? 'This IP is in a private/CGNAT range. If the router is behind CGNAT, create a WireGuard tunnel on the CGNAT Tunnel tab.'
+        : 'Public IP detected — a direct connection should work if the router is online.',
+  };
+
   // Fast TCP check (3s) before slow API/SSH attempt
   const targetPort = connection_type === 'ssh' ? (ssh_port || 22) : (api_port || 8728);
   const tcpCheck = await checkTcpReachable(ip_address, targetPort);

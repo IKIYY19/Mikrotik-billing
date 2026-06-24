@@ -44,6 +44,7 @@ class CGNATTunnelService {
     this.serverPublicKey = null;
     this.serverPrivateKey = null;
     this.serverWgIp = `${WG_TUNNEL_SUBNET}.1`;
+    this.serverPort = WG_TUNNEL_PORT;
     this.initialized = false;
   }
 
@@ -568,6 +569,92 @@ ${peers.join("\n")}
   }
 
   /**
+   * Read all current WireGuard handshakes once and return a map of
+   * peerPublicKey -> lastHandshakeEpochSeconds. Returns {} if wg is
+   * unavailable on this host (e.g. running off the tunnel server).
+   */
+  readHandshakes() {
+    try {
+      const wgOutput = execSync(`wg show ${WG_INTERFACE} latest-handshakes`, {
+        encoding: "utf8",
+        timeout: 5000,
+      }).trim();
+      const map = {};
+      for (const line of wgOutput.split("\n")) {
+        if (!line.trim()) continue;
+        const parts = line.split("\t");
+        if (parts.length >= 2) {
+          map[parts[0].trim()] = parseInt(parts[parts.length - 1], 10) || 0;
+        }
+      }
+      return map;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Sync is_online / last_seen for every tunnel-enabled router based on the
+   * WireGuard handshake age. A peer is considered online if it handshook in
+   * the last `staleSeconds` (default 180s). This is the cheapest, most
+   * reliable health signal for CGNAT routers because it requires no probe
+   * back through the tunnel.
+   */
+  async syncTunnelHealth(staleSeconds = 180) {
+    await this.initialize();
+    const db = this.getDb();
+
+    const result = await db.query(
+      `SELECT id, name, wireguard_public_key, is_online
+       FROM mikrotik_connections
+       WHERE use_tunnel = true AND wireguard_public_key IS NOT NULL`
+    );
+
+    const handshakes = this.readHandshakes();
+    const wgAvailable = Object.keys(handshakes).length > 0;
+    const now = Math.floor(Date.now() / 1000);
+    const updated = [];
+
+    for (const row of result.rows || []) {
+      const hs = handshakes[row.wireguard_public_key] || 0;
+      const online = hs > 0 && now - hs < staleSeconds;
+
+      // Only write when status actually changes to avoid churn
+      if (online !== row.is_online) {
+        await db.query(
+          `UPDATE mikrotik_connections
+           SET is_online = $1,
+               last_seen = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE last_seen END,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [online, row.id]
+        );
+      } else if (online) {
+        await db.query(
+          `UPDATE mikrotik_connections SET last_seen = CURRENT_TIMESTAMP WHERE id = $1`,
+          [row.id]
+        );
+      }
+
+      updated.push({
+        connectionId: row.id,
+        routerName: row.name,
+        online,
+        lastHandshake: hs ? new Date(hs * 1000).toISOString() : null,
+        handshakeAgeSeconds: hs ? now - hs : null,
+      });
+    }
+
+    return {
+      success: true,
+      wgAvailable,
+      checked: updated.length,
+      onlineCount: updated.filter((u) => u.online).length,
+      results: updated,
+    };
+  }
+
+  /**
    * List all tunnels
    */
   async listTunnels() {
@@ -581,22 +668,32 @@ ${peers.join("\n")}
        WHERE use_tunnel = true`
     );
 
+    // Read WireGuard handshakes once for live status (cheap, single exec)
+    const handshakes = this.readHandshakes();
+    const now = Math.floor(Date.now() / 1000);
+
     return {
       success: true,
       serverPublicKey: this.serverPublicKey,
       serverEndpoint: this.getServerEndpoint(),
       serverPort: WG_TUNNEL_PORT,
       tunnelSubnet: `${WG_TUNNEL_SUBNET}.0/24`,
-      tunnels: result.rows.map((row) => ({
-        connectionId: row.id,
-        routerName: row.name,
-        connectionIp: row.ip_address,
-        tunnelIp: row.wireguard_tunnel_ip,
-        publicKey: row.wireguard_public_key,
-        interfaceName: row.wireguard_interface_name,
-        isOnline: row.is_online,
-        lastSeen: row.last_seen,
-      })),
+      tunnels: result.rows.map((row) => {
+        const hs = handshakes[row.wireguard_public_key] || 0;
+        const tunnelActive = hs > 0 && now - hs < 180;
+        return {
+          connectionId: row.id,
+          routerName: row.name,
+          connectionIp: row.ip_address,
+          tunnelIp: row.wireguard_tunnel_ip,
+          publicKey: row.wireguard_public_key,
+          interfaceName: row.wireguard_interface_name,
+          isOnline: row.is_online,
+          lastSeen: row.last_seen,
+          tunnelActive,
+          lastHandshake: hs ? new Date(hs * 1000).toISOString() : null,
+        };
+      }),
     };
   }
 

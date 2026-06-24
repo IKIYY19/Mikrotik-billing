@@ -16,10 +16,23 @@
     "db:migrate": "node server/src/db/migrate.js",
     "db:seed": "node server/src/db/seed.js"
   },
-  "keywords": ["mikrotik", "routeros", "network", "config", "generator"],
+  "keywords": [
+    "mikrotik",
+    "routeros",
+    "network",
+    "config",
+    "generator"
+  ],
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2",
     "nodemon": "^3.0.2"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "express": "^5.2.1",
+    "lucide-react": "^1.21.0",
+    "react": "^19.2.7",
+    "uuid": "^14.0.1"
   }
 }
