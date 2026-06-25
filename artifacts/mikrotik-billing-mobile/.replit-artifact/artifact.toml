@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/mikrotik-billing-mobile/"
+title = "MikroTik Billing Mobile"
+version = "1.0.0"
+id = "artifacts/mikrotik-billing-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/mikrotik-billing-mobile/" ]
+localPort = 21074
+
+[services.development]
+run = "pnpm --filter @workspace/mikrotik-billing-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mikrotik-billing-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/mikrotik-billing-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "21074"
+BASE_PATH = "/mikrotik-billing-mobile/"
