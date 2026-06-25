@@ -1,40 +1,49 @@
-# Dependencies
-node_modules/
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Environment files
-.env
-.env.local
-.env.production
-**/.env
-server/.env
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
 
-# Logs
-logs/
-*.log
-npm-debug.log*
+# dependencies
+node_modules
 
-# Build output
-dist/
-build/
-client/dist/
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# OS
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
 .DS_Store
 Thumbs.db
 
-# Backup files
-*.backup
-*.bak
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
 
-# Coverage
-coverage/
-
-# Temporary files
-tmp/
-temp/
+# Replit
+.cache/
+.local/
