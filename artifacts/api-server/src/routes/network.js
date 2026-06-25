@@ -819,7 +819,7 @@ router.get('/management/dashboard', async (req, res) => {
 // NETWORK MANAGEMENT SUMMARY
 // Single endpoint for the unified dashboard
 // ═══════════════════════════════════════
-router.get('/summary', async (req, res) => {
+async function networkSummaryHandler(req, res) {
   const db = global.db || require('../db/memory');
   try {
     const [
@@ -855,7 +855,6 @@ router.get('/summary', async (req, res) => {
     const onlineRouters = routers.filter((r) => r.is_online).length;
     const offlineRouters = routers.filter((r) => !r.is_online).length;
 
-    // Subnet summaries from IPAM
     let subnets = [];
     try {
       const snRes = await db.query(
@@ -883,6 +882,10 @@ router.get('/summary', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-});
+}
+
+// Registered on both paths because the alias router prepends /network for non-pppoe routes
+router.get('/network/summary', networkSummaryHandler);
+router.get('/summary', networkSummaryHandler);
 
 module.exports = router;
