@@ -1,0 +1,332 @@
+/**
+ * Customer Portal Authentication
+ * Secure token-based auth for customer self-service portal
+ */
+
+const express = require("express");
+const router = express.Router();
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("../middleware/auth");
+const db = global.dbAvailable ? global.db : require("../db/memory");
+
+const crypto = require("crypto");
+const CUSTOMER_JWT_SECRET = crypto
+  .createHmac("sha256", JWT_SECRET)
+  .update("customer-portal-auth")
+  .digest("hex");
+const CUSTOMER_JWT_EXPIRES = "24h";
+const notificationService = require("../services/notificationService");
+
+// Generate secure PIN hash
+const hashPIN = async (pin) => await bcrypt.hash(pin, 10);
+const verifyPIN = async (pin, hash) => await bcrypt.compare(pin, hash);
+const isValidPIN = (pin) => /^\d{4,8}$/.test(String(pin || ""));
+
+// POST /api/portal/auth/login
+router.post("/login", async (req, res) => {
+  try {
+    const { phone, pin } = req.body;
+    if (!phone || !pin) {
+      return res.status(400).json({ error: "Phone and PIN required" });
+    }
+    if (!isValidPIN(pin)) {
+      return res.status(400).json({ error: "PIN must be 4-8 digits" });
+    }
+
+    const customer = await db.query(
+      "SELECT * FROM customers WHERE phone = $1 AND status = $2",
+      [phone, "active"],
+    );
+
+    if (customer.rows.length === 0) {
+      return res.status(401).json({ error: "Customer not found or inactive" });
+    }
+
+    const cust = customer.rows[0];
+
+    // If no PIN set, use last 4 of phone as default
+    const pinHash = cust.portal_pin_hash;
+    if (!pinHash) {
+      // First login - set PIN
+      const newPinHash = await hashPIN(pin);
+      await db.query(
+        "UPDATE customers SET portal_pin_hash = $1, last_portal_login = CURRENT_TIMESTAMP WHERE id = $2",
+        [newPinHash, cust.id],
+      );
+    } else {
+      const valid = await verifyPIN(pin, pinHash);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid PIN" });
+      }
+
+      await db.query(
+        "UPDATE customers SET last_portal_login = CURRENT_TIMESTAMP WHERE id = $1",
+        [cust.id],
+      );
+    }
+
+    // Generate customer-specific token
+    const token = jwt.sign(
+      {
+        customerId: cust.id,
+        phone: cust.phone,
+        type: "customer",
+      },
+      CUSTOMER_JWT_SECRET,
+      { expiresIn: CUSTOMER_JWT_EXPIRES },
+    );
+
+    res.json({
+      token,
+      customer: {
+        id: cust.id,
+        name: cust.name,
+        phone: cust.phone,
+        email: cust.email,
+        status: cust.status,
+      },
+    });
+  } catch (error) {
+    console.error("Portal login error:", error);
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
+// GET /api/portal/auth/me
+router.get("/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "No token" });
+    }
+
+    const decoded = jwt.verify(authHeader.split(" ")[1], CUSTOMER_JWT_SECRET);
+    const customer = await db.query(
+      "SELECT id, name, phone, email, status, address, created_at FROM customers WHERE id = $1",
+      [decoded.customerId],
+    );
+
+    if (customer.rows.length === 0) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    res.json(customer.rows[0]);
+  } catch (error) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+// POST /api/portal/auth/change-pin
+router.post("/change-pin", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "No token" });
+    }
+
+    const decoded = jwt.verify(authHeader.split(" ")[1], CUSTOMER_JWT_SECRET);
+    const { currentPIN, newPIN } = req.body;
+
+    if (!currentPIN || !newPIN) {
+      return res
+        .status(400)
+        .json({ error: "Current PIN and new PIN required" });
+    }
+
+    if (!isValidPIN(newPIN)) {
+      return res.status(400).json({ error: "PIN must be 4-8 digits" });
+    }
+
+    const customer = await db.query(
+      "SELECT portal_pin_hash FROM customers WHERE id = $1",
+      [decoded.customerId],
+    );
+
+    if (customer.rows.length === 0 || !customer.rows[0].portal_pin_hash) {
+      return res.status(400).json({ error: "No PIN set. Please login first." });
+    }
+
+    const valid = await verifyPIN(currentPIN, customer.rows[0].portal_pin_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current PIN is incorrect" });
+    }
+
+    const newPinHash = await hashPIN(newPIN);
+    await db.query("UPDATE customers SET portal_pin_hash = $1 WHERE id = $2", [
+      newPinHash,
+      decoded.customerId,
+    ]);
+
+    res.json({ message: "PIN changed successfully" });
+  } catch (error) {
+    console.error("Change PIN error:", error);
+    res.status(500).json({ error: "Failed to change PIN" });
+  }
+});
+
+// Helper: find customer by phone (works with DB and in-memory)
+async function findCustomerByPhone(phone) {
+  if (global.dbAvailable && global.db) {
+    const result = await global.db.query(
+      "SELECT * FROM customers WHERE phone = $1",
+      [phone],
+    );
+    return result.rows[0] || null;
+  }
+  const memoryDb = require("../db/memory");
+  const store = memoryDb._getStore ? memoryDb._getStore() : {};
+  return (store.customers || []).find((c) => c.phone === phone) || null;
+}
+
+async function updateCustomerField(customerId, field, value) {
+  if (global.dbAvailable && global.db) {
+    await global.db.query(
+      `UPDATE customers SET ${field} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [value, customerId],
+    );
+  } else {
+    const memoryDb = require("../db/memory");
+    const store = memoryDb._getStore ? memoryDb._getStore() : {};
+    const customer = (store.customers || []).find((c) => c.id === customerId);
+    if (customer) {customer[field] = value;}
+  }
+}
+
+// POST /api/portal/auth/forgot-pin
+router.post("/forgot-pin", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number required" });
+    }
+
+    const customer = await findCustomerByPhone(phone);
+    if (!customer) {
+      return res
+        .status(404)
+        .json({ error: "Customer not found with this phone number" });
+    }
+
+    // Generate 6-digit reset code
+    const resetCode = String(Math.floor(100000 + Math.random() * 900000));
+    const resetExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
+
+    await updateCustomerField(customer.id, "pin_reset_code", resetCode);
+    await updateCustomerField(customer.id, "pin_reset_expires", resetExpiry);
+
+    // Try to send reset code via SMS
+    try {
+      await notificationService.triggerSMS("password_reset", {
+        customer,
+        reset_code: resetCode,
+      }).catch((e) => console.error('customerAuth.js async op failed:', e?.message || e));
+    } catch (smsErr) {
+      // SMS not configured - silently continue
+    }
+
+    // Try to send reset code via WhatsApp
+    try {
+      const wa = await notificationService.getWhatsAppService();
+      await wa
+        .sendMessage(
+          customer.phone.replace(/^0/, "254"),
+          `Your internet service password reset code is: ${resetCode}. It expires in 30 minutes.`,
+        )
+        .catch((e) => console.error('customerAuth.js async op failed:', e?.message || e));
+    } catch (waErr) {
+      // WhatsApp not configured - silently continue
+    }
+
+    res.json({
+      success: true,
+      message: "Reset code sent to your phone",
+      // In development, return the code. In production, only send via SMS.
+      reset_code: process.env.NODE_ENV === "production" ? undefined : resetCode,
+    });
+  } catch (error) {
+    console.error("Forgot PIN error:", error);
+    res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
+// POST /api/portal/auth/reset-pin
+router.post("/reset-pin", async (req, res) => {
+  try {
+    const { phone, resetCode, newPIN } = req.body;
+
+    if (!phone || !resetCode || !newPIN) {
+      return res
+        .status(400)
+        .json({ error: "Phone, reset code, and new PIN required" });
+    }
+    if (!isValidPIN(newPIN)) {
+      return res.status(400).json({ error: "PIN must be 4-8 digits" });
+    }
+
+    const customer = await findCustomerByPhone(phone);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Validate reset code
+    if (!customer.pin_reset_code || customer.pin_reset_code !== resetCode) {
+      return res.status(400).json({ error: "Invalid reset code" });
+    }
+
+    if (
+      customer.pin_reset_expires &&
+      new Date(customer.pin_reset_expires) < new Date()
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Reset code has expired. Request a new one." });
+    }
+
+    // Hash and store new PIN
+    const newPinHash = await hashPIN(newPIN);
+    if (global.dbAvailable && global.db) {
+      await global.db.query(
+        `UPDATE customers SET portal_pin_hash = $1, pin_reset_code = NULL, pin_reset_expires = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [newPinHash, customer.id],
+      );
+    } else {
+      const memoryDb = require("../db/memory");
+      const store = memoryDb._getStore ? memoryDb._getStore() : {};
+      const cust = (store.customers || []).find((c) => c.id === customer.id);
+      if (cust) {
+        cust.portal_pin_hash = newPinHash;
+        cust.pin_reset_code = null;
+        cust.pin_reset_expires = null;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "PIN reset successfully. You can now login with your new PIN.",
+    });
+  } catch (error) {
+    console.error("Reset PIN error:", error);
+    res.status(500).json({ error: "Failed to reset PIN" });
+  }
+});
+
+// Middleware for customer portal auth
+const authenticateCustomer = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, CUSTOMER_JWT_SECRET);
+    req.customerId = decoded.customerId;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
+};
+
+module.exports = router;
+module.exports.authenticateCustomer = authenticateCustomer;

@@ -18,3 +18,11 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "b0a05b4bb5c47e9612fd55165f52f414b6fb89c3ecbb1215e88deb34866c8af28ba574882e31f8c3563562f645656343aacd2132776e8c51b39c0e812a929e31"
+ENCRYPTION_KEY = "6732c3823b2651101f1302575688edeea5beb8bb914b31d08a3064594c4956be"
+NODE_ENV = "development"
+ENABLE_MONITORING_API = "true"
