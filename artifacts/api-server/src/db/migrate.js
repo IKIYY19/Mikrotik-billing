@@ -7,6 +7,7 @@ const unifiedMigrations = require("./unifiedMigrations");
 const tenantMigrations = require("./tenantMigrations");
 const provisioningQueueMigrations = require("./provisioningQueueMigrations");
 const { runRlsMigrations } = require("./rlsMigrations");
+const { runSchemaFixesMigrations } = require("./schemaFixesMigrations");
 
 const coreMigrations = [
   // Users table (MUST be first - required for auth)
@@ -450,6 +451,10 @@ async function runMigrations() {
       await db.query(migration);
     }
     console.log("Provisioning Queue migrations completed successfully");
+
+    // Run schema fixes (missing columns added after original migrations)
+    await runSchemaFixesMigrations(db);
+    console.log("Schema fixes completed");
 
     // Run RLS migrations (must be LAST — depends on tenant_id columns existing)
     await runRlsMigrations(db);
