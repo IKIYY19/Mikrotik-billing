@@ -145,6 +145,9 @@ function createCorsOriginHandler() {
   return async (origin, callback) => {
     if (!origin) return callback(null, true);
 
+    // In development, allow all origins (Replit preview, localhost, etc.)
+    if (!isProductionEnv) return callback(null, true);
+
     // Static allowed origins (from env / config) with wildcard support
     if (allowedOrigins.length === 0 || allowedOrigins.some(pattern => matchesPattern(origin, pattern))) {
       return callback(null, true);
