@@ -1,0 +1,1 @@
+- [Network alias router](network-alias-router.md) — routes in network.js without a `/network/` prefix all 404 when accessed via `/api/network/*`

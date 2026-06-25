@@ -303,7 +303,7 @@ router.post('/hotspot/active/:address/kick', async (req, res) => {
 });
 
 // Get Hotspot vouchers
-router.get('/vouchers', async (req, res) => {
+router.get('/network/vouchers', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const result = await db.query('SELECT * FROM hotspot_vouchers ORDER BY created_at DESC');
@@ -312,7 +312,7 @@ router.get('/vouchers', async (req, res) => {
 });
 
 // Create Hotspot vouchers (batch)
-router.post('/vouchers', async (req, res) => {
+router.post('/network/vouchers', async (req, res) => {
   try {
     const { vouchers, connection_id } = req.body;
     console.log('Received voucher creation request:', { voucherCount: vouchers?.length, connection_id });
@@ -351,7 +351,7 @@ router.post('/vouchers', async (req, res) => {
 });
 
 // Delete voucher
-router.delete('/vouchers/:id', async (req, res) => {
+router.delete('/network/vouchers/:id', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     await db.query('DELETE FROM hotspot_vouchers WHERE id = $1', [req.params.id]);
@@ -574,7 +574,7 @@ router.post('/network/wireguard/peer', async (req, res) => {
 // Aggregates router health, IP pool usage, active PPPoE sessions,
 // and RADIUS NAS status into a single API response
 // ──────────────────────────────────────────────────────────────────
-router.get('/management/dashboard', async (req, res) => {
+router.get('/network/management/dashboard', async (req, res) => {
   try {
     const db = global.db || require('../db/memory');
     const dashboard = {
