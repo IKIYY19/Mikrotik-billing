@@ -1,1 +1,2 @@
-- [Network alias router](network-alias-router.md) — routes in network.js without a `/network/` prefix all 404 when accessed via `/api/network/*`
+- [Network alias router pattern](network-alias-router.md) — routes in network.js accessed via /api/network/* must be registered as /network/XXX not /XXX due to alias router in index.js
+- [WireGuard combined link script](wireguard-link-flow.md) — POST /api/cgnat-tunnel/new-router-script generates a single RouterOS paste that does WG+API+enrollment in one step

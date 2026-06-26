@@ -223,4 +223,83 @@ router.post("/:connectionId/regenerate-keys", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/cgnat-tunnel/new-router-script
+ * Pre-allocate a WireGuard tunnel for a brand-new router and return a
+ * combined RouterOS script (WireGuard setup + API enable + enrollment).
+ * Paste the script ONCE on the MikroTik terminal — done.
+ *
+ * Body: { routerName, apiUsername?, apiPassword, apiPort?, serverUrl, tenantSlug, enrollApiKey }
+ */
+router.post("/new-router-script", async (req, res) => {
+  try {
+    const {
+      routerName,
+      apiUsername = "billing",
+      apiPassword,
+      apiPort = 8728,
+      serverUrl,
+      tenantSlug,
+      enrollApiKey,
+    } = req.body;
+
+    if (!routerName) return res.status(400).json({ success: false, error: "routerName is required" });
+    if (!apiPassword) return res.status(400).json({ success: false, error: "apiPassword is required" });
+    if (!serverUrl) return res.status(400).json({ success: false, error: "serverUrl is required" });
+    if (!enrollApiKey) return res.status(400).json({ success: false, error: "enrollApiKey is required" });
+
+    await cgnatTunnelService.initialize();
+
+    // Create a placeholder mikrotik_connections row so we can call createTunnel()
+    const safeName = routerName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
+    const insertResult = await db.query(
+      `INSERT INTO mikrotik_connections
+         (name, ip_address, api_port, username, connection_type, is_online, use_tunnel, created_at, updated_at)
+       VALUES ($1, '0.0.0.0', $2, $3, 'api', false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [safeName, parseInt(apiPort, 10) || 8728, apiUsername]
+    );
+
+    const connectionId = insertResult.rows[0].id;
+
+    // Generate WireGuard tunnel (allocates tunnel IP + keys)
+    const tunnel = await cgnatTunnelService.createTunnel(connectionId);
+    if (!tunnel.success) {
+      // Clean up placeholder on failure
+      await db.query("DELETE FROM mikrotik_connections WHERE id = $1", [connectionId]).catch(() => {});
+      return res.status(500).json({ success: false, error: tunnel.error || "Failed to create tunnel" });
+    }
+
+    const slugPath = tenantSlug ? `/v1/${tenantSlug}/install` : "/v1/scripts/install";
+
+    const script = cgnatTunnelService.generateCombinedLinkScript({
+      routerName,
+      routerPrivateKey: tunnel.routerPrivateKey,
+      routerTunnelIp: tunnel.routerTunnelIp,
+      serverPublicKey: cgnatTunnelService.serverPublicKey,
+      serverEndpoint: cgnatTunnelService.getServerEndpoint(),
+      serverWgPort: tunnel.serverWgPort || parseInt(process.env.WG_TUNNEL_PORT || "51820", 10),
+      serverWgIp: cgnatTunnelService.serverWgIp,
+      interfaceName: tunnel.interfaceName,
+      apiUsername,
+      apiPassword,
+      apiPort: parseInt(apiPort, 10) || 8728,
+      serverUrl: serverUrl.replace(/\/$/, ""),
+      slugPath,
+      enrollApiKey,
+    });
+
+    res.json({
+      success: true,
+      connectionId,
+      tunnelIp: tunnel.routerTunnelIp,
+      interfaceName: tunnel.interfaceName,
+      script,
+      hint: `Apply this script on ${routerName} — it sets up WireGuard, enables the API, and enrolls the router in one step.`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

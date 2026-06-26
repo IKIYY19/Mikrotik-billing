@@ -57,6 +57,15 @@ export default function RoutersPage() {
   const [linkPhase, setLinkPhase] = useState(""); // "testing" | "saving" | ""
   // ─────────────────────────────────────────────────────────────────────────
 
+  // ── WireGuard link-wizard state ───────────────────────────────────────────
+  const [linkMode, setLinkMode] = useState("direct"); // "direct" | "wireguard"
+  const [wgForm, setWgForm] = useState({ routerName: "", apiPassword: "", apiPort: "8728" });
+  const [wgGenerating, setWgGenerating] = useState(false);
+  const [wgResult, setWgResult] = useState(null); // { script, tunnelIp, connectionId }
+  const [wgCopied, setWgCopied] = useState(false);
+  const [wgError, setWgError] = useState(null);
+  // ─────────────────────────────────────────────────────────────────────────
+
   // ── CGNAT WireGuard tunnel state ───────────────────────────────────────────
   const [tunnelServer, setTunnelServer] = useState(null); // /status payload
   const [tunnels, setTunnels] = useState([]);             // list of active tunnels
@@ -273,6 +282,33 @@ export default function RoutersPage() {
     let prefix = "";
     if (mgmtUser && mgmtPass) { prefix = `:global ztpMgmtUser "${mgmtUser}"; :global ztpMgmtPass "${mgmtPass}"; `; }
     return `${prefix}/tool fetch url="${appUrl}/api/router${slugPath}" http-header-field="Authorization: Bearer ${apiKey}" dst-path=install.rsc mode=${mode}${certFlag}; :delay 4s; /import file-name=install.rsc; :delay 1s; /file remove install.rsc`;
+  };
+
+  const generateWgScript = async () => {
+    if (!wgForm.routerName.trim()) { setWgError("Enter a router name"); return; }
+    if (!wgForm.apiPassword.trim()) { setWgError("Enter an API password"); return; }
+    if (!apiKey) { setWgError("Generate an API key first (above)"); return; }
+    setWgGenerating(true);
+    setWgError(null);
+    setWgResult(null);
+    try {
+      const token = getToken();
+      const { data } = await axios.post(
+        `${API}/cgnat-tunnel/new-router-script`,
+        {
+          routerName: wgForm.routerName.trim(),
+          apiPassword: wgForm.apiPassword,
+          apiPort: parseInt(wgForm.apiPort, 10) || 8728,
+          serverUrl: appUrl,
+          tenantSlug,
+          enrollApiKey: apiKey,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setWgResult({ script: data.script, tunnelIp: data.tunnelIp, connectionId: data.connectionId });
+    } catch (e) {
+      setWgError(e.response?.data?.error || e.message || "Failed to generate script");
+    } finally { setWgGenerating(false); }
   };
 
   // ── Link to Billing handlers ─────────────────────────────────────────────
@@ -512,106 +548,236 @@ export default function RoutersPage() {
 
       {/* LINK NEW ROUTER TAB */}
       {activeTab === "link" && (
-        <div className="space-y-6">
-          {/* Step 1: API Key */}
+        <div className="space-y-5">
+
+          {/* API Key (always shown) */}
           <Card className="bg-zinc-900/60 border-zinc-800/50">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">1</span> Your API Key
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {apiKey ? (
-                <code className="block w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-4 py-3 text-sm text-amber-400 font-mono break-all">{apiKey}</code>
-              ) : (
-                <p className="text-zinc-500 text-sm">No API key yet.</p>
-              )}
-              <Button onClick={generateKey} disabled={generating} className="gap-2">
-                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
-                {apiKey ? "Regenerate" : "Generate API Key"}
+            <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-xs text-zinc-500 mb-1 font-medium uppercase tracking-wide">Enrollment API Key</p>
+                {apiKey
+                  ? <code className="text-sm text-amber-400 font-mono break-all">{apiKey}</code>
+                  : <p className="text-zinc-500 text-sm">No API key yet — generate one to start.</p>}
+              </div>
+              <Button onClick={generateKey} disabled={generating} size="sm" className="gap-2 shrink-0">
+                {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                {apiKey ? "Regenerate" : "Generate Key"}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Step 2: Credentials */}
           {apiKey && (
-            <Card className="bg-zinc-900/60 border-zinc-800/50">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">2</span> Management Credentials
-                  {!showCredentials && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full ml-2">Recommended</span>}
-                </CardTitle>
-                <CardDescription>
-                  Include these so the router auto-links to billing on first contact. Without them, you can still link manually from the Routers list.
-                </CardDescription>
-              </CardHeader>
-              {showCredentials ? (
-                <CardContent className="space-y-3">
-                  <input type="text" value={mgmtUser} onChange={(e) => setMgmtUser(e.target.value)} placeholder="Username (usually admin)" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                  <input type="password" value={mgmtPass} onChange={(e) => setMgmtPass(e.target.value)} placeholder="Password" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                  <input type="text" value={mgmtPort} onChange={(e) => setMgmtPort(e.target.value)} placeholder="8728" className="w-24 bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                </CardContent>
-              ) : (
-                <CardContent><Button variant="outline" onClick={() => setShowCredentials(true)} className="gap-2 border-zinc-700/50 text-zinc-300"><Shield className="w-4 h-4" /> Add Credentials (For Full Management)</Button></CardContent>
-              )}
-            </Card>
-          )}
-
-          {/* Step 3: Command */}
-          {apiKey && (
-            <Card className="bg-zinc-900/60 border-zinc-800/50">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold">3</span> Run on MikroTik</CardTitle>
-                <CardDescription>Paste this single command into your MikroTik terminal</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <input type="text" value={appUrl} onChange={(e) => { setAppUrl(e.target.value); localStorage.setItem("router_link_app_url", e.target.value); }} placeholder="https://your-server.com" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                {!mgmtPass && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 flex items-start gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-blue-300 font-medium">Auto-detection mode</p>
-                      <p className="text-xs text-blue-400/70 mt-0.5">Router will auto-detect WAN, MAC, and model. RADIUS auth works immediately. Add credentials above for live monitoring & auto billing linking.</p>
-                    </div>
+            <>
+              {/* Mode picker */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { setLinkMode("direct"); setWgResult(null); setWgError(null); }}
+                  className={`rounded-xl border p-4 text-left transition-all ${linkMode === "direct" ? "border-blue-500/60 bg-blue-500/10" : "border-zinc-700/50 bg-zinc-900/40 hover:border-zinc-600/50"}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Globe className={`w-4 h-4 ${linkMode === "direct" ? "text-blue-400" : "text-zinc-500"}`} />
+                    <span className={`text-sm font-semibold ${linkMode === "direct" ? "text-blue-300" : "text-zinc-300"}`}>Direct Connection</span>
                   </div>
-                )}
-                {mgmtUser && mgmtPass && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
-                    <Shield className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-amber-300 font-medium">Credentials included — auto billing link enabled</p>
-                      <p className="text-xs text-amber-400/70 mt-0.5">The router will auto-link to billing on first contact. PPPoE provisioning will work immediately.</p>
-                    </div>
+                  <p className="text-xs text-zinc-500 leading-relaxed">Router has a public IP. Billing server connects directly.</p>
+                </button>
+                <button
+                  onClick={() => { setLinkMode("wireguard"); }}
+                  className={`rounded-xl border p-4 text-left transition-all ${linkMode === "wireguard" ? "border-violet-500/60 bg-violet-500/10" : "border-zinc-700/50 bg-zinc-900/40 hover:border-zinc-600/50"}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Lock className={`w-4 h-4 ${linkMode === "wireguard" ? "text-violet-400" : "text-zinc-500"}`} />
+                    <span className={`text-sm font-semibold ${linkMode === "wireguard" ? "text-violet-300" : "text-zinc-300"}`}>WireGuard (NAT/CGNAT)</span>
                   </div>
-                )}
-                <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-sm text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildCommand()}</pre>
-                <Button onClick={() => { navigator.clipboard.writeText(buildCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy to Clipboard"}</Button>
-              </CardContent>
-            </Card>
-          )}
+                  <p className="text-xs text-zinc-500 leading-relaxed">Router is behind NAT. Dials home over an encrypted tunnel.</p>
+                </button>
+              </div>
 
-          {/* Step 4: Status */}
-          {apiKey && (
-            <Card className="bg-zinc-900/60 border-zinc-800/50">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">4</span> Connection Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${isLinked && isOnline ? "bg-green-500 shadow-lg shadow-green-500/30" : connectionStatus?.connected && isOnline ? "bg-green-500 animate-pulse" : connectionStatus?.connected && !isOnline ? "bg-red-500" : connectionStatus?.status === "watching" ? "bg-amber-500 animate-pulse" : "bg-zinc-600"}`} />
-                  <span className="text-sm text-zinc-300">{isLinked && isOnline ? "Online & Managed" : connectionStatus?.connected && isOnline ? "Connected" : connectionStatus?.connected && !isOnline ? "Offline" : connectionStatus?.status === "watching" ? `Watching... (${watchAttempts} checks, ${Math.ceil((watchRemaining * 3) / 60)}m left)` : "Not monitoring"}</span>
+              {/* ── DIRECT MODE ─────────────────────────────────────────── */}
+              {linkMode === "direct" && (
+                <div className="space-y-4">
+                  {/* Credentials (optional) */}
+                  <Card className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-white text-sm flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-amber-400" /> Router API Credentials
+                        <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Recommended</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs">Include these so the router auto-links on first contact. Without them you link manually from the Routers list.</CardDescription>
+                    </CardHeader>
+                    {showCredentials ? (
+                      <CardContent className="space-y-2 pt-0">
+                        <input type="text" value={mgmtUser} onChange={(e) => setMgmtUser(e.target.value)} placeholder="Username (usually admin)" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                        <div className="flex gap-2">
+                          <input type="password" value={mgmtPass} onChange={(e) => setMgmtPass(e.target.value)} placeholder="Password" className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                          <input type="text" value={mgmtPort} onChange={(e) => setMgmtPort(e.target.value)} placeholder="8728" className="w-20 bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                        </div>
+                      </CardContent>
+                    ) : (
+                      <CardContent className="pt-0"><Button variant="outline" onClick={() => setShowCredentials(true)} size="sm" className="gap-2 border-zinc-700/50 text-zinc-300"><Shield className="w-3.5 h-3.5" /> Add Credentials</Button></CardContent>
+                    )}
+                  </Card>
+
+                  {/* Command */}
+                  <Card className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-white text-sm flex items-center gap-2"><Terminal className="w-4 h-4 text-green-400" /> Paste in MikroTik Terminal</CardTitle>
+                      <CardDescription className="text-xs">One command — downloads &amp; runs the enrollment script on the router</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-0">
+                      <input type="text" value={appUrl} onChange={(e) => { setAppUrl(e.target.value); localStorage.setItem("router_link_app_url", e.target.value); }} placeholder="https://your-server.com" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                      {mgmtUser && mgmtPass ? (
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2.5 flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                          <p className="text-xs text-green-300">Credentials included — router will auto-link on first contact</p>
+                        </div>
+                      ) : (
+                        <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-lg p-2.5 flex items-center gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                          <p className="text-xs text-zinc-500">No credentials — router enrolls but requires manual Link to Billing</p>
+                        </div>
+                      )}
+                      <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-3 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{buildCommand()}</pre>
+                      <Button onClick={() => { navigator.clipboard.writeText(buildCommand()); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 3000); }} className="gap-2 w-full">
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? "Copied!" : "Copy Command"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Watch status */}
+                  <Card className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${connectionStatus?.connected && isOnline ? "bg-green-500 shadow-lg shadow-green-500/30" : connectionStatus?.status === "watching" ? "bg-amber-500 animate-pulse" : "bg-zinc-600"}`} />
+                        <span className="text-sm text-zinc-300">
+                          {connectionStatus?.connected && isOnline ? "Router detected & online"
+                            : connectionStatus?.status === "watching" ? `Listening for router... (${watchAttempts} checks)`
+                            : "Waiting for router to check in"}
+                        </span>
+                      </div>
+                      {connectionStatus?.router && (
+                        <div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3 space-y-0.5">
+                          <p className="text-sm text-white font-medium">{connectionStatus.router.name} <span className="text-zinc-500 font-normal">({connectionStatus.router.model || "Unknown"})</span></p>
+                          <p className="text-xs text-zinc-500 font-mono">{connectionStatus.router.ip}</p>
+                          <p className="text-xs mt-1">{connectionStatus.router.has_connection ? <span className="text-green-400">✓ Fully managed</span> : <span className="text-amber-400">Click Link to Billing on the Routers tab to complete setup</span>}</p>
+                        </div>
+                      )}
+                      {lastError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{lastError}</p>}
+                    </CardContent>
+                  </Card>
                 </div>
-                {connectionStatus?.router && (
-                  <div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3 space-y-1">
-                    <p className="text-sm text-white font-medium">{connectionStatus.router.name} ({connectionStatus.router.model || "Unknown"})</p>
-                    <p className="text-xs text-zinc-500">MAC: {connectionStatus.router.mac} &middot; IP: {connectionStatus.router.ip}</p>
-                    <p className="text-xs">{connectionStatus.router.has_connection ? <span className="text-green-400">Fully managed</span> : <span className="text-amber-400">Needs credentials for management — go to Routers → Link to Billing</span>}</p>
+              )}
+
+              {/* ── WIREGUARD MODE ──────────────────────────────────────── */}
+              {linkMode === "wireguard" && (
+                <div className="space-y-4">
+                  {/* How it works */}
+                  <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4 flex items-start gap-3">
+                    <Lock className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                    <div className="text-sm space-y-1">
+                      <p className="text-violet-200 font-medium">How WireGuard linking works</p>
+                      <ol className="text-zinc-400 text-xs space-y-0.5 list-decimal pl-4">
+                        <li>Fill in the form and click Generate Script</li>
+                        <li>Copy the script and paste it into your MikroTik terminal</li>
+                        <li>The router sets up WireGuard, enables API access, and enrolls itself</li>
+                        <li>The router appears in the Routers list as Online &amp; Managed — done</li>
+                      </ol>
+                    </div>
                   </div>
-                )}
-                {lastError && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2"><AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" /><p className="text-xs text-red-400">{lastError}</p></div>}
-                {connectionStatus?.status === "timeout" && <Button onClick={startWatching} className="gap-2 w-full">Start New Watch</Button>}
-              </CardContent>
-            </Card>
+
+                  {/* Server URL */}
+                  <Card className="bg-zinc-900/60 border-zinc-800/50">
+                    <CardContent className="p-4 space-y-2">
+                      <label className="text-xs text-zinc-400 font-medium">Billing server URL</label>
+                      <input type="text" value={appUrl} onChange={(e) => { setAppUrl(e.target.value); localStorage.setItem("router_link_app_url", e.target.value); }} placeholder="https://your-server.com" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
+                      <p className="text-xs text-zinc-600">The public address of this billing server — the router will reach back to it for enrollment.</p>
+                    </CardContent>
+                  </Card>
+
+                  {/* WireGuard form */}
+                  {!wgResult && (
+                    <Card className="bg-zinc-900/60 border-zinc-800/50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white text-sm flex items-center gap-2"><Lock className="w-4 h-4 text-violet-400" /> Router Details</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-0">
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Router name</label>
+                          <input type="text" value={wgForm.routerName} onChange={(e) => setWgForm({ ...wgForm, routerName: e.target.value })} placeholder="e.g. Branch-Nairobi" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">API password <span className="text-zinc-600">(will be set on the router)</span></label>
+                          <input type="password" value={wgForm.apiPassword} onChange={(e) => setWgForm({ ...wgForm, apiPassword: e.target.value })} placeholder="Choose a strong password" className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
+                          <p className="text-xs text-zinc-600 mt-1">The script creates a <strong className="text-zinc-400">billing</strong> user on the router with this password.</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">API port</label>
+                          <input type="number" value={wgForm.apiPort} onChange={(e) => setWgForm({ ...wgForm, apiPort: e.target.value })} className="w-28 bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
+                        </div>
+                        {wgError && (
+                          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                            <p className="text-xs text-red-400">{wgError}</p>
+                          </div>
+                        )}
+                        <Button onClick={generateWgScript} disabled={wgGenerating} className="gap-2 w-full bg-violet-600 hover:bg-violet-700">
+                          {wgGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                          {wgGenerating ? "Generating…" : "Generate WireGuard Link Script"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Generated script */}
+                  {wgResult && (
+                    <Card className="bg-zinc-900/60 border-violet-500/30">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <CardTitle className="text-white text-sm flex items-center gap-2">
+                              <Check className="w-4 h-4 text-green-400" /> Script Ready — Paste in MikroTik Terminal
+                            </CardTitle>
+                            <p className="text-xs text-zinc-500 mt-1">Tunnel IP: <span className="font-mono text-violet-300">{wgResult.tunnelIp?.split("/")[0]}</span></p>
+                          </div>
+                          <button onClick={() => { setWgResult(null); setWgError(null); }} className="text-zinc-500 hover:text-zinc-300 text-xs shrink-0">Change</button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-0">
+                        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2.5 flex items-start gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                          <p className="text-xs text-amber-300/90">This script contains private keys. Paste it once on the router and keep it private.</p>
+                        </div>
+                        <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-3 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre max-h-64 overflow-y-auto">{wgResult.script}</pre>
+                        <Button
+                          onClick={() => { navigator.clipboard.writeText(wgResult.script); setWgCopied(true); toast.success("Script copied!"); setTimeout(() => setWgCopied(false), 3000); }}
+                          className="gap-2 w-full bg-violet-600 hover:bg-violet-700"
+                        >
+                          {wgCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          {wgCopied ? "Copied!" : "Copy Script"}
+                        </Button>
+                        <div className="bg-zinc-800/30 rounded-lg p-3 text-xs text-zinc-400 space-y-1">
+                          <p className="font-medium text-zinc-300">What this script does:</p>
+                          <p>① Sets up WireGuard interface &amp; connects to billing server</p>
+                          <p>② Enables the MikroTik API on port {wgForm.apiPort}</p>
+                          <p>③ Creates a <strong className="text-zinc-300">billing</strong> API user with your password</p>
+                          <p>④ Enrolls the router — it appears in your Routers list automatically</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Server-side setup notice */}
+                  <Card className="bg-zinc-900/40 border-zinc-800/30">
+                    <CardContent className="p-4 flex items-start gap-3">
+                      <Server className="w-4 h-4 text-zinc-500 mt-0.5 shrink-0" />
+                      <div className="text-xs text-zinc-500 space-y-1">
+                        <p className="text-zinc-400 font-medium">First time using WireGuard?</p>
+                        <p>Your billing server needs WireGuard installed and a server config generated once. Go to the <button onClick={() => setActiveTab("cgnat")} className="text-violet-400 hover:text-violet-300 underline">CGNAT Tunnel tab</button> → Server Setup to get the one-time Linux setup script.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -441,9 +441,107 @@ ${peers.join("\n")}
   }
 
   /**
-   * Generate MikroTik RouterOS configuration script for WireGuard client
-   * This script should be applied on the MikroTik router to establish the tunnel
+   * Generate a combined RouterOS script: WireGuard setup + API enable + enrollment.
+   * Paste this ONCE on the MikroTik terminal — the router fully links itself.
    */
+  generateCombinedLinkScript({
+    routerName,
+    routerPrivateKey,
+    routerTunnelIp,
+    serverPublicKey,
+    serverEndpoint,
+    serverWgPort,
+    serverWgIp,
+    interfaceName,
+    apiUsername,
+    apiPassword,
+    apiPort,
+    serverUrl,
+    slugPath,
+    enrollApiKey,
+  }) {
+    const tunnelIpPlain = routerTunnelIp.split("/")[0];
+    const ts = new Date().toISOString().slice(0, 16).replace("T", " ");
+
+    return `#############################################
+# MikroTik Billing -- WireGuard + Auto-Link
+# Router  : ${routerName}
+# Server  : ${serverUrl}
+# Tunnel  : ${tunnelIpPlain}
+# Created : ${ts} UTC
+# Requires: RouterOS v7.x (WireGuard support)
+#############################################
+
+:log info "=== Billing setup starting: ${routerName} ==="
+:put "============================================"
+:put " MikroTik Billing - WireGuard Remote Link"
+:put " Router: ${routerName}"
+:put "============================================"
+:put ""
+
+# ──────────────────────────────────────────────
+# PHASE 1/4 -- WireGuard interface
+# ──────────────────────────────────────────────
+:put ">>> [1/4] Configuring WireGuard tunnel..."
+:local wgIface "${interfaceName}"
+:do { /interface wireguard remove [find name=$wgIface] } on-error={}
+:delay 500ms
+/interface wireguard add name=$wgIface private-key="${routerPrivateKey}" listen-port=13231 comment="billing-mgmt"
+/interface wireguard peers add interface=$wgIface public-key="${serverPublicKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverWgPort} allowed-address=${serverWgIp}/32 persistent-keepalive=25s comment="billing-server"
+:do { /ip address remove [find comment="billing-tunnel-ip"] } on-error={}
+/ip address add address=${routerTunnelIp} interface=$wgIface comment="billing-tunnel-ip"
+:do { /ip firewall filter remove [find comment="billing-wg-in"] } on-error={}
+/ip firewall filter add chain=input protocol=udp dst-port=13231 action=accept comment="billing-wg-in" place-before=0
+:put ">>> [1/4] WireGuard interface ready"
+
+# ──────────────────────────────────────────────
+# PHASE 2/4 -- Enable router API
+# ──────────────────────────────────────────────
+:put ">>> [2/4] Enabling API service..."
+/ip service set api disabled=no port=${apiPort}
+:do { /user remove [find name="${apiUsername}"] } on-error={}
+/user add name="${apiUsername}" group=full password="${apiPassword}" comment="MikroTik Billing API"
+:put ">>> [2/4] API user '${apiUsername}' ready on port ${apiPort}"
+
+# ──────────────────────────────────────────────
+# PHASE 3/4 -- Wait for WireGuard to connect
+# ──────────────────────────────────────────────
+:put ">>> [3/4] Waiting for WireGuard tunnel (12s)..."
+:delay 12s
+:local tunnelUp [/interface wireguard get [find name=$wgIface] running]
+:if ($tunnelUp) do={
+  :put ">>> [3/4] Tunnel is UP -- server can reach ${tunnelIpPlain}"
+} else={
+  :put ">>> [3/4] WARN: Tunnel not up yet. Ensure UDP ${serverWgPort} is open to ${serverEndpoint}"
+  :put ">>> Continuing enrollment -- retry if billing shows router offline."
+}
+
+# ──────────────────────────────────────────────
+# PHASE 4/4 -- Enroll with billing server
+# ──────────────────────────────────────────────
+:put ">>> [4/4] Enrolling with billing server..."
+:global ztpMgmtUser "${apiUsername}"
+:global ztpMgmtPass "${apiPassword}"
+:global ztpMgmtPort "${apiPort}"
+/tool fetch url="${serverUrl}/api/router${slugPath}" http-header-field="Authorization: Bearer ${enrollApiKey}" dst-path=install.rsc mode=https check-certificate=no
+:delay 5s
+/import file-name=install.rsc
+:delay 3s
+:do { /file remove install.rsc } on-error={}
+
+:put ""
+:put "============================================"
+:put " Setup complete!"
+:put " Tunnel IP : ${tunnelIpPlain}"
+:put " API port  : ${apiPort}"
+:put " API user  : ${apiUsername}"
+:put " The billing dashboard will show this router"
+:put " as ONLINE once the tunnel handshake occurs."
+:put "============================================"
+:log info "=== Billing setup complete: ${routerName} (${tunnelIpPlain}) ==="
+`;
+  }
+
   generateMikrotikConfig({
     routerPrivateKey,
     routerTunnelIp,
