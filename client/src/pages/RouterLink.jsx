@@ -97,6 +97,15 @@ export default function RouterLink() {
     () => JSON.parse(localStorage.getItem("router_metrics")) || {}
   );
   const [showMetrics, setShowMetrics] = useState(false);
+  const [alertRules, setAlertRules] = useState(
+    () => JSON.parse(localStorage.getItem("alert_rules")) || []
+  );
+  const [showAlertForm, setShowAlertForm] = useState(false);
+  const [newAlert, setNewAlert] = useState({
+    type: "offline_time",
+    threshold: 5,
+    enabled: true,
+  });
   const watchIntervalRef = React.useRef(null);
 
   const configTemplates = [
@@ -648,7 +657,68 @@ export default function RouterLink() {
       recordMetric(status.router.id, "latency", Math.random() * 50 + 10);
       // Simulate bandwidth (in Mbps)
       recordMetric(status.router.id, "bandwidth", Math.random() * 100);
+      checkAlertRules(status.router);
     }
+  };
+
+  const checkAlertRules = (router) => {
+    alertRules.forEach((rule) => {
+      if (!rule.enabled) return;
+
+      let shouldAlert = false;
+      let message = "";
+
+      if (rule.type === "offline_time") {
+        if (!router.is_online) {
+          shouldAlert = true;
+          message = `Router ${router.name} has been offline for ${rule.threshold} minutes`;
+        }
+      } else if (rule.type === "high_latency") {
+        const latency = parseFloat(getMetricAverage(router.id, "latency"));
+        if (latency > rule.threshold) {
+          shouldAlert = true;
+          message = `Router ${router.name} latency is ${latency}ms (threshold: ${rule.threshold}ms)`;
+        }
+      } else if (rule.type === "api_failures") {
+        if (lastError && rule.threshold > 0) {
+          shouldAlert = true;
+          message = `Router ${router.name} API connection failed`;
+        }
+      }
+
+      if (shouldAlert) {
+        addLog("warning", message, router.name);
+      }
+    });
+  };
+
+  const createAlertRule = () => {
+    const rule = {
+      id: `alert-${Date.now()}`,
+      ...newAlert,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...alertRules, rule];
+    setAlertRules(updated);
+    localStorage.setItem("alert_rules", JSON.stringify(updated));
+    setNewAlert({ type: "offline_time", threshold: 5, enabled: true });
+    setShowAlertForm(false);
+    addLog("success", `Alert rule created: ${rule.type}`);
+    toast.success("Alert rule created");
+  };
+
+  const deleteAlertRule = (ruleId) => {
+    const updated = alertRules.filter((r) => r.id !== ruleId);
+    setAlertRules(updated);
+    localStorage.setItem("alert_rules", JSON.stringify(updated));
+  };
+
+  const toggleAlertRule = (ruleId) => {
+    const updated = alertRules.map((r) =>
+      r.id === ruleId ? { ...r, enabled: !r.enabled } : r
+    );
+    setAlertRules(updated);
+    localStorage.setItem("alert_rules", JSON.stringify(updated));
   };
 
   const bulkApplyDiagnosticFix = async (stepId) => {
@@ -1465,13 +1535,22 @@ export default function RouterLink() {
                 </div>
 
                 {apiKey && (
-                  <Button
-                    onClick={() => setShowTopology(true)}
-                    variant="outline"
-                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300 mb-3 w-full"
-                  >
-                    🗺️ View Network Topology
-                  </Button>
+                  <div className="flex gap-2 mb-3">
+                    <Button
+                      onClick={() => setShowTopology(true)}
+                      variant="outline"
+                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1"
+                    >
+                      🗺️ Topology
+                    </Button>
+                    <Button
+                      onClick={() => setShowMetrics(true)}
+                      variant="outline"
+                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1"
+                    >
+                      📊 Metrics
+                    </Button>
+                  </div>
                 )}
 
                 {selectedRouters.size > 0 && (
@@ -1572,6 +1651,68 @@ export default function RouterLink() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Performance Metrics Modal */}
+      {showMetrics && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-3xl w-full mx-4 my-8">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-white font-medium">Performance Metrics</h2>
+              <button
+                onClick={() => setShowMetrics(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 max-h-96 overflow-y-auto">
+              {allRouters.length === 0 ? (
+                <p className="text-zinc-500 text-sm text-center py-8">No routers connected yet</p>
+              ) : (
+                <div className="space-y-6">
+                  {allRouters.map((router) => (
+                    <div key={router.id} className="border border-zinc-700/50 rounded-lg p-4 bg-zinc-800/20">
+                      <p className="text-white font-medium mb-4">{router.name}</p>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-1">Uptime</p>
+                          <p className="text-2xl text-green-400 font-bold">
+                            {getMetricAverage(router.id, "uptime")}%
+                          </p>
+                          <div className="w-full bg-zinc-800/50 rounded h-1 mt-2">
+                            <div
+                              className="bg-green-500 h-full rounded transition-all"
+                              style={{ width: `${getMetricAverage(router.id, "uptime")}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-1">Latency (avg)</p>
+                          <p className="text-2xl text-blue-400 font-bold">
+                            {getMetricAverage(router.id, "latency")}ms
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-2">
+                            {metrics[router.id]?.latency?.length || 0} samples
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-1">Bandwidth (avg)</p>
+                          <p className="text-2xl text-amber-400 font-bold">
+                            {getMetricAverage(router.id, "bandwidth")}Mbps
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-2">
+                            {metrics[router.id]?.bandwidth?.length || 0} samples
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Network Topology Modal */}
