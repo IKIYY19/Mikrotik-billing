@@ -616,7 +616,6 @@ export default function IntegrationsSettings() {
     <div className="bg-[#0f111a] text-white p-6 md:p-8 relative overflow-x-hidden">
       {/* Decorative gradient overlay */}
       <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
-      
       <div className="max-w-7xl mx-auto relative z-10 space-y-8">
         
         {/* Header Section */}
@@ -775,9 +774,8 @@ export default function IntegrationsSettings() {
                     </button>
                   </div>
                 </div>
-
                 {/* Card Summary Panel */}
-                <div className="px-5 py-4 flex-grow flex flex-col justify-between gap-4">
+                <div className="px-5 py-4 flex-grow flex flex-col justify-between gap-4 font-medium">
                   <div>
                     <p className="text-xs text-gray-400 line-clamp-2">
                       {docs.desc}
@@ -805,7 +803,6 @@ export default function IntegrationsSettings() {
                     </button>
                   </div>
                 </div>
-
                 {/* Card Configuration Panel */}
                 {isExpanded && (
                   <div className="border-t border-white/[0.04] bg-white/[0.01] p-5 space-y-5 animate-in slide-in-from-top-2 duration-200">
