@@ -20,37 +20,17 @@ api.interceptors.request.use((config) => {
 });
 
 let isRedirecting = false;
-
-function clearSessionAndRedirect() {
-  if (isRedirecting) return;
-  isRedirecting = true;
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("auth_user");
-  sessionStorage.clear();
-  window.location.href = "/login";
-}
-
-// Handle all auth failure responses
+// Handle 401 responses
 api.interceptors.response.use(
-  (res) => {
-    isRedirecting = false;
-    return res;
-  },
+  (res) => res,
   (error) => {
-    const status = error.response?.status;
-    const errMsg = error.response?.data?.error || "";
-
-    const isAuthFailure =
-      status === 401 ||
-      (status === 403 &&
-        (errMsg === "Invalid or expired token" ||
-          errMsg.toLowerCase().includes("jwt") ||
-          errMsg.toLowerCase().includes("token") ||
-          errMsg.toLowerCase().includes("malformed") ||
-          errMsg.toLowerCase().includes("expired")));
-
-    if (isAuthFailure) {
-      clearSessionAndRedirect();
+    if (error.response?.status === 401) {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      if (!isRedirecting) {
+        isRedirecting = true;
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   },

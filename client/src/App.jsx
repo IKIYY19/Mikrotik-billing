@@ -66,7 +66,6 @@ const PPPoEManagement = lazy(() => import("./pages/billing/PPPoEManagement").the
 const HotspotManagement = lazy(() => import("./pages/billing/HotspotManagement").then(m => ({ default: m.HotspotManagement })));
 const HotspotVouchers = lazy(() => import("./pages/billing/HotspotVouchers").then(m => ({ default: m.HotspotVouchers })));
 const NetworkServices = lazy(() => import("./pages/billing/NetworkServices").then(m => ({ default: m.NetworkServices })));
-const NetworkManagement = lazy(() => import("./pages/billing/NetworkManagement").then(m => ({ default: m.NetworkManagement })));
 const RadiusManagement = lazy(() => import("./pages/billing/RadiusManagement").then(m => ({ default: m.RadiusManagement })));
 const RadiusImport = lazy(() => import("./pages/RadiusImport").then(m => ({ default: m.RadiusImport })));
 const TicketSystem = lazy(() => import("./pages/billing/TicketSystem").then(m => ({ default: m.TicketSystem })));
@@ -80,7 +79,6 @@ const AuditLogs = lazy(() => import("./pages/AuditLogs").then(m => ({ default: m
 const FUPProfiles = lazy(() => import("./pages/network/FUPProfiles").then(m => ({ default: m.FUPProfiles })));
 const TR069Devices = lazy(() => import("./pages/network/TR069Devices").then(m => ({ default: m.TR069Devices })));
 const SpeedTest = lazy(() => import("./pages/network/SpeedTest").then(m => ({ default: m.SpeedTest })));
-const NetworkManagementDashboard = lazy(() => import("./pages/network/NetworkManagementDashboard").then(m => ({ default: m.NetworkManagementDashboard })));
 
 const SignupPage = lazy(() => import("./pages/public/SignupPage").then(m => ({ default: m.SignupPage })));
 const PlansPage = lazy(() => import("./pages/public/PlansPage").then(m => ({ default: m.PlansPage })));
@@ -96,15 +94,6 @@ function App() {
     document.documentElement.dir = i18n.language === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
-
-  // Clear chunk load reload flag on successful mount
-  useEffect(() => {
-    try {
-      sessionStorage.removeItem('chunk-load-reload-attempted');
-    } catch (e) {
-      // Ignore session storage access errors
-    }
-  }, []);
 
   // Heartbeat to keep user online status updated
   useEffect(() => {
@@ -198,7 +187,7 @@ function App() {
                   </div>
 
                   {/* Main content */}
-                  <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <main className="flex-1 overflow-auto">
                     {/* Mobile header bar */}
                     <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800/50">
                       <button
@@ -213,7 +202,6 @@ function App() {
                       <div className="w-5" /> {/* spacer */}
                     </div>
                     <Suspense fallback={<PageLoader />}>
-                      <div className="flex-1 overflow-y-auto">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/project/:id" element={<ProjectDetail />} />
@@ -302,14 +290,13 @@ function App() {
                           path="/network-services"
                           element={<NetworkServices />}
                         />
-                        <Route path="/network-management" element={<NetworkManagement />} />
                         <Route path="/olt" element={<OLTManagement />} />
                         <Route path="/fup" element={<FUPProfiles />} />
                         <Route path="/tr069" element={<TR069Devices />} />
                         <Route path="/speedtest" element={<SpeedTest />} />
                         <Route path="/ipam" element={<IPAMPage />} />
-                        <Route path="/network-dashboard" element={<NetworkManagementDashboard />} />
-                        <Route path="/billing-monitoring" element={<MonitoringDashboard />} />
+                        {/* <Route path="/alerts" element={<Alerts />} /> */}
+                        {/* <Route path="/monitoring" element={<Monitoring />} /> */}
                         <Route path="/radius" element={<RadiusManagement />} />
                         <Route path="/radius-import" element={<RadiusImport />} />
                         <Route path="/tickets" element={<TicketSystem />} />
@@ -341,7 +328,6 @@ function App() {
                         {/* Fallback */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
-                      </div>
                     </Suspense>
                   </main>
                   <Toast />

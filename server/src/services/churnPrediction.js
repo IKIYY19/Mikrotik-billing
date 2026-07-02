@@ -49,10 +49,10 @@ async function calculateChurnScore(customerId) {
 
       if (lateRatio > 0.7) {
         score += 40;
-        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late`, severity: "high" });
+        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late", severity: "high" });
       } else if (lateRatio > 0.4) {
         score += 25;
-        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late`, severity: "medium" });
+        factors.push({ name: "Payment pattern", detail: `${Math.round(lateRatio * 100)}% of payments are late", severity: "medium" });
       } else if (lateRatio > 0.1) {
         score += 10;
         factors.push({ name: "Payment pattern", detail: "Some payments are late", severity: "low" });
@@ -122,17 +122,7 @@ async function calculateChurnScore(customerId) {
   }
 }
 
-// Simple in-memory cache for churn report
-let cachedReport = null;
-let lastCacheTime = 0;
-const CHURN_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache
-
 async function getChurnReport() {
-  const now = Date.now();
-  if (cachedReport && (now - lastCacheTime < CHURN_CACHE_DURATION)) {
-    return cachedReport;
-  }
-
   const db = getDb();
   try {
     const customers = await db.query(
@@ -141,25 +131,16 @@ async function getChurnReport() {
     if (customers.rows.length === 0) return { high_risk: [], summary: { total: 0, high_risk: 0, medium_risk: 0, low_risk: 0 } };
 
     const scores = [];
-    const batchSize = 10;
-    const targets = customers.rows.slice(0, 50);
-
-    for (let i = 0; i < targets.length; i += batchSize) {
-      const batch = targets.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (c) => {
-          const result = await calculateChurnScore(c.id);
-          return { ...result, name: c.name, email: c.email, phone: c.phone };
-        })
-      );
-      scores.push(...batchResults);
+    for (const c of customers.rows.slice(0, 50)) {
+      const result = await calculateChurnScore(c.id);
+      scores.push({ ...result, name: c.name, email: c.email, phone: c.phone });
     }
 
     const highRisk = scores.filter(s => s.risk === "high").sort((a, b) => b.score - a.score);
     const mediumRisk = scores.filter(s => s.risk === "medium");
     const lowRisk = scores.filter(s => s.risk === "low");
 
-    const report = {
+    return {
       high_risk: highRisk,
       all_risk: scores.sort((a, b) => b.score - a.score),
       summary: {
@@ -169,13 +150,8 @@ async function getChurnReport() {
         low_risk: lowRisk.length,
       },
     };
-
-    cachedReport = report;
-    lastCacheTime = Date.now();
-    return report;
   } catch (e) {
     logger.error("[ChurnPrediction] Report failed", { error: e.message });
-    if (cachedReport) return cachedReport;
     return { high_risk: [], summary: { total: 0, high_risk: 0, medium_risk: 0, low_risk: 0 } };
   }
 }

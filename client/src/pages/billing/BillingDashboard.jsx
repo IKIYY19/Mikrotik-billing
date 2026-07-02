@@ -103,15 +103,14 @@ export function BillingDashboard() {
   }
 
   const s = stats || {};
-  const currency = s.currency_symbol || '$';
   const statCards = [
-    { label: 'Monthly Revenue', value: s.monthly_revenue ?? 0, icon: DollarSign, gradient: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20', textColor: 'text-emerald-400', prefix: currency, trend: s.revenue_trend ?? undefined },
-    { label: 'MRR', value: s.mrr ?? 0, icon: TrendingUp, gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-500/10', ring: 'ring-blue-500/20', textColor: 'text-blue-400', prefix: currency },
-    { label: 'ARPU', value: s.arpu ?? 0, icon: Activity, gradient: 'from-violet-500 to-violet-600', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20', textColor: 'text-violet-400', prefix: currency },
+    { label: 'Monthly Revenue', value: s.monthly_revenue ?? 0, icon: DollarSign, gradient: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20', textColor: 'text-emerald-400', prefix: '$' },
+    { label: 'MRR', value: s.mrr ?? 0, icon: TrendingUp, gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-500/10', ring: 'ring-blue-500/20', textColor: 'text-blue-400', prefix: '$' },
+    { label: 'ARPU', value: s.arpu ?? 0, icon: Activity, gradient: 'from-violet-500 to-violet-600', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20', textColor: 'text-violet-400', prefix: '$' },
     { label: 'Active Customers', value: s.active_customers ?? 0, icon: Users, gradient: 'from-cyan-500 to-cyan-600', bg: 'bg-cyan-500/10', ring: 'ring-cyan-500/20', textColor: 'text-cyan-400', sub: `of ${s.total_customers ?? 0}` },
     { label: 'Active Subs', value: s.active_subscriptions ?? 0, icon: Package, gradient: 'from-green-500 to-green-600', bg: 'bg-green-500/10', ring: 'ring-green-500/20', textColor: 'text-green-400', sub: `of ${s.total_subscriptions ?? 0}` },
     { label: 'Suspended', value: s.suspended_subscriptions ?? 0, icon: Clock, gradient: 'from-red-500 to-red-600', bg: 'bg-red-500/10', ring: 'ring-red-500/20', textColor: 'text-red-400' },
-    { label: 'Outstanding', value: s.total_outstanding ?? 0, icon: AlertTriangle, gradient: 'from-amber-500 to-amber-600', bg: 'bg-amber-500/10', ring: 'ring-amber-500/20', textColor: 'text-amber-400', prefix: currency },
+    { label: 'Outstanding', value: s.total_outstanding ?? 0, icon: AlertTriangle, gradient: 'from-amber-500 to-amber-600', bg: 'bg-amber-500/10', ring: 'ring-amber-500/20', textColor: 'text-amber-400', prefix: '$' },
     { label: 'Overdue Invoices', value: s.overdue_invoices ?? 0, icon: FileText, gradient: 'from-orange-500 to-orange-600', bg: 'bg-orange-500/10', ring: 'ring-orange-500/20', textColor: 'text-orange-400' },
   ];
 
@@ -126,7 +125,7 @@ export function BillingDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {statCards.map((card, i) => (
-          <StatCard key={i} {...card} />
+          <StatCard key={i} {...card} trend={i === 0 ? 12 : undefined} />
         ))}
       </div>
 

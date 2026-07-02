@@ -16,7 +16,41 @@ function pgNow() {
 }
 
 // ─── In-memory fallback store ───
-const _branches = [];
+const _branches = [
+  {
+    id: "branch-nairobi-main",
+    name: "Nairobi Main POP",
+    city: "Nairobi",
+    address: "Moi Avenue",
+    contact: "+254700000001",
+    status: "active",
+    lat: -1.2921,
+    lng: 36.8219,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "branch-mombasa",
+    name: "Mombasa POP",
+    city: "Mombasa",
+    address: "Moi Road",
+    contact: "+254700000002",
+    status: "active",
+    lat: -4.0435,
+    lng: 39.6682,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "branch-kisumu",
+    name: "Kisumu POP",
+    city: "Kisumu",
+    address: "Oginga Odinga St",
+    contact: "+254700000003",
+    status: "active",
+    lat: -0.0917,
+    lng: 34.7679,
+    created_at: new Date().toISOString(),
+  },
+];
 
 const _agents = [];
 
@@ -34,9 +68,71 @@ const deviceMetrics = [];
 const pppoeSessions = [];
 
 // ─── Default seed data ───
-const DEFAULT_BRANCHES = [];
+const DEFAULT_BRANCHES = [
+  {
+    id: "branch-nairobi-main",
+    name: "Nairobi Main POP",
+    city: "Nairobi",
+    address: "Moi Avenue",
+    contact: "+254700000001",
+    status: "active",
+    lat: -1.2921,
+    lng: 36.8219,
+  },
+  {
+    id: "branch-mombasa",
+    name: "Mombasa POP",
+    city: "Mombasa",
+    address: "Moi Road",
+    contact: "+254700000002",
+    status: "active",
+    lat: -4.0435,
+    lng: 39.6682,
+  },
+  {
+    id: "branch-kisumu",
+    name: "Kisumu POP",
+    city: "Kisumu",
+    address: "Oginga Odinga St",
+    contact: "+254700000003",
+    status: "active",
+    lat: -0.0917,
+    lng: 34.7679,
+  },
+];
 
-const DEFAULT_AGENTS = [];
+const DEFAULT_AGENTS = [
+  {
+    id: "agent-001",
+    name: "James Ochieng",
+    phone: "+254711111111",
+    email: "james@agent.co.ke",
+    branch_id: "branch-nairobi-main",
+    commission_rate: 10,
+    balance: 5000,
+    status: "active",
+  },
+  {
+    id: "agent-002",
+    name: "Amina Hassan",
+    phone: "+254722222222",
+    email: "amina@agent.co.ke",
+    branch_id: "branch-mombasa",
+    commission_rate: 12,
+    balance: 3500,
+    status: "active",
+  },
+  {
+    id: "agent-003",
+    name: "Peter Kamau",
+    phone: "+254733333333",
+    email: "peter@agent.co.ke",
+    branch_id: "branch-kisumu",
+    commission_rate: 10,
+    balance: 2000,
+    status: "active",
+  },
+];
 
 const DEFAULT_GRACE_CONFIG = {
   warn_days: 7,
@@ -346,7 +442,36 @@ async function updateGraceConfig(data) {
 }
 
 // ─── Seed sample vouchers ───
-const seedVouchers = () => {};
+const seedVouchers = () => {
+  if (vouchers.length > 0) {return;}
+  const codes = [
+    "VCH-A1B2C3",
+    "VCH-D4E5F6",
+    "VCH-G7H8I9",
+    "VCH-J0K1L2",
+    "VCH-M3N4O5",
+  ];
+  codes.forEach((code, i) => {
+    vouchers.push({
+      id: `voucher-${i + 1}`,
+      code,
+      plan_name: [
+        "Bronze 5M",
+        "Silver 10M",
+        "Gold 25M",
+        "Silver 10M",
+        "Bronze 5M",
+      ][i],
+      duration_days: 30,
+      price: [15, 25, 45, 25, 15][i],
+      sold_by: ["agent-001", "agent-002", "agent-001", null, null][i],
+      sold_to: ["", "", "John Kamau", "", ""][i],
+      status: i < 2 ? "sold" : i < 3 ? "redeemed" : "available",
+      redeemed_at: i === 2 ? "2026-04-01T10:00:00Z" : null,
+      created_at: new Date().toISOString(),
+    });
+  });
+};
 seedVouchers();
 
 // ─── Seed network metrics ───

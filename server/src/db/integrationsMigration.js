@@ -25,11 +25,7 @@ ALTER TABLE integrations ADD COLUMN IF NOT EXISTS last_test_message TEXT;
 
 INSERT INTO integrations (service_name, display_name, category, config_data) VALUES
   ('africas_talking', 'Africa''s Talking', 'sms', '{"username": "sandbox", "api_key": "", "sender_id": "MyISP"}'),
-  ('mpesa', 'M-Pesa', 'payment', '{"consumer_key": "", "consumer_secret": "", "shortcode": "174379", "passkey": "", "environment": "sandbox", "callback_url": ""}'),
-  ('airtel_money', 'Airtel Money', 'payment', '{"client_id": "", "client_secret": "", "environment": "sandbox", "country": "KE"}'),
-  ('mtn_momo', 'MTN Mobile Money', 'payment', '{"subscription_key": "", "api_user": "", "api_key": "", "environment": "sandbox", "country": "UG"}'),
-  ('paystack', 'Paystack', 'payment', '{"secret_key": "", "public_key": "", "currency": "KES", "webhook_secret": ""}'),
-  ('pesalink', 'PesaLink', 'payment', '{"bank_name": "", "account_name": "", "account_number": "", "bank_code": "", "branch_code": "", "reference_prefix": "INV"}'),
+  ('mpesa', 'M-Pesa', 'payment', '{"consumer_key": "", "consumer_secret": "", "shortcode": "174379", "passkey": "", "environment": "sandbox"}'),
   ('whatsapp', 'WhatsApp Business', 'messaging', '{"access_token": "", "phone_number_id": "", "verify_token": ""}'),
   ('sendgrid', 'SendGrid', 'email', '{"api_key": "", "from_email": "", "from_name": ""}'),
   ('twilio', 'Twilio SMS', 'sms', '{"account_sid": "", "auth_token": "", "phone_number": ""}'),

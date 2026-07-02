@@ -18,24 +18,6 @@ class SectionErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error(`[${this.props.sectionName || 'Section'}] Error:`, error, errorInfo.componentStack);
     
-    // Check for chunk loading errors / failed dynamic imports
-    const isChunkError = 
-      error && 
-      (error.message?.includes('Failed to fetch dynamically imported module') ||
-       error.message?.includes('error loading dynamically imported module') ||
-       error.name === 'ChunkLoadError');
-
-    if (isChunkError) {
-      const chunkErrorKey = 'chunk-load-reload-attempted';
-      const lastAttempt = sessionStorage.getItem(chunkErrorKey);
-      
-      if (!lastAttempt) {
-        sessionStorage.setItem(chunkErrorKey, 'true');
-        window.location.reload();
-        return;
-      }
-    }
-
     // Log to analytics/monitoring if available
     if (window.gtag) {
       window.gtag('event', 'exception', {

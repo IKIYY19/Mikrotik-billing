@@ -25,9 +25,6 @@ import {
 } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { MpesaStkModal } from "../../components/MpesaStkModal";
-import AirtelStkModal from "../../components/AirtelStkModal";
-import MtnStkModal from "../../components/MtnStkModal";
-import PaystackModal from "../../components/PaystackModal";
 
 const API = import.meta.env.VITE_API_URL || "/api";
 
@@ -51,10 +48,6 @@ export function BillingCustomerDetail() {
   const [telegramChatId, setTelegramChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
   const [stkModal, setStkModal] = useState(false);
-  const [airtelModal, setAirtelModal] = useState(false);
-  const [mtnModal, setMtnModal] = useState(false);
-  const [paystackModal, setPaystackModal] = useState(false);
-  const [paymentDropdown, setPaymentDropdown] = useState(false);
 
   useEffect(() => {
     fetchCustomer();
@@ -230,43 +223,13 @@ export function BillingCustomerDetail() {
           >
             {customer.status}
           </span>
-          {/* Payment dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setPaymentDropdown(v => !v)}
-              className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <CreditCard className="w-4 h-4" />
-              <span className="hidden sm:inline">Collect Payment</span>
-              <span className="ml-1 text-xs opacity-70">▾</span>
-            </button>
-            {paymentDropdown && (
-              <>
-                {/* Backdrop */}
-                <div className="fixed inset-0 z-10" onClick={() => setPaymentDropdown(false)} />
-                <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden min-w-[220px]">
-                  <div className="px-3 py-1.5 text-xs text-slate-500 uppercase tracking-wider border-b border-slate-700">Mobile Money</div>
-                  <button onClick={() => { setPaymentDropdown(false); setStkModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 transition-colors text-sm text-left text-white">
-                    <span>📱</span> M-Pesa STK Push
-                  </button>
-                  <button onClick={() => { setPaymentDropdown(false); setAirtelModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 transition-colors text-sm text-left text-white">
-                    <span>📲</span> Airtel Money
-                  </button>
-                  <button onClick={() => { setPaymentDropdown(false); setMtnModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 transition-colors text-sm text-left text-white">
-                    <span>📳</span> MTN Mobile Money
-                  </button>
-                  <div className="px-3 py-1.5 text-xs text-slate-500 uppercase tracking-wider border-t border-b border-slate-700">Card &amp; Bank</div>
-                  <button onClick={() => { setPaymentDropdown(false); setPaystackModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 transition-colors text-sm text-left text-white">
-                    <span>💳</span> Paystack (Card/Bank/USSD)
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <button
+            onClick={() => setStkModal(true)}
+            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Smartphone className="w-4 h-4" />
+            <span className="hidden sm:inline">Send M-Pesa Push</span>
+          </button>
           <button
             onClick={() => window.open(`${API}/billing/customers/${id}/statement`, '_blank')}
             className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -728,36 +691,6 @@ export function BillingCustomerDetail() {
         open={stkModal}
         onClose={() => setStkModal(false)}
         onSuccess={() => { setStkModal(false); fetchCustomer(); }}
-        customer={customer}
-        invoice={customer?.invoices?.find(i => i.status !== 'paid') || null}
-        defaultAmount={outstanding > 0 ? outstanding : undefined}
-      />
-
-      {/* Airtel Money Modal */}
-      <AirtelStkModal
-        open={airtelModal}
-        onClose={() => setAirtelModal(false)}
-        onSuccess={() => { setAirtelModal(false); fetchCustomer(); }}
-        customer={customer}
-        invoice={customer?.invoices?.find(i => i.status !== 'paid') || null}
-        defaultAmount={outstanding > 0 ? outstanding : undefined}
-      />
-
-      {/* MTN Mobile Money Modal */}
-      <MtnStkModal
-        open={mtnModal}
-        onClose={() => setMtnModal(false)}
-        onSuccess={() => { setMtnModal(false); fetchCustomer(); }}
-        customer={customer}
-        invoice={customer?.invoices?.find(i => i.status !== 'paid') || null}
-        defaultAmount={outstanding > 0 ? outstanding : undefined}
-      />
-
-      {/* Paystack Modal */}
-      <PaystackModal
-        open={paystackModal}
-        onClose={() => setPaystackModal(false)}
-        onSuccess={() => { setPaystackModal(false); fetchCustomer(); }}
         customer={customer}
         invoice={customer?.invoices?.find(i => i.status !== 'paid') || null}
         defaultAmount={outstanding > 0 ? outstanding : undefined}

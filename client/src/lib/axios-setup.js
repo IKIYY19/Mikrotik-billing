@@ -6,73 +6,48 @@
 import axios from 'axios';
 import { getToken } from './auth';
 
-// REQUEST interceptor - adds token to every request
-// Also intercepts demo/offline fake tokens and clears them immediately
+console.log('🔥 AXIOS INTERCEPTOR ACTIVATED');
+
+// REQUEST interceptor - adds token to EVERY request
 axios.interceptors.request.use((config) => {
   const token = getToken();
-
-  // If a stale offline/demo token is stored, clear it now and redirect to login
-  if (token === 'demo-token-offline') {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    window.location.href = '/login';
-    return Promise.reject(new Error('Stale offline token cleared'));
-  }
-
+  
+  console.log(`📡 Request: ${config.method?.toUpperCase()} ${config.url}`);
+  console.log(`🔑 Token:`, token ? `PRESENT (${token.substring(0, 25)}...)` : 'MISSING');
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log(`✅ Header attached`);
+  } else {
+    console.warn(`⚠️ NO TOKEN - request will fail auth`);
   }
-
+  
   return config;
 });
 
-let _isRedirecting = false;
-
-function clearSessionAndRedirect() {
-  if (_isRedirecting) return;
-  _isRedirecting = true;
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('auth_user');
-  sessionStorage.clear();
-  window.location.href = '/login';
-}
-
-// RESPONSE interceptor - handles all auth failure scenarios
+// RESPONSE interceptor - handles 401 errors
 axios.interceptors.response.use(
-  (res) => {
-    // Reset redirect flag on successful response
-    _isRedirecting = false;
-    return res;
-  },
+  (res) => res,
   (error) => {
-    const status = error.response?.status;
-    const errMsg = error.response?.data?.error || '';
-
-    const isAuthFailure =
-      status === 401 ||
-      (status === 403 && (
-        errMsg === 'Invalid or expired token' ||
-        errMsg.toLowerCase().includes('jwt') ||
-        errMsg.toLowerCase().includes('token') ||
-        errMsg.toLowerCase().includes('malformed') ||
-        errMsg.toLowerCase().includes('expired')
-      ));
-
-    if (isAuthFailure) {
-      clearSessionAndRedirect();
+    if (error.response?.status === 401) {
+      console.error('❌ 401 Unauthorized - clearing token and redirecting');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/login';
     }
-
     return Promise.reject(error);
   }
 );
 
-// Make token status available in browser console for debugging
-if (typeof window !== 'undefined') {
-  window.getAuthStatus = () => {
-    const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('auth_user');
-    return { hasToken: !!token, tokenPreview: token ? token.substring(0, 40) + '...' : null, user: user ? JSON.parse(user) : null };
-  };
-}
+// Make token available globally for debugging
+window.getAuthStatus = () => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  console.log('=== AUTH STATUS ===');
+  console.log('Token:', token ? token.substring(0, 40) + '...' : 'NULL');
+  console.log('User:', user || 'NULL');
+  console.log('==================');
+  return { hasToken: !!token, user: user ? JSON.parse(user) : null };
+};
 
 export default axios;

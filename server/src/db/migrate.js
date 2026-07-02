@@ -160,7 +160,6 @@ const coreMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_portal_username ON customers(portal_username)`,
-  `CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at)`,
 
   // Hotspot vouchers table
   `CREATE TABLE IF NOT EXISTS hotspot_vouchers (
@@ -290,14 +289,8 @@ const coreMigrations = [
   // Add router connectivity tracking (Phase 1 - basic online/offline)
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false`,
   `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`,
-  // WireGuard tunnel fields for CGNAT bypass
-  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_tunnel_ip VARCHAR(45)`,
-  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_public_key TEXT`,
-  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_private_key TEXT`,
-  `ALTER TABLE mikrotik_connections ADD COLUMN IF NOT EXISTS wireguard_interface_name VARCHAR(50)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_online ON mikrotik_connections(is_online)`,
   `CREATE INDEX IF NOT EXISTS idx_mikrotik_last_seen ON mikrotik_connections(last_seen)`,
-  `CREATE INDEX IF NOT EXISTS idx_mikrotik_wg_tunnel ON mikrotik_connections(use_tunnel, wireguard_tunnel_ip)`,
 
   // Monitoring and alerting tables (safe migrations with IF NOT EXISTS)
   `CREATE TABLE IF NOT EXISTS health_checks (
@@ -411,8 +404,19 @@ async function runMigrations() {
       throw new Error("Integrations migration reported failure");
     }
 
+    // Run provisioning migrations (routers table)
+    for (const migration of provisioningMigrations) {
+      await db.query(migration);
+    }
+    console.log("Provisioning migrations completed successfully");
+
+    // Run provisioning queue migrations
+    for (const migration of provisioningQueueMigrations) {
+      await db.query(migration);
+    }
+    console.log("Provisioning Queue migrations completed successfully");
+
     // Run unified migrations (inventory, wallet, backup, branches, agents, radius)
-    // MUST run before tenant migrations because tenant migrations alters tables created here (branches, agents, wallets)
     for (const migration of unifiedMigrations) {
       try {
         await db.query(migration);
@@ -426,7 +430,6 @@ async function runMigrations() {
     console.log("Unified migrations completed");
 
     // Run tenant migrations (multi-tenancy)
-    // MUST run before provisioning migrations because provisioning migrations creates tables (routers) referencing tenants
     for (const migration of tenantMigrations) {
       try {
         await db.query(migration);
@@ -438,18 +441,6 @@ async function runMigrations() {
       }
     }
     console.log("Tenant migrations completed");
-
-    // Run provisioning migrations (routers table)
-    for (const migration of provisioningMigrations) {
-      await db.query(migration);
-    }
-    console.log("Provisioning migrations completed successfully");
-
-    // Run provisioning queue migrations
-    for (const migration of provisioningQueueMigrations) {
-      await db.query(migration);
-    }
-    console.log("Provisioning Queue migrations completed successfully");
 
     // Run RLS migrations (must be LAST — depends on tenant_id columns existing)
     await runRlsMigrations(db);

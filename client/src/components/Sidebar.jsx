@@ -53,8 +53,6 @@ import {
   BarChart2,
   Globe,
   AlertTriangle,
-  LayoutGrid,
-  Monitor,
 } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
@@ -97,12 +95,10 @@ const navGroups = [
     icon: Network,
     color: "blue",
     items: [
-      { to: "/network-management", icon: Monitor, label: "Overview", feature: "network" },
-      { to: "/network-dashboard", icon: LayoutGrid, label: "Net Dashboard", feature: "monitoring" },
       { to: "/pppoe", icon: Network, label: "PPPoE", feature: "pppoe" },
       { to: "/hotspot", icon: Wifi, label: "Hotspot", feature: "hotspot" },
       { to: "/hotspot-vouchers", icon: Ticket, label: "Vouchers", feature: "vouchers" },
-      { to: "/ipam", icon: Globe, label: "IPAM", feature: "ipam" },
+      { to: "/ipam", icon: Network, label: "IPAM", feature: "ipam" },
       { to: "/network-services", icon: Server, label: "Network Services", feature: "network-services" },
       { to: "/olt", icon: Radio, label: "OLT / Fiber", feature: "olt" },
       { to: "/fup", icon: Gauge, label: "FUP Profiles", feature: "fup" },
@@ -130,6 +126,7 @@ const navGroups = [
     icon: Activity,
     color: "amber",
     items: [
+      { to: "/billing-monitoring", icon: Activity, label: "Monitoring", feature: "monitoring" },
       { to: "/billing-map", icon: MapPin, label: "Network Map", feature: "network-map" },
       { to: "/billing-auto-suspend", icon: Shield, label: "Auto-Suspend", feature: "auto-suspend" },
       { to: "/billing-agents", icon: UserCheck, label: "Agents", feature: "agents" },

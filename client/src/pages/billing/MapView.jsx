@@ -178,12 +178,9 @@ export function MapView() {
       zoomControl: false,
     });
 
-    // Use CartoDB tile servers (more reliable CDN than direct OSM, no API key needed)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 20,
-      crossOrigin: true,
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -198,19 +195,13 @@ export function MapView() {
 
     mapRef.current = map;
 
-    // Force Leaflet to recalculate tile positions immediately and after layout settles
-    const t1 = setTimeout(() => map.invalidateSize(), 50);
-    const t2 = setTimeout(() => map.invalidateSize(), 300);
-    const t3 = setTimeout(() => map.invalidateSize(), 800);
+    // CRITICAL: force Leaflet to recalculate container size after React paint
+    // Without this, tiles render as 0px boxes when container height isn't
+    // resolved at the moment L.map() is called.
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 500);
 
-    // ResizeObserver: re-run invalidateSize any time the container is resized by the browser
-    let ro;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => map.invalidateSize());
-      ro.observe(mapDivRef.current);
-    }
-
-    // Also invalidate on window resize
+    // Also invalidate on window resize so tiles fill correctly after layout shifts
     const onResize = () => map.invalidateSize();
     window.addEventListener("resize", onResize);
 
@@ -218,8 +209,6 @@ export function MapView() {
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
-      if (ro) ro.disconnect();
       window.removeEventListener("resize", onResize);
       map.remove();
       mapRef.current = null;

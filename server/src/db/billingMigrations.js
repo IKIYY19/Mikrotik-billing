@@ -242,8 +242,6 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status)`,
   `CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date)`,
-  `CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON invoices(created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_received ON payments(received_at)`,
   `ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10,2)`,
@@ -367,8 +365,6 @@ const billingMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_radacct_username ON radacct(username)`,
   `CREATE INDEX IF NOT EXISTS idx_radacct_sessionid ON radacct(acctsessionid)`,
   `CREATE INDEX IF NOT EXISTS idx_radacct_starttime ON radacct(acctstarttime)`,
-  `CREATE INDEX IF NOT EXISTS idx_radacct_stoptime ON radacct(acctstoptime)`,
-  `CREATE INDEX IF NOT EXISTS idx_radacct_stop_start ON radacct(acctstoptime, acctstarttime)`,
 
   // Resellers
   `CREATE TABLE IF NOT EXISTS resellers (
