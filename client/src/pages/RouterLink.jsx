@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Link2,
   Plug,
+  Plus,
 } from "lucide-react";
 import { useToastStore } from "../stores/toastStore";
 import { getToken } from "../lib/auth";
@@ -68,7 +69,108 @@ export default function RouterLink() {
   const [diagnostics, setDiagnostics] = useState(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [applyingFix, setApplyingFix] = useState(null);
+  const [selectedRouters, setSelectedRouters] = useState(new Set());
+  const [bulkApplyingFix, setBulkApplyingFix] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(null);
+  const [connectionLogs, setConnectionLogs] = useState([]);
+  const [showKeyRotation, setShowKeyRotation] = useState(false);
+  const [keyRotationSchedule, setKeyRotationSchedule] = useState(
+    () => localStorage.getItem("key_rotation_days") || "90"
+  );
+  const [keyHistory, setKeyHistory] = useState(
+    () => JSON.parse(localStorage.getItem("key_history")) || []
+  );
+  const [routerGroups, setRouterGroups] = useState(
+    () => JSON.parse(localStorage.getItem("router_groups")) || []
+  );
+  const [showGroupForm, setShowGroupForm] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupType, setNewGroupType] = useState("location");
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [backups, setBackups] = useState(
+    () => JSON.parse(localStorage.getItem("router_backups")) || []
+  );
+  const [showBackupPanel, setShowBackupPanel] = useState(false);
+  const [showTopology, setShowTopology] = useState(false);
+  const [metrics, setMetrics] = useState(
+    () => JSON.parse(localStorage.getItem("router_metrics")) || {}
+  );
+  const [showMetrics, setShowMetrics] = useState(false);
   const watchIntervalRef = React.useRef(null);
+
+  const configTemplates = [
+    {
+      id: "standard",
+      name: "Standard ISP Setup",
+      description: "Full RADIUS + PPPoE + Hotspot with monitoring",
+      commands: [
+        "/ip radius add address=BILLING_SERVER secret=YOUR_SECRET service=ppp",
+        "/interface pppoe-server server add interface=bridge1 service-name=ISP authentication=radius",
+        "/ip hotspot profile add name=hsprof radius=yes",
+        "/ip hotspot add name=hs1 interface=bridge1 profile=hsprof",
+        "/ip firewall nat add chain=dstnat action=dst-nat to-addresses=BILLING_SERVER protocol=tcp dst-port=8728 in-interface-list=WAN",
+      ],
+    },
+    {
+      id: "minimal",
+      name: "Minimal Setup",
+      description: "PPPoE only (no Hotspot or RADIUS)",
+      commands: [
+        "/interface pppoe-server server add interface=bridge1 service-name=ISP local-address=10.0.0.1 remote-address=10.0.0.0/24",
+      ],
+    },
+    {
+      id: "advanced",
+      name: "Advanced Multi-WAN",
+      description: "RADIUS + PPPoE + Hotspot + QoS + Failover",
+      commands: [
+        "/ip radius add address=BILLING_SERVER secret=YOUR_SECRET service=ppp",
+        "/interface pppoe-server server add interface=bridge1 service-name=ISP authentication=radius",
+        "/ip hotspot profile add name=hsprof radius=yes",
+        "/ip hotspot add name=hs1 interface=bridge1 profile=hsprof",
+        "/queue simple add name=qos1 target=bridge1 max-limit=100M",
+        "/routing failover add interface=ether1-gateway check-gateway=ping disabled=no",
+      ],
+    },
+  ];
+
+  const applyTemplate = async (template) => {
+    if (selectedRouters.size === 0) {
+      toast.error("Select routers first");
+      return;
+    }
+
+    setApplyingTemplate(template.id);
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (const routerId of selectedRouters) {
+        try {
+          await axios.post(
+            `${API}/router/v1/${tenantSlug}/routers/${routerId}/execute-commands`,
+            { commands: template.commands },
+            { headers: { Authorization: `Bearer ${apiKey}` } },
+          );
+          successCount++;
+        } catch (e) {
+          failureCount++;
+        }
+      }
+
+      toast.success(
+        `Applied ${template.name} to ${successCount} router(s)${failureCount > 0 ? `, failed on ${failureCount}` : ""}`
+      );
+      setSelectedRouters(new Set());
+      setShowTemplates(false);
+      fetchAllRouters();
+    } catch (e) {
+      toast.error("Template apply failed");
+    } finally {
+      setApplyingTemplate(null);
+    }
+  };
 
   const startWatching = async () => {
     if (!tenantSlug) {return;}
@@ -91,10 +193,12 @@ export default function RouterLink() {
             setConnectionStatus({ connected: true, status: "online", router: data.router, message: data.message });
             fetchDiagnostics(data.router?.id);
             fetchAllRouters();
+            addLog("success", `Router connected: ${data.message}`, data.router?.name);
             toast.success(data.message);
           } else if (data.expired) {
             stopWatching();
             setConnectionStatus({ connected: false, status: "timeout", message: data.message });
+            addLog("warning", `Watch session expired: ${data.message}`);
           } else {
             setWatchRemaining(Math.max(0, 600 - (data.elapsed || 0)));
           }
@@ -154,7 +258,7 @@ export default function RouterLink() {
     }
   };
 
-  const generateKey = async () => {
+  const generateKey = async (isRotation = false) => {
     setGenerating(true);
     try {
       const token = getToken();
@@ -170,10 +274,17 @@ export default function RouterLink() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+      const newHistory = [
+        { key: apiKey, createdAt: new Date().toISOString(), rotated: isRotation },
+        ...keyHistory.slice(0, 9),
+      ];
+      setKeyHistory(newHistory);
+      localStorage.setItem("key_history", JSON.stringify(newHistory));
       setApiKey(key);
       localStorage.setItem("router_link_api_key", key);
       setPolling(true);
-      toast.success("API key generated");
+      addLog("success", isRotation ? "API key rotated" : "New API key generated");
+      toast.success(isRotation ? "API key rotated successfully" : "API key generated");
     } catch (e) {
       toast.error("Failed to generate key");
     } finally {
@@ -223,6 +334,7 @@ export default function RouterLink() {
       } else {
         fetchDiagnostics(routerId);
       }
+      addLog("success", `Diagnostic fix applied: ${stepId}`);
       toast.success(data.message || "Fix applied");
     } catch (e) {
       toast.error(e.response?.data?.error || "Failed to apply fix");
@@ -319,6 +431,14 @@ export default function RouterLink() {
   };
 
   // Manual check (in addition to SSE watch)
+  const addLog = (type, message, routerName = "System") => {
+    const timestamp = new Date().toLocaleTimeString();
+    setConnectionLogs((prev) => [
+      { type, message, routerName, timestamp },
+      ...prev.slice(0, 99),
+    ]);
+  };
+
   const manualCheck = async () => {
     setLastError(null);
     if (!tenantSlug || !apiKey) {
@@ -331,20 +451,24 @@ export default function RouterLink() {
       setConnectionStatus(data);
       setDebugInfo({ url, response: data });
       setCheckCount((c) => c + 1);
+      updateMetricsFromStatus(data);
       fetchAllRouters();
       if (data.router?.id) {
         fetchDiagnostics(data.router.id);
+        addLog("success", `Router ${data.router.name} found`, data.router.name);
       } else {
         setDiagnostics(null);
       }
       if (data.connected) {
         toast.success("Router found!");
       } else {
+        addLog("pending", "Still waiting for router to connect...");
         toast.info("Still waiting...");
       }
     } catch (e) {
       const msg = e.response?.data?.error || e.message;
       setLastError(`${msg} (HTTP ${e.response?.status || "network error"})`);
+      addLog("error", msg);
     }
   };
 
@@ -354,6 +478,214 @@ export default function RouterLink() {
   const copyApiKey = () => {
     navigator.clipboard.writeText(apiKey);
     toast.success("API key copied");
+  };
+
+  const toggleRouterSelection = (routerId) => {
+    const newSelected = new Set(selectedRouters);
+    if (newSelected.has(routerId)) {
+      newSelected.delete(routerId);
+    } else {
+      newSelected.add(routerId);
+    }
+    setSelectedRouters(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRouters.size === allRouters.length) {
+      setSelectedRouters(new Set());
+    } else {
+      setSelectedRouters(new Set(allRouters.map(r => r.id)));
+    }
+  };
+
+  const addRouterToGroup = (routerId, groupId) => {
+    const updated = routerGroups.map((g) => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          routerIds: Array.from(new Set([...(g.routerIds || []), routerId])),
+        };
+      }
+      return g;
+    });
+    setRouterGroups(updated);
+    localStorage.setItem("router_groups", JSON.stringify(updated));
+    toast.success("Router added to group");
+  };
+
+  const removeRouterFromGroup = (routerId, groupId) => {
+    const updated = routerGroups.map((g) => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          routerIds: (g.routerIds || []).filter((id) => id !== routerId),
+        };
+      }
+      return g;
+    });
+    setRouterGroups(updated);
+    localStorage.setItem("router_groups", JSON.stringify(updated));
+  };
+
+  const createGroup = () => {
+    if (!newGroupName.trim()) {
+      toast.error("Group name required");
+      return;
+    }
+    const newGroup = {
+      id: `group-${Date.now()}`,
+      name: newGroupName,
+      type: newGroupType,
+      routerIds: Array.from(selectedRouters),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...routerGroups, newGroup];
+    setRouterGroups(updated);
+    localStorage.setItem("router_groups", JSON.stringify(updated));
+    setNewGroupName("");
+    setShowGroupForm(false);
+    addLog("success", `Group created: ${newGroupName}`);
+    toast.success(`Group ${newGroupName} created`);
+  };
+
+  const deleteGroup = (groupId) => {
+    const updated = routerGroups.filter((g) => g.id !== groupId);
+    setRouterGroups(updated);
+    localStorage.setItem("router_groups", JSON.stringify(updated));
+  };
+
+  const backupRouterConfig = (routerId) => {
+    const router = allRouters.find((r) => r.id === routerId);
+    if (!router) return;
+
+    const backup = {
+      id: `backup-${Date.now()}`,
+      routerId,
+      routerName: router.name,
+      routerModel: router.model,
+      config: {
+        ...router,
+        backupTime: new Date().toISOString(),
+      },
+    };
+
+    const updated = [backup, ...backups.slice(0, 19)];
+    setBackups(updated);
+    localStorage.setItem("router_backups", JSON.stringify(updated));
+    addLog("success", `Backed up config from ${router.name}`);
+    toast.success(`Backed up ${router.name}`);
+  };
+
+  const restoreRouterConfig = async (backupId, targetRouterId) => {
+    const backup = backups.find((b) => b.id === backupId);
+    const targetRouter = allRouters.find((r) => r.id === targetRouterId);
+
+    if (!backup || !targetRouter) {
+      toast.error("Backup or target router not found");
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${API}/router/v1/${tenantSlug}/routers/${targetRouterId}/restore-config`,
+        { sourceConfig: backup.config },
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+      addLog("success", `Restored config from ${backup.routerName} to ${targetRouter.name}`);
+      toast.success(`Config restored to ${targetRouter.name}`);
+    } catch (e) {
+      toast.error("Restore failed: " + (e.response?.data?.error || e.message));
+      addLog("error", `Restore failed: ${e.message}`);
+    }
+  };
+
+  const deleteBackup = (backupId) => {
+    const updated = backups.filter((b) => b.id !== backupId);
+    setBackups(updated);
+    localStorage.setItem("router_backups", JSON.stringify(updated));
+  };
+
+  const exportBackup = (backupId) => {
+    const backup = backups.find((b) => b.id === backupId);
+    if (!backup) return;
+
+    const dataStr = JSON.stringify(backup, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `router-backup-${backup.routerName}-${new Date().toISOString().split("T")[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const recordMetric = (routerId, type, value) => {
+    setMetrics((prev) => {
+      const updated = { ...prev };
+      if (!updated[routerId]) {
+        updated[routerId] = { uptime: [], latency: [], bandwidth: [] };
+      }
+      updated[routerId][type] = [
+        { timestamp: Date.now(), value },
+        ...updated[routerId][type].slice(0, 59),
+      ];
+      localStorage.setItem("router_metrics", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const getMetricAverage = (routerId, type) => {
+    const data = metrics[routerId]?.[type] || [];
+    if (data.length === 0) return 0;
+    return (data.reduce((sum, m) => sum + m.value, 0) / data.length).toFixed(2);
+  };
+
+  const updateMetricsFromStatus = (status) => {
+    if (status.router?.id) {
+      // Simulate uptime percentage (100% if online, 0% if offline)
+      recordMetric(status.router.id, "uptime", status.router.is_online ? 100 : 0);
+      // Simulate latency
+      recordMetric(status.router.id, "latency", Math.random() * 50 + 10);
+      // Simulate bandwidth (in Mbps)
+      recordMetric(status.router.id, "bandwidth", Math.random() * 100);
+    }
+  };
+
+  const bulkApplyDiagnosticFix = async (stepId) => {
+    if (selectedRouters.size === 0) {
+      toast.error("Select routers first");
+      return;
+    }
+
+    setBulkApplyingFix(stepId);
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (const routerId of selectedRouters) {
+        try {
+          const { data } = await axios.post(
+            `${API}/router/v1/${tenantSlug}/routers/${routerId}/diagnostics/${stepId}/apply`,
+            {},
+            { headers: { Authorization: `Bearer ${apiKey}` } },
+          );
+          successCount++;
+        } catch (e) {
+          failureCount++;
+        }
+      }
+
+      toast.success(`Applied to ${successCount} router(s)${failureCount > 0 ? `, failed on ${failureCount}` : ""}`);
+      setSelectedRouters(new Set());
+      fetchAllRouters();
+      if (connectionStatus?.router?.id) {
+        fetchDiagnostics(connectionStatus.router.id);
+      }
+    } catch (e) {
+      toast.error("Bulk operation failed");
+    } finally {
+      setBulkApplyingFix(null);
+    }
   };
 
   if (loading) {
@@ -453,14 +785,26 @@ export default function RouterLink() {
               No API key yet. Generate one to get started.
             </p>
           )}
-          <Button onClick={generateKey} disabled={generating} className="gap-2">
-            {generating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Key className="w-4 h-4" />
+          <div className="flex gap-2">
+            <Button onClick={() => generateKey(false)} disabled={generating} className="gap-2 flex-1">
+              {generating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Key className="w-4 h-4" />
+              )}
+              {apiKey ? "Regenerate API Key" : "Generate API Key"}
+            </Button>
+            {apiKey && (
+              <Button
+                variant="outline"
+                onClick={() => setShowKeyRotation(true)}
+                className="gap-2 border-zinc-700/50 text-zinc-300"
+              >
+                <Shield className="w-4 h-4" />
+                Rotation
+              </Button>
             )}
-            {apiKey ? "Regenerate API Key" : "Generate API Key"}
-          </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -917,29 +1261,303 @@ export default function RouterLink() {
               </details>
             )}
 
+            {/* Router Groups */}
+            {apiKey && (
+              <div className="border-t border-zinc-800/50 pt-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500 font-medium">Router Groups</p>
+                  <Button
+                    onClick={() => setShowGroupForm(true)}
+                    variant="outline"
+                    className="h-7 gap-1 text-xs border-zinc-700/50"
+                  >
+                    <Plus className="w-3 h-3" />
+                    New Group
+                  </Button>
+                </div>
+
+                {showGroupForm && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Group name (e.g., Downtown, Warehouse)"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    />
+                    <select
+                      value={newGroupType}
+                      onChange={(e) => setNewGroupType(e.target.value)}
+                      className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    >
+                      <option value="location">Location</option>
+                      <option value="type">Type</option>
+                      <option value="region">Region</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={createGroup}
+                        className="flex-1 h-7 gap-1 text-xs"
+                      >
+                        Create Group
+                      </Button>
+                      <Button
+                        onClick={() => setShowGroupForm(false)}
+                        variant="outline"
+                        className="flex-1 h-7 text-xs border-zinc-700/50"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {routerGroups.length === 0 ? (
+                    <p className="text-xs text-zinc-500">No groups yet. Create one to organize routers.</p>
+                  ) : (
+                    routerGroups.map((group) => (
+                      <div key={group.id} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm text-white font-medium">{group.name}</p>
+                            <p className="text-xs text-zinc-500">
+                              {group.routerIds?.length || 0} router(s) • {group.type}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => {
+                                setSelectedRouters(new Set(group.routerIds || []));
+                                setSelectedGroup(group.id);
+                              }}
+                              variant="outline"
+                              className="h-7 gap-1 text-xs border-zinc-700/50"
+                            >
+                              Select
+                            </Button>
+                            <Button
+                              onClick={() => deleteGroup(group.id)}
+                              variant="outline"
+                              className="h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Backups Panel */}
+            {backups.length > 0 && (
+              <div className="border-t border-zinc-800/50 pt-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500 font-medium">Configuration Backups ({backups.length})</p>
+                  <button
+                    onClick={() => setShowBackupPanel(!showBackupPanel)}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    {showBackupPanel ? "Hide" : "Show"}
+                  </button>
+                </div>
+
+                {showBackupPanel && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {backups.map((backup) => (
+                      <div key={backup.id} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <p className="text-sm text-white font-medium">{backup.routerName}</p>
+                            <p className="text-xs text-zinc-500">
+                              {backup.routerModel} • {new Date(backup.config.backupTime).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                restoreRouterConfig(backup.id, e.target.value);
+                                e.target.value = "";
+                              }
+                            }}
+                            className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            defaultValue=""
+                          >
+                            <option value="">Restore to...</option>
+                            {allRouters.filter((r) => r.id !== backup.routerId).map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => exportBackup(backup.id)}
+                            className="px-2 py-1 text-xs bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-700/50 rounded text-zinc-300"
+                            title="Download backup"
+                          >
+                            ⬇
+                          </button>
+                          <button
+                            onClick={() => deleteBackup(backup.id)}
+                            className="px-2 py-1 text-xs bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded text-red-400"
+                            title="Delete backup"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Connection Logs */}
+            {connectionLogs.length > 0 && (
+              <div className="border-t border-zinc-800/50 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500 font-medium">Connection Logs</p>
+                  <button
+                    onClick={() => setConnectionLogs([])}
+                    className="text-xs text-zinc-400 hover:text-zinc-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {connectionLogs.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className={`text-xs px-2 py-1 rounded font-mono ${
+                        log.type === "success"
+                          ? "bg-green-500/10 text-green-300"
+                          : log.type === "error"
+                            ? "bg-red-500/10 text-red-300"
+                            : log.type === "warning"
+                              ? "bg-amber-500/10 text-amber-300"
+                              : "bg-zinc-800/30 text-zinc-400"
+                      }`}
+                    >
+                      <span className="text-zinc-500">[{log.timestamp}]</span>{" "}
+                      <span className="font-medium">{log.routerName}:</span> {log.message}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* All Routers for this tenant */}
             {allRouters.length > 0 && (
               <div className="mt-4 pt-4 border-t border-zinc-800/50">
-                <p className="text-xs text-zinc-500 mb-2 font-medium">ALL ROUTERS ({allRouters.length})</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500 font-medium">ALL ROUTERS ({allRouters.length})</p>
+                  {selectedRouters.size > 0 && (
+                    <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">
+                      {selectedRouters.size} selected
+                    </span>
+                  )}
+                </div>
+
+                {apiKey && (
+                  <Button
+                    onClick={() => setShowTopology(true)}
+                    variant="outline"
+                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300 mb-3 w-full"
+                  >
+                    🗺️ View Network Topology
+                  </Button>
+                )}
+
+                {selectedRouters.size > 0 && (
+                  <div className="mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-blue-300 font-medium">Bulk Actions</span>
+                      <button
+                        onClick={() => setSelectedRouters(new Set())}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <Button
+                      onClick={() => setShowTemplates(true)}
+                      disabled={applyingTemplate}
+                      className="h-8 gap-2 w-full text-xs"
+                    >
+                      <Terminal className="w-3 h-3" />
+                      Apply Configuration Template
+                    </Button>
+                    {diagnostics?.steps?.map((step) => (
+                      step.status !== "ok" && (
+                        <Button
+                          key={step.id}
+                          onClick={() => bulkApplyDiagnosticFix(step.id)}
+                          disabled={bulkApplyingFix === step.id}
+                          className="h-8 gap-2 w-full text-xs"
+                        >
+                          {bulkApplyingFix === step.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Shield className="w-3 h-3" />
+                          )}
+                          Apply {step.label} to {selectedRouters.size} router(s)
+                        </Button>
+                      )
+                    ))}
+                  </div>
+                )}
+
                 <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-2 py-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={selectedRouters.size === allRouters.length && allRouters.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 cursor-pointer"
+                    />
+                    <span className="text-zinc-400">Select All</span>
+                  </div>
                   {allRouters.map((r) => (
-                    <div key={r.id} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className={`w-2 h-2 rounded-full ${r.is_online ? 'bg-green-500' : r.provision_status === 'online' ? 'bg-amber-500' : 'bg-zinc-500'}`} />
-                        <span className="text-white">{r.name}</span>
-                        <span className="text-zinc-500">{r.model || ""}</span>
-                        <span className={`text-xs ${r.is_online ? 'text-green-400' : 'text-red-400'}`}>
-                          {r.is_online ? 'ONLINE' : r.provision_status === 'online' ? 'OFFLINE' : r.provision_status}
-                        </span>
+                    <div key={r.id} className={`bg-zinc-800/30 border rounded-lg p-3 flex items-center justify-between transition ${selectedRouters.has(r.id) ? "border-blue-500/50 bg-blue-500/10" : "border-zinc-700/50"}`}>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedRouters.has(r.id)}
+                          onChange={() => toggleRouterSelection(r.id)}
+                          className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 cursor-pointer shrink-0"
+                        />
+                        <div className="flex items-center gap-2 text-xs min-w-0 flex-1">
+                          <div className={`w-2 h-2 rounded-full ${r.is_online ? 'bg-green-500' : r.provision_status === 'online' ? 'bg-amber-500' : 'bg-zinc-500'}`} shrink-0 />
+                          <span className="text-white truncate">{r.name}</span>
+                          <span className="text-zinc-500">{r.model || ""}</span>
+                          <span className={`text-xs ${r.is_online ? 'text-green-400' : 'text-red-400'}`}>
+                            {r.is_online ? 'ONLINE' : r.provision_status === 'online' ? 'OFFLINE' : r.provision_status}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-zinc-500">
-                        <span>{r.mac_address || "no MAC"}</span>
-                        <span className="mx-2">|</span>
-                        <span>{r.ip_address || "no IP"}</span>
-                        <span className="mx-2">|</span>
-                        <span className={r.linked_mikrotik_connection_id ? "text-green-400" : "text-amber-400"}>
-                          {r.linked_mikrotik_connection_id ? "managed" : "unmanaged"}
-                        </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => backupRouterConfig(r.id)}
+                          className="p-1 hover:bg-zinc-700/50 rounded text-xs text-zinc-400 hover:text-zinc-300"
+                          title="Backup config"
+                        >
+                          💾
+                        </button>
+                        <div className="text-xs text-zinc-500">
+                          <span>{r.mac_address || "no MAC"}</span>
+                          <span className="mx-2">|</span>
+                          <span>{r.ip_address || "no IP"}</span>
+                          <span className="mx-2">|</span>
+                          <span className={r.linked_mikrotik_connection_id ? "text-green-400" : "text-amber-400"}>
+                            {r.linked_mikrotik_connection_id ? "managed" : "unmanaged"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -954,6 +1572,213 @@ export default function RouterLink() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Network Topology Modal */}
+      {showTopology && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-4xl w-full mx-4 max-h-96 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-white font-medium">Network Topology</h2>
+              <button
+                onClick={() => setShowTopology(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6">
+              {allRouters.length === 0 ? (
+                <p className="text-zinc-500 text-sm text-center py-8">No routers connected yet</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {/* Central server */}
+                  <div className="flex justify-center mb-4">
+                    <div className="bg-blue-500/20 border-2 border-blue-500 rounded-lg px-4 py-2 text-center">
+                      <p className="text-white font-medium text-sm">Billing Server</p>
+                      <p className="text-xs text-zinc-400">{appUrl}</p>
+                    </div>
+                  </div>
+
+                  {/* Connection lines and routers */}
+                  <div className="space-y-3">
+                    {allRouters.map((router) => (
+                      <div key={router.id} className="flex items-center gap-4">
+                        <div className="flex-1 h-px bg-gradient-to-r from-zinc-700/50 to-transparent" />
+                        <div
+                          className={`px-4 py-2 rounded-lg border flex-shrink-0 text-center min-w-40 ${
+                            router.is_online
+                              ? "bg-green-500/20 border-green-500 text-green-300"
+                              : "bg-zinc-800/50 border-zinc-700/50 text-zinc-400"
+                          }`}
+                        >
+                          <p className="text-white font-medium text-sm">{router.name}</p>
+                          <p className="text-xs">
+                            {router.ip_address || "No IP"}
+                          </p>
+                          <p className={`text-xs ${router.is_online ? "text-green-400" : "text-red-400"}`}>
+                            {router.is_online ? "● Online" : "● Offline"}
+                          </p>
+                        </div>
+                        <div className="flex-1 h-px bg-gradient-to-l from-zinc-700/50 to-transparent" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Statistics */}
+                  <div className="border-t border-zinc-800 pt-4 mt-4 grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl text-white font-bold">{allRouters.length}</p>
+                      <p className="text-xs text-zinc-500">Total Routers</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl text-green-400 font-bold">
+                        {allRouters.filter((r) => r.is_online).length}
+                      </p>
+                      <p className="text-xs text-zinc-500">Online</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl text-amber-400 font-bold">
+                        {allRouters.filter((r) => !r.is_online).length}
+                      </p>
+                      <p className="text-xs text-zinc-500">Offline</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Key Rotation Modal */}
+      {showKeyRotation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="bg-zinc-900 border-zinc-800 max-w-md w-full mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">API Key Rotation</CardTitle>
+                <button
+                  onClick={() => setShowKeyRotation(false)}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-2 font-medium">Rotate every (days)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={keyRotationSchedule}
+                  onChange={(e) => {
+                    setKeyRotationSchedule(e.target.value);
+                    localStorage.setItem("key_rotation_days", e.target.value);
+                  }}
+                  className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+                <p className="text-xs text-zinc-500 mt-1">Recommended: 90 days</p>
+              </div>
+
+              <Button
+                onClick={() => {
+                  generateKey(true);
+                  setShowKeyRotation(false);
+                }}
+                disabled={generating}
+                className="gap-2 w-full"
+              >
+                {generating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Key className="w-4 h-4" />
+                )}
+                Rotate Key Now
+              </Button>
+
+              {keyHistory.length > 0 && (
+                <div className="pt-4 border-t border-zinc-700/50">
+                  <p className="text-xs text-zinc-400 font-medium mb-2">Key History</p>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {keyHistory.map((entry, idx) => (
+                      <div key={idx} className="bg-zinc-800/30 border border-zinc-700/50 rounded p-2">
+                        <div className="text-xs text-zinc-300 font-mono break-all mb-1">
+                          {entry.key}
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          {new Date(entry.createdAt).toLocaleDateString()}{" "}
+                          {entry.rotated && <span className="text-amber-400">(rotated)</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Templates Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="bg-zinc-900 border-zinc-800 max-w-2xl w-full mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Configuration Templates</CardTitle>
+                <button
+                  onClick={() => setShowTemplates(false)}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <CardDescription>
+                Apply pre-built configurations to {selectedRouters.size} router(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+              {configTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className="border border-zinc-700/50 rounded-lg p-4 bg-zinc-800/30 hover:bg-zinc-800/50 transition"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">{template.name}</p>
+                      <p className="text-xs text-zinc-400 mt-1">{template.description}</p>
+                    </div>
+                    <Button
+                      onClick={() => applyTemplate(template)}
+                      disabled={applyingTemplate === template.id}
+                      className="h-8 gap-2 whitespace-nowrap"
+                    >
+                      {applyingTemplate === template.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3 h-3" />
+                      )}
+                      Apply
+                    </Button>
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    <p className="font-medium mb-1">Commands to run:</p>
+                    <ul className="space-y-1">
+                      {template.commands.map((cmd, idx) => (
+                        <li key={idx} className="text-zinc-400 break-all">
+                          • {cmd}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* What This Does */}
