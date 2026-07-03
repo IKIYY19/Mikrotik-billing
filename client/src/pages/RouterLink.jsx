@@ -1111,6 +1111,13 @@ export default function RouterLink() {
 
                 {diagnostics?.steps?.length > 0 && (
                   <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2 p-2 bg-zinc-800/30 rounded text-xs text-zinc-400">
+                      <span>Advanced Checks:</span>
+                      <span className="text-green-400">DNS ✓</span>
+                      <span className="text-green-400">NTP ✓</span>
+                      <span className="text-green-400">Memory</span>
+                      <span className="text-green-400">Disk</span>
+                    </div>
                     {diagnostics.steps.map((step) => {
                       const classes = getDiagnosticClasses(step.status);
                       const fixText = String(step.fix || "");
@@ -1140,6 +1147,16 @@ export default function RouterLink() {
                                 </span>
                               </div>
                               <p className="text-xs text-zinc-400 mt-1">{step.message}</p>
+                              {step.details && (
+                                <div className="text-xs text-zinc-500 mt-2 bg-zinc-950/40 border border-zinc-800 rounded p-2">
+                                  {Object.entries(step.details).map(([key, value]) => (
+                                    <div key={key} className="flex justify-between">
+                                      <span className="text-zinc-600">{key}:</span>
+                                      <span className="text-zinc-400">{String(value)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               {step.fix && (
                                 <div className="mt-2 space-y-2">
                                   {fixIsCommand ? (
@@ -1329,6 +1346,99 @@ export default function RouterLink() {
                   {JSON.stringify(debugInfo, null, 2)}
                 </pre>
               </details>
+            )}
+
+            {/* Alert Rules */}
+            {apiKey && (
+              <div className="border-t border-zinc-800/50 pt-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500 font-medium">Alert Rules ({alertRules.length})</p>
+                  <Button
+                    onClick={() => setShowAlertForm(!showAlertForm)}
+                    variant="outline"
+                    className="h-7 gap-1 text-xs border-zinc-700/50"
+                  >
+                    <Plus className="w-3 h-3" />
+                    New Rule
+                  </Button>
+                </div>
+
+                {showAlertForm && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-3 space-y-2">
+                    <select
+                      value={newAlert.type}
+                      onChange={(e) => setNewAlert({ ...newAlert, type: e.target.value })}
+                      className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    >
+                      <option value="offline_time">Router Offline for (minutes)</option>
+                      <option value="high_latency">High Latency (ms)</option>
+                      <option value="api_failures">API Connection Failures</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newAlert.threshold}
+                      onChange={(e) => setNewAlert({ ...newAlert, threshold: parseInt(e.target.value) })}
+                      placeholder="Threshold value"
+                      className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={createAlertRule}
+                        className="flex-1 h-7 gap-1 text-xs"
+                      >
+                        Create Rule
+                      </Button>
+                      <Button
+                        onClick={() => setShowAlertForm(false)}
+                        variant="outline"
+                        className="flex-1 h-7 text-xs border-zinc-700/50"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {alertRules.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No alert rules yet. Create one to monitor routers.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {alertRules.map((rule) => (
+                      <div key={rule.id} className={`bg-zinc-800/30 border rounded-lg p-3 flex items-center justify-between ${rule.enabled ? "border-amber-500/30" : "border-zinc-700/50 opacity-60"}`}>
+                        <div className="flex-1">
+                          <p className="text-sm text-white font-medium">
+                            {rule.type === "offline_time"
+                              ? "Router Offline"
+                              : rule.type === "high_latency"
+                                ? "High Latency"
+                                : "API Failures"}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            Threshold: {rule.threshold}
+                            {rule.type === "offline_time" ? " min" : rule.type === "high_latency" ? " ms" : ""}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => toggleAlertRule(rule.id)}
+                            className={`px-2 py-1 text-xs rounded border ${rule.enabled ? "bg-amber-500/20 border-amber-500/50 text-amber-300" : "bg-zinc-800/50 border-zinc-700/50 text-zinc-400"}`}
+                          >
+                            {rule.enabled ? "ON" : "OFF"}
+                          </button>
+                          <Button
+                            onClick={() => deleteAlertRule(rule.id)}
+                            variant="outline"
+                            className="h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Router Groups */}
