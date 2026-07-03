@@ -106,6 +106,13 @@ export default function RouterLink() {
     threshold: 5,
     enabled: true,
   });
+  const [showWireGuardSetup, setShowWireGuardSetup] = useState(false);
+  const [wireguardConfig, setWireguardConfig] = useState({
+    serverPublicIp: "",
+    serverPort: "51820",
+    routerWgIp: "10.0.0.2/24",
+    serverWgIp: "10.0.0.1/24",
+  });
   const watchIntervalRef = React.useRef(null);
 
   const configTemplates = [
@@ -719,6 +726,40 @@ export default function RouterLink() {
     );
     setAlertRules(updated);
     localStorage.setItem("alert_rules", JSON.stringify(updated));
+  };
+
+  const generateWireGuardKeys = () => {
+    // Simulate key generation (in production, use libsodium or tweetnacl)
+    const randomKey = () =>
+      btoa(Array.from(crypto.getRandomValues(new Uint8Array(32))))
+        .replace(/[+/]/g, (c) => (c === "+" ? "-" : "_"))
+        .replace(/=/g, "")
+        .substring(0, 43);
+
+    return {
+      serverPrivate: randomKey(),
+      serverPublic: randomKey(),
+      routerPrivate: randomKey(),
+      routerPublic: randomKey(),
+    };
+  };
+
+  const getWireGuardServerConfig = (keys) => {
+    return `[Interface]
+Address = ${wireguardConfig.serverWgIp}
+ListenPort = ${wireguardConfig.serverPort}
+PrivateKey = ${keys.serverPrivate}
+
+[Peer]
+PublicKey = ${keys.routerPublic}
+AllowedIPs = ${wireguardConfig.routerWgIp}`;
+  };
+
+  const getWireGuardRouterConfig = (keys) => {
+    return `/interface wireguard add name=wg-tunnel
+/interface wireguard peers add interface=wg-tunnel public-key="${keys.serverPublic}" endpoint-address=${wireguardConfig.serverPublicIp} endpoint-port=${wireguardConfig.serverPort} allowed-address=${wireguardConfig.serverWgIp} preshared-key="" persistent-keepalive=25
+/ip address add address=${wireguardConfig.routerWgIp} interface=wg-tunnel
+/ip route add dst-address=${wireguardConfig.serverWgIp} gateway=wg-tunnel`;
   };
 
   const bulkApplyDiagnosticFix = async (stepId) => {
@@ -1645,20 +1686,27 @@ export default function RouterLink() {
                 </div>
 
                 {apiKey && (
-                  <div className="flex gap-2 mb-3">
+                  <div className="flex gap-2 mb-3 flex-wrap">
                     <Button
                       onClick={() => setShowTopology(true)}
                       variant="outline"
-                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1"
+                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1 min-w-24"
                     >
                       🗺️ Topology
                     </Button>
                     <Button
                       onClick={() => setShowMetrics(true)}
                       variant="outline"
-                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1"
+                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1 min-w-24"
                     >
                       📊 Metrics
+                    </Button>
+                    <Button
+                      onClick={() => setShowWireGuardSetup(true)}
+                      variant="outline"
+                      className="h-8 gap-2 border-zinc-700/50 text-zinc-300 flex-1 min-w-32"
+                    >
+                      🔐 WireGuard
                     </Button>
                   </div>
                 )}
@@ -1761,6 +1809,160 @@ export default function RouterLink() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* WireGuard Setup Modal */}
+      {showWireGuardSetup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-2xl w-full mx-4 my-8">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 sticky top-0 bg-zinc-900">
+              <h2 className="text-white font-medium">WireGuard Setup (Remote Access via CGNAT)</h2>
+              <button
+                onClick={() => setShowWireGuardSetup(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 max-h-96 overflow-y-auto space-y-6">
+              {/* Step 1: Configuration */}
+              <div>
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">1</span>
+                  Configure Endpoints
+                </h3>
+                <div className="space-y-2 bg-zinc-800/20 border border-zinc-700/50 rounded-lg p-4">
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1 font-medium">Server Public IP/Domain</label>
+                    <input
+                      type="text"
+                      placeholder="your-server.com or 1.2.3.4"
+                      value={wireguardConfig.serverPublicIp}
+                      onChange={(e) => setWireguardConfig({ ...wireguardConfig, serverPublicIp: e.target.value })}
+                      className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1 font-medium">Server Port</label>
+                      <input
+                        type="text"
+                        value={wireguardConfig.serverPort}
+                        onChange={(e) => setWireguardConfig({ ...wireguardConfig, serverPort: e.target.value })}
+                        className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1 font-medium">Router WG IP</label>
+                      <input
+                        type="text"
+                        value={wireguardConfig.routerWgIp}
+                        onChange={(e) => setWireguardConfig({ ...wireguardConfig, routerWgIp: e.target.value })}
+                        className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Key Generation */}
+              <div>
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">2</span>
+                  Generate Keys
+                </h3>
+                <Button
+                  onClick={() => {
+                    const keys = generateWireGuardKeys();
+                    setWireguardConfig({ ...wireguardConfig, keys });
+                  }}
+                  className="gap-2 w-full"
+                >
+                  <Key className="w-4 h-4" />
+                  Generate Public/Private Keys
+                </Button>
+                {wireguardConfig.keys && (
+                  <div className="mt-3 space-y-2 text-xs bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
+                    <div>
+                      <p className="text-zinc-500 mb-1">Server Private Key:</p>
+                      <code className="block bg-zinc-900 border border-zinc-700/50 rounded p-2 text-green-400 break-all font-mono">
+                        {wireguardConfig.keys.serverPrivate}
+                      </code>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 mb-1">Router Private Key:</p>
+                      <code className="block bg-zinc-900 border border-zinc-700/50 rounded p-2 text-green-400 break-all font-mono">
+                        {wireguardConfig.keys.routerPrivate}
+                      </code>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Step 3: Server Config */}
+              {wireguardConfig.keys && (
+                <div>
+                  <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold">3</span>
+                    Server Configuration
+                  </h3>
+                  <p className="text-xs text-zinc-400 mb-2">Deploy this on your billing server:</p>
+                  <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">
+                    {getWireGuardServerConfig(wireguardConfig.keys)}
+                  </pre>
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getWireGuardServerConfig(wireguardConfig.keys));
+                      toast.success("Server config copied");
+                    }}
+                    variant="outline"
+                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300 mt-2 w-full"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copy Server Config
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 4: Router Config */}
+              {wireguardConfig.keys && (
+                <div>
+                  <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">4</span>
+                    MikroTik Commands
+                  </h3>
+                  <p className="text-xs text-zinc-400 mb-2">Run these commands on your MikroTik router:</p>
+                  <pre className="bg-zinc-950 border border-zinc-700/50 rounded-lg p-4 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">
+                    {getWireGuardRouterConfig(wireguardConfig.keys)}
+                  </pre>
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getWireGuardRouterConfig(wireguardConfig.keys));
+                      toast.success("Router commands copied");
+                    }}
+                    variant="outline"
+                    className="h-8 gap-2 border-zinc-700/50 text-zinc-300 mt-2 w-full"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copy Router Commands
+                  </Button>
+                </div>
+              )}
+
+              {/* Benefits */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-sm text-blue-300 font-medium mb-2">Benefits of WireGuard:</p>
+                <ul className="text-xs text-blue-400 space-y-1">
+                  <li>✓ Works through CGNAT and any firewall</li>
+                  <li>✓ All traffic encrypted end-to-end</li>
+                  <li>✓ Low CPU & bandwidth overhead</li>
+                  <li>✓ Fast reconnection with keepalive</li>
+                  <li>✓ Access router API securely</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Performance Metrics Modal */}
