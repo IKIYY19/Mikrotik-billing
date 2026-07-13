@@ -7,7 +7,8 @@
 const express = require("express");
 const router = express.Router();
 const cgnatTunnelService = require("../services/cgnatTunnelService");
-const db = global.db || require("../db/memory");
+const getDb = () => global.db || require("../db/memory");
+const db = { query: (...args) => getDb().query(...args) };
 const { encrypt, decrypt } = require("../utils/encryption");
 
 /**
@@ -143,7 +144,7 @@ router.get("/:connectionId/mikrotik-script", async (req, res) => {
  */
 router.get("/scripts/server-setup", async (req, res) => {
   try {
-    const script = cgnatTunnelService.generateServerSetupScript();
+    const script = await cgnatTunnelService.generateServerSetupScript();
     res.type("text/plain").send(script);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -252,12 +253,13 @@ router.post("/new-router-script", async (req, res) => {
 
     // Create a placeholder mikrotik_connections row so we can call createTunnel()
     const safeName = routerName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
-    const insertResult = await db.query(
+    const encryptedPassword = encrypt(apiPassword);
+    const insertResult = await (global.db || db).query(
       `INSERT INTO mikrotik_connections
-         (name, ip_address, api_port, username, connection_type, is_online, use_tunnel, created_at, updated_at)
-       VALUES ($1, '0.0.0.0', $2, $3, 'api', false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         (name, ip_address, api_port, username, password_encrypted, connection_type, is_online, use_tunnel, created_at, updated_at)
+       VALUES ($1, '0.0.0.0', $2, $3, $4, 'api', false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [safeName, parseInt(apiPort, 10) || 8728, apiUsername]
+      [safeName, parseInt(apiPort, 10) || 8728, apiUsername, encryptedPassword]
     );
 
     const connectionId = insertResult.rows[0].id;
@@ -275,12 +277,12 @@ router.post("/new-router-script", async (req, res) => {
     const script = cgnatTunnelService.generateCombinedLinkScript({
       routerName,
       routerPrivateKey: tunnel.routerPrivateKey,
-      routerTunnelIp: tunnel.routerTunnelIp,
+      routerTunnelIp: tunnel.routerTunnelIp,           // "10.200.0.X/24" — now returned by createTunnel
       serverPublicKey: cgnatTunnelService.serverPublicKey,
       serverEndpoint: cgnatTunnelService.getServerEndpoint(),
-      serverWgPort: tunnel.serverWgPort || parseInt(process.env.WG_TUNNEL_PORT || "51820", 10),
+      serverWgPort: tunnel.serverPort,                  // was tunnel.serverWgPort (undefined)
       serverWgIp: cgnatTunnelService.serverWgIp,
-      interfaceName: tunnel.interfaceName,
+      interfaceName: tunnel.interfaceName,              // now returned by createTunnel
       apiUsername,
       apiPassword,
       apiPort: parseInt(apiPort, 10) || 8728,

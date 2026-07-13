@@ -62,8 +62,19 @@ class CGNATTunnelService {
     if (this.initialized) return true;
 
     try {
-      // Try to load existing keys from DB
       const db = this.getDb();
+
+      // Ensure system_keys table exists BEFORE querying it
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS system_keys (
+          key_name VARCHAR(100) PRIMARY KEY,
+          key_value TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Try to load existing keys from DB
       const keyResult = await db.query(
         "SELECT key_name, key_value FROM system_keys WHERE key_name LIKE 'wireguard_%'"
       );
@@ -302,11 +313,14 @@ class CGNATTunnelService {
     return {
       success: true,
       tunnelIp,
+      routerTunnelIp: tunnelIpWithMask,  // with /24 CIDR — used by generateCombinedLinkScript
+      interfaceName: wgInterfaceName,
       routerPublicKey: routerPubKey,
       routerPrivateKey: routerPrivateKey,
       serverPublicKey: this.serverPublicKey,
       serverEndpoint: this.getServerEndpoint(),
       serverPort: WG_TUNNEL_PORT,
+      serverWgPort: WG_TUNNEL_PORT,       // alias used by new-router-script route
       mikrotikScript,
       message: "Apply the mikrotikScript on your router to establish the tunnel, then update the connection IP to the tunnel IP.",
     };
@@ -338,6 +352,112 @@ class CGNATTunnelService {
     logger.info("WireGuard tunnel removed for router", { connectionId });
 
     return { success: true, message: "Tunnel removed" };
+  }
+
+  /**
+   * Generate the server-side WireGuard setup script.
+   * Uses the ACTUAL server private key stored in the DB so the router scripts
+   * and this config are always in sync.
+   */
+  async generateServerSetupScript() {
+    await this.initialize();
+
+    const serverPrivateKey = this.serverPrivateKey || "(run service once to generate)";
+    const serverPublicKey = this.serverPublicKey || "(run service once to generate)";
+
+    return `#!/bin/bash
+#############################################
+# MikroTik Billing - WireGuard Server Setup
+# Run this ONCE on your billing server/VPS
+# as root (or with sudo).
+#
+# Server public key : ${serverPublicKey}
+# Tunnel subnet     : ${WG_TUNNEL_SUBNET}.0/24
+# Listen port       : ${WG_TUNNEL_PORT}
+# Interface         : ${WG_INTERFACE}
+#############################################
+
+set -e
+
+echo "=== MikroTik Billing WireGuard Server Setup ==="
+
+# ── 1. Install WireGuard ─────────────────────────────────────────────────────
+if ! command -v wg &> /dev/null; then
+    echo "Installing WireGuard..."
+    if command -v apt-get &> /dev/null; then
+        apt-get update -qq && apt-get install -y wireguard wireguard-tools
+    elif command -v yum &> /dev/null; then
+        yum install -y wireguard-tools
+    elif command -v dnf &> /dev/null; then
+        dnf install -y wireguard-tools
+    else
+        echo "ERROR: Cannot install WireGuard automatically. Install wireguard-tools manually."
+        exit 1
+    fi
+    echo "WireGuard installed."
+else
+    echo "WireGuard already installed."
+fi
+
+# ── 2. Enable IP forwarding ──────────────────────────────────────────────────
+echo "Enabling IP forwarding..."
+sysctl -w net.ipv4.ip_forward=1
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-wireguard-billing.conf
+sysctl -p /etc/sysctl.d/99-wireguard-billing.conf 2>/dev/null || true
+
+# ── 3. Write WireGuard config ────────────────────────────────────────────────
+# This uses the EXACT private key the billing service generated and stored in
+# its database. Router scripts embed the matching public key.
+echo "Writing WireGuard config..."
+mkdir -p ${WG_CONFIG_DIR}
+
+cat > ${WG_CONFIG_PATH} << 'WGEOF'
+[Interface]
+# MikroTik Billing - WireGuard Tunnel Server
+# Auto-managed by CGNAT Tunnel Service — do NOT manually add/remove peers here.
+Address = ${WG_TUNNEL_SUBNET}.1/24
+ListenPort = ${WG_TUNNEL_PORT}
+PrivateKey = ${serverPrivateKey}
+SaveConfig = false
+WGEOF
+
+# Replace shell variable placeholders in the heredoc output
+sed -i "s|\\${WG_TUNNEL_SUBNET}|${WG_TUNNEL_SUBNET}|g; s|\\${WG_TUNNEL_PORT}|${WG_TUNNEL_PORT}|g; s|\\${serverPrivateKey}|${serverPrivateKey}|g" ${WG_CONFIG_PATH}
+chmod 600 ${WG_CONFIG_PATH}
+echo "Config written to ${WG_CONFIG_PATH}"
+
+# ── 4. Open firewall ─────────────────────────────────────────────────────────
+echo "Opening firewall port ${WG_TUNNEL_PORT}/udp..."
+if command -v ufw &> /dev/null; then
+    ufw allow ${WG_TUNNEL_PORT}/udp
+    echo "UFW rule added."
+elif command -v firewall-cmd &> /dev/null; then
+    firewall-cmd --permanent --add-port=${WG_TUNNEL_PORT}/udp && firewall-cmd --reload
+    echo "Firewalld rule added."
+else
+    echo "WARNING: Add UDP ${WG_TUNNEL_PORT} to your firewall manually."
+fi
+
+# ── 5. Start WireGuard ───────────────────────────────────────────────────────
+echo "Starting WireGuard interface..."
+wg-quick down ${WG_INTERFACE} 2>/dev/null || true
+wg-quick up   ${WG_INTERFACE}
+
+# Enable on boot
+systemctl enable wg-quick@${WG_INTERFACE} 2>/dev/null || true
+
+echo ""
+echo "=== Setup Complete ==="
+echo "Interface   : ${WG_INTERFACE}"
+echo "Listen port : ${WG_TUNNEL_PORT}"
+echo "Server IP   : ${WG_TUNNEL_SUBNET}.1/24"
+echo "Public key  : ${serverPublicKey}"
+echo ""
+echo "Router scripts generated by the billing dashboard already include this"
+echo "public key. Paste a generated script on each MikroTik to connect it."
+echo ""
+echo "To verify: run 'wg show ${WG_INTERFACE}' after a router connects."
+`;
   }
 
   /**
@@ -793,99 +913,6 @@ ${peers.join("\n")}
         };
       }),
     };
-  }
-
-  /**
-   * Generate the server-side WireGuard setup script
-   * This should be run on the VPS/billing server to set up the WireGuard interface
-   */
-  generateServerSetupScript() {
-    return `#!/bin/bash
-#############################################
-# MikroTik Billing - WireGuard Server Setup
-# Run this on your billing server/VPS
-#############################################
-
-set -e
-
-WG_INTERFACE="${WG_INTERFACE}"
-WG_PORT=${WG_TUNNEL_PORT}
-WG_SUBNET="${WG_TUNNEL_SUBNET}.0/24"
-WG_CONFIG="${WG_CONFIG_PATH}"
-
-echo "=== MikroTik Billing WireGuard Server Setup ==="
-
-# Install WireGuard if not present
-if ! command -v wg &> /dev/null; then
-    echo "Installing WireGuard..."
-    if command -v apt-get &> /dev/null; then
-        apt-get update && apt-get install -y wireguard
-    elif command -v yum &> /dev/null; then
-        yum install -y wireguard-tools
-    else
-        echo "ERROR: Cannot install WireGuard automatically. Install it manually."
-        exit 1
-    fi
-fi
-
-# Enable IP forwarding
-echo "Enabling IP forwarding..."
-echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-wireguard.conf
-sysctl -p /etc/sysctl.d/99-wireguard.conf
-
-# Create config directory
-mkdir -p "$(dirname "$WG_CONFIG")"
-
-# Generate server keys if they don't exist
-if [ ! -f /etc/wireguard/server_private_key ]; then
-    echo "Generating WireGuard server keys..."
-    wg genkey | tee /etc/wireguard/server_private_key | wg pubkey > /etc/wireguard/server_public_key
-    chmod 600 /etc/wireguard/server_private_key
-fi
-
-SERVER_PRIVATE_KEY=$(cat /etc/wireguard/server_private_key)
-
-# Create initial config
-cat > "$WG_CONFIG" << EOF
-[Interface]
-Address = ${WG_TUNNEL_SUBNET}.1/24
-ListenPort = ${WG_TUNNEL_PORT}
-PrivateKey = \${SERVER_PRIVATE_KEY}
-SaveConfig = false
-EOF
-
-chmod 600 "$WG_CONFIG"
-
-# Open firewall
-if command -v ufw &> /dev/null; then
-    ufw allow ${WG_TUNNEL_PORT}/udp
-    echo "UFW rule added for port ${WG_TUNNEL_PORT}/udp"
-elif command -v firewall-cmd &> /dev/null; then
-    firewall-cmd --permanent --add-port=${WG_TUNNEL_PORT}/udp
-    firewall-cmd --reload
-    echo "Firewalld rule added for port ${WG_TUNNEL_PORT}/udp"
-else
-    echo "WARNING: Could not add firewall rule automatically. Allow UDP port ${WG_TUNNEL_PORT}."
-fi
-
-# Start WireGuard
-echo "Starting WireGuard interface..."
-wg-quick up "$WG_INTERFACE" 2>/dev/null || true
-
-# Enable on boot
-systemctl enable wg-quick@"$WG_INTERFACE" 2>/dev/null || true
-
-echo ""
-echo "=== Setup Complete ==="
-echo "WireGuard Interface: $WG_INTERFACE"
-echo "Listening Port: $WG_PORT"
-echo "Tunnel Subnet: $WG_SUBNET"
-echo "Server Public Key: $(cat /etc/wireguard/server_public_key)"
-echo ""
-echo "Add this server public key to your MikroTik router configuration."
-echo "Set WG_SERVER_ENDPOINT in your .env to this server's public IP."
-echo "Set WG_INTERFACE=$WG_INTERFACE in your .env"
-`;
   }
 
   /**
