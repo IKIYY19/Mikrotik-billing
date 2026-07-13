@@ -18,7 +18,13 @@ const TABS = [
 ];
 
 export default function RoutersPage() {
-  const toast = useToastStore();
+  const addToast = useToastStore((state) => state.addToast);
+  const toast = {
+    error: (msg) => addToast('error', msg, '', 4000),
+    success: (msg) => addToast('success', msg, '', 4000),
+    warning: (msg) => addToast('warning', msg, '', 4000),
+    info: (msg) => addToast('info', msg, '', 4000),
+  };
   const [activeTab, setActiveTab] = useState("routers");
   const [loading, setLoading] = useState(true);
 

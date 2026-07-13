@@ -119,6 +119,22 @@ class MpesaService {
     }
   }
 
+  // Register C2B URLs with Safaricom (call once per shortcode in production)
+  async registerC2BUrls(validationUrl, confirmationUrl) {
+    await this.authenticate();
+    const response = await axios.post(
+      `${this.baseUrl}/mpesa/c2b/v1/registerurl`,
+      {
+        ShortCode: this.shortcode,
+        ResponseType: 'Completed',
+        ConfirmationURL: confirmationUrl,
+        ValidationURL: validationUrl,
+      },
+      { headers: { Authorization: `Bearer ${this.accessToken}` } }
+    );
+    return response.data;
+  }
+
   // B2C (Business to Customer) - Payouts
   async b2c(phone, amount, occasion, description) {
     await this.authenticate();

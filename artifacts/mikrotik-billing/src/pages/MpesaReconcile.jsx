@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import { Smartphone, Upload, CheckCircle, AlertTriangle, DollarSign, Hash, FileText, X, RefreshCw } from "lucide-react";
 import { useToast } from "../hooks/useToast";
+import MpesaLivePayments from "../components/MpesaLivePayments";
 
 const API = import.meta.env.VITE_API_URL || "/api";
 
@@ -302,6 +303,7 @@ function MatchedDetailTable({ matched }) {
 // ─── MAIN PAGE ───────────────────────────────────────────────────────
 
 export function MpesaReconcile() {
+  // eslint-disable-next-line no-unused-vars
   const toast = useToast();
   const fileInputRef = useRef(null);
 
@@ -401,10 +403,10 @@ export function MpesaReconcile() {
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
             <Smartphone className="w-7 h-7 text-emerald-400" />
-            M-Pesa Reconcile
+            M-Pesa
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Paste M-Pesa statements or upload CSV to auto-match payments to invoices
+            Real-time Daraja payments + manual statement reconciliation
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -415,6 +417,16 @@ export function MpesaReconcile() {
             Clear All
           </button>
         </div>
+      </div>
+
+      {/* Live Payments Feed + Daraja C2B Setup */}
+      <div className="mb-8">
+        <MpesaLivePayments />
+      </div>
+
+      <div className="border-t border-zinc-800 mb-6 pt-6">
+        <h3 className="text-lg font-semibold text-white mb-1">Manual Reconciliation</h3>
+        <p className="text-sm text-zinc-400">Paste M-Pesa statements or upload CSV to auto-match payments to invoices</p>
       </div>
 
       {/* Stats Bar */}

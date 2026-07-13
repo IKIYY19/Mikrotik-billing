@@ -598,6 +598,8 @@ const startServer = async () => {
     );
     app.use("/api/devices", authenticate, require("./routes/devices"));
     app.use("/api/provisioning-queue", authenticate, require("./routes/provisioningQueue"));
+    // Public C2B webhook endpoints — Safaricom sends no auth headers
+    app.use("/api/payments/mpesa/c2b", require("./routes/mpesaC2BPublic"));
     app.use(
       "/api/payments",
       authenticate,
