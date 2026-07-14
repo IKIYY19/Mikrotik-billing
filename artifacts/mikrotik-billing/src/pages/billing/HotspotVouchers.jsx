@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import {
   Ticket, Plus, Download, Printer, QrCode, RefreshCw, Copy, Check,
-  Settings, Trash2, Eye, FileText, Zap, Package, Clock
+  Settings, Trash2, Eye, FileText, Zap, Package, Clock, Wifi
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -79,14 +79,6 @@ function VoucherCard({ voucher, showQR = true }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function Wifi({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-    </svg>
   );
 }
 

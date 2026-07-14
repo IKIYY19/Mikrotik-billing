@@ -30,7 +30,11 @@ import { Button } from "../components/ui/button";
 const API = import.meta.env.VITE_API_URL || "/api";
 
 export default function RouterLink() {
-  const toast = useToastStore();
+  const addToast = useToastStore((state) => state.addToast);
+  const toast = {
+    success: (msg) => addToast("success", msg, "", 3000),
+    error:   (msg) => addToast("error",   msg, "", 4000),
+  };
   const [apiKey, setApiKey] = useState(
     () => localStorage.getItem("router_link_api_key") || ""
   );

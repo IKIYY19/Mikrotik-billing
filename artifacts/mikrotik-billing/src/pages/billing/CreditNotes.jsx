@@ -11,7 +11,11 @@ import { Label } from "../../components/ui/label";
 const API = import.meta.env.VITE_API_URL || "/api";
 
 export default function CreditNotes() {
-  const toast = useToastStore();
+  const addToast = useToastStore((state) => state.addToast);
+  const toast = {
+    success: (msg) => addToast("success", msg, "", 3000),
+    error:   (msg) => addToast("error",   msg, "", 4000),
+  };
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

@@ -44,7 +44,11 @@ const PRESET_COLORS = [
 ];
 
 export default function TenantSettingsPage() {
-  const toast = useToastStore();
+  const addToast = useToastStore((state) => state.addToast);
+  const toast = {
+    success: (msg) => addToast("success", msg, "", 3000),
+    error:   (msg) => addToast("error",   msg, "", 4000),
+  };
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
