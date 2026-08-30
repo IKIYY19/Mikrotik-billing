@@ -28,7 +28,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # The Vite config requires these values at build time. The API defaults to
-# /api, so the web client and server remain on the same Render service.
+# /api, so the web client and server remain on the same service.
 RUN PORT=4173 BASE_PATH=/ pnpm --filter @workspace/mikrotik-billing run build
 RUN mkdir -p client && rm -rf client/dist && cp -R artifacts/mikrotik-billing/dist/public client/dist
 

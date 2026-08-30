@@ -758,7 +758,7 @@ const startServer = async () => {
         });
       }
 
-      serverInstance = app.listen(PORT, async () => {
+      serverInstance = app.listen(PORT, "0.0.0.0", async () => {
         logger.info("============================================");
         logger.info(" MikroTik Billing Platform");
         logger.info(` Version: ${process.env.npm_package_version || "1.0.0"}`);
