@@ -73,6 +73,10 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - unrs-resolver
+  - '@sentry/profiling-node'
+  - aws-sdk
+  - cpu-features
+  - ssh2
 
 overrides:
   # replit uses linux-x64 only, we can exclude all other platforms
