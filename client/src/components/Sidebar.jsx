@@ -4,7 +4,7 @@ import axios from "axios";
 import { useBranding } from "../contexts/BrandingContext";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
-import { LayoutDashboard, Network, Link, HardDrive, FileCode, Server, ChevronDown, ChevronRight, DollarSign, Users, Package, CreditCard, Receipt, MessageSquare, MessageCircle, MapPin, Wallet, Star, Activity, UserCheck, Shield, FileText as FileText2, Database, Settings as SettingsIcon, TrendingUp, Wifi, Ticket, LifeBuoy, Palette, LogOut, Webhook, User, Key, Radio, Gauge, Router, GitMerge, Building2, Sun, Moon, Upload, X, Eye, EyeOff, Zap, ChartBar as BarChart2, Globe, TriangleAlert as AlertTriangle, Tag, Gift } from "lucide-react";
+import { LayoutDashboard, Network, Link, HardDrive, FileCode, Server, ChevronDown, ChevronRight, DollarSign, Users, Package, CreditCard, Receipt, MessageSquare, MessageCircle, MapPin, Wallet, Star, Activity, UserCheck, Shield, FileText as FileText2, Database, Settings as SettingsIcon, TrendingUp, Wifi, Ticket, LifeBuoy, Palette, LogOut, Webhook, User, Key, Radio, Gauge, Router, GitMerge, Building2, Sun, Moon, Upload, X, Eye, EyeOff, Zap, BarChart2, Globe, AlertTriangle, Tag, Gift } from "lucide-react";
 import { clearAuth } from "../lib/auth";
 import { SearchButton } from "./GlobalSearch";
 import { canAccessFeature, ROLES } from "../lib/permissions";

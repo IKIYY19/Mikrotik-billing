@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Tag, Plus, CreditCard as Edit3, Trash2, Ticket, Percent, DollarSign, Clock, CircleCheck as CheckCircle, Circle as XCircle, Copy } from 'lucide-react';
+import { Tag, Plus, Edit3, Trash2, Ticket, Percent, DollarSign, Clock, CheckCircle, XCircle, Copy } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
 const API = import.meta.env.VITE_API_URL || '/api';
