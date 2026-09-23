@@ -1,11 +1,17 @@
+databases:
+  - name: mikrotik-db
+    databaseName: mikrotik_config_builder
+    user: mikrotik_user
+    plan: free
+    ipAllowList: []
+
 services:
   - type: web
     name: mikrotik-billing
     runtime: docker
     repo: https://github.com/IKIYY19/Mikrotik-billing.git
     branch: master
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    dockerfilePath: ./Dockerfile.render
     plan: free
     healthCheckPath: /api/health
     envVars:
@@ -13,14 +19,30 @@ services:
         value: production
       - key: PORT
         value: 5000
-      # Use the existing Render PostgreSQL database. Render cannot provision
-      # another free database when one is already active on the account.
-      - key: DATABASE_URL
-        sync: false
+      - key: DB_HOST
+        fromDatabase:
+          name: mikrotik-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: mikrotik-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: mikrotik-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: mikrotik-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: mikrotik-db
+          property: password
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: ENCRYPTION_KEY
-        generateValue: true
+        sync: false
       - key: INITIAL_ADMIN_EMAIL
         sync: false
       - key: INITIAL_ADMIN_PASSWORD

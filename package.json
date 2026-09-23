@@ -1,16 +1,25 @@
 {
-  "name": "workspace",
-  "version": "0.0.0",
-  "license": "MIT",
+  "name": "mikrotik-config-builder",
+  "version": "1.0.0",
+  "description": "Full-stack web application for generating MikroTik RouterOS scripts",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "dev": "npm run install:deps && concurrently --kill-others-on-fail=false \"npm run dev:server\" \"npm run dev:client\"",
+    "install:deps": "cd server && npm install --prefer-offline --silent && cd ../client && npm install --prefer-offline --silent",
+    "dev:server": "node server/src/index.js",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd server && npm install --omit=dev && cd ../client && npm install && npm run build",
+    "build:client": "npm run build --prefix client",
+    "lint": "npm run lint --prefix server && npm run lint --prefix client",
+    "test": "npm run test --prefix server",
+    "check": "npm run test && npm run build:client",
+    "start": "node server/src/index.js",
+    "db:migrate": "node server/src/db/migrate.js",
+    "db:seed": "node server/src/db/seed.js"
   },
-  "private": true,
+  "keywords": ["mikrotik", "routeros", "network", "config", "generator"],
+  "license": "MIT",
   "devDependencies": {
-    "prettier": "^3.8.4",
-    "typescript": "~5.9.3"
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.2"
   }
 }
